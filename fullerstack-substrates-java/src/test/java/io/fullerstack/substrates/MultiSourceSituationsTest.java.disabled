@@ -1,0 +1,221 @@
+package io.kafkaobs.substrates;
+
+import io.humainary.modules.serventis.monitors.api.Monitors;
+import io.kafkaobs.shared.models.*;
+import io.kafkaobs.substrates.aggregators.health.ClusterHealthAggregator;
+import io.kafkaobs.substrates.aggregators.capacity.CapacityPlanner;
+import io.kafkaobs.substrates.aggregators.patterns.FailurePatternDetector;
+import io.kafkaobs.substrates.sink.Capture;
+import io.kafkaobs.substrates.sink.Sink;
+import io.kafkaobs.substrates.sink.SinkQuery;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.annotation.DirtiesContext.ClassMode;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
+/**
+ * Integration test for multiple aggregators emitting to kafka.situations concurrently.
+ *
+ * <p>Verifies ClusterHealthAggregator, FailurePatternDetector, and CapacityPlanner
+ * can all emit ReporterSignals to situations circuit without conflicts.
+ */
+@SpringBootTest
+@DirtiesContext(classMode = ClassMode.BEFORE_EACH_TEST_METHOD)
+class MultiSourceSituationsTest {
+
+    @Autowired
+    private CortexRuntime cortex;
+
+    @Autowired
+    private ClusterHealthAggregator clusterHealthAggregator;
+
+    @Autowired
+    private FailurePatternDetector failurePatternDetector;
+
+    @Autowired
+    private CapacityPlanner capacityPlanner;
+
+    @Test
+    void shouldHandleMultipleConcurrentSituations() {
+        // Given - Use unique broker IDs to avoid test pollution
+        String testId = "multi-" + System.currentTimeMillis();
+
+        // When - Trigger cluster degradation (ClusterHealthAggregator)
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-1", Monitors.Condition.STABLE);
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-2", Monitors.Condition.STABLE);
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-3", Monitors.Condition.STABLE);
+
+        // Small delay to let initial emissions settle
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-1", Monitors.Condition.DEGRADED); // 33% degraded
+
+        // Then - Situations captured in kafka.situations
+        await().atMost(30, SECONDS).untilAsserted(() -> {
+            List<Capture> situations = querySituations();
+
+            assertThat(situations)
+                .as("Should have at least one situation")
+                .isNotEmpty();
+
+            // Verify ClusterHealthAggregator source present
+            Set<String> sources = situations.stream()
+                .map(c -> c.metadata().get("source"))
+                .collect(Collectors.toSet());
+
+            assertThat(sources)
+                .as("Should have ClusterHealthAggregator situations")
+                .contains("ClusterHealthAggregator");
+
+            // Verify cluster-degradation pattern
+            Set<String> patterns = situations.stream()
+                .map(c -> c.metadata().get("pattern"))
+                .collect(Collectors.toSet());
+
+            assertThat(patterns)
+                .as("Should have cluster-degradation pattern")
+                .contains("cluster-degradation");
+        });
+    }
+
+    @Test
+    void shouldAllowFilteringByLevel() {
+        // Given - Use unique broker IDs to avoid test pollution
+        String testId = "filter-" + System.currentTimeMillis();
+
+        // Given - Multiple situations with different levels
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-1", Monitors.Condition.STABLE);
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-2", Monitors.Condition.STABLE);
+
+        // Small delay to let initial emissions settle
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+
+        // DEGRADED → WARNING
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-1", Monitors.Condition.DEGRADED);
+
+        // Small delay
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+
+        // DOWN → CRITICAL
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-1", Monitors.Condition.DOWN);
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-2", Monitors.Condition.DOWN);
+
+        // Then - Can filter by level
+        await().atMost(30, SECONDS).untilAsserted(() -> {
+            List<Capture> allSituations = querySituations();
+            assertThat(allSituations).isNotEmpty();
+
+            List<Capture> criticalOnly = allSituations.stream()
+                .filter(c -> "CRITICAL".equals(c.value()))
+                .toList();
+
+            List<Capture> warningOnly = allSituations.stream()
+                .filter(c -> "WARNING".equals(c.value()))
+                .toList();
+
+            assertThat(criticalOnly).isNotEmpty();
+            assertThat(criticalOnly).allSatisfy(c ->
+                assertThat(c.metadata().get("pattern")).isEqualTo("cluster-degradation")
+            );
+        });
+    }
+
+    @Test
+    void shouldAllowFilteringByPattern() {
+        // Given - Use unique broker IDs to avoid test pollution
+        String testId = "pattern-" + System.currentTimeMillis();
+
+        // Trigger cluster degradation
+        clusterHealthAggregator.updateBrokerStatus(testId + "-test-1", Monitors.Condition.STABLE);
+        clusterHealthAggregator.updateBrokerStatus(testId + "-test-2", Monitors.Condition.STABLE);
+        clusterHealthAggregator.updateBrokerStatus(testId + "-test-3", Monitors.Condition.STABLE);
+
+        // Small delay to let initial emissions settle
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+
+        clusterHealthAggregator.updateBrokerStatus(testId + "-test-1", Monitors.Condition.DEGRADED);
+
+        // Then - Can filter by pattern
+        await().atMost(30, SECONDS).untilAsserted(() -> {
+            List<Capture> situations = querySituations();
+
+            List<Capture> clusterDegradations = situations.stream()
+                .filter(c -> "cluster-degradation".equals(c.metadata().get("pattern")))
+                .toList();
+
+            assertThat(clusterDegradations)
+                .as("Should find cluster-degradation pattern")
+                .isNotEmpty();
+
+            assertThat(clusterDegradations).allSatisfy(c -> {
+                assertThat(c.metadata())
+                    .containsEntry("source", "ClusterHealthAggregator")
+                    .containsEntry("pattern", "cluster-degradation")
+                    .containsKey("affectedResources");
+            });
+        });
+    }
+
+    @Test
+    void shouldAllowFilteringBySource() {
+        // Given - Use unique broker IDs to avoid test pollution
+        String testId = "source-" + System.currentTimeMillis();
+
+        // Trigger cluster degradation
+        clusterHealthAggregator.updateBrokerStatus(testId + "-test-1", Monitors.Condition.STABLE);
+        clusterHealthAggregator.updateBrokerStatus(testId + "-test-2", Monitors.Condition.STABLE);
+        clusterHealthAggregator.updateBrokerStatus(testId + "-test-3", Monitors.Condition.STABLE);
+
+        // Small delay to let initial emissions settle
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+
+        clusterHealthAggregator.updateBrokerStatus(testId + "-test-1", Monitors.Condition.DEGRADED);
+
+        // Then - Can filter by source
+        await().atMost(30, SECONDS).untilAsserted(() -> {
+            List<Capture> situations = querySituations();
+
+            List<Capture> fromClusterHealth = situations.stream()
+                .filter(c -> "ClusterHealthAggregator".equals(c.metadata().get("source")))
+                .toList();
+
+            assertThat(fromClusterHealth)
+                .as("Should find ClusterHealthAggregator situations")
+                .isNotEmpty();
+
+            assertThat(fromClusterHealth).allSatisfy(c -> {
+                assertThat(c.subject()).isEqualTo("cluster.situation");
+                assertThat(c.metadata())
+                    .containsEntry("source", "ClusterHealthAggregator")
+                    .containsEntry("pattern", "cluster-degradation");
+            });
+        });
+    }
+
+    /**
+     * Query all ReporterSignals from kafka.situations circuit.
+     */
+    private List<Capture> querySituations() {
+        SinkQuery query = new SinkQuery(
+            Optional.of(Instant.now().minus(Duration.ofMinutes(5))),
+            Optional.of(Instant.now()),
+            Optional.of("*.situation"), // All situation channels
+            Optional.of("ReporterSignal")
+        );
+        return cortex.getSink().query(query);
+    }
+}

@@ -1,0 +1,82 @@
+package io.kafkaobs.substrates;
+
+import io.humainary.modules.serventis.monitors.api.Monitors;
+import io.kafkaobs.substrates.aggregators.health.ClusterHealthAggregator;
+import io.kafkaobs.substrates.sink.Capture;
+import io.kafkaobs.substrates.sink.SinkQuery;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Direct test of ClusterHealthAggregator situation emission.
+ */
+@SpringBootTest
+class ClusterHealthAggregatorSituationTest {
+
+    @Autowired
+    private CortexRuntime cortex;
+
+    @Autowired
+    private ClusterHealthAggregator clusterHealthAggregator;
+
+    @Test
+    void shouldEmitSituationWhenMajorityDown() {
+        // Given - Start with unique broker IDs for this test
+        String testId = "test-" + System.currentTimeMillis();
+
+        // When - Add 2 brokers, both go down (100% down > 50% threshold → CRITICAL)
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-1", Monitors.Condition.STABLE);
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-2", Monitors.Condition.STABLE);
+
+        // Small delay to let first emissions settle
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+
+        // Now take them both down
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-1", Monitors.Condition.DOWN);
+        clusterHealthAggregator.updateBrokerStatus(testId + "-broker-2", Monitors.Condition.DOWN);
+
+        // Small delay for emission
+        try { Thread.sleep(500); } catch (InterruptedException e) {}
+
+        // Then - Check sink for situation signals
+        SinkQuery query = new SinkQuery(
+            Optional.of(Instant.now().minus(Duration.ofMinutes(1))),
+            Optional.of(Instant.now()),
+            Optional.of("cluster.situation"),
+            Optional.empty()
+        );
+
+        List<Capture> situations = cortex.getSink().query(query);
+
+        System.out.println("=== SITUATIONS FOUND: " + situations.size() + " ===");
+        situations.forEach(s -> System.out.println("  " + s));
+
+        // Also check cluster.status to verify emissions are happening
+        SinkQuery statusQuery = new SinkQuery(
+            Optional.of(Instant.now().minus(Duration.ofMinutes(1))),
+            Optional.of(Instant.now()),
+            Optional.of("cluster.status"),
+            Optional.empty()
+        );
+
+        List<Capture> statuses = cortex.getSink().query(statusQuery);
+        System.out.println("=== CLUSTER STATUS SIGNALS: " + statuses.size() + " ===");
+        statuses.forEach(s -> System.out.println("  " + s));
+
+        assertThat(situations)
+            .as("Should have emitted at least one situation signal")
+            .isNotEmpty();
+
+        assertThat(situations)
+            .as("Should have CRITICAL situation")
+            .anyMatch(c -> "CRITICAL".equals(c.value()));
+    }
+}

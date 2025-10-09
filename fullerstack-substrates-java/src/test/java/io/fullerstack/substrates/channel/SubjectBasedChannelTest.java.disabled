@@ -1,0 +1,146 @@
+package io.kafkaobs.substrates.channel;
+
+import io.humainary.modules.serventis.monitors.api.Monitors;
+import io.kafkaobs.shared.models.MonitorSignal;
+import io.kafkaobs.shared.models.VectorClock;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * Unit tests for SubjectBasedChannel.
+ */
+class SubjectBasedChannelTest {
+
+    @Test
+    void shouldCreateChannelWithValidSubject() {
+        // Given
+        String subject = "broker-001.jvm.heap";
+
+        // When
+        var channel = new SubjectBasedChannel(subject);
+
+        // Then
+        assertThat(channel.getSubject()).isEqualTo(subject);
+        assertThat(channel.getName()).isEqualTo(subject);
+    }
+
+    @Test
+    void shouldRejectNullSubject() {
+        // When/Then
+        assertThatThrownBy(() -> new SubjectBasedChannel(null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("subject cannot be null");
+    }
+
+    @Test
+    void shouldRejectBlankSubject() {
+        // When/Then
+        assertThatThrownBy(() -> new SubjectBasedChannel("   "))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("subject cannot be null or blank");
+    }
+
+    @Test
+    void shouldEmitSignalToChannel() {
+        // Given
+        var channel = new SubjectBasedChannel("broker-001.status");
+        var signal = MonitorSignal.stable(
+            "kafka.broker.health",
+            "broker-001.status",
+            Map.of("heap_usage", "65.0")
+        );
+
+        // When
+        channel.emit(signal);
+
+        // Then
+        assertThat(channel.getBufferSize()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldHandleMultipleSignalEmissions() {
+        // Given
+        var channel = new SubjectBasedChannel("broker-001.jvm.heap");
+        var signal1 = createTestSignal(Monitors.Condition.STABLE);
+        var signal2 = createTestSignal(Monitors.Condition.DEGRADED);
+        var signal3 = createTestSignal(Monitors.Condition.DOWN);
+
+        // When
+        channel.emit(signal1);
+        channel.emit(signal2);
+        channel.emit(signal3);
+
+        // Then
+        assertThat(channel.getBufferSize()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldIgnoreNullSignal() {
+        // Given
+        var channel = new SubjectBasedChannel("broker-001.status");
+
+        // When
+        channel.emit(null);
+
+        // Then
+        assertThat(channel.getBufferSize()).isEqualTo(0);
+    }
+
+    @Test
+    void shouldBeThreadSafe() throws InterruptedException {
+        // Given
+        var channel = new SubjectBasedChannel("broker-001.jvm.gc");
+        int threadCount = 10;
+        int signalsPerThread = 100;
+
+        // When
+        Thread[] threads = new Thread[threadCount];
+        for (int i = 0; i < threadCount; i++) {
+            threads[i] = new Thread(() -> {
+                for (int j = 0; j < signalsPerThread; j++) {
+                    channel.emit(createTestSignal(Monitors.Condition.STABLE));
+                }
+            });
+            threads[i].start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        // Then
+        assertThat(channel.getBufferSize()).isEqualTo(threadCount * signalsPerThread);
+    }
+
+    @Test
+    void shouldDrainBuffer() {
+        // Given
+        var channel = new SubjectBasedChannel("broker-001.status");
+        channel.emit(createTestSignal(Monitors.Condition.STABLE));
+        channel.emit(createTestSignal(Monitors.Condition.STABLE));
+        channel.emit(createTestSignal(Monitors.Condition.STABLE));
+
+        // When
+        int drained = channel.drainBuffer();
+
+        // Then
+        assertThat(drained).isEqualTo(3);
+        assertThat(channel.getBufferSize()).isEqualTo(0);
+    }
+
+    private MonitorSignal createTestSignal(Monitors.Condition condition) {
+        return MonitorSignal.create(
+            "kafka.broker.health",
+            "broker-001.status",
+            condition,
+            Monitors.Confidence.CONFIRMED,
+            Map.of("test", "data")
+        );
+    }
+}

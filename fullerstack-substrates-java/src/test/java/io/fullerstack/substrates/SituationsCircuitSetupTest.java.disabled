@@ -1,0 +1,52 @@
+package io.kafkaobs.substrates;
+
+import io.kafkaobs.substrates.circuit.Circuit;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Simple test to verify kafka.situations circuit is properly configured.
+ */
+@SpringBootTest
+class SituationsCircuitSetupTest {
+
+    @Autowired
+    private CortexRuntime cortex;
+
+    @Test
+    void shouldHaveSituationsCircuit() {
+        List<Circuit> circuits = cortex.getCircuits();
+
+        assertThat(circuits).isNotEmpty();
+        assertThat(circuits).anyMatch(c -> "kafka.situations".equals(c.getName()));
+    }
+
+    @Test
+    void shouldHaveReportersConduitInSituationsCircuit() {
+        var situationsCircuit = cortex.getCircuits().stream()
+            .filter(circuit -> "kafka.situations".equals(circuit.getName()))
+            .findFirst();
+
+        assertThat(situationsCircuit).isPresent();
+        assertThat(situationsCircuit.get().getConduits())
+            .anyMatch(conduit -> "reporters".equals(conduit.getName()));
+    }
+
+    @Test
+    void shouldHaveClusterSituationChannel() {
+        var channel = cortex.getCircuits().stream()
+            .filter(circuit -> "kafka.situations".equals(circuit.getName()))
+            .flatMap(circuit -> circuit.getConduits().stream())
+            .filter(conduit -> "reporters".equals(conduit.getName()))
+            .flatMap(conduit -> conduit.getChannels().stream())
+            .filter(ch -> "cluster.situation".equals(ch.getSubject()))
+            .findFirst();
+
+        assertThat(channel).isPresent();
+    }
+}
