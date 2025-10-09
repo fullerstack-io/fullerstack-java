@@ -11,18 +11,20 @@ import java.util.Objects;
 /**
  * Implementation of Substrates.Container combining Pool and Component.
  *
- * <p>Provides unified access to pooled resources and event sourcing through
- * composition of Pool and Source implementations.
- *
- * <p>Features:
+ * <p>Container is typically created by wrapping a Conduit, which provides:
  * <ul>
- *   <li>Pool interface delegation for resource lookup via get()</li>
- *   <li>Component interface for source() access</li>
- *   <li>Proper Subject with CONTAINER type</li>
+ *   <li>Pool behavior - Conduit.get(Name) returns percepts composed from Channels</li>
+ *   <li>Source behavior - Conduit.source() emits events from those percepts</li>
  * </ul>
  *
- * @param <P> pool type
- * @param <E> event emission type
+ * <p>The Container API exposes Container<Pool<P>, Source<E>>, meaning:
+ * <ul>
+ *   <li>get(Name) returns the Pool (usually the Conduit itself)</li>
+ *   <li>source() returns Source<Source<E>> for nested subscription pattern</li>
+ * </ul>
+ *
+ * @param <P> percept type (what the Pool contains)
+ * @param <E> event emission type (what the Source emits)
  * @see Container
  */
 public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
@@ -34,7 +36,13 @@ public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
     /**
      * Creates a container with the specified pool and source.
      *
-     * @param pool the pool implementation
+     * <p>Typically called with a Conduit:
+     * <pre>
+     * Conduit<P, E> conduit = circuit.conduit(name, composer);
+     * Container<Pool<P>, Source<E>> container = new ContainerImpl<>(conduit, conduit.source());
+     * </pre>
+     *
+     * @param pool the pool implementation (usually a Conduit)
      * @param source the source implementation for events
      */
     public ContainerImpl(Pool<P> pool, Source<E> source) {
@@ -43,8 +51,11 @@ public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
         this.name = source.subject().name();
 
         // Container<Pool<P>, Source<E>> means source() returns Source<Source<E>>
-        // Create a wrapper that emits the event source itself
+        // This enables the nested subscription pattern from William Louth's examples:
+        // container.source().subscribe(subject -> source -> source.subscribe(...))
         this.containerSource = new SourceImpl<>(name);
+        // Emit the eventSource so subscribers can get it
+        this.containerSource.emit(eventSource);
     }
 
     @Override

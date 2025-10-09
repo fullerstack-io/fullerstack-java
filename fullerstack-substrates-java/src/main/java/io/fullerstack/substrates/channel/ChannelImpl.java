@@ -1,7 +1,10 @@
 package io.fullerstack.substrates.channel;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pipe.PipeImpl;
+import io.fullerstack.substrates.state.StateImpl;
+import io.fullerstack.substrates.subject.SubjectImpl;
 
 import java.util.concurrent.BlockingQueue;
 
@@ -14,24 +17,22 @@ import java.util.concurrent.BlockingQueue;
  */
 public class ChannelImpl<E> implements Channel<E> {
 
-    private final Name channelName;
+    private final Subject channelSubject;
     private final BlockingQueue<E> queue;
 
-    public ChannelImpl(Name subject, BlockingQueue<E> queue) {
-        this.channelName = subject;
+    public ChannelImpl(Name channelName, BlockingQueue<E> queue) {
+        this.channelSubject = new SubjectImpl(
+            IdImpl.generate(),
+            channelName,
+            StateImpl.empty(),
+            Subject.Type.CHANNEL
+        );
         this.queue = queue;
     }
 
     @Override
     public Subject subject() {
-        // TODO Story 4.3: Create proper Subject implementation
-        return new Subject() {
-            @Override public Id id() { return new Id() {}; }  // Empty marker interface
-            @Override public Name name() { return channelName; }
-            @Override public State state() { return null; }  // TODO Story 4.3: Implement state management
-            @Override public Type type() { return Type.CHANNEL; }
-            @Override public CharSequence part() { return channelName.part(); }
-        };
+        return channelSubject;
     }
 
     @Override
@@ -48,13 +49,14 @@ public class ChannelImpl<E> implements Channel<E> {
 
     /**
      * Emit directly to the queue (used by Pipe).
+     * The queue is shared with the Conduit, which will process and forward to its Source.
      */
     public void emit(E emission) {
         try {
             queue.put(emission);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Failed to emit to channel: " + channelName, e);
+            throw new RuntimeException("Failed to emit to channel: " + channelSubject.name(), e);
         }
     }
 }

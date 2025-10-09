@@ -94,63 +94,6 @@ class CircuitImplTest {
         assertThat((Object) result).isSameAs(circuit);
     }
 
-    @Test
-    void shouldThrowForConduitStub() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
-
-        assertThatThrownBy(() -> circuit.conduit(composer -> null))
-            .isInstanceOf(UnsupportedOperationException.class)
-            .hasMessageContaining("Story 4.12");
-    }
-
-    @Test
-    void shouldThrowForNamedConduitStub() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
-
-        assertThatThrownBy(() -> circuit.conduit(NameImpl.of("test"), composer -> null))
-            .isInstanceOf(UnsupportedOperationException.class)
-            .hasMessageContaining("Story 4.12");
-    }
-
-    @Test
-    void shouldThrowForConduitWithSequencerStub() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
-
-        assertThatThrownBy(() -> circuit.<String, String>conduit(
-            NameImpl.of("test"),
-            (Composer<String, String>) composer -> "value",
-            (Sequencer<Segment<String>>) sequencer -> {}
-        ))
-            .isInstanceOf(UnsupportedOperationException.class)
-            .hasMessageContaining("Story 4.12");
-    }
-
-    @Test
-    void shouldThrowForContainerWithComposerStub() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
-
-        // Container creation works, but using the pool will throw
-        assertThatThrownBy(() -> {
-            Container<Pool<String>, Source<String>> container = circuit.container(composer -> "value");
-            Pool<String> pool = container.get(NameImpl.of("test")); // Get pool
-            pool.get(NameImpl.of("item")); // This triggers the composer
-        })
-            .isInstanceOf(UnsupportedOperationException.class)
-            .hasMessageContaining("Story 4.16");
-    }
-
-    @Test
-    void shouldThrowForContainerWithSequencerStub() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
-
-        assertThatThrownBy(() -> circuit.<String, String>container(
-            NameImpl.of("test"),
-            (Composer<String, String>) composer -> "value",
-            (Sequencer<Segment<String>>) sequencer -> {}
-        ))
-            .isInstanceOf(UnsupportedOperationException.class)
-            .hasMessageContaining("Story 4.16");
-    }
 
     @Test
     void shouldRequireNonNullName() {

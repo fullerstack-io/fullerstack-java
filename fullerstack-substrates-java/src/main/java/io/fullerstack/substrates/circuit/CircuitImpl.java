@@ -96,10 +96,12 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(name, "Conduit name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");
 
-        // Stub for Story 4.12
-        throw new UnsupportedOperationException(
-            "Conduit implementation pending - see Story 4.12 (Conduit + Composer)"
+        @SuppressWarnings("unchecked")
+        Conduit<P, E> conduit = (Conduit<P, E>) conduits.computeIfAbsent(
+            name,
+            n -> new io.fullerstack.substrates.conduit.ConduitImpl<>(this.name, n, composer)
         );
+        return conduit;
     }
 
     @Override
@@ -109,10 +111,9 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(composer, "Composer cannot be null");
         Objects.requireNonNull(sequencer, "Sequencer cannot be null");
 
-        // Stub for Story 4.12
-        throw new UnsupportedOperationException(
-            "Conduit implementation pending - see Story 4.12 (Conduit + Composer)"
-        );
+        // TODO: Implement sequencer support
+        // For now, just create conduit without sequencer
+        return conduit(name, composer);
     }
 
     @Override
@@ -126,19 +127,11 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(name, "Container name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");
 
-        // Create Pool using composer
-        Pool<P> pool = new PoolImpl<>(poolName -> {
-            // Use composer to create pool items - stub for now
-            // Story 4.16 will implement Composer properly
-            throw new UnsupportedOperationException(
-                "Composer implementation pending - see Story 4.16 (Sequencer + Composer)"
-            );
-        });
+        // Create a Conduit that will use the Composer to create percepts
+        Conduit<P, E> conduit = conduit(name, composer);
 
-        // Create Source for container events
-        Source<E> source = new SourceImpl<>(name);
-
-        return new ContainerImpl<>(pool, source);
+        // Container wraps the Conduit, exposing it as Pool + Source
+        return new ContainerImpl<>(conduit, conduit.source());
     }
 
     @Override
@@ -148,10 +141,10 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(composer, "Composer cannot be null");
         Objects.requireNonNull(sequencer, "Sequencer cannot be null");
 
-        // Stub - sequencer support in Story 4.16
-        throw new UnsupportedOperationException(
-            "Sequencer implementation pending - see Story 4.16 (Sequencer + Composer)"
-        );
+        // Create conduit with sequencer
+        Conduit<P, E> conduit = conduit(name, composer, sequencer);
+
+        return new ContainerImpl<>(conduit, conduit.source());
     }
 
     @Override

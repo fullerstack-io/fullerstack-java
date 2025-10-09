@@ -2,6 +2,10 @@ package io.fullerstack.substrates.conduit;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.channel.ChannelImpl;
+import io.fullerstack.substrates.id.IdImpl;
+import io.fullerstack.substrates.source.SourceImpl;
+import io.fullerstack.substrates.state.StateImpl;
+import io.fullerstack.substrates.subject.SubjectImpl;
 
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -14,22 +18,34 @@ import java.util.concurrent.LinkedBlockingQueue;
  * <p>Manages percepts created from channels via a Composer. Each percept corresponds to a subject
  * and shares a common queue for signal processing.
  *
+ * <p>Key behaviors:
+ * <ul>
+ *   <li>Composes Channels into percepts on-demand via get(Name)</li>
+ *   <li>Emits events through Source when Channels emit</li>
+ *   <li>Subscribers can observe all emissions via source().subscribe()</li>
+ * </ul>
+ *
  * @param <P> the percept type (e.g., Pipe<E>)
  * @param <E> the emission type (e.g., MonitorSignal)
  */
 public class ConduitImpl<P, E> implements Conduit<P, E> {
 
-    private final Name circuitName;
-    private final Name conduitName;
+    private final Subject conduitSubject;
     private final Composer<? extends P, E> composer;
     private final Map<Name, P> percepts = new ConcurrentHashMap<>();
+    private final SourceImpl<E> eventSource;
     private final BlockingQueue<E> queue = new LinkedBlockingQueue<>(10000);
     private final Thread queueProcessor;
 
     public ConduitImpl(Name circuitName, Name conduitName, Composer<? extends P, E> composer) {
-        this.circuitName = circuitName;
-        this.conduitName = conduitName;
+        this.conduitSubject = new SubjectImpl(
+            IdImpl.generate(),
+            conduitName,
+            StateImpl.empty(),
+            Subject.Type.CONDUIT
+        );
         this.composer = composer;
+        this.eventSource = new SourceImpl<>(conduitName);
 
         // Start queue processor
         this.queueProcessor = startQueueProcessor();
@@ -37,20 +53,12 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
 
     @Override
     public Subject subject() {
-        // TODO Story 4.3: Create proper Subject implementation
-        return new Subject() {
-            @Override public Id id() { return new Id() {}; }  // Empty marker interface
-            @Override public Name name() { return conduitName; }
-            @Override public State state() { return null; }  // TODO Story 4.3: Implement state management
-            @Override public Type type() { return Type.CONDUIT; }
-            @Override public CharSequence part() { return conduitName.part(); }
-        };
+        return conduitSubject;
     }
 
     @Override
     public Source<E> source() {
-        // TODO Story 4.3: Implement source for pull-based consumption
-        throw new UnsupportedOperationException("Source pattern not yet implemented");
+        return eventSource;
     }
 
     @Override
@@ -72,19 +80,19 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
                     break;
                 } catch (Exception e) {
                     // Log error but continue processing (using System.err as this is pure runtime)
-                    System.err.println("Error processing emission in conduit " + conduitName + ": " + e.getMessage());
+                    System.err.println("Error processing emission in conduit " + conduitSubject.name() + ": " + e.getMessage());
                 }
             }
         });
         processor.setDaemon(true);
-        processor.setName("conduit-" + conduitName);
+        processor.setName("conduit-" + conduitSubject.name());
         processor.start();
         return processor;
     }
 
     private void processEmission(E emission) {
-        // TODO Story 4.12: Wire to actual sink
-        // For now, just process the emission through the queue
+        // Emit through Source so subscribers can observe
+        eventSource.emit(emission);
     }
 
     /**
