@@ -1,4 +1,4 @@
-package io.fullerstack.serventis;
+package io.fullerstack.signetics;
 
 import io.humainary.modules.serventis.reporters.api.Reporters;
 

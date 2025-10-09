@@ -1,4 +1,4 @@
-package io.fullerstack.serventis;
+package io.fullerstack.signetics;
 
 import java.time.Instant;
 import java.util.Map;
