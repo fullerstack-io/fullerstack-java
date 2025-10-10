@@ -23,18 +23,18 @@ Substrates implements an event-driven architecture for observability, based on W
 │  (Central Processing Engine - Precise Ordering Guarantees)      │
 │                                                                 │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │                    Conduit                                  │ │
-│  │                                                             │ │
+│  │                    Conduit                                 │ │
+│  │                                                            │ │
 │  │  Channel 1 ──┐                        ┌── Subscriber 1     │ │
 │  │  Channel 2 ──┤→ Queue → Processor → Source ── Subscriber 2 │ │
 │  │  Channel 3 ──┘                        └── Subscriber 3     │ │
-│  │                                                             │ │
+│  │                                                            │ │
 │  │  (Percepts created via Composer)                           │ │
 │  └────────────────────────────────────────────────────────────┘ │
 │                                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                     │
-│  │  Clock   │  │  Clock   │  │ Container│                     │
-│  └──────────┘  └──────────┘  └──────────┘                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                       │
+│  │  Clock   │  │  Clock   │  │ Container│                       │
+│  └──────────┘  └──────────┘  └──────────┘                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
