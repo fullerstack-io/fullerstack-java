@@ -61,9 +61,9 @@ System.out.println(subject.type());  // CHANNEL
 System.out.println(subject.id());    // Unique UUID
 ```
 
-### Id, @Identity, and @Idempotent
+### Id and @Identity
 
-Substrates defines **three distinct identity concepts**:
+Substrates defines **two related identity concepts**:
 
 #### 1. `Id` Interface - Unique Instance Identity
 
@@ -110,36 +110,6 @@ interface Name extends Extent<Name> {
 ```
 
 **Meaning:** When you have a `Name` or `Id`, comparing `name1 == name2` is meaningful because they're meant to be unique references.
-
-#### 3. `@Idempotent` Annotation - Safe Repeated Execution
-
-**What:** Method-level annotation indicating a method can be called multiple times with the same effect.
-
-**Applied to:** Methods like `Resource.close()`
-
-**Purpose:** Documents that repeating the operation is safe.
-
-**Example:**
-```java
-interface Resource {
-    @Idempotent
-    default void close() {
-        // Can call multiple times safely
-    }
-}
-
-// Usage:
-circuit.close();
-circuit.close();  // Safe - idempotent
-```
-
-### Identity Architecture Summary
-
-| Concept | Type | Applied To | Semantic Meaning |
-|---------|------|------------|------------------|
-| **`Id`** | Interface | Values (UUID, etc.) | "This is a unique identifier value" |
-| **`@Identity`** | Annotation | Types (`Id`, `Name`, `Subject`) | "Instances compared by reference (==)" |
-| **`@Idempotent`** | Annotation | Methods | "Safe to call multiple times" |
 
 **Key Insight:** Every component has **two identities**:
 1. **`Id`** - Unique instance identity (UUID)
@@ -410,22 +380,47 @@ source.subscribe(
 ### Example: Filter and Limit
 
 ```java
+// Transformation configured at CONDUIT level
 Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-    cortex.name("numbers"),
-    Composer.pipe(segment -> segment
+    cortex.name("numbers"),            // ← Conduit name
+    Composer.pipe(segment -> segment   // ← Transformation applies to ALL channels
         .guard(n -> n > 0)      // Only positive
         .guard(n -> n % 2 == 0) // Only even
         .limit(50)              // Max 50 emissions
     )
 );
 
-Pipe<Integer> pipe = conduit.get(cortex.name("counter"));
+// Get a Channel (Pipe) from the Conduit
+Pipe<Integer> pipe = conduit.get(cortex.name("counter"));  // ← Channel name
 
 // Emit 200 numbers
 for (int i = -100; i < 100; i++) {
     pipe.emit(i);
 }
 // Only 50 positive even numbers will be emitted (2, 4, 6, ..., 100)
+```
+
+**Key Insight:** The transformation pipeline is configured once at the **Conduit level**. All Channels created from `conduit.get()` share the same transformation, regardless of their individual names.
+
+**Example showing shared transformations:**
+```java
+// Same conduit with transformation
+Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    cortex.name("numbers"),
+    Composer.pipe(segment -> segment.guard(n -> n > 0))  // Only positive
+);
+
+// Two different channels from the SAME conduit
+Pipe<Integer> channel1 = conduit.get(cortex.name("producer1"));
+Pipe<Integer> channel2 = conduit.get(cortex.name("producer2"));
+
+channel1.emit(-5);  // ❌ Filtered out (negative)
+channel1.emit(10);  // ✅ Passes through (positive)
+
+channel2.emit(-3);  // ❌ Filtered out (negative)
+channel2.emit(7);   // ✅ Passes through (positive)
+
+// BOTH channels apply the same guard(n -> n > 0) transformation
 ```
 
 ### Example: Sampling
@@ -496,6 +491,7 @@ All major components implement `Resource`:
 
 ```java
 interface Resource {
+    @Idempotent
     void close();  // Cleanup and release resources
 }
 ```
@@ -504,6 +500,18 @@ interface Resource {
 - **Component** (Circuit, Clock, Container)
 - **Subscription**
 - **Sink**
+
+**@Idempotent Annotation:**
+
+The `@Idempotent` annotation on `close()` indicates it's safe to call multiple times with the same effect:
+
+```java
+Circuit circuit = cortex.circuit();
+circuit.close();
+circuit.close();  // ✅ Safe - idempotent (no-op on second call)
+```
+
+This is a method-level annotation (unrelated to `Id` or `@Identity`) that documents safe repeated execution.
 
 ### Manual Lifecycle
 
