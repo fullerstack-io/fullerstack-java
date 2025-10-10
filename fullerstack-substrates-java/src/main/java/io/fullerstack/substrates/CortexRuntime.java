@@ -56,9 +56,7 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public Circuit circuit() {
-        // Generate unique name for default circuit to avoid collisions
-        Id id = IdImpl.generate();
-        return circuit(NameImpl.of("circuit").name(id.toString()));
+        return circuit(NameImpl.of("default"));
     }
 
     @Override
@@ -285,7 +283,6 @@ public class CortexRuntime implements Cortex {
      */
     private static class SinkStub<E> implements Sink<E> {
         private final Source<E> source;
-        private final Id sinkId = IdImpl.generate();
 
         SinkStub(Source<E> source) {
             this.source = source;
@@ -293,7 +290,7 @@ public class CortexRuntime implements Cortex {
 
         @Override
         public Subject subject() {
-            return new SubjectImpl(sinkId, NameImpl.of("sink").name(sinkId.toString()), StateImpl.empty(), Subject.Type.SINK);
+            return new SubjectImpl(IdImpl.generate(), NameImpl.of("sink"), StateImpl.empty(), Subject.Type.SINK);
         }
 
         @Override
@@ -311,11 +308,9 @@ public class CortexRuntime implements Cortex {
      * Stub Subscription implementation.
      */
     private static class SubscriptionStub implements Subscription {
-        private final Id subscriptionId = IdImpl.generate();
-
         @Override
         public Subject subject() {
-            return new SubjectImpl(subscriptionId, NameImpl.of("subscription").name(subscriptionId.toString()), StateImpl.empty(), Subject.Type.SUBSCRIPTION);
+            return new SubjectImpl(IdImpl.generate(), NameImpl.of("subscription"), StateImpl.empty(), Subject.Type.SUBSCRIPTION);
         }
 
         @Override

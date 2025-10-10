@@ -58,24 +58,10 @@ public class ClockImpl implements Clock {
     }
 
     /**
-     * Creates a clock with generated ID and unique name.
+     * Creates a clock with default name.
      */
     public ClockImpl() {
-        Id id = IdImpl.generate();
-        Name name = NameImpl.of("clock").name(id.toString());
-        this.clockSubject = new SubjectImpl(
-            id,
-            name,
-            StateImpl.empty(),
-            Subject.Type.CLOCK
-        );
-        this.source = new SourceImpl<>(name);
-        this.scheduler = Executors.newScheduledThreadPool(1, r -> {
-            Thread thread = new Thread(r);
-            thread.setDaemon(true);
-            thread.setName("clock-" + name.part());
-            return thread;
-        });
+        this(NameImpl.of("clock"));
     }
 
     @Override
@@ -114,13 +100,12 @@ public class ClockImpl implements Clock {
         // Return subscription that cancels the scheduled task
         return new Subscription() {
             private volatile boolean subscriptionClosed = false;
-            private final Id subscriptionId = IdImpl.generate();
 
             @Override
             public Subject subject() {
                 return new SubjectImpl(
-                    subscriptionId,
-                    name.name(subscriptionId.toString()),
+                    IdImpl.generate(),
+                    name,
                     StateImpl.empty(),
                     Subject.Type.SUBSCRIPTION
                 );

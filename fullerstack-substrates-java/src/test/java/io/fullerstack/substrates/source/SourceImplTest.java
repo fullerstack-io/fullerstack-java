@@ -46,10 +46,7 @@ class SourceImplTest {
 
         assertThat((Object) source).isNotNull();
         assertThat((Object) source.subject()).isNotNull();
-        // Name should be hierarchical: "source.<uuid>" for uniqueness
-        String namePath = source.subject().name().toString();
-        assertThat(namePath).startsWith("source.");
-        assertThat(namePath).matches("source\\.[a-f0-9\\-]{36}");
+        assertThat(source.subject().name().part()).isEqualTo("source");
     }
 
     @Test
