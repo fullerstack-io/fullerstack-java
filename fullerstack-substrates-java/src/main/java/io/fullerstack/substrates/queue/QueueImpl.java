@@ -71,16 +71,19 @@ public class QueueImpl implements Queue {
      * Background processor that executes scripts from the queue.
      */
     private void processQueue() {
-        // Create a Current instance for script execution
+        // Create a Current instance for script execution with stable Subject
+        Id currentId = IdImpl.generate();
         Current current = new Current() {
+            private final Subject currentSubject = new SubjectImpl(
+                currentId,
+                NameImpl.of("queue-current").name(currentId.toString()),
+                StateImpl.empty(),
+                Subject.Type.SCRIPT
+            );
+
             @Override
             public Subject subject() {
-                return new SubjectImpl(
-                    IdImpl.generate(),
-                    NameImpl.of("queue-current"),
-                    StateImpl.empty(),
-                    Subject.Type.SCRIPT
-                );
+                return currentSubject;
             }
 
             @Override

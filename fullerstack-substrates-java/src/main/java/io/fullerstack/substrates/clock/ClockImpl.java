@@ -98,17 +98,20 @@ public class ClockImpl implements Clock {
         );
 
         // Return subscription that cancels the scheduled task
+        // Each subscription has unique ID and stable Subject
         return new Subscription() {
             private volatile boolean subscriptionClosed = false;
+            private final Id subscriptionId = IdImpl.generate();
+            private final Subject subscriptionSubject = new SubjectImpl(
+                subscriptionId,
+                name.name(subscriptionId.toString()),
+                StateImpl.empty(),
+                Subject.Type.SUBSCRIPTION
+            );
 
             @Override
             public Subject subject() {
-                return new SubjectImpl(
-                    IdImpl.generate(),
-                    name,
-                    StateImpl.empty(),
-                    Subject.Type.SUBSCRIPTION
-                );
+                return subscriptionSubject;
             }
 
             @Override

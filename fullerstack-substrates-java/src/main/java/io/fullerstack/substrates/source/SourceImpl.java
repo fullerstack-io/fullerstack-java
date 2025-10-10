@@ -73,17 +73,20 @@ public class SourceImpl<E> implements Source<E>, Pipe<E> {
         subscribers.add(subscriber);
 
         // Return subscription that removes subscriber on close()
+        // Each subscription has unique ID and stable Subject
         return new Subscription() {
             private volatile boolean closed = false;
+            private final Id subscriptionId = IdImpl.generate();
+            private final Subject subscriptionSubject = new SubjectImpl(
+                subscriptionId,
+                NameImpl.of("subscription").name(subscriptionId.toString()),
+                StateImpl.empty(),
+                Subject.Type.SUBSCRIPTION
+            );
 
             @Override
             public Subject subject() {
-                return new SubjectImpl(
-                    IdImpl.generate(),
-                    NameImpl.of("subscription"),
-                    StateImpl.empty(),
-                    Subject.Type.SUBSCRIPTION
-                );
+                return subscriptionSubject;
             }
 
             @Override
