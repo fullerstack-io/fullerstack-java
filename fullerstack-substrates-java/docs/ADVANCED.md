@@ -262,11 +262,28 @@ System.out.println(root.value());  // "a"
 
 ## Composer Transformations
 
-Composers can be transformed using functional operations.
+Composers transform Channels into Percepts. A **Composer wraps around a Channel**, not around a Pipe. The Composer's `compose(Channel)` method takes a Channel and returns a Percept (which might be a Pipe, the Channel itself, or a custom type).
+
+### How Composer Works
+
+```java
+// Composer interface
+interface Composer<P, E> {
+    P compose(Channel<E> channel);  // Takes Channel, returns Percept
+}
+
+// Composer.pipe() returns channel's pipe
+Composer<Pipe<String>, String> pipeComposer = Composer.pipe();
+// Equivalent to: channel -> channel.pipe()
+
+// Composer.channel() returns the channel itself
+Composer<Channel<String>, String> channelComposer = Composer.channel();
+// Equivalent to: channel -> channel
+```
 
 ### Composer.map() - Transform Results
 
-Apply a function to the result of a composer:
+Apply a function to transform the percept returned by a composer:
 
 ```java
 // Base composer returns Pipe
