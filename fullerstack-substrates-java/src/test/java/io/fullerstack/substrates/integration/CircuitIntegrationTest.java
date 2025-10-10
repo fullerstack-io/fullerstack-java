@@ -3,7 +3,7 @@ package io.fullerstack.substrates.integration;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.CortexRuntime;
 import io.fullerstack.substrates.circuit.CircuitImpl;
-import io.fullerstack.substrates.util.NameImpl;
+import io.fullerstack.substrates.name.NameImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 

@@ -8,7 +8,7 @@ import io.fullerstack.substrates.scope.ScopeImpl;
 import io.fullerstack.substrates.slot.SlotImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.util.NameImpl;
+import io.fullerstack.substrates.name.NameImpl;
 
 import java.lang.reflect.Member;
 import java.util.Iterator;

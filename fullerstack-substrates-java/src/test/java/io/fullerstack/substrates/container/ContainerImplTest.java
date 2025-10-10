@@ -6,7 +6,7 @@ import io.fullerstack.substrates.pool.PoolImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.util.NameImpl;
+import io.fullerstack.substrates.name.NameImpl;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;

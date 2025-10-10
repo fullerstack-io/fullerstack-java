@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.util.NameImpl;
+import io.fullerstack.substrates.name.NameImpl;
 
 import java.util.List;
 import java.util.Objects;

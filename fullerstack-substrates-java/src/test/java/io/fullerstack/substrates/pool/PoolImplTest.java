@@ -2,7 +2,7 @@ package io.fullerstack.substrates.pool;
 
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pool;
-import io.fullerstack.substrates.util.NameImpl;
+import io.fullerstack.substrates.name.NameImpl;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;

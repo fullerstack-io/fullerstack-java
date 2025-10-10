@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.segment;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.util.NameImpl;
+import io.fullerstack.substrates.name.NameImpl;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

@@ -1,4 +1,4 @@
-package io.fullerstack.substrates.util;
+package io.fullerstack.substrates.name;
 
 import io.humainary.substrates.api.Substrates.Name;
 
