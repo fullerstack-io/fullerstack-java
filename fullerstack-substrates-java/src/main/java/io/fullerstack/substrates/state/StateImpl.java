@@ -122,8 +122,12 @@ public class StateImpl implements State {
 
     @Override
     public <T> T value(Slot<T> slot) {
-        // Return value from LAST occurrence of this name
-        T result = null;
+        // API: "Returns the value of a slot matching the specified slot
+        //      or the value of the specified slot when not found"
+        // Start with fallback value from query slot
+        T result = slot.value();
+
+        // Search for matching name and override with LAST occurrence
         for (Slot<?> s : slots) {
             if (s.name().equals(slot.name())) {
                 @SuppressWarnings("unchecked")
@@ -131,6 +135,8 @@ public class StateImpl implements State {
                 result = value;  // Keep updating with later occurrences
             }
         }
+
+        // Returns slot.value() fallback if name not found
         return result;
     }
 

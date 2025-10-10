@@ -131,4 +131,40 @@ class StateImplTest {
 
         assertThat(timeouts).containsExactly(30, 45, 60);  // All values
     }
+
+    @Test
+    void shouldReturnFallbackValueWhenNotFound() {
+        // API: "Returns the value of a slot matching the specified slot
+        //      or the value of the specified slot when not found"
+
+        Name missingName = NameImpl.of("missing");
+        State state = new StateImpl()
+            .state(NameImpl.of("existing"), 100);
+
+        // Slot provides fallback value (42)
+        Integer result = state.value(io.fullerstack.substrates.slot.SlotImpl.of(missingName, 42));
+
+        assertThat(result).isEqualTo(42);  // Should return fallback, not null
+    }
+
+    @Test
+    void shouldSupportNestedState() {
+        // State can contain State (hierarchical config)
+        Name dbConfigName = NameImpl.of("database");
+
+        State innerState = new StateImpl()
+            .state(NameImpl.of("host"), "localhost")
+            .state(NameImpl.of("port"), 3306);
+
+        State outerState = new StateImpl()
+            .state(dbConfigName, innerState)
+            .state(NameImpl.of("timeout"), 30);
+
+        // Retrieve nested State
+        State retrieved = outerState.value(
+            io.fullerstack.substrates.slot.SlotImpl.of(dbConfigName, StateImpl.empty(), State.class)
+        );
+
+        assertThat(retrieved).isSameAs(innerState);
+    }
 }
