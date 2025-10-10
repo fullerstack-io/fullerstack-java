@@ -11,11 +11,11 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>signetics-java</artifactId>
+    <artifactId>serventis-signals-java</artifactId>
     <packaging>jar</packaging>
 
-    <name>Signetics (Java)</name>
-    <description>Signal implementations for Humainary Serventis semantic APIs (Java 24)</description>
+    <name>Serventis Signals (Java)</name>
+    <description>Concrete signal type implementations for the Humainary Serventis observability framework, providing immutable Java records for Monitor, Service, Queue, Reporter, Probe, and Resource signals (Java 24)</description>
 
     <dependencies>
         <!-- Humainary Serventis API modules -->

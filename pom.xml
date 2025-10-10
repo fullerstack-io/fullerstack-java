@@ -16,7 +16,7 @@
 
     <modules>
         <module>fullerstack-substrates-java</module>
-        <module>fullerstack-signetics-java</module>
+        <module>fullerstack-serventis-java</module>
         <module>kafka-fullerstack</module>
     </modules>
 
@@ -57,7 +57,7 @@
             </dependency>
             <dependency>
                 <groupId>io.fullerstack</groupId>
-                <artifactId>signetics-java</artifactId>
+                <artifactId>serventis-signals-java</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
