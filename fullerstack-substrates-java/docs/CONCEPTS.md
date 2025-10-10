@@ -48,8 +48,8 @@ Substrates provides the **runtime substrate** for this observability stack.
 **What:** Hierarchical reference system for identifying entities.
 
 **Components:**
-- **Id** - Unique identifier
-- **Name** - Hierarchical name (like a namespace)
+- **Id** - Unique instance identifier (UUID-based)
+- **Name** - Hierarchical semantic identity (like a namespace)
 - **State** - Immutable key-value data
 - **Type** - Category (CHANNEL, CIRCUIT, CLOCK, etc.)
 
@@ -58,8 +58,92 @@ Substrates provides the **runtime substrate** for this observability stack.
 Subject subject = channel.subject();
 System.out.println(subject.name());  // e.g., "circuit.conduit.channel1"
 System.out.println(subject.type());  // CHANNEL
-System.out.println(subject.id());    // Unique ID
+System.out.println(subject.id());    // Unique UUID
 ```
+
+### Id, @Identity, and @Idempotent
+
+Substrates defines **three distinct identity concepts**:
+
+#### 1. `Id` Interface - Unique Instance Identity
+
+**What:** Marker interface for unique identifier **values** (like UUIDs).
+
+**Purpose:** Distinguishes between different instances of the same type.
+
+**Example:**
+```java
+Id id1 = IdImpl.generate();  // UUID: a1b2c3d4-...
+Id id2 = IdImpl.generate();  // UUID: e5f6g7h8-...
+
+assert !id1.equals(id2);  // Different IDs
+```
+
+**Usage in Subject:**
+```java
+Subject subject1 = circuit1.subject();
+Subject subject2 = circuit2.subject();
+
+// Even if both circuits have name "default", they have unique IDs
+assert !subject1.id().equals(subject2.id());
+```
+
+#### 2. `@Identity` Annotation - Reference Equality Semantics
+
+**What:** Type-level annotation indicating instances should be compared by **reference** (==), not value.
+
+**Applied to:** `Id`, `Name`, `Subject` interfaces
+
+**Purpose:** Signals these are singletons/flyweights - don't copy them, compare by reference.
+
+**Example:**
+```java
+@Identity
+@Provided
+interface Id {
+}
+
+@Identity
+@Provided
+interface Name extends Extent<Name> {
+}
+```
+
+**Meaning:** When you have a `Name` or `Id`, comparing `name1 == name2` is meaningful because they're meant to be unique references.
+
+#### 3. `@Idempotent` Annotation - Safe Repeated Execution
+
+**What:** Method-level annotation indicating a method can be called multiple times with the same effect.
+
+**Applied to:** Methods like `Resource.close()`
+
+**Purpose:** Documents that repeating the operation is safe.
+
+**Example:**
+```java
+interface Resource {
+    @Idempotent
+    default void close() {
+        // Can call multiple times safely
+    }
+}
+
+// Usage:
+circuit.close();
+circuit.close();  // Safe - idempotent
+```
+
+### Identity Architecture Summary
+
+| Concept | Type | Applied To | Semantic Meaning |
+|---------|------|------------|------------------|
+| **`Id`** | Interface | Values (UUID, etc.) | "This is a unique identifier value" |
+| **`@Identity`** | Annotation | Types (`Id`, `Name`, `Subject`) | "Instances compared by reference (==)" |
+| **`@Idempotent`** | Annotation | Methods | "Safe to call multiple times" |
+
+**Key Insight:** Every component has **two identities**:
+1. **`Id`** - Unique instance identity (UUID)
+2. **`Name`** - Semantic identity for pooling/caching (see below)
 
 **Hierarchy:**
 ```java
@@ -71,12 +155,17 @@ name.enclosure().ifPresent(parent -> {
 
 ### Name
 
-**What:** Hierarchical namespace like DNS or file paths.
+**What:** Hierarchical semantic identity used for both naming and caching.
 
 **Features:**
 - Dot-separated parts: `"app.service.endpoint"`
 - Implements `Extent<Name>` for hierarchical navigation
 - Immutable and comparable
+- **Used as cache key** in Circuit/Cortex component pools
+
+**Dual Purpose:**
+1. **Semantic Identity** - Human-readable hierarchical names
+2. **Cache Key** - Enables singleton pattern for named components
 
 **Usage:**
 ```java
@@ -86,6 +175,32 @@ Name endpoint = service.name("endpoint");
 
 System.out.println(endpoint.path());  // "app.service.endpoint"
 System.out.println(endpoint.depth()); // 3
+```
+
+**Name as Cache Key:**
+```java
+Cortex cortex = new CortexRuntime();
+
+// First call creates circuit with name "kafka-cluster"
+Circuit c1 = cortex.circuit(cortex.name("kafka-cluster"));
+
+// Second call returns THE SAME circuit (cached by name)
+Circuit c2 = cortex.circuit(cortex.name("kafka-cluster"));
+
+assert c1 == c2;  // ✅ Singleton pattern via Name caching
+```
+
+**Default Names Create Singletons:**
+```java
+// No-arg methods use static "default" name for singleton behavior
+Circuit c1 = cortex.circuit();  // Uses name "default"
+Circuit c2 = cortex.circuit();  // Returns same circuit
+
+Clock clk1 = circuit.clock();   // Uses name "default"
+Clock clk2 = circuit.clock();   // Returns same clock
+
+assert c1 == c2;   // ✅ Same circuit
+assert clk1 == clk2;  // ✅ Same clock
 ```
 
 ### State

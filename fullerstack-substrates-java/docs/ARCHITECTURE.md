@@ -48,19 +48,51 @@ Substrates implements an event-driven architecture for observability, based on W
 - Manages Conduits, Clocks, Containers, and Queue
 - Provides precise ordering guarantees for emitted events
 - Coordinates resource lifecycle
-- Caches components by name for reuse
+- **Caches components by Name for singleton behavior**
 
 **Key Methods:**
-- `conduit(Name, Composer)` - Creates/retrieves Conduit
-- `clock(Name)` - Creates/retrieves Clock
+- `conduit(Name, Composer)` - Creates/retrieves Conduit (cached by Name)
+- `clock(Name)` - Creates/retrieves Clock (cached by Name)
 - `container(Name, Composer)` - Creates Container
-- `queue()` - Returns coordination Queue
+- `queue()` - Returns single shared Queue
 - `close()` - Closes all managed resources
 
 **Implementation Details:**
 - Uses `ConcurrentHashMap` for thread-safe component caching
-- Implements lazy initialization
+- Implements lazy initialization via `computeIfAbsent()`
+- **Name is the cache key** - same Name returns same instance
 - Daemon virtual threads auto-cleanup on JVM shutdown
+
+**Caching Pattern:**
+```java
+// CircuitImpl.java
+private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
+
+public Clock clock(Name name) {
+    return clocks.computeIfAbsent(name, ClockImpl::new);  // ← Singleton per Name
+}
+
+public Clock clock() {
+    return clock(NameImpl.of("default"));  // ← Uses static "default" name
+}
+```
+
+**Example:**
+```java
+Circuit circuit = cortex.circuit();
+
+// First call creates clock "default"
+Clock c1 = circuit.clock();
+
+// Second call returns THE SAME clock instance
+Clock c2 = circuit.clock();
+
+assert c1 == c2;  // ✅ Singleton behavior
+
+// Different name creates new clock
+Clock c3 = circuit.clock(cortex.name("ticker"));
+assert c1 != c3;  // ✅ Different instance
+```
 
 ### Conduit
 
@@ -340,7 +372,100 @@ Transformed value → queue (or filtered/limited)
 
 ## Design Principles
 
-### 1. Interface Types Over Implementation Types
+### 1. Name-Based Component Caching
+
+**Pattern:** Components are cached by Name using `Map.computeIfAbsent()`.
+
+**Architecture:**
+```
+CortexRuntime (Global)
+    ├── circuits: Map<Name, Circuit>     ← Level 1: Circuit cache by Name
+    │
+    └── Each Circuit contains:
+            ├── clocks: Map<Name, Clock>      ← Level 2: Clock cache by Name
+            └── conduits: Map<Name, Conduit>  ← Level 2: Conduit cache by Name
+```
+
+**Two-Level Caching:**
+
+**Level 1 - Cortex caches Circuits:**
+```java
+// CortexRuntime.java
+private final Map<Name, Circuit> circuits = new ConcurrentHashMap<>();
+
+public Circuit circuit(Name name) {
+    return circuits.computeIfAbsent(name, this::createCircuit);
+}
+
+public Circuit circuit() {
+    return circuit(NameImpl.of("default"));  // Singleton
+}
+```
+
+**Level 2 - Circuit caches Clocks and Conduits:**
+```java
+// CircuitImpl.java
+private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
+private final Map<Name, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
+
+public Clock clock(Name name) {
+    return clocks.computeIfAbsent(name, ClockImpl::new);
+}
+
+public <P, E> Conduit<P, E> conduit(Name name, Composer<? extends P, E> composer) {
+    return conduits.computeIfAbsent(name, n -> new ConduitImpl<>(circuitSubject.name(), n, composer));
+}
+```
+
+**Name = Cache Key, Id = Instance Identity:**
+
+Every component has **two identities**:
+
+1. **`Name`** - Semantic identity for **pooling/caching**
+   - Used as cache key in `Map.computeIfAbsent(name, ...)`
+   - Static names like `"default"` create singletons
+   - Custom names allow multiple instances per Circuit
+
+2. **`Id`** - Unique instance identity
+   - Each instance gets a unique UUID
+   - Generated once during construction
+   - Used in Subject for instance tracking
+
+**Example:**
+```java
+Cortex cortex = new CortexRuntime();
+
+// Same name → Same Circuit instance
+Circuit c1 = cortex.circuit(cortex.name("kafka-cluster"));
+Circuit c2 = cortex.circuit(cortex.name("kafka-cluster"));
+assert c1 == c2;  // ✅ Cached by Name
+
+// But each has unique ID
+assert !c1.subject().id().equals(c2.subject().id());  // ❌ Would fail - same instance!
+
+// Different Circuit instance
+Circuit c3 = cortex.circuit(cortex.name("other-cluster"));
+assert c1 != c3;  // ✅ Different Name = Different instance
+assert !c1.subject().id().equals(c3.subject().id());  // ✅ Different IDs
+```
+
+**Default Names Pattern:**
+
+No-arg factory methods use static names for singleton behavior:
+
+```java
+// Uses "default" name internally
+Circuit c1 = cortex.circuit();   // circuit(NameImpl.of("default"))
+Circuit c2 = cortex.circuit();   // Returns same instance
+
+Clock clk1 = circuit.clock();    // clock(NameImpl.of("default"))
+Clock clk2 = circuit.clock();    // Returns same instance
+
+Conduit cd1 = circuit.conduit(Composer.pipe());  // conduit(NameImpl.of("default"), ...)
+Conduit cd2 = circuit.conduit(Composer.pipe());  // Returns same instance
+```
+
+### 2. Interface Types Over Implementation Types
 
 All fields use interface types, not implementations:
 
@@ -355,7 +480,7 @@ private final SourceImpl<E> source;
 
 **Rationale:** Aligns with William Louth's precise architectural vision, enables flexibility.
 
-### 2. @Temporal Types Are Not Retained
+### 3. @Temporal Types Are Not Retained
 
 Types marked `@Temporal` are transient and should not be stored:
 
@@ -363,14 +488,14 @@ Types marked `@Temporal` are transient and should not be stored:
 - **Sift** - Used only during Sequencer.apply(), predicate captured
 - **Closure** - Used for ARM pattern, executes and closes
 
-### 3. Virtual Threads Are Daemon Threads
+### 4. Virtual Threads Are Daemon Threads
 
 - Queue processors use daemon virtual threads
 - Auto-cleanup on JVM shutdown
 - No explicit shutdown needed in most cases
 - Circuit.close() interrupts threads for clean shutdown
 
-### 4. Component Extends Resource
+### 5. Component Extends Resource
 
 All major components implement Resource interface:
 - Circuit extends Component extends Resource
@@ -379,14 +504,14 @@ All major components implement Resource interface:
 
 All have lifecycle management via `close()`.
 
-### 5. Precise Ordering Guarantees
+### 6. Precise Ordering Guarantees
 
 Circuit provides precise ordering for emitted events:
 - Single queue per Conduit
 - Sequential processing by queue processor
 - FIFO ordering maintained
 
-### 6. Immutable State Pattern
+### 7. Immutable State Pattern
 
 State is immutable:
 ```java
@@ -398,7 +523,7 @@ State state = cortex.state()
 
 Each `state()` call returns new State instance.
 
-### 7. Segment Mutability
+### 8. Segment Mutability
 
 Segment is mutable (returns `this`) because:
 - `Sequencer.apply(Segment)` is `void`
