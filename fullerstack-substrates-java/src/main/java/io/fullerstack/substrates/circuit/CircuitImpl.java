@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @see Circuit
  */
 public class CircuitImpl implements Circuit {
-    private final Name name;
+    private final Subject circuitSubject;
     private final Source<State> stateSource;
     private final Queue queue; // Virtual thread is daemon - auto-cleanup on JVM shutdown
     private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
@@ -47,19 +47,21 @@ public class CircuitImpl implements Circuit {
      * @param name circuit name
      */
     public CircuitImpl(Name name) {
-        this.name = Objects.requireNonNull(name, "Circuit name cannot be null");
+        Objects.requireNonNull(name, "Circuit name cannot be null");
+        Id id = IdImpl.generate();
+        this.circuitSubject = new SubjectImpl(
+            id,
+            name,
+            StateImpl.empty(),
+            Subject.Type.CIRCUIT
+        );
         this.stateSource = new SourceImpl<>(name);
         this.queue = new QueueImpl();
     }
 
     @Override
     public Subject subject() {
-        return new SubjectImpl(
-            IdImpl.generate(),
-            name,
-            StateImpl.empty(),
-            Subject.Type.CIRCUIT
-        );
+        return circuitSubject;
     }
 
     @Override
@@ -99,7 +101,7 @@ public class CircuitImpl implements Circuit {
         @SuppressWarnings("unchecked")
         Conduit<P, E> conduit = (Conduit<P, E>) conduits.computeIfAbsent(
             name,
-            n -> new io.fullerstack.substrates.conduit.ConduitImpl<>(this.name, n, composer)
+            n -> new io.fullerstack.substrates.conduit.ConduitImpl<>(circuitSubject.name(), n, composer)
         );
         return conduit;
     }

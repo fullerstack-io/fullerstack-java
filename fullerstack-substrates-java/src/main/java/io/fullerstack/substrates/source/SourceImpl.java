@@ -41,10 +41,18 @@ public class SourceImpl<E> implements Source<E>, Pipe<E> {
     private final Subject sourceSubject;
 
     /**
-     * Creates a source with generated ID and default name.
+     * Creates a source with generated ID and unique name.
      */
     public SourceImpl() {
-        this(NameImpl.of("source"));
+        Id id = IdImpl.generate();
+        Name name = NameImpl.of("source").name(id.toString());
+        Objects.requireNonNull(name, "Source name cannot be null");
+        this.sourceSubject = new SubjectImpl(
+            id,
+            name,
+            StateImpl.empty(),
+            Subject.Type.SOURCE
+        );
     }
 
     /**
@@ -75,12 +83,13 @@ public class SourceImpl<E> implements Source<E>, Pipe<E> {
         // Return subscription that removes subscriber on close()
         return new Subscription() {
             private volatile boolean closed = false;
+            private final Id subscriptionId = IdImpl.generate();
 
             @Override
             public Subject subject() {
                 return new SubjectImpl(
-                    IdImpl.generate(),
-                    NameImpl.of("subscription"),
+                    subscriptionId,
+                    NameImpl.of("subscription").name(subscriptionId.toString()),
                     StateImpl.empty(),
                     Subject.Type.SUBSCRIPTION
                 );

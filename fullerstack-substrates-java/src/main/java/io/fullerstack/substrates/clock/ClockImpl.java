@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
  * @see Clock
  */
 public class ClockImpl implements Clock {
-    private final Name name;
+    private final Subject clockSubject;
     private final Source<Instant> source;
     private final ScheduledExecutorService scheduler;
     private volatile boolean closed = false;
@@ -40,7 +40,14 @@ public class ClockImpl implements Clock {
      * @param name clock name
      */
     public ClockImpl(Name name) {
-        this.name = Objects.requireNonNull(name, "Clock name cannot be null");
+        Objects.requireNonNull(name, "Clock name cannot be null");
+        Id id = IdImpl.generate();
+        this.clockSubject = new SubjectImpl(
+            id,
+            name,
+            StateImpl.empty(),
+            Subject.Type.CLOCK
+        );
         this.source = new SourceImpl<>(name);
         this.scheduler = Executors.newScheduledThreadPool(1, r -> {
             Thread thread = new Thread(r);
@@ -51,20 +58,29 @@ public class ClockImpl implements Clock {
     }
 
     /**
-     * Creates a clock with default name.
+     * Creates a clock with generated ID and unique name.
      */
     public ClockImpl() {
-        this(NameImpl.of("clock"));
-    }
-
-    @Override
-    public Subject subject() {
-        return new SubjectImpl(
-            IdImpl.generate(),
+        Id id = IdImpl.generate();
+        Name name = NameImpl.of("clock").name(id.toString());
+        this.clockSubject = new SubjectImpl(
+            id,
             name,
             StateImpl.empty(),
             Subject.Type.CLOCK
         );
+        this.source = new SourceImpl<>(name);
+        this.scheduler = Executors.newScheduledThreadPool(1, r -> {
+            Thread thread = new Thread(r);
+            thread.setDaemon(true);
+            thread.setName("clock-" + name.part());
+            return thread;
+        });
+    }
+
+    @Override
+    public Subject subject() {
+        return clockSubject;
     }
 
     @Override
@@ -98,12 +114,13 @@ public class ClockImpl implements Clock {
         // Return subscription that cancels the scheduled task
         return new Subscription() {
             private volatile boolean subscriptionClosed = false;
+            private final Id subscriptionId = IdImpl.generate();
 
             @Override
             public Subject subject() {
                 return new SubjectImpl(
-                    IdImpl.generate(),
-                    name,
+                    subscriptionId,
+                    name.name(subscriptionId.toString()),
                     StateImpl.empty(),
                     Subject.Type.SUBSCRIPTION
                 );
