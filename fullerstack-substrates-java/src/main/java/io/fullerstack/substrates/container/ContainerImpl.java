@@ -30,7 +30,8 @@ import java.util.Objects;
 public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
     private final Pool<P> pool;
     private final Source<E> eventSource;
-    private final SourceImpl<Source<E>> containerSource;
+    private final Source<Source<E>> containerSource;
+    private final Pipe<Source<E>> emitter; // Producer API
     private final Name name;
 
     /**
@@ -53,9 +54,11 @@ public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
         // Container<Pool<P>, Source<E>> means source() returns Source<Source<E>>
         // This enables the nested subscription pattern from William Louth's examples:
         // container.source().subscribe(subject -> source -> source.subscribe(...))
-        this.containerSource = new SourceImpl<>(name);
+        SourceImpl<Source<E>> nestedSource = new SourceImpl<>(name);
+        this.containerSource = nestedSource;
+        this.emitter = nestedSource; // SourceImpl implements both Source and Pipe
         // Emit the eventSource so subscribers can get it
-        this.containerSource.emit(eventSource);
+        this.emitter.emit(eventSource);
     }
 
     @Override

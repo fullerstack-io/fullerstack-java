@@ -33,7 +33,8 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     private final Subject conduitSubject;
     private final Composer<? extends P, E> composer;
     private final Map<Name, P> percepts = new ConcurrentHashMap<>();
-    private final SourceImpl<E> eventSource;
+    private final Source<E> eventSource; // Source (SourceImpl implements Pipe for emit())
+    private final Pipe<E> emitter; // Producer API
     private final BlockingQueue<E> queue = new LinkedBlockingQueue<>(10000);
     private final Thread queueProcessor;
 
@@ -45,7 +46,9 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
             Subject.Type.CONDUIT
         );
         this.composer = composer;
-        this.eventSource = new SourceImpl<>(conduitName);
+        SourceImpl<E> source = new SourceImpl<>(conduitName);
+        this.eventSource = source;
+        this.emitter = source; // SourceImpl implements both Source and Pipe
 
         // Start queue processor
         this.queueProcessor = startQueueProcessor();
@@ -91,8 +94,8 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     }
 
     private void processEmission(E emission) {
-        // Emit through Source so subscribers can observe
-        eventSource.emit(emission);
+        // Emit through Pipe so subscribers can observe
+        emitter.emit(emission);
     }
 
     /**

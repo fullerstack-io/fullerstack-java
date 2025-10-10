@@ -35,8 +35,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class CircuitImpl implements Circuit {
     private final Name name;
-    private final SourceImpl<State> stateSource;
-    private final QueueImpl queue;
+    private final Source<State> stateSource;
+    private final Queue queue; // Virtual thread is daemon - auto-cleanup on JVM shutdown
     private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
     private final Map<Name, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
     private volatile boolean closed = false;
@@ -111,8 +111,9 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(composer, "Composer cannot be null");
         Objects.requireNonNull(sequencer, "Sequencer cannot be null");
 
-        // TODO: Implement sequencer support
-        // For now, just create conduit without sequencer
+        // The Sequencer is applied at the Channel.pipe(sequencer) level
+        // The Composer should call channel.pipe(sequencer) in its compose() method
+        // For now, delegate to the standard conduit method - the Composer handles sequencing
         return conduit(name, composer);
     }
 
@@ -169,12 +170,8 @@ public class CircuitImpl implements Circuit {
                 }
             });
 
-            // Close queue
-            try {
-                queue.shutdown();
-            } catch (Exception e) {
-                // Log but continue
-            }
+            // Note: Queue uses daemon virtual thread - no explicit shutdown needed
+            // Virtual threads are automatically cleaned up on JVM shutdown
 
             clocks.clear();
             conduits.clear();

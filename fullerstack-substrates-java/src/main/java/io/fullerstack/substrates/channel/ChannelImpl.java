@@ -3,9 +3,11 @@ package io.fullerstack.substrates.channel;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pipe.PipeImpl;
+import io.fullerstack.substrates.segment.SegmentImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -37,26 +39,18 @@ public class ChannelImpl<E> implements Channel<E> {
 
     @Override
     public Pipe<E> pipe() {
-        return new PipeImpl<>(this);
+        return new PipeImpl<>(queue);
     }
 
     @Override
     public Pipe<E> pipe(Sequencer<? super Segment<E>> sequencer) {
-        // TODO: Implement sequencer support for ordered emission
-        // For now, return simple pipe
-        return new PipeImpl<>(this);
-    }
+        Objects.requireNonNull(sequencer, "Sequencer cannot be null");
 
-    /**
-     * Emit directly to the queue (used by Pipe).
-     * The queue is shared with the Conduit, which will process and forward to its Source.
-     */
-    public void emit(E emission) {
-        try {
-            queue.put(emission);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Failed to emit to channel: " + channelSubject.name(), e);
-        }
+        // Create a Segment and apply the Sequencer transformations
+        SegmentImpl<E> segment = new SegmentImpl<>();
+        sequencer.apply(segment);
+
+        // Return a Pipe that applies the Segment transformations
+        return new PipeImpl<>(queue, segment);
     }
 }

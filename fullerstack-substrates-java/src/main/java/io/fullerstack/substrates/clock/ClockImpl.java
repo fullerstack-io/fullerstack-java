@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class ClockImpl implements Clock {
     private final Name name;
-    private final SourceImpl<Instant> source;
+    private final Source<Instant> source;
     private final ScheduledExecutorService scheduler;
     private volatile boolean closed = false;
 

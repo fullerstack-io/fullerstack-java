@@ -13,6 +13,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * Implementation of Substrates.Source for event emission and subscriber management.
  *
+ * <p>Implements both Source (consumer API) and Pipe (producer API) to provide
+ * a complete event bus: components can emit() to it, and others can subscribe() to it.
+ *
  * <p>Manages subscribers with thread-safe CopyOnWriteArrayList, suitable for
  * read-heavy workloads (many emissions, fewer subscribe/unsubscribe operations).
  *
@@ -20,13 +23,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * <ul>
  *   <li>Thread-safe subscriber management</li>
  *   <li>Subscription lifecycle with close() support</li>
- *   <li>Internal emit() method for event delivery</li>
+ *   <li>Pipe.emit() for event delivery (producer API)</li>
+ *   <li>Source.subscribe() for event subscription (consumer API)</li>
  * </ul>
  *
  * @param <E> event emission type
  * @see Source
+ * @see Pipe
  */
-public class SourceImpl<E> implements Source<E> {
+public class SourceImpl<E> implements Source<E>, Pipe<E> {
     private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
     private final Subject sourceSubject;
 
@@ -89,11 +94,12 @@ public class SourceImpl<E> implements Source<E> {
     /**
      * Emits an event to all subscribers.
      *
-     * <p>This method is not part of the Source interface but is provided for
-     * testing and internal use by other Substrates components.
+     * <p>This implements the Pipe interface, allowing SourceImpl to act as both
+     * a producer (via emit) and a consumer subscription manager (via subscribe).
      *
      * @param emission the event to emit
      */
+    @Override
     public void emit(E emission) {
         for (Subscriber<E> subscriber : subscribers) {
             // Collect pipes that the subscriber registers
