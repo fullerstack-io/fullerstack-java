@@ -7,6 +7,7 @@ import io.fullerstack.substrates.state.StateImpl;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -122,6 +123,11 @@ public class ScopeImpl implements Scope {
     @Override
     public CharSequence part() {
         return name.part();
+    }
+
+    @Override
+    public Optional<Scope> enclosure() {
+        return Optional.ofNullable(parent);
     }
 
     /**
