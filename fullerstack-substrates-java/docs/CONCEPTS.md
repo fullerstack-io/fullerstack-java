@@ -203,6 +203,47 @@ assert c1 == c2;   // ✅ Same circuit
 assert clk1 == clk2;  // ✅ Same clock
 ```
 
+**Correct vs Incorrect Usage Pattern:**
+
+⚠️ **CRITICAL:** Always use Cortex/Circuit factory methods, never direct construction.
+
+```java
+// ✅ CORRECT - Uses cache via Circuit.clock()
+Clock clock1 = circuit.clock(cortex.name("timer"));
+Clock clock2 = circuit.clock(cortex.name("timer"));
+assert clock1 == clock2;  // Same instance (cached)
+
+// ❌ WRONG - Bypasses cache via direct construction
+Clock clock3 = new ClockImpl(cortex.name("timer"));
+Clock clock4 = new ClockImpl(cortex.name("timer"));
+assert clock3 != clock4;  // Different instances! (breaks singleton)
+```
+
+**Why constructors generate new Ids:**
+
+Component constructors (ClockImpl, ConduitImpl, CircuitImpl) always generate a new Id because they're only called once per Name by the cache:
+
+```java
+// ClockImpl constructor - called ONLY by cache miss
+public ClockImpl(Name name) {
+    Id id = IdImpl.generate();  // New ID each time
+    this.clockSubject = new SubjectImpl(id, name, ...);
+}
+
+// CircuitImpl.clock() - ensures constructor called once per Name
+public Clock clock(Name name) {
+    return clocks.computeIfAbsent(name, ClockImpl::new);
+    //                             ^^^^ Only called if Name absent
+}
+```
+
+**The computeIfAbsent() guarantee:**
+- First call with Name → constructor called → Id generated → stored in cache
+- Second call with same Name → cached instance returned → no new Id generated
+- Direct construction → bypasses cache → breaks singleton pattern
+
+See [Architecture Guide - Factory Method + Flyweight Pattern](ARCHITECTURE.md#1-name-based-component-caching) for detailed explanation.
+
 ### State
 
 **What:** Immutable collection of named slots (key-value pairs).

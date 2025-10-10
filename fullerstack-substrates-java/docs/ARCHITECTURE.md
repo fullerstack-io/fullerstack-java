@@ -465,6 +465,69 @@ Conduit cd1 = circuit.conduit(Composer.pipe());  // conduit(NameImpl.of("default
 Conduit cd2 = circuit.conduit(Composer.pipe());  // Returns same instance
 ```
 
+**Factory Method + Flyweight Pattern:**
+
+The caching architecture uses two distinct patterns:
+
+1. **Constructor = Factory Method** (always creates new instance)
+   - ClockImpl, ConduitImpl constructors generate new Id each time
+   - Constructors don't handle caching logic
+   - Pure factory - create instance, initialize state
+
+2. **Circuit/Cortex methods = Flyweight Pool** (manages caching)
+   - `circuit.clock(name)` checks cache first via `computeIfAbsent()`
+   - Only calls constructor if Name not in cache
+   - Manages singleton lifecycle
+
+**Why constructors generate new Ids:**
+
+```java
+// ClockImpl constructor - called ONLY by cache miss
+public ClockImpl(Name name) {
+    Id id = IdImpl.generate();  // New ID - but only called once per Name!
+    this.clockSubject = new SubjectImpl(id, name, ...);
+}
+
+// CircuitImpl.clock() - manages caching
+public Clock clock(Name name) {
+    return clocks.computeIfAbsent(name, ClockImpl::new);
+    //                             ^^^^ Constructor called once per Name
+}
+```
+
+**First call:** Cache miss → calls `ClockImpl::new` → generates new Id → stores in cache
+**Second call:** Cache hit → returns existing Clock → no new Id generated
+
+**CRITICAL: Always use Circuit/Cortex factory methods, not direct construction:**
+
+```java
+// ✅ Correct - uses cache
+Clock clock1 = circuit.clock(name);
+Clock clock2 = circuit.clock(name);
+assert clock1 == clock2;  // Same instance
+
+// ❌ WRONG - bypasses cache
+Clock clock3 = new ClockImpl(name);  // Different instance!
+Clock clock4 = new ClockImpl(name);  // Another different instance!
+assert clock3 != clock4;  // Breaks singleton pattern
+```
+
+**The `computeIfAbsent()` guarantee:**
+
+```java
+// CircuitImpl.java line 87
+return clocks.computeIfAbsent(name, ClockImpl::new);
+//                                   ^^^^^^^^^^^^^^
+//                                   Only called if Name absent from map
+//                                   Otherwise returns cached Clock
+```
+
+This pattern ensures:
+- Same Name → Same instance (singleton per Name)
+- Different Name → Different instance
+- Constructor called exactly once per Name
+- Thread-safe atomic cache lookup/creation
+
 ### 2. Interface Types Over Implementation Types
 
 All fields use interface types, not implementations:
