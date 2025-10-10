@@ -218,20 +218,68 @@ See [Architecture Guide - Factory Method + Flyweight Pattern](ARCHITECTURE.md#1-
 
 **What:** Immutable collection of named slots (key-value pairs).
 
+**Immutability:** Each `state()` call returns a **NEW State** instance. The original State is never modified.
+
 **Types Supported:**
 - Primitives: `int`, `long`, `float`, `double`, `boolean`
 - Objects: `String`, `Name`, `State` (nested)
 
-**Usage:**
+**Basic Usage:**
 ```java
+State s1 = cortex.state();
+State s2 = s1.state(cortex.name("count"), 42);
+State s3 = s2.state(cortex.name("name"), "sensor1");
+
+// Each state() returns a NEW State
+assert s1 != s2;  // ✅ Different objects
+assert s2 != s3;  // ✅ Different objects
+
+// Fluent API (method chaining)
 State state = cortex.state()
     .state(cortex.name("count"), 42)
     .state(cortex.name("name"), "sensor1")
-    .state(cortex.name("active"), true)
-    .compact();  // Remove duplicates
+    .state(cortex.name("active"), true);
+```
 
-state.values(cortex.slot(cortex.name("count"), 0))
-    .forEach(count -> System.out.println("Count: " + count));
+**Duplicate Handling:**
+
+State uses a **List internally**, allowing duplicate names (override pattern):
+
+```java
+State config = cortex.state()
+    .state(cortex.name("timeout"), 30)   // Default value
+    .state(cortex.name("retries"), 3)
+    .state(cortex.name("timeout"), 60);  // Override (both exist!)
+
+// State has 3 slots (2 have name "timeout")
+assert config.stream().count() == 3;
+
+// compact() removes duplicates, keeping LAST occurrence
+State compacted = config.compact();
+assert compacted.stream().count() == 2;  // Only 1 "timeout" remains (value: 60)
+```
+
+**Why Allow Duplicates?**
+
+This supports the **configuration override pattern**:
+- Start with defaults
+- Apply environment-specific overrides
+- Call `compact()` when ready to finalize
+
+**Retrieving Values:**
+
+```java
+State state = cortex.state()
+    .state(cortex.name("timeout"), 30)
+    .state(cortex.name("timeout"), 60);
+
+// value() returns LAST occurrence
+Integer timeout = state.value(cortex.slot(cortex.name("timeout"), 0));
+assert timeout == 60;  // Last value wins
+
+// values() returns ALL occurrences
+var allTimeouts = state.values(cortex.slot(cortex.name("timeout"), 0)).toList();
+assert allTimeouts.equals(List.of(30, 60));  // Both values
 ```
 
 ### Substrate

@@ -574,17 +574,28 @@ Circuit provides precise ordering for emitted events:
 - Sequential processing by queue processor
 - FIFO ordering maintained
 
-### 7. Immutable State Pattern
+### 7. Immutable State with Override Pattern
 
-State is immutable:
+State is immutable - each `state()` call returns a **NEW** State instance:
+
 ```java
-State state = cortex.state()
-    .state(name1, value1)
-    .state(name2, value2)
-    .compact();
+State s1 = cortex.state();
+State s2 = s1.state(name1, value1);  // s2 is NEW State
+State s3 = s2.state(name2, value2);  // s3 is NEW State
+
+assert s1 != s2 != s3;  // All different objects
 ```
 
-Each `state()` call returns new State instance.
+**Override Pattern:** State uses a List internally, allowing duplicates:
+
+```java
+State config = cortex.state()
+    .state(name("timeout"), 30)    // Default
+    .state(name("timeout"), 60)    // Override (both exist!)
+    .compact();                    // Remove duplicates (keeps last: 60)
+```
+
+This enables configuration layering (defaults → environment → user overrides).
 
 ### 8. Segment Mutability
 
