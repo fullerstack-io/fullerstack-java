@@ -17,7 +17,7 @@ import java.util.UUID;
  *
  * @param id unique signal identifier
  * @param circuit circuit name (e.g., "kafka.broker.health")
- * @param channel channel name (e.g., "broker-1.jvm.heap")
+ * @param subject subject name (e.g., "broker-1.jvm.heap")
  * @param timestamp when signal was emitted
  * @param vectorClock causal ordering clock
  * @param status Humainary Monitors.Status (Condition + Confidence)
@@ -26,7 +26,7 @@ import java.util.UUID;
 public record MonitorSignal(
     UUID id,
     String circuit,
-    String channel,
+    String subject,
     Instant timestamp,
     VectorClock vectorClock,
     Monitors.Status status,
@@ -41,7 +41,7 @@ public record MonitorSignal(
      * Creates a monitor signal with the specified condition and confidence.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param condition operational condition
      * @param confidence certainty level
      * @param metadata additional context
@@ -49,7 +49,7 @@ public record MonitorSignal(
      */
     public static MonitorSignal create(
         String circuit,
-        String channel,
+        String subject,
         Monitors.Condition condition,
         Monitors.Confidence confidence,
         Map<String, String> metadata
@@ -57,7 +57,7 @@ public record MonitorSignal(
         return new MonitorSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             new MonitorStatusImpl(condition, confidence),
@@ -69,66 +69,66 @@ public record MonitorSignal(
      * Creates a STABLE/CONFIRMED monitor signal.
      *
      * @param circuit circuit name
-     * @param channel channel name
+     * @param subject subject name
      * @param metadata additional context
      * @return STABLE/CONFIRMED monitor signal
      */
-    public static MonitorSignal stable(String circuit, String channel, Map<String, String> metadata) {
-        return create(circuit, channel, Monitors.Condition.STABLE, Monitors.Confidence.CONFIRMED, metadata);
+    public static MonitorSignal stable(String circuit, String subject, Map<String, String> metadata) {
+        return create(circuit, subject, Monitors.Condition.STABLE, Monitors.Confidence.CONFIRMED, metadata);
     }
 
     /**
      * Creates a DEGRADED monitor signal.
      *
      * @param circuit circuit name
-     * @param channel channel name
+     * @param subject subject name
      * @param confidence certainty level
      * @param metadata additional context
      * @return DEGRADED monitor signal
      */
     public static MonitorSignal degraded(
         String circuit,
-        String channel,
+        String subject,
         Monitors.Confidence confidence,
         Map<String, String> metadata
     ) {
-        return create(circuit, channel, Monitors.Condition.DEGRADED, confidence, metadata);
+        return create(circuit, subject, Monitors.Condition.DEGRADED, confidence, metadata);
     }
 
     /**
      * Creates a DEFECTIVE monitor signal.
      *
      * @param circuit circuit name
-     * @param channel channel name
+     * @param subject subject name
      * @param confidence certainty level
      * @param metadata additional context
      * @return DEFECTIVE monitor signal
      */
     public static MonitorSignal defective(
         String circuit,
-        String channel,
+        String subject,
         Monitors.Confidence confidence,
         Map<String, String> metadata
     ) {
-        return create(circuit, channel, Monitors.Condition.DEFECTIVE, confidence, metadata);
+        return create(circuit, subject, Monitors.Condition.DEFECTIVE, confidence, metadata);
     }
 
     /**
      * Creates a DOWN monitor signal.
      *
      * @param circuit circuit name
-     * @param channel channel name
+     * @param subject subject name
      * @param confidence certainty level
      * @param metadata additional context
      * @return DOWN monitor signal
      */
     public static MonitorSignal down(
         String circuit,
-        String channel,
+        String subject,
         Monitors.Confidence confidence,
         Map<String, String> metadata
     ) {
-        return create(circuit, channel, Monitors.Condition.DOWN, confidence, metadata);
+        return create(circuit, subject, Monitors.Condition.DOWN, confidence, metadata);
     }
 
     // Convenience methods

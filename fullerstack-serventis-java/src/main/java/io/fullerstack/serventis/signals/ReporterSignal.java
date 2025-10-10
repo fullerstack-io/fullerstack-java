@@ -25,7 +25,7 @@ import java.util.UUID;
  *
  * @param id unique signal identifier
  * @param circuit circuit name (e.g., "kafka.situations")
- * @param channel channel name (e.g., "client.producer-123.situation")
+ * @param subject subject name (e.g., "client.producer-123.situation")
  * @param timestamp when situation was detected
  * @param vectorClock causal ordering clock
  * @param situation Humainary Reporters.Situation (NORMAL, WARNING, CRITICAL)
@@ -35,7 +35,7 @@ import java.util.UUID;
 public record ReporterSignal(
     UUID id,
     String circuit,
-    String channel,
+    String subject,
     Instant timestamp,
     VectorClock vectorClock,
     Reporters.Situation situation,
@@ -55,16 +55,16 @@ public record ReporterSignal(
     /**
      * Creates a NORMAL reporter signal.
      *
-     * @param subject channel subject (e.g., "client.producer-123.situation")
+     * @param subjectName subject name (e.g., "client.producer-123.situation")
      * @param reason human-readable explanation
      * @param metadata context metadata
      * @return NORMAL reporter signal
      */
-    public static ReporterSignal normal(String subject, String reason, Map<String, String> metadata) {
+    public static ReporterSignal normal(String subjectName, String reason, Map<String, String> metadata) {
         return new ReporterSignal(
             UUID.randomUUID(),
             "kafka.situations",
-            subject,
+            subjectName,
             Instant.now(),
             VectorClock.empty(),
             Reporters.Situation.NORMAL,
@@ -76,16 +76,16 @@ public record ReporterSignal(
     /**
      * Creates a WARNING reporter signal.
      *
-     * @param subject channel subject (e.g., "client.producer-123.situation")
+     * @param subjectName subject name (e.g., "client.producer-123.situation")
      * @param reason human-readable explanation
      * @param metadata context metadata
      * @return WARNING reporter signal
      */
-    public static ReporterSignal warning(String subject, String reason, Map<String, String> metadata) {
+    public static ReporterSignal warning(String subjectName, String reason, Map<String, String> metadata) {
         return new ReporterSignal(
             UUID.randomUUID(),
             "kafka.situations",
-            subject,
+            subjectName,
             Instant.now(),
             VectorClock.empty(),
             Reporters.Situation.WARNING,
@@ -97,16 +97,16 @@ public record ReporterSignal(
     /**
      * Creates a CRITICAL reporter signal.
      *
-     * @param subject channel subject (e.g., "client.producer-123.situation")
+     * @param subjectName subject name (e.g., "client.producer-123.situation")
      * @param reason human-readable explanation
      * @param metadata context metadata
      * @return CRITICAL reporter signal
      */
-    public static ReporterSignal critical(String subject, String reason, Map<String, String> metadata) {
+    public static ReporterSignal critical(String subjectName, String reason, Map<String, String> metadata) {
         return new ReporterSignal(
             UUID.randomUUID(),
             "kafka.situations",
-            subject,
+            subjectName,
             Instant.now(),
             VectorClock.empty(),
             Reporters.Situation.CRITICAL,

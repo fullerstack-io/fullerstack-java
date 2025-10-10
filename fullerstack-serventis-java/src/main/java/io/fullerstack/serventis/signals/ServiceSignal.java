@@ -17,7 +17,7 @@ import java.util.UUID;
  *
  * @param id unique signal identifier
  * @param circuit circuit name (e.g., "kafka.client.interactions")
- * @param channel channel name (e.g., "producer-app1.send")
+ * @param subject subject name (e.g., "producer-app1.send")
  * @param timestamp when signal was emitted
  * @param vectorClock causal ordering clock
  * @param signal Humainary Services.Signal (combines Sign + Orientation)
@@ -26,7 +26,7 @@ import java.util.UUID;
 public record ServiceSignal(
     UUID id,
     String circuit,
-    String channel,
+    String subject,
     Instant timestamp,
     VectorClock vectorClock,
     Services.Signal signal,
@@ -41,15 +41,15 @@ public record ServiceSignal(
      * Creates a CALL signal (RELEASE orientation) indicating self-initiated service call.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param metadata additional context
      * @return new ServiceSignal with CALL/RELEASE
      */
-    public static ServiceSignal call(String circuit, String channel, Map<String, String> metadata) {
+    public static ServiceSignal call(String circuit, String subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             Services.Signal.CALL,
@@ -61,15 +61,15 @@ public record ServiceSignal(
      * Creates a CALLED signal (RECEIPT orientation) indicating observed incoming call.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param metadata additional context
      * @return new ServiceSignal with CALL/RECEIPT
      */
-    public static ServiceSignal called(String circuit, String channel, Map<String, String> metadata) {
+    public static ServiceSignal called(String circuit, String subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             Services.Signal.CALLED,
@@ -81,15 +81,15 @@ public record ServiceSignal(
      * Creates a SUCCESS signal (RELEASE orientation) indicating self-reported successful completion.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param metadata additional context
      * @return new ServiceSignal with SUCCESS/RELEASE
      */
-    public static ServiceSignal success(String circuit, String channel, Map<String, String> metadata) {
+    public static ServiceSignal success(String circuit, String subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             Services.Signal.SUCCESS,
@@ -101,15 +101,15 @@ public record ServiceSignal(
      * Creates a SUCCEEDED signal (RECEIPT orientation) indicating observed successful response.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param metadata additional context
      * @return new ServiceSignal with SUCCESS/RECEIPT
      */
-    public static ServiceSignal succeeded(String circuit, String channel, Map<String, String> metadata) {
+    public static ServiceSignal succeeded(String circuit, String subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             Services.Signal.SUCCEEDED,
@@ -121,15 +121,15 @@ public record ServiceSignal(
      * Creates a FAIL signal (RELEASE orientation) indicating self-reported failure.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param metadata additional context (should include error details)
      * @return new ServiceSignal with FAIL/RELEASE
      */
-    public static ServiceSignal fail(String circuit, String channel, Map<String, String> metadata) {
+    public static ServiceSignal fail(String circuit, String subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             Services.Signal.FAIL,
@@ -141,15 +141,15 @@ public record ServiceSignal(
      * Creates a FAILED signal (RECEIPT orientation) indicating observed failure in response.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param metadata additional context (should include error details)
      * @return new ServiceSignal with FAIL/RECEIPT
      */
-    public static ServiceSignal failed(String circuit, String channel, Map<String, String> metadata) {
+    public static ServiceSignal failed(String circuit, String subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             Services.Signal.FAILED,
@@ -161,15 +161,15 @@ public record ServiceSignal(
      * Creates a START signal (RELEASE orientation) indicating work execution started.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param metadata additional context
      * @return new ServiceSignal with START/RELEASE
      */
-    public static ServiceSignal start(String circuit, String channel, Map<String, String> metadata) {
+    public static ServiceSignal start(String circuit, String subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             Services.Signal.START,
@@ -181,15 +181,15 @@ public record ServiceSignal(
      * Creates a STARTED signal (RECEIPT orientation) indicating observed work start.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param metadata additional context
      * @return new ServiceSignal with START/RECEIPT
      */
-    public static ServiceSignal started(String circuit, String channel, Map<String, String> metadata) {
+    public static ServiceSignal started(String circuit, String subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             Services.Signal.STARTED,
@@ -201,15 +201,15 @@ public record ServiceSignal(
      * Creates a STOP signal (RELEASE orientation) indicating work completion.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param metadata additional context
      * @return new ServiceSignal with STOP/RELEASE
      */
-    public static ServiceSignal stop(String circuit, String channel, Map<String, String> metadata) {
+    public static ServiceSignal stop(String circuit, String subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             Services.Signal.STOP,
@@ -221,15 +221,15 @@ public record ServiceSignal(
      * Creates a STOPPED signal (RECEIPT orientation) indicating observed work completion.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param metadata additional context
      * @return new ServiceSignal with STOP/RECEIPT
      */
-    public static ServiceSignal stopped(String circuit, String channel, Map<String, String> metadata) {
+    public static ServiceSignal stopped(String circuit, String subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             Services.Signal.STOPPED,

@@ -60,7 +60,7 @@ This library implements all six Serventis signal types:
 MonitorSignal signal = new MonitorSignal(
     UUID.randomUUID(),
     "kafka.broker.health",
-    "broker-1.jvm.heap",
+    "broker-1.jvm.heap",  // subject
     Instant.now(),
     new VectorClock(Map.of("broker-1", 42L)),
     MonitorStatus.DEGRADED,
@@ -86,7 +86,7 @@ MonitorSignal signal = new MonitorSignal(
 ServiceSignal signal = new ServiceSignal(
     UUID.randomUUID(),
     "kafka.client.interactions",
-    "orders.0.producer.order-service",
+    "orders.0.producer.order-service",  // subject
     Instant.now(),
     new VectorClock(Map.of("order-service", 15L)),
     ServiceStatus.COMPLETED,
@@ -111,7 +111,7 @@ ServiceSignal signal = new ServiceSignal(
 QueueSignal signal = new QueueSignal(
     UUID.randomUUID(),
     "kafka.partition.behavior",
-    "orders.0.lag",
+    "orders.0.lag",  // subject
     Instant.now(),
     new VectorClock(Map.of("partition-sensor", 100L)),
     QueueStatus.LAGGING,
@@ -136,7 +136,7 @@ QueueSignal signal = new QueueSignal(
 ReporterSignal signal = new ReporterSignal(
     UUID.randomUUID(),
     "kafka.situations",
-    "cluster.situation",
+    "cluster.situation",  // subject
     Instant.now(),
     new VectorClock(Map.of("health-aggregator", 250L)),
     ReporterSeverity.CRITICAL,
@@ -179,12 +179,14 @@ All signal types implement the common `Signal` interface:
 public interface Signal {
     UUID id();                    // Unique identifier
     String circuit();             // Circuit name for routing
-    String channel();             // Channel within circuit
+    String subject();             // Subject name (aligns with Substrates terminology)
     Instant timestamp();          // When signal was emitted
     VectorClock vectorClock();    // Causal ordering
     Map<String, String> payload(); // Additional metadata
 }
 ```
+
+**Note:** `subject()` aligns with Substrates' `Conduit.get(Name subject)` pattern, where the subject is the semantic identity that a Channel routes to.
 
 ### VectorClock
 
@@ -192,12 +194,32 @@ Enables causal ordering across distributed agents:
 
 ```java
 public record VectorClock(Map<String, Long> clocks) {
-    public long toLong() {
-        return clocks.values().stream()
-            .max(Long::compare)
-            .orElse(0L);
-    }
+
+    // Increment clock for an actor
+    VectorClock increment(String actor);
+
+    // Test if this clock happened before another
+    boolean happenedBefore(VectorClock other);
+
+    // Test if two clocks are concurrent
+    boolean concurrent(VectorClock other);
+
+    // Merge two clocks (takes max of each actor)
+    VectorClock merge(VectorClock other);
+
+    // Convert to single timestamp (loses causal info)
+    long toLong();
 }
+```
+
+**Causal Ordering Example:**
+```java
+VectorClock vc1 = new VectorClock(Map.of("broker-1", 10L, "broker-2", 5L));
+VectorClock vc2 = new VectorClock(Map.of("broker-1", 12L, "broker-2", 5L));
+
+vc1.happenedBefore(vc2);  // true - vc1 causally precedes vc2
+vc1.concurrent(vc2);       // false - there's a causal relationship
+VectorClock merged = vc1.merge(vc2);  // {broker-1: 12, broker-2: 5}
 ```
 
 ### Immutability
@@ -222,26 +244,39 @@ Circuit circuit = cortex.circuit(cortex.name("kafka.broker.health"));
 Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
     circuit.conduit(cortex.name("monitors"), Composer.pipe());
 
-// 3. Get Channel Pipe
+// 3. Get Pipe for specific subject
 Pipe<MonitorSignal> heapPipe =
-    monitors.get(cortex.name("broker-1.jvm.heap"));
+    monitors.get(cortex.name("broker-1.jvm.heap"));  // Subject name
 
-// 4. Emit Signal
-MonitorSignal signal = new MonitorSignal(...);
+// 4. Emit Signal with matching subject
+MonitorSignal signal = MonitorSignal.degraded(
+    "kafka.broker.health",           // circuit
+    "broker-1.jvm.heap",  // subject              // subject (matches Conduit.get() call)
+    Monitors.Confidence.CONFIRMED,
+    Map.of("heapUsed", "85%")
+);
 heapPipe.emit(signal);
 
 // 5. Subscribe to Signals
 monitors.source().subscribe(
     cortex.subscriber(
         cortex.name("cluster-health-aggregator"),
-        (subject, registrar) -> {
+        (subject, registrar) -> {  // subject parameter = Name from Conduit.get()
             registrar.register(s -> {
                 // Process signal, emit higher-level assessments
+                if (s.subject().equals("broker-1.jvm.heap")) {
+                    // React to specific subject's signals
+                }
             });
         }
     )
 );
 ```
+
+**Key Alignment:**
+- `Signal.subject()` corresponds to the `Name` passed to `Conduit.get(Name subject)`
+- `Signal.circuit()` corresponds to the `Circuit` name
+- The subject is the semantic identity, the Channel/Pipe is the infrastructure
 
 ---
 

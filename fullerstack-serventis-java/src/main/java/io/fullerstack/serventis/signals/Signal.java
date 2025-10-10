@@ -31,11 +31,14 @@ public interface Signal {
     String circuit();
 
     /**
-     * Channel name within circuit (e.g., "broker-1.jvm.heap").
+     * Subject name within circuit (e.g., "broker-1.jvm.heap").
      *
-     * @return channel name
+     * <p>In Substrates terminology, the subject is the semantic identity that a Channel routes to.
+     * This aligns with {@code Conduit.get(Name subject)} which retrieves a percept by subject name.
+     *
+     * @return subject name
      */
-    String channel();
+    String subject();
 
     /**
      * Timestamp when signal was emitted.

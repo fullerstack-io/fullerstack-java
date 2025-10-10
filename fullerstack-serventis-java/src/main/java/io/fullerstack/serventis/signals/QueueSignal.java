@@ -17,7 +17,7 @@ import java.util.UUID;
  *
  * @param id unique signal identifier
  * @param circuit circuit name (e.g., "kafka.partition.behavior")
- * @param channel channel name (e.g., "my-topic.0.producer")
+ * @param subject subject name (e.g., "my-topic.0.producer")
  * @param timestamp when signal was emitted
  * @param vectorClock causal ordering clock
  * @param queueSignal Humainary Queues.Signal (Sign + units)
@@ -26,7 +26,7 @@ import java.util.UUID;
 public record QueueSignal(
     UUID id,
     String circuit,
-    String channel,
+    String subject,
     Instant timestamp,
     VectorClock vectorClock,
     Queues.Signal queueSignal,
@@ -41,7 +41,7 @@ public record QueueSignal(
      * Creates a queue signal with the specified sign and units.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param sign queue operation type
      * @param units quantity involved
      * @param metadata additional context
@@ -49,7 +49,7 @@ public record QueueSignal(
      */
     public static QueueSignal create(
         String circuit,
-        String channel,
+        String subject,
         Queues.Sign sign,
         long units,
         Map<String, String> metadata
@@ -57,7 +57,7 @@ public record QueueSignal(
         return new QueueSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             new QueueSignalImpl(sign, units),
@@ -69,7 +69,7 @@ public record QueueSignal(
      * Creates a PUT signal indicating producer wrote to partition.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param units number of messages written
      * @param metadata additional context (topic, partition, offset)
      * @return new QueueSignal with PUT
@@ -82,7 +82,7 @@ public record QueueSignal(
      * Creates a TAKE signal indicating consumer read from partition.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param units number of messages read
      * @param metadata additional context (topic, partition, offset, lag)
      * @return new QueueSignal with TAKE
@@ -95,7 +95,7 @@ public record QueueSignal(
      * Creates an OVERFLOW signal indicating partition approaching disk capacity.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param units number of units that couldn't be added
      * @param metadata additional context (topic, partition, diskUsage, threshold)
      * @return new QueueSignal with OVERFLOW
@@ -108,7 +108,7 @@ public record QueueSignal(
      * Creates an UNDERFLOW signal indicating take failed due to empty queue.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param units number of units that couldn't be taken
      * @param metadata additional context (topic, partition, consumerLag)
      * @return new QueueSignal with UNDERFLOW

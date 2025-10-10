@@ -25,7 +25,7 @@
         </dependency>
         <dependency>
             <groupId>io.fullerstack</groupId>
-            <artifactId>signetics-java</artifactId>
+            <artifactId>serventis-signals-java</artifactId>
         </dependency>
 
         <!-- Spring Boot -->

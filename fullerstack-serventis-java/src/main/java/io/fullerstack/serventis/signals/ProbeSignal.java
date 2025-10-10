@@ -25,7 +25,7 @@ import java.util.UUID;
  *
  * @param id unique signal identifier
  * @param circuit circuit name (e.g., "kafka.client.interactions")
- * @param channel channel name (e.g., "producer-123.send")
+ * @param subject subject name (e.g., "producer-123.send")
  * @param timestamp when observation was made
  * @param vectorClock causal ordering clock
  * @param observation Humainary Probes.Observation (Origin × Operation × Outcome)
@@ -34,7 +34,7 @@ import java.util.UUID;
 public record ProbeSignal(
     UUID id,
     String circuit,
-    String channel,
+    String subject,
     Instant timestamp,
     VectorClock vectorClock,
     Probes.Observation observation,
@@ -49,7 +49,7 @@ public record ProbeSignal(
      * Creates a probe signal with the specified origin, operation, and outcome.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param origin observation perspective (CLIENT or SERVER)
      * @param operation type of operation (CONNECT, SEND, RECEIVE, PROCESS, CLOSE)
      * @param outcome result (SUCCESS or FAILURE)
@@ -58,7 +58,7 @@ public record ProbeSignal(
      */
     public static ProbeSignal create(
         String circuit,
-        String channel,
+        String subject,
         Probes.Origin origin,
         Probes.Operation operation,
         Probes.Outcome outcome,
@@ -67,7 +67,7 @@ public record ProbeSignal(
         return new ProbeSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             new ProbeObservationImpl(origin, operation, outcome),
@@ -79,7 +79,7 @@ public record ProbeSignal(
      * Creates a CONNECT probe signal.
      *
      * @param circuit circuit name
-     * @param channel channel name
+     * @param subject subject name
      * @param origin CLIENT or SERVER
      * @param outcome SUCCESS or FAILURE
      * @param metadata connection details (broker, port, latency)
@@ -87,19 +87,19 @@ public record ProbeSignal(
      */
     public static ProbeSignal connect(
         String circuit,
-        String channel,
+        String subject,
         Probes.Origin origin,
         Probes.Outcome outcome,
         Map<String, String> metadata
     ) {
-        return create(circuit, channel, origin, Probes.Operation.CONNECT, outcome, metadata);
+        return create(circuit, subject, origin, Probes.Operation.CONNECT, outcome, metadata);
     }
 
     /**
      * Creates a SEND probe signal.
      *
      * @param circuit circuit name
-     * @param channel channel name
+     * @param subject subject name
      * @param origin CLIENT or SERVER
      * @param outcome SUCCESS or FAILURE
      * @param metadata send details (topic, partition, offset, bytes)
@@ -107,19 +107,19 @@ public record ProbeSignal(
      */
     public static ProbeSignal send(
         String circuit,
-        String channel,
+        String subject,
         Probes.Origin origin,
         Probes.Outcome outcome,
         Map<String, String> metadata
     ) {
-        return create(circuit, channel, origin, Probes.Operation.SEND, outcome, metadata);
+        return create(circuit, subject, origin, Probes.Operation.SEND, outcome, metadata);
     }
 
     /**
      * Creates a RECEIVE probe signal.
      *
      * @param circuit circuit name
-     * @param channel channel name
+     * @param subject subject name
      * @param origin CLIENT or SERVER
      * @param outcome SUCCESS or FAILURE
      * @param metadata receive details (topic, partition, offset, count, bytes)
@@ -127,19 +127,19 @@ public record ProbeSignal(
      */
     public static ProbeSignal receive(
         String circuit,
-        String channel,
+        String subject,
         Probes.Origin origin,
         Probes.Outcome outcome,
         Map<String, String> metadata
     ) {
-        return create(circuit, channel, origin, Probes.Operation.RECEIVE, outcome, metadata);
+        return create(circuit, subject, origin, Probes.Operation.RECEIVE, outcome, metadata);
     }
 
     /**
      * Creates a PROCESS probe signal.
      *
      * @param circuit circuit name
-     * @param channel channel name
+     * @param subject subject name
      * @param origin CLIENT or SERVER
      * @param outcome SUCCESS or FAILURE
      * @param metadata processing details (duration, records processed)
@@ -147,19 +147,19 @@ public record ProbeSignal(
      */
     public static ProbeSignal process(
         String circuit,
-        String channel,
+        String subject,
         Probes.Origin origin,
         Probes.Outcome outcome,
         Map<String, String> metadata
     ) {
-        return create(circuit, channel, origin, Probes.Operation.PROCESS, outcome, metadata);
+        return create(circuit, subject, origin, Probes.Operation.PROCESS, outcome, metadata);
     }
 
     /**
      * Creates a CLOSE probe signal.
      *
      * @param circuit circuit name
-     * @param channel channel name
+     * @param subject subject name
      * @param origin CLIENT or SERVER
      * @param outcome SUCCESS or FAILURE
      * @param metadata close details (reason, duration)
@@ -167,12 +167,12 @@ public record ProbeSignal(
      */
     public static ProbeSignal close(
         String circuit,
-        String channel,
+        String subject,
         Probes.Origin origin,
         Probes.Outcome outcome,
         Map<String, String> metadata
     ) {
-        return create(circuit, channel, origin, Probes.Operation.CLOSE, outcome, metadata);
+        return create(circuit, subject, origin, Probes.Operation.CLOSE, outcome, metadata);
     }
 
     // Convenience methods

@@ -27,7 +27,7 @@ import java.util.UUID;
  *
  * @param id unique signal identifier
  * @param circuit circuit name (e.g., "kafka.broker.health")
- * @param channel channel name (e.g., "broker-1.connections")
+ * @param subject subject name (e.g., "broker-1.connections")
  * @param timestamp when resource operation occurred
  * @param vectorClock causal ordering clock
  * @param resourceSignal Humainary Resources.Signal (Sign + units)
@@ -36,7 +36,7 @@ import java.util.UUID;
 public record ResourceSignal(
     UUID id,
     String circuit,
-    String channel,
+    String subject,
     Instant timestamp,
     VectorClock vectorClock,
     Resources.Signal resourceSignal,
@@ -51,7 +51,7 @@ public record ResourceSignal(
      * Creates a resource signal with the specified sign and units.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param sign resource operation type
      * @param units quantity of resource units involved
      * @param metadata additional context
@@ -59,7 +59,7 @@ public record ResourceSignal(
      */
     public static ResourceSignal create(
         String circuit,
-        String channel,
+        String subject,
         Resources.Sign sign,
         long units,
         Map<String, String> metadata
@@ -67,7 +67,7 @@ public record ResourceSignal(
         return new ResourceSignal(
             UUID.randomUUID(),
             circuit,
-            channel,
+            subject,
             Instant.now(),
             VectorClock.empty(),
             new ResourceSignalImpl(sign, units),
@@ -79,7 +79,7 @@ public record ResourceSignal(
      * Creates an ATTEMPT signal indicating a non-blocking resource request.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param units number of resource units requested
      * @param metadata request context (tryAcquire, timeout=0)
      * @return ATTEMPT resource signal
@@ -92,7 +92,7 @@ public record ResourceSignal(
      * Creates an ACQUIRE signal indicating a blocking resource request.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param units number of resource units requested
      * @param metadata request context (acquire with wait, timeout specified)
      * @return ACQUIRE resource signal
@@ -105,7 +105,7 @@ public record ResourceSignal(
      * Creates a GRANT signal indicating resource request was successful.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param units number of resource units granted
      * @param metadata grant context (pool size, utilization, wait time)
      * @return GRANT resource signal
@@ -118,7 +118,7 @@ public record ResourceSignal(
      * Creates a DENY signal indicating resource request was denied (no capacity).
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param units number of resource units that couldn't be granted
      * @param metadata denial context (pool exhausted, max capacity, current utilization)
      * @return DENY resource signal
@@ -131,7 +131,7 @@ public record ResourceSignal(
      * Creates a TIMEOUT signal indicating resource request timed out.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param units number of resource units that couldn't be granted
      * @param metadata timeout context (wait time, timeout threshold, backpressure)
      * @return TIMEOUT resource signal
@@ -144,7 +144,7 @@ public record ResourceSignal(
      * Creates a RELEASE signal indicating resource units were returned.
      *
      * @param circuit circuit name
-     * @param channel channel name (subject)
+     * @param subject subject name
      * @param units number of resource units released
      * @param metadata release context (hold duration, pool size after release)
      * @return RELEASE resource signal
