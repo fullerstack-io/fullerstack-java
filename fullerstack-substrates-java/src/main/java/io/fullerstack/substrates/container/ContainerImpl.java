@@ -31,7 +31,7 @@ public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
     private final Pool<P> pool;
     private final Source<E> eventSource;
     private final Source<Source<E>> containerSource;
-    private final Pipe<Source<E>> emitter; // Producer API
+    private final Pipe<Source<E>> emitter; // Internal emit API for nested Source pattern
     private final Name name;
 
     /**

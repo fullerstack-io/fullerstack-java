@@ -13,23 +13,28 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * Implementation of Substrates.Source for event emission and subscriber management.
  *
- * <p>Implements both Source (consumer API) and Pipe (producer API) to provide
- * a complete event bus: components can emit() to it, and others can subscribe() to it.
+ * <p>SourceImpl is an event dispatcher that implements both Source and Pipe interfaces:
+ * <ul>
+ *   <li><b>Source interface</b> - Allows external code to subscribe and observe emissions</li>
+ *   <li><b>Pipe interface</b> - Allows internal code (Conduit) to emit events to subscribers</li>
+ * </ul>
+ *
+ * <p><b>Data Flow:</b>
+ * <ol>
+ *   <li>Conduit calls {@code source.emit(value)} via Pipe interface</li>
+ *   <li>SourceImpl dispatches to all Subscribers</li>
+ *   <li>Each Subscriber registers consumer Pipes via Registrar</li>
+ *   <li>Emission is forwarded to all registered consumer Pipes</li>
+ * </ol>
  *
  * <p>Manages subscribers with thread-safe CopyOnWriteArrayList, suitable for
  * read-heavy workloads (many emissions, fewer subscribe/unsubscribe operations).
  *
- * <p>Features:
- * <ul>
- *   <li>Thread-safe subscriber management</li>
- *   <li>Subscription lifecycle with close() support</li>
- *   <li>Pipe.emit() for event delivery (producer API)</li>
- *   <li>Source.subscribe() for event subscription (consumer API)</li>
- * </ul>
- *
  * @param <E> event emission type
  * @see Source
  * @see Pipe
+ * @see Subscriber
+ * @see Registrar
  */
 public class SourceImpl<E> implements Source<E>, Pipe<E> {
     private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
@@ -94,8 +99,10 @@ public class SourceImpl<E> implements Source<E>, Pipe<E> {
     /**
      * Emits an event to all subscribers.
      *
-     * <p>This implements the Pipe interface, allowing SourceImpl to act as both
-     * a producer (via emit) and a consumer subscription manager (via subscribe).
+     * <p>This implements the Pipe interface, allowing the Conduit to emit events
+     * into the Source, which then dispatches them to all registered subscriber Pipes.
+     *
+     * <p>Called by Conduit's queue processor when a Channel emits a value.
      *
      * @param emission the event to emit
      */

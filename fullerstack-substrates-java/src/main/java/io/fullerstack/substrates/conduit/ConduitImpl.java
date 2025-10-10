@@ -15,13 +15,22 @@ import java.util.concurrent.LinkedBlockingQueue;
 /**
  * Generic implementation of Substrates.Conduit interface.
  *
- * <p>Manages percepts created from channels via a Composer. Each percept corresponds to a subject
+ * <p>Routes emitted values from Channels (producers) to Pipes (consumers) via a shared queue.
+ * Manages percepts created from channels via a Composer. Each percept corresponds to a subject
  * and shares a common queue for signal processing.
+ *
+ * <p><b>Data Flow:</b>
+ * <ol>
+ *   <li>Channel (producer) emits value → goes to shared queue</li>
+ *   <li>Queue processor takes value → calls processEmission()</li>
+ *   <li>processEmission() calls emitter.emit() (SourceImpl)</li>
+ *   <li>Source dispatches to Subscribers → registered consumer Pipes receive emission</li>
+ * </ol>
  *
  * <p>Key behaviors:
  * <ul>
  *   <li>Composes Channels into percepts on-demand via get(Name)</li>
- *   <li>Emits events through Source when Channels emit</li>
+ *   <li>Processes emissions asynchronously via queue processor thread</li>
  *   <li>Subscribers can observe all emissions via source().subscribe()</li>
  * </ul>
  *
@@ -33,8 +42,8 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     private final Subject conduitSubject;
     private final Composer<? extends P, E> composer;
     private final Map<Name, P> percepts = new ConcurrentHashMap<>();
-    private final Source<E> eventSource; // Source (SourceImpl implements Pipe for emit())
-    private final Pipe<E> emitter; // Producer API
+    private final Source<E> eventSource; // Observable stream - external code subscribes to this
+    private final Pipe<E> emitter; // Internal emit API - queue processor emits via this
     private final BlockingQueue<E> queue = new LinkedBlockingQueue<>(10000);
     private final Thread queueProcessor;
 
@@ -94,7 +103,7 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     }
 
     private void processEmission(E emission) {
-        // Emit through Pipe so subscribers can observe
+        // Emit to Source (via Pipe interface) which dispatches to all Subscribers
         emitter.emit(emission);
     }
 
