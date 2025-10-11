@@ -2,10 +2,6 @@ package io.fullerstack.substrates.slot;
 
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Slot;
-import io.humainary.substrates.api.Substrates.Subject;
-import io.fullerstack.substrates.id.IdImpl;
-import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.state.StateImpl;
 
 import java.util.Objects;
 
@@ -62,20 +58,6 @@ public class SlotImpl<T> implements Slot<T> {
         return value;
     }
 
-    /**
-     * Creates a Subject representation of this Slot.
-     *
-     * @return subject with slot state
-     */
-    public Subject subject() {
-        return new SubjectImpl(
-            IdImpl.generate(),
-            name,
-            StateImpl.of(name, value != null ? value.toString() : "null"),
-            Subject.Type.SCOPE  // Using SCOPE as there's no SLOT type
-        );
-    }
-
     // Factory methods for common types
     public static Slot<Boolean> of(Name name, boolean value) {
         return new SlotImpl<>(name, value, Boolean.class);
@@ -99,6 +81,14 @@ public class SlotImpl<T> implements Slot<T> {
 
     public static Slot<String> of(Name name, String value) {
         return new SlotImpl<>(name, value, String.class);
+    }
+
+    public static Slot<Name> of(Name name, Name value) {
+        return new SlotImpl<>(name, value, Name.class);
+    }
+
+    public static Slot<io.humainary.substrates.api.Substrates.State> of(Name name, io.humainary.substrates.api.Substrates.State value) {
+        return new SlotImpl<>(name, value, io.humainary.substrates.api.Substrates.State.class);
     }
 
     @SuppressWarnings("unchecked")

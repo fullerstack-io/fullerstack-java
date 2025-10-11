@@ -1,5 +1,6 @@
 package io.fullerstack.substrates.state;
 
+import io.fullerstack.substrates.slot.SlotImpl;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Slot;
 import io.humainary.substrates.api.Substrates.State;
@@ -231,45 +232,5 @@ public class StateImpl implements State {
     @Override
     public String toString() {
         return "State[slots=" + slots.size() + "]";
-    }
-
-    /**
-     * Internal Slot implementation for State storage.
-     * Immutable, lightweight, no Subject overhead.
-     */
-    private static class SlotImpl<T> implements Slot<T> {
-        private final Name name;
-        private final T value;
-        private final Class<T> type;
-
-        private SlotImpl(Name name, T value, Class<T> type) {
-            this.name = name;
-            this.value = value;
-            this.type = type;
-        }
-
-        @Override
-        public Name name() {
-            return name;
-        }
-
-        @Override
-        public Class<T> type() {
-            return type;
-        }
-
-        @Override
-        public T value() {
-            return value;
-        }
-
-        @SuppressWarnings("unchecked")
-        static <T> Slot<T> of(Name name, T value) {
-            return new SlotImpl<>(name, value, (Class<T>) value.getClass());
-        }
-
-        static <T> Slot<T> of(Name name, T value, Class<T> type) {
-            return new SlotImpl<>(name, value, type);
-        }
     }
 }
