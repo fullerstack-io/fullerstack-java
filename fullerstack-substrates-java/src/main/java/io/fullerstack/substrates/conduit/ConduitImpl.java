@@ -154,12 +154,4 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         }
     }
 
-    /**
-     * Stops the queue processor thread.
-     */
-    public void shutdown() {
-        if (queueProcessor != null && queueProcessor.isAlive()) {
-            queueProcessor.interrupt();
-        }
-    }
 }

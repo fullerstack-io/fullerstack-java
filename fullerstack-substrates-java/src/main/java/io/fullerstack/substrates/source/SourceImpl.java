@@ -86,8 +86,12 @@ public class SourceImpl<E> implements Source<E> {
     }
 
     /**
-     * Returns the list of subscribers for conduit processing.
-     * Package-private visibility for Conduit access.
+     * INTERNAL: Returns subscribers for Conduit processing.
+     *
+     * TODO: This violates strict API compliance. Should either:
+     * 1. Move SourceImpl and ConduitImpl to same package for package-private access
+     * 2. Redesign architecture so Conduit doesn't need direct subscriber access
+     * 3. Have Source handle invocation instead of exposing subscribers
      *
      * @return list of subscribers
      */
