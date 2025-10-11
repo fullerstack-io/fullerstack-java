@@ -43,8 +43,7 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     private final Composer<? extends P, E> composer;
     private final Map<Name, P> percepts = new ConcurrentHashMap<>();
     private final Source<E> eventSource; // Observable stream - external code subscribes to this
-    private final Pipe<E> emitter; // Internal emit API - queue processor emits via this
-    private final BlockingQueue<E> queue = new LinkedBlockingQueue<>(10000);
+    private final BlockingQueue<Capture<E>> queue = new LinkedBlockingQueue<>(10000);
     private final Thread queueProcessor;
 
     public ConduitImpl(Name circuitName, Name conduitName, Composer<? extends P, E> composer) {
@@ -55,9 +54,7 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
             Subject.Type.CONDUIT
         );
         this.composer = composer;
-        SourceImpl<E> source = new SourceImpl<>(conduitName);
-        this.eventSource = source;
-        this.emitter = source; // SourceImpl implements both Source and Pipe
+        this.eventSource = new SourceImpl<>(conduitName);
 
         // Start queue processor
         this.queueProcessor = startQueueProcessor();
@@ -85,8 +82,8 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         Thread processor = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    E emission = queue.take();
-                    processEmission(emission);
+                    Capture<E> capture = queue.take();
+                    processEmission(capture);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
@@ -102,9 +99,10 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         return processor;
     }
 
-    private void processEmission(E emission) {
-        // Emit to Source (via Pipe interface) which dispatches to all Subscribers
-        emitter.emit(emission);
+    private void processEmission(Capture<E> capture) {
+        // Notify Source with the Capture (Channel's Subject + emission)
+        // Source will dispatch to Subscribers with the CHANNEL's Subject
+        ((SourceImpl<E>) eventSource).notify(capture);
     }
 
     /**

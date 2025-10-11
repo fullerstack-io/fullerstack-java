@@ -1,6 +1,7 @@
 package io.fullerstack.substrates.source;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
@@ -40,6 +41,26 @@ class SourceImplTest {
         };
     }
 
+    /**
+     * Helper to create a test Subject (simulating a Channel).
+     */
+    private Subject testSubject(String name) {
+        return new SubjectImpl(
+            IdImpl.generate(),
+            NameImpl.of(name),
+            StateImpl.empty(),
+            Subject.Type.CHANNEL
+        );
+    }
+
+    /**
+     * Helper to create a Capture and notify the source (simulating Conduit behavior).
+     */
+    private <E> void notifySource(SourceImpl<E> source, String channelName, E emission) {
+        Capture<E> capture = new CaptureImpl<>(testSubject(channelName), emission);
+        source.notify(capture);
+    }
+
     @Test
     void shouldCreateSourceWithDefaultName() {
         SourceImpl<String> source = new SourceImpl<>();
@@ -70,7 +91,7 @@ class SourceImplTest {
             });
         }));
 
-        source.emit("test-event");
+        notifySource(source, "test-channel", "test-event");
 
         assertThat(notificationCount.get()).isEqualTo(1);
         assertThat(receivedEvents).containsExactly("test-event");
@@ -90,7 +111,7 @@ class SourceImplTest {
             registrar.register(emission -> count2.incrementAndGet());
         }));
 
-        source.emit("event");
+        notifySource(source, "test-channel", "event");
 
         assertThat(count1.get()).isEqualTo(1);
         assertThat(count2.get()).isEqualTo(1);
@@ -105,11 +126,11 @@ class SourceImplTest {
             registrar.register(emission -> count.incrementAndGet());
         }));
 
-        source.emit("event1");
+        notifySource(source, "test-channel", "event1");
         assertThat(count.get()).isEqualTo(1);
 
         subscription.close();
-        source.emit("event2");
+        notifySource(source, "test-channel", "event2");
 
         // Should still be 1 (not 2) because subscriber was removed
         assertThat(count.get()).isEqualTo(1);
@@ -124,10 +145,10 @@ class SourceImplTest {
             registrar.register(emission -> received.add(emission));
         }));
 
-        source.emit("before");
+        notifySource(source, "test-channel", "before");
 
         subscription.close();
-        source.emit("after");
+        notifySource(source, "test-channel", "after");
 
         assertThat(received).containsExactly("before");
     }
@@ -154,7 +175,7 @@ class SourceImplTest {
         assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
 
         // Emit event - all subscribers should be notified
-        source.emit("test");
+        notifySource(source, "test-channel", "test");
 
         assertThat(totalNotifications.get()).isEqualTo(threadCount);
     }
@@ -168,9 +189,9 @@ class SourceImplTest {
             registrar.register(emission -> received.add(emission));
         }));
 
-        source.emit(1);
-        source.emit(2);
-        source.emit(3);
+        notifySource(source, "test-channel", 1);
+        notifySource(source, "test-channel", 2);
+        notifySource(source, "test-channel", 3);
 
         assertThat(received).containsExactly(1, 2, 3);
     }

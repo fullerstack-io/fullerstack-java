@@ -2,8 +2,12 @@ package io.fullerstack.substrates.integration;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.CortexRuntime;
+import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.circuit.CircuitImpl;
 import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.id.IdImpl;
+import io.fullerstack.substrates.state.StateImpl;
+import io.fullerstack.substrates.subject.SubjectImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -120,10 +124,20 @@ class CircuitIntegrationTest {
             }
         });
 
-        // Emit state via cast to SourceImpl
+        // Notify source with a Capture (simulating Channel emission)
         io.fullerstack.substrates.source.SourceImpl<State> sourceImpl =
             (io.fullerstack.substrates.source.SourceImpl<State>) source;
-        sourceImpl.emit(io.fullerstack.substrates.state.StateImpl.of(NameImpl.of("event"), 1));
+        Subject testChannel = new SubjectImpl(
+            IdImpl.generate(),
+            NameImpl.of("test-channel"),
+            StateImpl.empty(),
+            Subject.Type.CHANNEL
+        );
+        Capture<State> capture = new CaptureImpl<>(
+            testChannel,
+            StateImpl.of(NameImpl.of("event"), 1)
+        );
+        sourceImpl.notify(capture);
 
         assertThat(emissionCount.get()).isEqualTo(1);
     }

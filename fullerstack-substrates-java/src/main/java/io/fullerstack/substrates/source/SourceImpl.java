@@ -11,32 +11,36 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Implementation of Substrates.Source for event emission and subscriber management.
+ * Implementation of Substrates.Source for event routing and subscriber management.
  *
- * <p>SourceImpl is an event dispatcher that implements both Source and Pipe interfaces:
+ * <p>SourceImpl is a routing mechanism that connects emitting Subjects (Channels) with Subscribers:
  * <ul>
  *   <li><b>Source interface</b> - Allows external code to subscribe and observe emissions</li>
- *   <li><b>Pipe interface</b> - Allows internal code (Conduit) to emit events to subscribers</li>
+ *   <li><b>notify(Capture)</b> - Package-visible method for Conduit to dispatch Channel emissions</li>
  * </ul>
  *
  * <p><b>Data Flow:</b>
  * <ol>
- *   <li>Conduit calls {@code source.emit(value)} via Pipe interface</li>
- *   <li>SourceImpl dispatches to all Subscribers</li>
+ *   <li>Conduit calls {@code source.notify(capture)} with Channel's Subject + emission</li>
+ *   <li>SourceImpl dispatches to all Subscribers with the CHANNEL's Subject (not Source's)</li>
  *   <li>Each Subscriber registers consumer Pipes via Registrar</li>
  *   <li>Emission is forwarded to all registered consumer Pipes</li>
  * </ol>
+ *
+ * <p><b>Critical Design Point:</b> Source is NOT an emitter - it's a connection mechanism.
+ * The actual emitting Subjects are Channels, and their identity must be preserved when
+ * dispatching to Subscribers for hierarchical routing.
  *
  * <p>Manages subscribers with thread-safe CopyOnWriteArrayList, suitable for
  * read-heavy workloads (many emissions, fewer subscribe/unsubscribe operations).
  *
  * @param <E> event emission type
  * @see Source
- * @see Pipe
  * @see Subscriber
  * @see Registrar
+ * @see Capture
  */
-public class SourceImpl<E> implements Source<E>, Pipe<E> {
+public class SourceImpl<E> implements Source<E> {
     private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
     private final Subject sourceSubject;
 
@@ -100,23 +104,25 @@ public class SourceImpl<E> implements Source<E>, Pipe<E> {
     }
 
     /**
-     * Emits an event to all subscribers.
+     * Notifies all subscribers of a captured emission from a Channel.
      *
-     * <p>This implements the Pipe interface, allowing the Conduit to emit events
-     * into the Source, which then dispatches them to all registered subscriber Pipes.
+     * <p>Public method called by Conduit's queue processor to dispatch emissions.
+     * Unlike a Pipe's emit(), this method preserves the emitting Channel's Subject identity,
+     * allowing Subscribers to perform hierarchical routing based on WHO emitted.
      *
-     * <p>Called by Conduit's queue processor when a Channel emits a value.
+     * <p><b>Critical:</b> Passes capture.subject() (the Channel's Subject) to subscribers,
+     * NOT sourceSubject. This is essential for Humainary's hierarchical routing design.
      *
-     * @param emission the event to emit
+     * @param capture the captured emission (Channel's Subject + value)
      */
-    @Override
-    public void emit(E emission) {
+    public void notify(Capture<E> capture) {
         for (Subscriber<E> subscriber : subscribers) {
             // Collect pipes that the subscriber registers
             List<Pipe<E>> pipes = new CopyOnWriteArrayList<>();
 
-            // Invoke the subscriber, which will register its pipes
-            subscriber.accept(sourceSubject, new Registrar<E>() {
+            // Invoke the subscriber with the CHANNEL's Subject (from capture)
+            // This enables hierarchical routing based on the emitting Channel
+            subscriber.accept(capture.subject(), new Registrar<E>() {
                 @Override
                 public void register(Pipe<E> pipe) {
                     pipes.add(pipe);
@@ -125,14 +131,8 @@ public class SourceImpl<E> implements Source<E>, Pipe<E> {
 
             // Now emit to all registered pipes
             for (Pipe<E> pipe : pipes) {
-                pipe.emit(emission);
+                pipe.emit(capture.emission());
             }
         }
-    }
-
-    /**
-     * Internal Capture implementation for event delivery.
-     */
-    private record CaptureImpl<E>(Subject subject, E emission) implements Capture<E> {
     }
 }

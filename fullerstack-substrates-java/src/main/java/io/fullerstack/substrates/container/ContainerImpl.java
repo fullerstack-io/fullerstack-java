@@ -1,6 +1,7 @@
 package io.fullerstack.substrates.container;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
@@ -30,8 +31,7 @@ import java.util.Objects;
 public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
     private final Pool<P> pool;
     private final Source<E> eventSource;
-    private final Source<Source<E>> containerSource;
-    private final Pipe<Source<E>> emitter; // Internal emit API for nested Source pattern
+    private final SourceImpl<Source<E>> containerSource;
     private final Name name;
 
     /**
@@ -54,11 +54,12 @@ public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
         // Container<Pool<P>, Source<E>> means source() returns Source<Source<E>>
         // This enables the nested subscription pattern from William Louth's examples:
         // container.source().subscribe(subject -> source -> source.subscribe(...))
-        SourceImpl<Source<E>> nestedSource = new SourceImpl<>(name);
-        this.containerSource = nestedSource;
-        this.emitter = nestedSource; // SourceImpl implements both Source and Pipe
-        // Emit the eventSource so subscribers can get it
-        this.emitter.emit(eventSource);
+        this.containerSource = new SourceImpl<>(name);
+
+        // Notify the containerSource with a Capture containing the container's subject and eventSource
+        // This makes the eventSource available to subscribers of the container
+        Capture<Source<E>> capture = new CaptureImpl<>(subject(), eventSource);
+        this.containerSource.notify(capture);
     }
 
     @Override

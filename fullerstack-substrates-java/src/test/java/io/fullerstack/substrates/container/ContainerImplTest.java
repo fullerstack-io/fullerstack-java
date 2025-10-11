@@ -1,6 +1,7 @@
 package io.fullerstack.substrates.container;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pool.PoolImpl;
 import io.fullerstack.substrates.source.SourceImpl;
@@ -36,6 +37,26 @@ class ContainerImplTest {
                 handler.accept(subject, registrar);
             }
         };
+    }
+
+    /**
+     * Helper to create a test Subject (simulating a Channel).
+     */
+    private Subject testSubject(String name) {
+        return new SubjectImpl(
+            IdImpl.generate(),
+            NameImpl.of(name),
+            StateImpl.empty(),
+            Subject.Type.CHANNEL
+        );
+    }
+
+    /**
+     * Helper to create a Capture and notify the source (simulating Conduit behavior).
+     */
+    private <E> void notifySource(SourceImpl<E> source, String channelName, E emission) {
+        Capture<E> capture = new CaptureImpl<>(testSubject(channelName), emission);
+        source.notify(capture);
     }
 
     @Test
@@ -76,7 +97,7 @@ class ContainerImplTest {
         }));
 
         // Emit from source
-        source.emit("test-event");
+        notifySource(source, "test-channel", "test-event");
 
         assertThat(notificationCount.get()).isEqualTo(1);
     }
@@ -98,8 +119,8 @@ class ContainerImplTest {
             registrar.register(emission -> emissionCount.incrementAndGet());
         }));
 
-        source.emit("event1");
-        source.emit("event2");
+        notifySource(source, "test-channel", "event1");
+        notifySource(source, "test-channel", "event2");
 
         assertThat(emissionCount.get()).isEqualTo(2);
     }
@@ -150,8 +171,8 @@ class ContainerImplTest {
             registrar.register(emission -> count2.incrementAndGet());
         }));
 
-        source.emit(1);
-        source.emit(2);
+        notifySource(source, "test-channel", 1);
+        notifySource(source, "test-channel", 2);
 
         assertThat(count1.get()).isEqualTo(2);
         assertThat(count2.get()).isEqualTo(2);
@@ -173,8 +194,8 @@ class ContainerImplTest {
             registrar.register(value -> sum.addAndGet(value));
         }));
 
-        source.emit(10);
-        source.emit(20);
+        notifySource(source, "test-channel", 10);
+        notifySource(source, "test-channel", 20);
 
         assertThat(sum.get()).isEqualTo(30);
     }
