@@ -18,9 +18,21 @@ import java.util.stream.Stream;
  * returns a NEW State instance with the slot appended. This allows duplicate names
  * to exist in the slot list.
  *
+ * <p><b>Type Matching:</b> Per William Louth's design, "A State stores the type with
+ * the name, only matching when both are exact matches." This allows the same name to
+ * hold different types simultaneously:
+ * <pre>
+ * State state = cortex.state()
+ *     .state(name("port"), 8080)        // Integer
+ *     .state(name("port"), "HTTP/1.1"); // String (does NOT override Integer!)
+ *
+ * Integer port = state.value(slot(name("port"), 0));     // 8080
+ * String protocol = state.value(slot(name("port"), "")); // "HTTP/1.1"
+ * </pre>
+ *
  * <p><b>Duplicate Handling:</b> Uses a List internally, which allows multiple slots
- * with the same name. Call {@code compact()} to remove duplicates, keeping the last
- * occurrence of each name.
+ * with the same (name, type) pair. Call {@code compact()} to remove duplicates, keeping
+ * the last occurrence of each (name, type) pair.
  *
  * <p><b>Pattern:</b> Builder pattern with override support:
  * <pre>
@@ -51,12 +63,20 @@ public class StateImpl implements State {
 
     @Override
     public State compact() {
-        // Remove duplicates, keeping last occurrence of each name
-        Map<Name, Slot<?>> deduped = new LinkedHashMap<>();
+        // Remove duplicates, keeping last occurrence of each (name, type) pair
+        // Per article: "A State stores the type with the name, only matching when both are exact matches"
+        Map<NameTypePair, Slot<?>> deduped = new LinkedHashMap<>();
         for (Slot<?> slot : slots) {
-            deduped.put(slot.name(), slot);  // Last occurrence wins
+            deduped.put(new NameTypePair(slot.name(), slot.type()), slot);  // Last occurrence wins
         }
         return new StateImpl(new ArrayList<>(deduped.values()));
+    }
+
+    /**
+     * Composite key for deduplication: (name, type) pair.
+     * State matches slots by both name AND type.
+     */
+    private record NameTypePair(Name name, Class<?> type) {
     }
 
     @Override
@@ -127,29 +147,43 @@ public class StateImpl implements State {
         // Start with fallback value from query slot
         T result = slot.value();
 
-        // Search for matching name and override with LAST occurrence
+        // Search for matching name AND type, override with LAST occurrence
+        // Per article: "A State stores the type with the name, only matching when both are exact matches"
         for (Slot<?> s : slots) {
-            if (s.name().equals(slot.name())) {
+            if (s.name().equals(slot.name()) && typesMatch(slot.type(), s.type())) {
                 @SuppressWarnings("unchecked")
                 T value = ((Slot<T>) s).value();
                 result = value;  // Keep updating with later occurrences
             }
         }
 
-        // Returns slot.value() fallback if name not found
+        // Returns slot.value() fallback if name and type not found
         return result;
     }
 
     @Override
     public <T> Stream<T> values(Slot<? extends T> slot) {
-        // Return ALL values with this name (for duplicate handling)
+        // Return ALL values with this name AND type (for duplicate handling)
+        // Per article: "A State stores the type with the name, only matching when both are exact matches"
         return slots.stream()
-            .filter(s -> s.name().equals(slot.name()))
+            .filter(s -> s.name().equals(slot.name()) && typesMatch(slot.type(), s.type()))
             .map(s -> {
                 @SuppressWarnings("unchecked")
                 Slot<T> typed = (Slot<T>) s;
                 return typed.value();
             });
+    }
+
+    /**
+     * Check if types match for slot lookup.
+     * Handles both exact matches and interface/subclass relationships.
+     *
+     * @param queryType the type being queried (e.g., State.class)
+     * @param storedType the type stored in the slot (e.g., StateImpl.class)
+     * @return true if types are compatible
+     */
+    private boolean typesMatch(Class<?> queryType, Class<?> storedType) {
+        return queryType.equals(storedType) || queryType.isAssignableFrom(storedType);
     }
 
     @Override

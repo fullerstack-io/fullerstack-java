@@ -282,6 +282,53 @@ var allTimeouts = state.values(cortex.slot(cortex.name("timeout"), 0)).toList();
 assert allTimeouts.equals(List.of(30, 60));  // Both values
 ```
 
+**Type Matching:**
+
+From William Louth's article: **"A State stores the type with the name, only matching when both are exact matches."**
+
+State matches slots by BOTH name AND type:
+
+```java
+Name XYZ = cortex.name("XYZ");
+
+// Create slots with different types
+Slot<Integer> intSlot = cortex.slot(XYZ, 0);
+Slot<String> stringSlot = cortex.slot(XYZ, "");
+
+// Build state with same name, different types
+State state = cortex.state()
+    .state(XYZ, 3)      // Integer
+    .state(XYZ, "4");   // String - does NOT override Integer!
+
+// Query by (name, type) pair
+Integer intValue = state.value(intSlot);
+assert intValue == 3;  // Integer value unchanged
+
+String stringValue = state.value(stringSlot);
+assert stringValue.equals("4");  // String value found
+
+// Both coexist because types differ
+assert state.stream().count() == 2;
+```
+
+**Why Type Matching Matters:**
+
+This prevents errors in heterogeneous configurations:
+
+```java
+// Different components use same name, different types
+State config = cortex.state()
+    .state(cortex.name("port"), 8080)        // Integer port number
+    .state(cortex.name("port"), "HTTP/1.1"); // String protocol version
+
+// Each component gets the right type
+Integer portNumber = config.value(cortex.slot(cortex.name("port"), 0));
+String protocol = config.value(cortex.slot(cortex.name("port"), ""));
+
+assert portNumber == 8080;           // ✅ Type-safe lookup
+assert protocol.equals("HTTP/1.1");  // ✅ No conflicts
+```
+
 ### Slot
 
 **What:** Immutable query/lookup object for type-safe State access with fallback support.

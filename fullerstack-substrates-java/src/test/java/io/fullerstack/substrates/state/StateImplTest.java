@@ -167,4 +167,54 @@ class StateImplTest {
 
         assertThat(retrieved).isSameAs(innerState);
     }
+
+    @Test
+    void shouldMatchByBothNameAndType() {
+        // Per article: "A State stores the type with the name, only matching when both are exact matches"
+        Name XYZ = NameImpl.of("XYZ");
+
+        // Create slots with different types
+        var intSlot = io.fullerstack.substrates.slot.SlotImpl.of(XYZ, 0);
+        var stringSlot = io.fullerstack.substrates.slot.SlotImpl.of(XYZ, "");
+
+        // Build state with same name, different types
+        State state = new StateImpl()
+            .state(XYZ, 3)      // Integer
+            .state(XYZ, "4");   // String - does NOT override Integer!
+
+        // Query by type - Integer slot returns Integer value
+        Integer intValue = state.value(intSlot);
+        assertThat(intValue).isEqualTo(3);  // Integer value unchanged
+
+        // Query by type - String slot returns String value
+        String stringValue = state.value(stringSlot);
+        assertThat(stringValue).isEqualTo("4");  // String value found
+
+        // Both coexist because types differ
+        assertThat(state.stream().count()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldCompactByNameAndType() {
+        // compact() should only remove duplicates with same (name, type) pair
+        Name XYZ = NameImpl.of("XYZ");
+
+        State state = new StateImpl()
+            .state(XYZ, 1)      // Integer #1
+            .state(XYZ, 2)      // Integer #2 (duplicate)
+            .state(XYZ, "a")    // String #1 (different type)
+            .state(XYZ, "b");   // String #2 (duplicate)
+
+        State compacted = state.compact();
+
+        // Should keep last Integer and last String
+        assertThat(compacted.stream().count()).isEqualTo(2);
+
+        // Verify values
+        var intSlot = io.fullerstack.substrates.slot.SlotImpl.of(XYZ, 0);
+        var stringSlot = io.fullerstack.substrates.slot.SlotImpl.of(XYZ, "");
+
+        assertThat(compacted.value(intSlot)).isEqualTo(2);     // Last Integer
+        assertThat(compacted.value(stringSlot)).isEqualTo("b"); // Last String
+    }
 }
