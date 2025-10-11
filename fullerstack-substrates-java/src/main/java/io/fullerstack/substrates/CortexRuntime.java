@@ -8,6 +8,7 @@ import io.fullerstack.substrates.scope.ScopeImpl;
 import io.fullerstack.substrates.slot.SlotImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
+import io.fullerstack.substrates.subscriber.SubscriberImpl;
 import io.fullerstack.substrates.name.NameImpl;
 
 import java.lang.reflect.Member;
@@ -254,18 +255,12 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public <E> Subscriber<E> subscriber(Name name, BiConsumer<Subject, Registrar<E>> fn) {
-        Objects.requireNonNull(name, "Subscriber name cannot be null");
-        Objects.requireNonNull(fn, "Subscriber function cannot be null");
-        // Stub implementation - will be completed in Story 4.12
-        return new SubscriberStub<>(name, fn);
+        return new SubscriberImpl<>(name, fn);
     }
 
     @Override
     public <E> Subscriber<E> subscriber(Name name, Pool<? extends Pipe<E>> pool) {
-        Objects.requireNonNull(name, "Subscriber name cannot be null");
-        Objects.requireNonNull(pool, "Pipe pool cannot be null");
-        // Stub implementation - will be completed in Story 4.12
-        return new SubscriberStub<>(name, pool);
+        return new SubscriberImpl<>(name, pool);
     }
 
     // ========== Capture Creation (1 method) ==========
@@ -330,31 +325,6 @@ public class CortexRuntime implements Cortex {
 
         @Override
         public void close() {
-            // No-op for stub
-        }
-    }
-
-    /**
-     * Stub Subscriber implementation - will be replaced in Story 4.12.
-     */
-    private static class SubscriberStub<E> implements Subscriber<E> {
-        private final Name name;
-
-        SubscriberStub(Name name, BiConsumer<Subject, Registrar<E>> fn) {
-            this.name = name;
-        }
-
-        SubscriberStub(Name name, Pool<? extends Pipe<E>> pool) {
-            this.name = name;
-        }
-
-        @Override
-        public Subject subject() {
-            return new SubjectImpl(IdImpl.generate(), name, StateImpl.empty(), Subject.Type.SUBSCRIBER);
-        }
-
-        @Override
-        public void accept(Subject subject, Registrar<E> registrar) {
             // No-op for stub
         }
     }
