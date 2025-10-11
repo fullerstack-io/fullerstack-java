@@ -29,7 +29,7 @@ import java.util.Objects;
  *   ↓
  * QueueProcessor takes Capture
  *   ↓
- * Source.notify(capture) passes Channel's Subject to Subscribers
+ * Conduit invokes subscriber.accept(capture.subject(), registrar)
  *   ↓
  * Subscriber receives (subject, registrar) where subject.name() == "sensor1"
  * </pre>

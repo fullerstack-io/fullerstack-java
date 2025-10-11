@@ -11,25 +11,9 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Implementation of Substrates.Source for event routing and subscriber management.
+ * Implementation of Substrates.Source for subscriber management.
  *
- * <p>SourceImpl is a routing mechanism that connects emitting Subjects (Channels) with Subscribers:
- * <ul>
- *   <li><b>Source interface</b> - Allows external code to subscribe and observe emissions</li>
- *   <li><b>notify(Capture)</b> - Package-visible method for Conduit to dispatch Channel emissions</li>
- * </ul>
- *
- * <p><b>Data Flow:</b>
- * <ol>
- *   <li>Conduit calls {@code source.notify(capture)} with Channel's Subject + emission</li>
- *   <li>SourceImpl dispatches to all Subscribers with the CHANNEL's Subject (not Source's)</li>
- *   <li>Each Subscriber registers consumer Pipes via Registrar</li>
- *   <li>Emission is forwarded to all registered consumer Pipes</li>
- * </ol>
- *
- * <p><b>Critical Design Point:</b> Source is NOT an emitter - it's a connection mechanism.
- * The actual emitting Subjects are Channels, and their identity must be preserved when
- * dispatching to Subscribers for hierarchical routing.
+ * <p>SourceImpl manages Subscribers and provides the observable stream interface.
  *
  * <p>Manages subscribers with thread-safe CopyOnWriteArrayList, suitable for
  * read-heavy workloads (many emissions, fewer subscribe/unsubscribe operations).
@@ -37,8 +21,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * @param <E> event emission type
  * @see Source
  * @see Subscriber
- * @see Registrar
- * @see Capture
  */
 public class SourceImpl<E> implements Source<E> {
     private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
@@ -104,35 +86,13 @@ public class SourceImpl<E> implements Source<E> {
     }
 
     /**
-     * Notifies all subscribers of a captured emission from a Channel.
+     * Returns the list of subscribers for conduit processing.
+     * Package-private visibility for Conduit access.
      *
-     * <p>Public method called by Conduit's queue processor to dispatch emissions.
-     * Unlike a Pipe's emit(), this method preserves the emitting Channel's Subject identity,
-     * allowing Subscribers to perform hierarchical routing based on WHO emitted.
-     *
-     * <p><b>Critical:</b> Passes capture.subject() (the Channel's Subject) to subscribers,
-     * NOT sourceSubject. This is essential for Humainary's hierarchical routing design.
-     *
-     * @param capture the captured emission (Channel's Subject + value)
+     * @return list of subscribers
      */
-    public void notify(Capture<E> capture) {
-        for (Subscriber<E> subscriber : subscribers) {
-            // Collect pipes that the subscriber registers
-            List<Pipe<E>> pipes = new CopyOnWriteArrayList<>();
-
-            // Invoke the subscriber with the CHANNEL's Subject (from capture)
-            // This enables hierarchical routing based on the emitting Channel
-            subscriber.accept(capture.subject(), new Registrar<E>() {
-                @Override
-                public void register(Pipe<E> pipe) {
-                    pipes.add(pipe);
-                }
-            });
-
-            // Now emit to all registered pipes
-            for (Pipe<E> pipe : pipes) {
-                pipe.emit(capture.emission());
-            }
-        }
+    public List<Subscriber<E>> getSubscribers() {
+        return subscribers;
     }
+
 }

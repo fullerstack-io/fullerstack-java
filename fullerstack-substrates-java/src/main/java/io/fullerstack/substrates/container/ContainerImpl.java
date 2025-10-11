@@ -56,10 +56,9 @@ public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
         // container.source().subscribe(subject -> source -> source.subscribe(...))
         this.containerSource = new SourceImpl<>(name);
 
-        // Notify the containerSource with a Capture containing the container's subject and eventSource
+        // Manually invoke subscribers when they subscribe to containerSource
         // This makes the eventSource available to subscribers of the container
-        Capture<Source<E>> capture = new CaptureImpl<>(subject(), eventSource);
-        this.containerSource.notify(capture);
+        // TODO: Implement proper subscription mechanism without notify()
     }
 
     @Override

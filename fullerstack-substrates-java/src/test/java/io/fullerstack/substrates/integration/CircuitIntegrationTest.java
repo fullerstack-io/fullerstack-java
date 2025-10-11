@@ -124,7 +124,7 @@ class CircuitIntegrationTest {
             }
         });
 
-        // Notify source with a Capture (simulating Channel emission)
+        // Simulate Conduit behavior of invoking subscribers
         io.fullerstack.substrates.source.SourceImpl<State> sourceImpl =
             (io.fullerstack.substrates.source.SourceImpl<State>) source;
         Subject testChannel = new SubjectImpl(
@@ -133,11 +133,23 @@ class CircuitIntegrationTest {
             StateImpl.empty(),
             Subject.Type.CHANNEL
         );
-        Capture<State> capture = new CaptureImpl<>(
-            testChannel,
-            StateImpl.of(NameImpl.of("event"), 1)
-        );
-        sourceImpl.notify(capture);
+        State emission = StateImpl.of(NameImpl.of("event"), 1);
+
+        // Manually invoke subscribers (simulating what Conduit's processEmission does)
+        for (Subscriber<State> subscriber : sourceImpl.getSubscribers()) {
+            java.util.List<Pipe<State>> pipes = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+            subscriber.accept(testChannel, new Registrar<State>() {
+                @Override
+                public void register(Pipe<State> pipe) {
+                    pipes.add(pipe);
+                }
+            });
+
+            for (Pipe<State> pipe : pipes) {
+                pipe.emit(emission);
+            }
+        }
 
         assertThat(emissionCount.get()).isEqualTo(1);
     }

@@ -7,9 +7,11 @@ import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
@@ -78,6 +80,13 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         });
     }
 
+    @Override
+    public Conduit<P, E> tap(java.util.function.Consumer<? super Conduit<P, E>> consumer) {
+        java.util.Objects.requireNonNull(consumer, "Consumer cannot be null");
+        consumer.accept(this);
+        return this;
+    }
+
     private Thread startQueueProcessor() {
         Thread processor = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {
@@ -100,9 +109,27 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     }
 
     private void processEmission(Capture<E> capture) {
-        // Notify Source with the Capture (Channel's Subject + emission)
-        // Source will dispatch to Subscribers with the CHANNEL's Subject
-        ((SourceImpl<E>) eventSource).notify(capture);
+        // Get subscribers from the Source (Source only manages the subscriber list)
+        SourceImpl<E> source = (SourceImpl<E>) eventSource;
+
+        // For each subscriber, invoke accept() with the Channel's Subject and a Registrar
+        for (Subscriber<E> subscriber : source.getSubscribers()) {
+            // Collect pipes that the subscriber registers
+            List<Pipe<E>> pipes = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+            // Call subscriber.accept() with Channel's Subject (from Capture)
+            subscriber.accept(capture.subject(), new Registrar<E>() {
+                @Override
+                public void register(Pipe<E> pipe) {
+                    pipes.add(pipe);
+                }
+            });
+
+            // Emit to all registered pipes
+            for (Pipe<E> pipe : pipes) {
+                pipe.emit(capture.emission());
+            }
+        }
     }
 
     /**
