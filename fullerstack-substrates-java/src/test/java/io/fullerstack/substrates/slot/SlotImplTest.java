@@ -87,13 +87,19 @@ class SlotImplTest {
     }
 
     @Test
-    void shouldSupportValueUpdate() {
+    void shouldBeImmutable() {
+        // Slots are immutable - value cannot change after creation
         Name name = NameImpl.of("count");
-        SlotImpl<Integer> slot = (SlotImpl<Integer>) SlotImpl.of(name, 42);
+        Slot<Integer> slot = SlotImpl.of(name, 42);
 
-        slot.value(100);
+        assertThat(slot.value()).isEqualTo(42);
 
-        assertThat(slot.value()).isEqualTo(100);
+        // To get a different value, create a new Slot
+        Slot<Integer> newSlot = SlotImpl.of(name, 100);
+        assertThat(newSlot.value()).isEqualTo(100);
+
+        // Original unchanged
+        assertThat(slot.value()).isEqualTo(42);
     }
 
     @Test

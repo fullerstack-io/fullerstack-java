@@ -10,17 +10,29 @@ import io.fullerstack.substrates.state.StateImpl;
 import java.util.Objects;
 
 /**
- * Implementation of Substrates.Slot for typed configuration storage.
+ * Implementation of Substrates.Slot for typed query/lookup objects.
  *
- * <p>Slots provide type-safe storage for configuration values with associated names.
+ * <p><b>Immutable Design:</b> Slots are immutable query objects used to lookup
+ * values in State with type safety and fallback support.
+ *
+ * <p><b>Pattern:</b> Create Slot once, reuse for multiple State queries:
+ * <pre>
+ * Slot&lt;Integer&gt; maxConn = cortex.slot(name("max-connections"), 100);
+ * int value1 = state1.value(maxConn);  // Query state1
+ * int value2 = state2.value(maxConn);  // Reuse for state2
+ * </pre>
+ *
+ * <p>Based on William Louth's design: Slots are immutable query objects,
+ * not mutable configuration holders.
  *
  * @param <T> the value type
  * @see Slot
+ * @see State#value(Slot)
  */
 public class SlotImpl<T> implements Slot<T> {
     private final Name name;
     private final Class<T> type;
-    private T value;
+    private final T value;
 
     /**
      * Creates a new Slot.
@@ -48,15 +60,6 @@ public class SlotImpl<T> implements Slot<T> {
     @Override
     public T value() {
         return value;
-    }
-
-    /**
-     * Sets a new value.
-     *
-     * @param newValue the new value
-     */
-    public void value(T newValue) {
-        this.value = newValue;
     }
 
     /**

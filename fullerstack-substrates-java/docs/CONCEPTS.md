@@ -282,6 +282,68 @@ var allTimeouts = state.values(cortex.slot(cortex.name("timeout"), 0)).toList();
 assert allTimeouts.equals(List.of(30, 60));  // Both values
 ```
 
+### Slot
+
+**What:** Immutable query/lookup object for type-safe State access with fallback support.
+
+**Immutability:** Slots are immutable - created once, reused for multiple State queries.
+
+**Purpose:** Slots serve THREE roles:
+1. **Lookup key** - `slot.name()` identifies what to find
+2. **Type safety** - `slot.type()` ensures compile-time type checking
+3. **Fallback value** - `slot.value()` returned when name not found in State
+
+**Pattern:** Create once, reuse for querying:
+
+```java
+// Create Slot with fallback value (100)
+Slot<Integer> maxConnSlot = cortex.slot(name("max-connections"), 100);
+
+// Use same Slot to query different States
+State state1 = cortex.state().state(name("max-connections"), 200);
+State state2 = cortex.state();  // Empty
+
+int conn1 = state1.value(maxConnSlot);  // 200 (found in state)
+int conn2 = state2.value(maxConnSlot);  // 100 (fallback from slot)
+```
+
+**Design Philosophy:**
+
+From William Louth's [States and Slots article](https://humainary.io/blog/observability-x-states-and-slots/):
+
+> **"Instead of relying on 'stringly-typed' key-value pairs that can lead to runtime errors and type mismatches, this design enforces type safety at compile-time."**
+
+Slots replace error-prone patterns:
+
+```java
+// ❌ OLD: Stringly-typed (runtime errors)
+int timeout = (Integer) map.get("timeout");  // ClassCastException risk!
+
+// ✅ NEW: Type-safe Slot (compile-time safety)
+Slot<Integer> timeoutSlot = cortex.slot(name("timeout"), 30);
+int timeout = state.value(timeoutSlot);  // Type-safe + fallback
+```
+
+**Hierarchical State with Slot<State>:**
+
+```java
+// Inner state
+State dbConfig = cortex.state()
+    .state(name("host"), "localhost")
+    .state(name("port"), 3306);
+
+// Outer state containing inner state
+State appConfig = cortex.state()
+    .state(name("database"), dbConfig)  // Slot<State>
+    .state(name("timeout"), 30);
+
+// Query with fallback
+Slot<State> dbSlot = cortex.slot(name("database"), cortex.state());
+State config = appConfig.value(dbSlot);  // Returns dbConfig
+```
+
+**Key Insight:** Slots are **NOT mutable configuration holders**. They are immutable query objects that enable type-safe, fallback-aware State lookups.
+
 ### Substrate
 
 **What:** Base interface for all components with an associated Subject.
