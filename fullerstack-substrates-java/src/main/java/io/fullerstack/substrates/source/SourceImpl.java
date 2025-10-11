@@ -5,6 +5,7 @@ import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.subscription.SubscriptionImpl;
 
 import java.util.List;
 import java.util.Objects;
@@ -59,30 +60,7 @@ public class SourceImpl<E> implements Source<E> {
         subscribers.add(subscriber);
 
         // Return subscription that removes subscriber on close()
-        // Each subscription has unique ID and stable Subject
-        return new Subscription() {
-            private volatile boolean closed = false;
-            private final Id subscriptionId = IdImpl.generate();
-            private final Subject subscriptionSubject = new SubjectImpl(
-                subscriptionId,
-                NameImpl.of("subscription").name(subscriptionId.toString()),
-                StateImpl.empty(),
-                Subject.Type.SUBSCRIPTION
-            );
-
-            @Override
-            public Subject subject() {
-                return subscriptionSubject;
-            }
-
-            @Override
-            public void close() {
-                if (!closed) {
-                    closed = true;
-                    subscribers.remove(subscriber);
-                }
-            }
-        };
+        return new SubscriptionImpl(() -> subscribers.remove(subscriber));
     }
 
     /**

@@ -10,6 +10,7 @@ import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.subscriber.SubscriberImpl;
 import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.sink.SinkImpl;
 
 import java.lang.reflect.Member;
 import java.util.Iterator;
@@ -199,8 +200,7 @@ public class CortexRuntime implements Cortex {
     @Override
     public <E> Sink<E> sink(Source<E> source) {
         Objects.requireNonNull(source, "Source cannot be null");
-        // Stub implementation - will be completed in Story 4.14
-        return new SinkStub<>(source);
+        return new SinkImpl<>(source);
     }
 
     @Override
@@ -271,63 +271,7 @@ public class CortexRuntime implements Cortex {
         return new CaptureImpl<>(subject, emission);
     }
 
-    // ========== Inner Classes (Stubs for dependencies) ==========
-
-    /**
-     * Stub Sink implementation - will be replaced in Story 4.14.
-     */
-    private static class SinkStub<E> implements Sink<E> {
-        private final Source<E> source;
-        private final Id sinkId = IdImpl.generate();
-        private final Subject sinkSubject = new SubjectImpl(
-            sinkId,
-            NameImpl.of("sink").name(sinkId.toString()),
-            StateImpl.empty(),
-            Subject.Type.SINK
-        );
-
-        SinkStub(Source<E> source) {
-            this.source = source;
-        }
-
-        @Override
-        public Subject subject() {
-            return sinkSubject;
-        }
-
-        @Override
-        public Stream<Capture<E>> drain() {
-            return Stream.empty();
-        }
-
-        @Override
-        public void close() {
-            // No-op for stub
-        }
-    }
-
-    /**
-     * Stub Subscription implementation.
-     */
-    private static class SubscriptionStub implements Subscription {
-        private final Id subscriptionId = IdImpl.generate();
-        private final Subject subscriptionSubject = new SubjectImpl(
-            subscriptionId,
-            NameImpl.of("subscription").name(subscriptionId.toString()),
-            StateImpl.empty(),
-            Subject.Type.SUBSCRIPTION
-        );
-
-        @Override
-        public Subject subject() {
-            return subscriptionSubject;
-        }
-
-        @Override
-        public void close() {
-            // No-op for stub
-        }
-    }
+    // ========== Inner Classes ==========
 
     /**
      * Capture implementation.

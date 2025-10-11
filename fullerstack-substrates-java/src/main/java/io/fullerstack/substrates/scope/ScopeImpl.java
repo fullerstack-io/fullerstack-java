@@ -4,6 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.state.StateImpl;
+import io.fullerstack.substrates.closure.ClosureImpl;
 
 import java.util.Map;
 import java.util.Objects;
@@ -77,18 +78,7 @@ public class ScopeImpl implements Scope {
     public <R extends Resource> Closure<R> closure(R resource) {
         checkClosed();
         register(resource);
-        return new Closure<R>() {
-            @Override
-            public void consume(java.util.function.Consumer<? super R> consumer) {
-                consumer.accept(resource);
-                resources.remove(resource);
-                try {
-                    resource.close();
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to close resource", e);
-                }
-            }
-        };
+        return new ClosureImpl<>(resource);
     }
 
     @Override
