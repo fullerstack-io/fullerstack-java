@@ -15,7 +15,7 @@ import java.util.Objects;
  * <p>Container is typically created by wrapping a Conduit, which provides:
  * <ul>
  *   <li>Pool behavior - Conduit.get(Name) returns percepts composed from Channels</li>
- *   <li>Source behavior - Conduit.source() emits events from those percepts</li>
+ *   <li>Source behavior - Conduit.source() emits events when Channel Subjects emit values</li>
  * </ul>
  *
  * <p>The Container API exposes Container<Pool<P>, Source<E>>, meaning:
