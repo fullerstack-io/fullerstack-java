@@ -51,7 +51,7 @@ public class SubscriberImpl<E> implements Subscriber<E> {
     /**
      * Creates a function-based Subscriber.
      *
-     * @param name the subscriber name
+     * @param name the name to be used by the subject assigned to the subscriber
      * @param handler the callback function that receives (Subject, Registrar)
      * @throws NullPointerException if name or handler is null
      */
@@ -75,7 +75,7 @@ public class SubscriberImpl<E> implements Subscriber<E> {
      * <p>When a Subject emits, this Subscriber retrieves a Pipe from the pool
      * using the Subject's name and registers it to receive the emission.
      *
-     * @param name the subscriber name
+     * @param name the name to be used by the subject assigned to the subscriber
      * @param pool the pool of Pipes keyed by Subject name
      * @throws NullPointerException if name or pool is null
      */
