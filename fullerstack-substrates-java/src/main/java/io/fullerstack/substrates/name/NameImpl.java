@@ -30,8 +30,18 @@ public class NameImpl implements Name {
     }
 
     @Override
-    public Name name(Name name) {
-        return name;
+    public Name name(Name suffix) {
+        // If suffix has no parent, create new Name with suffix's part and this as parent
+        if (suffix instanceof NameImpl impl && impl.parent == null) {
+            return new NameImpl(impl.part, this);
+        }
+        // Otherwise, suffix is already hierarchical - need to rebuild with this as base
+        // This handles cases where suffix itself has structure
+        Name current = this;
+        for (Name part : suffix) {
+            current = new NameImpl(((NameImpl)part).part, current);
+        }
+        return current;
     }
 
     @Override
@@ -88,6 +98,16 @@ public class NameImpl implements Name {
     @Override
     public Name name(Member member) {
         return new NameImpl(member.getName(), this);
+    }
+
+    @Override
+    public CharSequence path() {
+        return toPath();
+    }
+
+    @Override
+    public CharSequence path(char separator) {
+        return toPath().replace(SEPARATOR, separator);
     }
 
     @Override

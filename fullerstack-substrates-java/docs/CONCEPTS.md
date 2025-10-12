@@ -84,7 +84,7 @@ assert !id1.equals(id2);  // Different IDs
 Subject subject1 = circuit1.subject();
 Subject subject2 = circuit2.subject();
 
-// Even if both circuits have name "default", they have unique IDs
+// Even if both circuits have the same name, they have unique IDs
 assert !subject1.id().equals(subject2.id());
 ```
 
@@ -160,13 +160,13 @@ Circuit c2 = cortex.circuit(cortex.name("kafka-cluster"));
 assert c1 == c2;  // ✅ Singleton pattern via Name caching
 ```
 
-**Default Names Create Singletons:**
+**Type-Based Default Names Create Singletons:**
 ```java
-// No-arg methods use static "default" name for singleton behavior
-Circuit c1 = cortex.circuit();  // Uses name "default"
+// No-arg methods use type-based default names for singleton behavior
+Circuit c1 = cortex.circuit();  // Uses name "circuit"
 Circuit c2 = cortex.circuit();  // Returns same circuit
 
-Clock clk1 = circuit.clock();   // Uses name "default"
+Clock clk1 = circuit.clock();   // Uses name "clock"
 Clock clk2 = circuit.clock();   // Returns same clock
 
 assert c1 == c2;   // ✅ Same circuit

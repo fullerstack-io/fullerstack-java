@@ -66,4 +66,15 @@ class NameImplTest {
 
         assertThat(name.toString()).isEqualTo("kafka.broker.1");
     }
+
+    @Test
+    void shouldSupportAppendingNameToName() {
+        Name base = NameImpl.of("circuit");
+        Name suffix = NameImpl.of("conduit");
+
+        Name result = base.name(suffix);
+
+        assertThat(result.value()).isEqualTo("circuit.conduit");
+        assertThat(result.toString()).isEqualTo("circuit.conduit");
+    }
 }

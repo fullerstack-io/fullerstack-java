@@ -10,14 +10,12 @@
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>Fullerstack</name>
-    <description>Event-driven runtime and observability framework for Java 24</description>
-    <url>https://fullerstack.io</url>
+    <name>Fullerstack Java</name>
+    <description>A collection of Java libraries and implementations by Fullerstack</description>
+    <url>https://github.com/fullerstack-io/fullerstack-java</url>
 
     <modules>
         <module>fullerstack-substrates-java</module>
-        <module>fullerstack-serventis-java</module>
-        <module>kafka-fullerstack</module>
     </modules>
 
     <properties>
@@ -32,7 +30,6 @@
         <junit.version>5.11.0</junit.version>
         <assertj.version>3.26.3</assertj.version>
         <mockito.version>5.14.1</mockito.version>
-        <spring-boot.version>3.4.0</spring-boot.version>
 
         <!-- Plugin Versions -->
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
@@ -47,18 +44,6 @@
                 <groupId>io.humainary.substrates</groupId>
                 <artifactId>humainary-substrates-api</artifactId>
                 <version>${substrates-api.version}</version>
-            </dependency>
-
-            <!-- Fullerstack Libraries -->
-            <dependency>
-                <groupId>io.fullerstack</groupId>
-                <artifactId>substrates-java</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.fullerstack</groupId>
-                <artifactId>serventis-signals-java</artifactId>
-                <version>${project.version}</version>
             </dependency>
 
             <!-- Testing -->
@@ -79,15 +64,6 @@
                 <artifactId>mockito-core</artifactId>
                 <version>${mockito.version}</version>
                 <scope>test</scope>
-            </dependency>
-
-            <!-- Spring Boot BOM (for kafka-fullerstack) -->
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-dependencies</artifactId>
-                <version>${spring-boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

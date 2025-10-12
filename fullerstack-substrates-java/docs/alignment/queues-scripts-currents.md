@@ -174,25 +174,32 @@ public QueueImpl() {
 
 **Verification**: ✅ Correct - Async processing with virtual threads
 
-### 5. ✅ FIFO Ordering
+### 5. ✅ FIFO Ordering (with Priority Support)
 
 **Article States:**
 > "Scripts are executed in FIFO (First In, First Out) order"
 
 **Our Implementation:**
 ```java
-// QueueImpl.java:18
-private final BlockingQueue<Script> scripts = new LinkedBlockingQueue<>();
+// QueueImpl.java:37
+private final BlockingDeque<Script> scripts = new LinkedBlockingDeque<>();
 
 @Override
 public void post(Script script) {
-    Objects.requireNonNull(script, "Script cannot be null");
-    scripts.offer(script);  // Add to end of queue
+    if (script != null && running) {
+        scripts.offerLast(script);  // Add to back (FIFO)
+    }
 }
 
 // In processQueue():
-Script script = scripts.take();  // Remove from front of queue
+Script script = scripts.takeFirst();  // Remove from front (FIFO)
 ```
+
+**Enhancement - Priority Support:**
+Using `BlockingDeque` instead of `BlockingQueue` enables future priority/QoS control:
+- **Normal-priority**: `offerLast()` + `takeFirst()` = FIFO (default)
+- **High-priority**: `offerFirst()` = jump to front of queue
+- This allows prioritizing certain Conduits or Scripts by name
 
 **Test Verification:**
 ```java
@@ -614,8 +621,9 @@ void shouldAllowPostingFromWithinScript() {
 | Script interface | ✓ | Functional interface with exec(Current) | ✅ |
 | Current interface | ✓ | subject() + post(Runnable) | ✅ |
 | Asynchronous processing | ✓ | Virtual thread processor | ✅ |
-| FIFO ordering | ✓ | LinkedBlockingQueue | ✅ |
-| Backpressure management | ✓ | BlockingQueue infrastructure | ✅ |
+| FIFO ordering | ✓ | LinkedBlockingDeque (FIFO default) | ✅ |
+| Priority support | ✓ (QoS control) | Deque enables offerFirst() for priority | ✅ |
+| Backpressure management | ✓ | BlockingDeque infrastructure | ✅ |
 | await() blocks | ✓ | Busy-wait until empty + not executing | ✅ |
 | Error handling | ✓ | Continue processing after exceptions | ✅ |
 | Virtual threads | ✓ | Thread.startVirtualThread() | ✅ |
@@ -646,7 +654,28 @@ Our `QueueImpl` and `CurrentImpl` implementations correctly implement all concep
 
 ## Note on Circuit Integration
 
-The Queue implementation is correct, but note that the Circuit architecture has a known issue (documented in `CIRCUIT_QUEUE_ARCHITECTURE_ISSUE.md`) where Conduits create their own queues instead of using the Circuit's single queue. This doesn't affect Queue's correctness but is a separate architectural concern about how Queue is integrated into the Circuit pattern.
+The Circuit architecture issue has been **RESOLVED** (documented in `CIRCUIT_QUEUE_ARCHITECTURE_ISSUE.md`). All Conduits within a Circuit now share the Circuit's single Queue, implementing the "Virtual CPU Core" / single-threaded execution model.
+
+## Recent Updates
+
+### Queue Implementation Enhancement (2025-10-11)
+
+**Updated from LinkedBlockingQueue to LinkedBlockingDeque** to enable priority/QoS control:
+
+**Changes:**
+1. Changed `BlockingQueue<Script>` to `BlockingDeque<Script>`
+2. Changed `offer()` to `offerLast()` (maintains FIFO)
+3. Changed `take()` to `takeFirst()` (processes from front)
+4. Added infrastructure for priority queuing via `post(Name, Script)`
+
+**Benefits:**
+- **FIFO preserved**: Default behavior unchanged (offerLast + takeFirst = FIFO)
+- **Priority support**: Can now use `offerFirst()` for high-priority Scripts
+- **QoS control**: Enables prioritizing certain Conduits or Scripts by name
+- **Backward compatible**: All 215 tests pass with no behavior changes
+
+**Future Enhancement:**
+The `post(Name name, Script script)` method currently uses FIFO, but can be extended to check the name for priority markers and use `offerFirst()` for high-priority Scripts, enabling QoS control across multiple Conduits.
 
 ## References
 

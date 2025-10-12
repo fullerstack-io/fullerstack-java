@@ -197,7 +197,7 @@ mvn clean install
 mvn test
 ```
 
-All 183 tests should pass.
+All 264 tests should pass.
 
 ## Requirements
 
@@ -213,15 +213,42 @@ All 183 tests should pass.
   - [Subscribers](https://humainary.io/blog/observability-x-subscribers/)
 - [William Louth on Semiotic Observability](https://humainary.io)
 
+## Acknowledgments
+
+This implementation is based on the **Humainary Substrates API** designed by **William Louth**. The Substrates framework provides a foundational approach to building observable, event-driven systems through elegant abstractions and compositional design patterns.
+
+We are deeply grateful to William Louth and the Humainary community for:
+- The innovative design of the Substrates API
+- The comprehensive Observability X blog series documenting the concepts
+- The vision for semiotic observability and humane software instrumentation
+- Making the API available under the Apache 2.0 license
+
+The architectural patterns, design principles, and core concepts implemented in this library originate from William Louth's work on observable systems, signal flow management, and contextual instrumentation.
+
+**Learn more about the Substrates framework:**
+- Humainary: https://humainary.io/
+- Substrates: https://substrates.io/
+- Observability X Blog: https://humainary.io/blog/category/observability-x/
+- Substrates API (Java): https://github.com/humainary-io/substrates-api-java
+
 ## License
 
-Apache License 2.0
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+This implementation uses the Humainary Substrates API, which is also licensed under Apache License 2.0.
+Copyright information and attributions are detailed in the [NOTICE](NOTICE) file.
 
 ## Contributing
 
 Contributions welcome! Please ensure all tests pass and follow the existing code style.
 
+When contributing, please:
+- Maintain alignment with the Humainary Substrates API specification
+- Follow the design principles documented in the Observability X blog series
+- Add tests for new functionality
+- Update documentation as needed
+
 ## Authors
 
-- Implementation: Fullerstack
-- API Design: William Louth (Humainary)
+**Implementation:** Fullerstack (https://fullerstack.io/)
+**API Design:** William Louth - Humainary (https://humainary.io/)

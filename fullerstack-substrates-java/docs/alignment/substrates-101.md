@@ -254,11 +254,11 @@ public class PipeImpl<E> implements Pipe<E> {
     }
 }
 
-// PipeComposer.java - Wraps Channel in Pipe
-public class PipeComposer<E> implements Composer<Pipe<E>, E> {
-    @Override
-    public Pipe<E> compose(Channel<E> channel) {
-        return channel.pipe();  // ← Creates Pipe percept
+// Composer.pipe() - API-provided static factory
+// From Substrates API:
+interface Composer<P, E> {
+    static <E> Composer<Pipe<E>, E> pipe() {
+        return Inlet::pipe;  // ← Creates Pipe percept
     }
 }
 ```
@@ -286,11 +286,13 @@ interface Composer<P, E> {
   P compose(Channel<E> channel);
 }
 
-// Example: PipeComposer
-public class PipeComposer<E> implements Composer<Pipe<E>, E> {
-    @Override
-    public Pipe<E> compose(Channel<E> channel) {
-        return channel.pipe();
+// Example: API-provided Composer.pipe()
+// From Substrates API:
+interface Composer<P, E> {
+    P compose(Channel<E> channel);
+
+    static <E> Composer<Pipe<E>, E> pipe() {
+        return Inlet::pipe;
     }
 }
 
@@ -775,7 +777,7 @@ void shouldPreserveSubjectInCapture() {
 | One Channel per Name | ✓ | percepts map caching | ✅ |
 | Channel has Subject | ✓ | ChannelImpl.channelSubject | ✅ |
 | Pipe as Percept | ✓ | PipeImpl wraps Channel | ✅ |
-| Composer creates Percept | ✓ | PipeComposer.compose() | ✅ |
+| Composer creates Percept | ✓ | Composer.pipe() (API-provided) | ✅ |
 | Inlet → Queue → Outlet | ✓ | emit → Capture → queue → Subscriber | ✅ |
 | Capture pairing | ✓ | CaptureImpl(Subject, Emission) | ✅ |
 | Subscriber registration | ✓ | Source.subscribe() + Registrar | ✅ |

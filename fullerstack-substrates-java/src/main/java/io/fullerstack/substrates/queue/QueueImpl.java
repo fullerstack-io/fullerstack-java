@@ -7,28 +7,34 @@ import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.name.NameImpl;
 
 import java.util.Objects;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
 
 /**
  * Implementation of Substrates.Queue for backpressure management.
  *
  * <p>Processes scripts asynchronously using a virtual thread. Scripts are
- * executed in FIFO order with proper error handling.
+ * executed in FIFO order by default, with support for priority queuing via Deque.
  *
  * <p>Features:
  * <ul>
  *   <li>Asynchronous script execution via virtual thread</li>
- *   <li>FIFO ordering guarantee</li>
+ *   <li>FIFO ordering guarantee (default behavior)</li>
+ *   <li>Priority queuing support via post(Name, Script)</li>
  *   <li>await() blocks until queue is empty</li>
  *   <li>Graceful error handling - continues processing after script errors</li>
  *   <li>Thread-safe concurrent post() operations</li>
  * </ul>
  *
+ * <p><b>QoS/Priority Support:</b>
+ * Using BlockingDeque allows high-priority scripts to be added to the front of the queue
+ * while maintaining FIFO for normal-priority scripts. This enables QoS control across
+ * multiple Conduits within a Circuit.
+ *
  * @see Queue
  */
 public class QueueImpl implements Queue {
-    private final BlockingQueue<Script> scripts = new LinkedBlockingQueue<>();
+    private final BlockingDeque<Script> scripts = new LinkedBlockingDeque<>();
     private final Thread processor;
     private volatile boolean running = true;
     private volatile boolean executing = false;
@@ -56,15 +62,18 @@ public class QueueImpl implements Queue {
     @Override
     public void post(Script script) {
         if (script != null && running) {
-            scripts.offer(script);
+            scripts.offerLast(script);  // Add to back (FIFO)
         }
     }
 
     @Override
     public void post(Name name, Script script) {
-        // Named script execution - for now just delegate to post()
-        // Could add name to MDC or logging context in future
-        post(script);
+        // Named script execution - for future priority/QoS support
+        // For now, all scripts use FIFO (addLast)
+        // Future: Check name for priority markers and use offerFirst() for high-priority
+        if (script != null && running) {
+            scripts.offerLast(script);  // Add to back (FIFO)
+        }
     }
 
     /**
@@ -95,7 +104,7 @@ public class QueueImpl implements Queue {
 
         while (running && !Thread.interrupted()) {
             try {
-                Script script = scripts.take();
+                Script script = scripts.takeFirst();  // Take from front (FIFO)
                 executing = true;
                 try {
                     script.exec(current);

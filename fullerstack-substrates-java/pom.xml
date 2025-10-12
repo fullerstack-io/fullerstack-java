@@ -17,6 +17,49 @@
     <name>Substrates (Java)</name>
     <description>Event-driven runtime implementation of Humainary Substrates API for Java 24</description>
 
+    <url>https://github.com/fullerstack-io/fullerstack-java</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+            <comments>
+                This implementation is based on the Humainary Substrates API designed by William Louth.
+                Both this implementation and the Substrates API are licensed under Apache 2.0.
+            </comments>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>fullerstack</id>
+            <name>Fullerstack</name>
+            <url>https://fullerstack.io/</url>
+            <roles>
+                <role>Implementation</role>
+            </roles>
+        </developer>
+    </developers>
+
+    <contributors>
+        <contributor>
+            <name>William Louth</name>
+            <organization>Humainary</organization>
+            <organizationUrl>https://humainary.io/</organizationUrl>
+            <roles>
+                <role>API Design</role>
+                <role>Substrates Framework Creator</role>
+            </roles>
+        </contributor>
+    </contributors>
+
+    <scm>
+        <connection>scm:git:git://github.com/fullerstack-io/fullerstack-java.git</connection>
+        <developerConnection>scm:git:ssh://github.com:fullerstack-io/fullerstack-java.git</developerConnection>
+        <url>https://github.com/fullerstack-io/fullerstack-java/tree/main/fullerstack-substrates-java</url>
+    </scm>
+
     <dependencies>
         <!-- Substrates API -->
         <dependency>

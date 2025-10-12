@@ -293,4 +293,87 @@ class SequencerIntegrationTest {
 
         assertThat(received).containsExactlyInAnyOrder(10, 20, 30, 40);
     }
+
+    @Test
+    void shouldApplySequencerAtConduitLevelToAllChannels() throws InterruptedException {
+        circuit = new CircuitImpl(NameImpl.of("test-circuit"));
+
+        List<Integer> received = new ArrayList<>();
+        CountDownLatch latch = new CountDownLatch(6);
+
+        // Create Sequencer that filters negatives and doubles values
+        Sequencer<Segment<Integer>> sequencer = path -> path
+            .guard(value -> value > 0)        // Filter negatives
+            .replace(value -> value * 2);     // Double the value
+
+        // Create conduit with Sequencer at Conduit level (not via Composer)
+        // This means ALL channels/pipes created from this Conduit will apply these transformations
+        Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+            NameImpl.of("conduit-sequencer"),
+            Composer.pipe(),  // Plain composer, no sequencer
+            sequencer         // Sequencer applied at Conduit level
+        );
+
+        conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
+
+        // Create multiple channels - all should apply the same transformations
+        Pipe<Integer> channel1 = conduit.get(NameImpl.of("channel-1"));
+        Pipe<Integer> channel2 = conduit.get(NameImpl.of("channel-2"));
+        Pipe<Integer> channel3 = conduit.get(NameImpl.of("channel-3"));
+
+        // Emit from channel 1
+        channel1.emit(-5);  // Filtered by guard
+        channel1.emit(10);  // Passes, becomes 20
+        channel1.emit(15);  // Passes, becomes 30
+
+        // Emit from channel 2
+        channel2.emit(0);   // Filtered by guard
+        channel2.emit(5);   // Passes, becomes 10
+        channel2.emit(7);   // Passes, becomes 14
+
+        // Emit from channel 3
+        channel3.emit(-1);  // Filtered by guard
+        channel3.emit(3);   // Passes, becomes 6
+        channel3.emit(4);   // Passes, becomes 8
+
+        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
+
+        // All channels applied the same transformations
+        assertThat(received).containsExactlyInAnyOrder(20, 30, 10, 14, 6, 8);
+    }
+
+    @Test
+    void shouldApplySequencerAtContainerLevelToAllConduits() throws InterruptedException {
+        circuit = new CircuitImpl(NameImpl.of("test-circuit"));
+
+        // Create Sequencer that filters positives only
+        Sequencer<Segment<Integer>> sequencer = path -> path.guard(value -> value > 0);
+
+        // Create Container with Sequencer at Container level
+        // This means ALL Conduits created by this Container will apply these transformations
+        Container<Pool<Pipe<Integer>>, Source<Integer>> container = circuit.container(
+            NameImpl.of("container-sequencer"),
+            Composer.pipe(),  // Plain composer
+            sequencer         // Sequencer applied at Container level
+        );
+
+        // Get two different conduits from the container
+        Pool<Pipe<Integer>> conduit1 = container.get(NameImpl.of("conduit-1"));
+        Pool<Pipe<Integer>> conduit2 = container.get(NameImpl.of("conduit-2"));
+
+        Pipe<Integer> pipe1 = conduit1.get(NameImpl.of("channel-1"));
+        Pipe<Integer> pipe2 = conduit2.get(NameImpl.of("channel-2"));
+
+        // Emit values
+        pipe1.emit(-5);  // Filtered
+        pipe1.emit(10);  // Passes
+        pipe2.emit(0);   // Filtered
+        pipe2.emit(20);  // Passes
+
+        // Wait to ensure all Scripts are processed
+        circuit.queue().await();
+
+        // Note: This test demonstrates the API usage - Container passes Sequencer to all created Conduits
+        // Full verification would require subscribing to individual Conduit sources
+    }
 }

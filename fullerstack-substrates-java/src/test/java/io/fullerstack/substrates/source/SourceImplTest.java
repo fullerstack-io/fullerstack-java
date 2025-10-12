@@ -55,27 +55,18 @@ class SourceImplTest {
 
     /**
      * Helper to simulate Conduit behavior of invoking subscribers.
-     * Directly calls subscriber.accept() for each subscriber, mimicking what Conduit's queue processor does.
+     * Uses SourceImpl.notifySubscribers() like ConduitImpl does.
      */
     private <E> void notifySource(SourceImpl<E> source, String channelName, E emission) {
         Subject subject = testSubject(channelName);
+        Capture<E> capture = new CaptureImpl<>(subject, emission);
 
-        // Simulate what ConduitImpl.processEmission() does
-        for (Subscriber<E> subscriber : source.getSubscribers()) {
-            java.util.List<Pipe<E>> pipes = new CopyOnWriteArrayList<>();
+        // Use SourceImpl's notification mechanism (like ConduitImpl does)
+        // Pass an empty pipeCache since we're testing Source in isolation
+        java.util.Map<Name, java.util.Map<Subscriber<E>, java.util.List<Pipe<E>>>> pipeCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
-            subscriber.accept(subject, new Registrar<E>() {
-                @Override
-                public void register(Pipe<E> pipe) {
-                    pipes.add(pipe);
-                }
-            });
-
-            // Emit to all registered pipes
-            for (Pipe<E> pipe : pipes) {
-                pipe.emit(emission);
-            }
-        }
+        source.notifySubscribers(capture, pipeCache);
     }
 
     @Test

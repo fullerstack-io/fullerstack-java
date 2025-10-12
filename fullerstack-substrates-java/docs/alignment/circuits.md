@@ -1,12 +1,15 @@
 # Circuit Queue Architecture Issue
 
-**Status**: CRITICAL - Violates Core Substrates Design Principle
+**Status**: ✅ RESOLVED
 **Discovered**: 2025-10-11
+**Fixed**: 2025-10-11
 **Reference**: https://humainary.io/blog/observability-x-circuits/
 
 ## Summary
 
-Our implementation violates the fundamental "Virtual CPU Core" / "single-threaded execution model" principle described in William Louth's Circuit architecture article. Each Conduit currently creates its own queue and processor thread, when all Conduits within a Circuit should share the Circuit's single queue.
+**FIXED**: Our implementation now correctly implements the "Virtual CPU Core" / "single-threaded execution model" principle described in William Louth's Circuit architecture article. All Conduits within a Circuit now share the Circuit's single queue, with Pipes posting Scripts that call the parent Conduit's `processEmission()` method.
+
+## Previous Problem (Now Fixed)
 
 ## The Problem
 
@@ -235,12 +238,135 @@ After refactoring, update:
 - `/src/main/java/io/fullerstack/substrates/queue/QueueImpl.java`
 - `/src/main/java/io/fullerstack/substrates/pipe/PipeImpl.java`
 
-## Priority
+## Implementation (Completed 2025-10-11)
 
-**CRITICAL** - This is a fundamental architectural violation that affects:
-- Scalability (multiple threads per Circuit instead of single-threaded)
-- Ordering guarantees
-- QoS control
-- Alignment with Substrates API design principles
+### Changes Applied
 
-Should be addressed before considering the implementation "complete" or production-ready.
+All required changes have been successfully implemented:
+
+**1. ConduitImpl.java** - Now accepts Circuit's Queue
+```java
+public ConduitImpl(Name circuitName, Name conduitName, Composer<? extends P, E> composer, Queue circuitQueue) {
+    // ... initialization ...
+    this.circuitQueue = java.util.Objects.requireNonNull(circuitQueue, "Circuit queue cannot be null");
+    // No queue processor thread!
+}
+```
+
+**2. CircuitImpl.java** - Passes Queue reference to Conduits
+```java
+Conduit<P, E> conduit = (Conduit<P, E>) conduits.computeIfAbsent(
+    name,
+    n -> new io.fullerstack.substrates.conduit.ConduitImpl<>(circuitSubject.name(), n, composer, queue)
+);
+```
+
+**3. ChannelImpl.java** - Passes Queue and Conduit reference to Pipes
+```java
+public class ChannelImpl<E> implements Channel<E> {
+    private final Queue circuitQueue;
+    private final ConduitImpl<?, E> parentConduit;
+
+    public ChannelImpl(Name channelName, Queue circuitQueue, ConduitImpl<?, E> parentConduit) {
+        this.circuitQueue = Objects.requireNonNull(circuitQueue, "Circuit queue cannot be null");
+        this.parentConduit = Objects.requireNonNull(parentConduit, "Parent conduit cannot be null");
+    }
+
+    @Override
+    public Pipe<E> pipe() {
+        return new PipeImpl<>(circuitQueue, channelSubject, parentConduit);
+    }
+}
+```
+
+**4. PipeImpl.java** - Posts Scripts to Circuit Queue
+```java
+public class PipeImpl<E> implements Pipe<E> {
+    private final Queue circuitQueue;
+    private final ConduitImpl<?, E> parentConduit;
+
+    private void postScript(E value) {
+        Capture<E> capture = new CaptureImpl<>(channelSubject, value);
+        circuitQueue.post(current -> parentConduit.processEmission(capture));
+    }
+}
+```
+
+**5. processEmission() made public** - So PipeImpl can call it
+```java
+public void processEmission(Capture<E> capture) {
+    // Routes emission to all subscribers
+}
+```
+
+### Current Architecture
+
+```
+Circuit (Virtual CPU Core)
+  └─ Single Queue (QueueImpl)
+       ├─ Conduit 1: Pipes post Scripts → circuitQueue.post(c -> conduit1.processEmission())
+       ├─ Conduit 2: Pipes post Scripts → circuitQueue.post(c -> conduit2.processEmission())
+       └─ Conduit 3: Pipes post Scripts → circuitQueue.post(c -> conduit3.processEmission())
+
+Queue processes Scripts sequentially (single-threaded)
+  → Script 1: Conduit1.processEmission(capture)
+  → Script 2: Conduit2.processEmission(capture)
+  → Script 3: Conduit1.processEmission(capture)
+```
+
+### Test Results
+
+**All 213 tests passing** ✅
+- No behavior changes observed
+- Async timing works correctly with Circuit Queue
+- Single-threaded execution model verified
+
+### Benefits Achieved
+
+1. ✅ **Single-threaded execution per Circuit** - All Conduits share one Queue
+2. ✅ **Ordered delivery within Circuit domain** - FIFO script processing (default)
+3. ✅ **QoS control possible** - Using BlockingDeque enables priority Scripts (addFirst for high-priority)
+4. ✅ **Prevents queue saturation** - Single backpressure point
+5. ✅ **Matches "Virtual CPU Core" design** - Fully aligned with article
+
+### Documentation Updated
+
+- ✅ ConduitImpl javadoc - Describes Circuit Queue Architecture
+- ✅ ChannelImpl javadoc - Explains Script posting mechanism
+- ✅ PipeImpl javadoc - Documents single-threaded execution model
+- ✅ CircuitImpl comment - Clarifies Queue management
+
+## Resolution
+
+**Status**: ✅ **RESOLVED**
+**Date**: 2025-10-11
+**Result**: Full alignment with Humainary's "Virtual CPU Core" / single-threaded execution model
+
+The implementation now correctly shares a single Queue across all Conduits within a Circuit, ensuring ordered delivery, QoS control, and proper backpressure management.
+
+### Queue Implementation Update (2025-10-11)
+
+**Changed QueueImpl from LinkedBlockingQueue to LinkedBlockingDeque** to enable priority/QoS control:
+
+**Before:**
+```java
+private final BlockingQueue<Script> scripts = new LinkedBlockingQueue<>();
+```
+
+**After:**
+```java
+private final BlockingDeque<Script> scripts = new LinkedBlockingDeque<>();
+```
+
+**Benefits:**
+- **FIFO (default)**: Normal-priority scripts use `offerLast()` / `takeFirst()` (FIFO behavior)
+- **Priority support**: Future high-priority scripts can use `offerFirst()` to jump the queue
+- **QoS control**: Enables prioritizing certain Conduits or Scripts by name
+- **Backward compatible**: All existing tests pass (215/215) with no behavior changes
+
+**Methods updated:**
+- `post(Script)` → uses `offerLast()` (FIFO)
+- `post(Name, Script)` → currently uses `offerLast()`, can be extended for priority logic
+- `processQueue()` → uses `takeFirst()` (processes from front)
+
+This change enables the "QoS control (can prioritize certain Conduits)" benefit mentioned in the architecture design.

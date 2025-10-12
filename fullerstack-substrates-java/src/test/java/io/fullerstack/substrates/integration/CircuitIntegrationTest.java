@@ -135,21 +135,11 @@ class CircuitIntegrationTest {
         );
         State emission = StateImpl.of(NameImpl.of("event"), 1);
 
-        // Manually invoke subscribers (simulating what Conduit's processEmission does)
-        for (Subscriber<State> subscriber : sourceImpl.getSubscribers()) {
-            java.util.List<Pipe<State>> pipes = new java.util.concurrent.CopyOnWriteArrayList<>();
-
-            subscriber.accept(testChannel, new Registrar<State>() {
-                @Override
-                public void register(Pipe<State> pipe) {
-                    pipes.add(pipe);
-                }
-            });
-
-            for (Pipe<State> pipe : pipes) {
-                pipe.emit(emission);
-            }
-        }
+        // Use SourceImpl's notification mechanism (like ConduitImpl does)
+        Capture<State> capture = new CaptureImpl<>(testChannel, emission);
+        java.util.Map<Name, java.util.Map<Subscriber<State>, java.util.List<Pipe<State>>>> pipeCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
+        sourceImpl.notifySubscribers(capture, pipeCache);
 
         assertThat(emissionCount.get()).isEqualTo(1);
     }

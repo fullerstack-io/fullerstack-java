@@ -1,87 +1,42 @@
 package io.fullerstack.substrates.container;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.capture.CaptureImpl;
-import io.fullerstack.substrates.id.IdImpl;
-import io.fullerstack.substrates.pool.PoolImpl;
-import io.fullerstack.substrates.source.SourceImpl;
-import io.fullerstack.substrates.state.StateImpl;
-import io.fullerstack.substrates.subject.SubjectImpl;
+import io.fullerstack.substrates.CortexRuntime;
 import io.fullerstack.substrates.name.NameImpl;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Tests for ContainerImpl verifying collection management behavior.
+ *
+ * <p>Based on Humainary article: https://humainary.io/blog/observability-x-containers/
+ * "A Container is a collection of Conduits of the same emittance data type"
+ */
 class ContainerImplTest {
+    private Cortex cortex;
+    private Circuit circuit;
 
-    /**
-     * Helper to create a test subscriber from a lambda.
-     */
-    private <E> Subscriber<E> subscriber(java.util.function.BiConsumer<Subject, Registrar<E>> handler) {
-        return new Subscriber<E>() {
-            @Override
-            public Subject subject() {
-                return new SubjectImpl(
-                    IdImpl.of(java.util.UUID.randomUUID()),
-                    NameImpl.of("test-subscriber"),
-                    StateImpl.empty(),
-                    Subject.Type.SUBSCRIBER
-                );
-            }
-
-            @Override
-            public void accept(Subject subject, Registrar<E> registrar) {
-                handler.accept(subject, registrar);
-            }
-        };
-    }
-
-    /**
-     * Helper to create a test Subject (simulating a Channel).
-     */
-    private Subject testSubject(String name) {
-        return new SubjectImpl(
-            IdImpl.generate(),
-            NameImpl.of(name),
-            StateImpl.empty(),
-            Subject.Type.CHANNEL
-        );
-    }
-
-    /**
-     * Helper to simulate Conduit behavior of invoking subscribers.
-     * Directly calls subscriber.accept() for each subscriber, mimicking what Conduit's queue processor does.
-     */
-    private <E> void notifySource(SourceImpl<E> source, String channelName, E emission) {
-        Subject subject = testSubject(channelName);
-
-        // Simulate what ConduitImpl.processEmission() does
-        for (Subscriber<E> subscriber : source.getSubscribers()) {
-            java.util.List<Pipe<E>> pipes = new java.util.concurrent.CopyOnWriteArrayList<>();
-
-            subscriber.accept(subject, new Registrar<E>() {
-                @Override
-                public void register(Pipe<E> pipe) {
-                    pipes.add(pipe);
-                }
-            });
-
-            // Emit to all registered pipes
-            for (Pipe<E> pipe : pipes) {
-                pipe.emit(emission);
+    @AfterEach
+    void cleanup() {
+        if (circuit != null) {
+            try {
+                circuit.close();
+            } catch (Exception e) {
+                // Ignore
             }
         }
     }
 
     @Test
-    void shouldCreateContainerWithPoolAndSource() {
-        Pool<String> pool = new PoolImpl<>(name -> "value-" + name.part());
-        Source<String> source = new SourceImpl<>(NameImpl.of("test-source"));
+    void shouldCreateContainerViaCircuit() {
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
 
-        Container<Pool<String>, Source<String>> container = new ContainerImpl<>(pool, source);
+        Container<Pool<Pipe<String>>, Source<String>> container =
+            circuit.container(cortex.name("test"), Composer.pipe());
 
         assertThat((Object) container).isNotNull();
         assertThat((Object) container.subject()).isNotNull();
@@ -89,131 +44,252 @@ class ContainerImplTest {
     }
 
     @Test
-    void shouldDelegateGetToPool() {
-        Pool<String> pool = new PoolImpl<>(name -> "value-" + name.part());
-        Source<String> source = new SourceImpl<>();
+    void shouldCacheContainerBySameName() {
+        // Test that Circuit caches Containers by name (like Clock and Conduit)
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
 
-        Container<Pool<String>, Source<String>> container = new ContainerImpl<>(pool, source);
+        Name containerName = cortex.name("metrics");
 
-        Pool<String> poolResult = container.get(NameImpl.of("test"));
+        // Call container() twice with the same name
+        Container<Pool<Pipe<Long>>, Source<Long>> container1 =
+            circuit.container(containerName, Composer.pipe());
+        Container<Pool<Pipe<Long>>, Source<Long>> container2 =
+            circuit.container(containerName, Composer.pipe());
 
-        assertThat((Object) poolResult).isSameAs(pool);
+        // Should return the SAME Container instance (cached)
+        assertThat((Object) container1).isSameAs(container2);
+    }
+
+    @Test
+    void shouldCreateDifferentContainersForDifferentNames() {
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
+
+        // Create containers with different names
+        Container<Pool<Pipe<String>>, Source<String>> orders =
+            circuit.container(cortex.name("orders"), Composer.pipe());
+        Container<Pool<Pipe<String>>, Source<String>> trades =
+            circuit.container(cortex.name("trades"), Composer.pipe());
+
+        // Different names should create different Container instances
+        assertThat((Object) orders).isNotSameAs(trades);
+    }
+
+    @Test
+    void shouldCacheContainerWithDifferentComposers() {
+        // Like Conduit, Container should be cached by (Name, Composer type)
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
+
+        Name containerName = cortex.name("data");
+
+        // Same name, different composers
+        Container<Pool<Pipe<Long>>, Source<Long>> pipeContainer =
+            circuit.container(containerName, Composer.pipe());
+        Container<Pool<Channel<Long>>, Source<Long>> channelContainer =
+            circuit.container(containerName, Composer.channel());
+
+        // Different composers should create different Container instances
+        assertThat((Object) pipeContainer).isNotSameAs(channelContainer);
+
+        // Calling again with same name + same composer should return cached instance
+        Container<Pool<Pipe<Long>>, Source<Long>> pipeContainer2 =
+            circuit.container(containerName, Composer.pipe());
+        assertThat((Object) pipeContainer).isSameAs(pipeContainer2);
+    }
+
+    @Test
+    void shouldCreateSeparateConduitsPerName() {
+        // This is the KEY test for the article's requirement
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
+
+        Container<Pool<Pipe<Long>>, Source<Long>> container =
+            circuit.container(cortex.name("metrics"), Composer.pipe());
+
+        // Get Pools for different names
+        Pool<Pipe<Long>> applPool = container.get(cortex.name("APPL"));
+        Pool<Pipe<Long>> msftPool = container.get(cortex.name("MSFT"));
+
+        // These should be DIFFERENT Conduits (not the same object)
+        assertThat((Object) applPool).isNotNull();
+        assertThat((Object) msftPool).isNotNull();
+        assertThat((Object) applPool).isNotSameAs(msftPool);
+    }
+
+    @Test
+    void shouldCacheSameConduitForSameName() {
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
+
+        Container<Pool<Pipe<String>>, Source<String>> container =
+            circuit.container(cortex.name("cache-test"), Composer.pipe());
+
+        // Get same name twice
+        Pool<Pipe<String>> pool1 = container.get(cortex.name("APPL"));
+        Pool<Pipe<String>> pool2 = container.get(cortex.name("APPL"));
+
+        // Should be same Conduit (cached)
+        assertThat((Object) pool1).isSameAs(pool2);
+    }
+
+    @Test
+    void shouldSupportNestedAccessPattern() {
+        // Article's example pattern:
+        // container.get(name("APPL")).get(BUY).emit(order)
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
+
+        Container<Pool<Pipe<String>>, Source<String>> container =
+            circuit.container(cortex.name("orders"), Composer.pipe());
+
+        // Get Conduit for APPL
+        Pool<Pipe<String>> applConduit = container.get(cortex.name("APPL"));
+
+        // Get BUY Pipe from APPL Conduit
+        Pipe<String> buyPipe = applConduit.get(cortex.name("BUY"));
+
+        // Emit order (should not throw)
+        assertThat((Object) buyPipe).isNotNull();
+        buyPipe.emit("Order{symbol=APPL, action=BUY, quantity=100}");
+    }
+
+    @Test
+    void shouldSupportMultipleConduitsWithEmissions() throws Exception {
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
+
+        Container<Pool<Pipe<String>>, Source<String>> container =
+            circuit.container(cortex.name("stocks"), Composer.pipe());
+
+        // APPL trades
+        container.get(cortex.name("APPL")).get(cortex.name("BUY")).emit("APPL-BUY-100");
+        container.get(cortex.name("APPL")).get(cortex.name("SELL")).emit("APPL-SELL-50");
+
+        // MSFT trades (different Conduit)
+        container.get(cortex.name("MSFT")).get(cortex.name("BUY")).emit("MSFT-BUY-200");
+        container.get(cortex.name("MSFT")).get(cortex.name("SELL")).emit("MSFT-SELL-100");
+
+        // Verify we have 2 separate Conduits
+        ContainerImpl<Pipe<String>, String> containerImpl = (ContainerImpl<Pipe<String>, String>) container;
+        assertThat(containerImpl.getConduits()).hasSize(2);
+        assertThat(containerImpl.getConduits()).containsKeys(
+            cortex.name("APPL"),
+            cortex.name("MSFT")
+        );
     }
 
     @Test
     void shouldProvideSourceForSubscriptions() {
-        Pool<String> pool = new PoolImpl<>(name -> "value");
-        SourceImpl<String> source = new SourceImpl<>();
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
 
-        ContainerImpl<String, String> container = new ContainerImpl<>(pool, source);
+        Container<Pool<Pipe<Integer>>, Source<Integer>> container =
+            circuit.container(cortex.name("sensors"), Composer.pipe());
 
-        AtomicInteger notificationCount = new AtomicInteger(0);
+        Source<Source<Integer>> containerSource = container.source();
 
-        container.eventSource().subscribe(subscriber((subject, registrar) -> {
-            registrar.register(emission -> notificationCount.incrementAndGet());
-        }));
-
-        // Emit from source
-        notifySource(source, "test-channel", "test-event");
-
-        assertThat(notificationCount.get()).isEqualTo(1);
+        assertThat((Object) containerSource).isNotNull();
+        assertThat((Object) containerSource.subject()).isNotNull();
     }
 
     @Test
-    void shouldSupportBothPoolAndSourceOperations() {
-        Pool<Integer> pool = new PoolImpl<>(name -> 42);
-        SourceImpl<String> source = new SourceImpl<>();
+    void shouldUseHierarchicalNamesForConduits() {
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
 
-        ContainerImpl<Integer, String> container = new ContainerImpl<>(pool, source);
+        Container<Pool<Pipe<String>>, Source<String>> container =
+            circuit.container(cortex.name("parent"), Composer.pipe());
 
-        // Test pool functionality
-        Pool<Integer> poolResult = container.get(NameImpl.of("test"));
-        assertThat((Object) poolResult).isSameAs(pool);
+        // Access creates Conduit with hierarchical name
+        container.get(cortex.name("child"));
 
-        // Test source functionality
-        AtomicInteger emissionCount = new AtomicInteger(0);
-        container.eventSource().subscribe(subscriber((subject, registrar) -> {
-            registrar.register(emission -> emissionCount.incrementAndGet());
-        }));
-
-        notifySource(source, "test-channel", "event1");
-        notifySource(source, "test-channel", "event2");
-
-        assertThat(emissionCount.get()).isEqualTo(2);
+        // Verify Conduit was created
+        ContainerImpl<Pipe<String>, String> containerImpl = (ContainerImpl<Pipe<String>, String>) container;
+        assertThat(containerImpl.getConduits()).hasSize(1);
     }
 
     @Test
-    void shouldRequireNonNullPool() {
-        Source<String> source = new SourceImpl<>();
+    void shouldRequireNonNullName() {
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
 
-        assertThatThrownBy(() -> new ContainerImpl<>(null, source))
+        Container<Pool<Pipe<String>>, Source<String>> container =
+            circuit.container(cortex.name("test"), Composer.pipe());
+
+        Name nullName = null;
+        assertThatThrownBy(() -> container.get(nullName))
             .isInstanceOf(NullPointerException.class)
-            .hasMessageContaining("Pool cannot be null");
+            .hasMessageContaining("Conduit name cannot be null");
     }
 
     @Test
-    void shouldRequireNonNullSource() {
-        Pool<String> pool = new PoolImpl<>(name -> "value");
+    void shouldCloseAllManagedConduits() {
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
 
-        assertThatThrownBy(() -> new ContainerImpl<>(pool, null))
-            .isInstanceOf(NullPointerException.class)
-            .hasMessageContaining("Source cannot be null");
+        Container<Pool<Pipe<String>>, Source<String>> container =
+            circuit.container(cortex.name("closeable"), Composer.pipe());
+
+        // Create multiple Conduits
+        container.get(cortex.name("conduit1"));
+        container.get(cortex.name("conduit2"));
+        container.get(cortex.name("conduit3"));
+
+        // Close container (should close all Conduits)
+        container.close();
+
+        // Verify all Conduits were cleared
+        ContainerImpl<Pipe<String>, String> containerImpl = (ContainerImpl<Pipe<String>, String>) container;
+        assertThat(containerImpl.getConduits()).isEmpty();
     }
 
     @Test
-    void shouldUseSourceNameForSubject() {
-        Pool<String> pool = new PoolImpl<>(name -> "value");
-        Source<String> source = new SourceImpl<>(NameImpl.of("test-source"));
+    void shouldHandleDifferentEmissionTypes() {
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
 
-        Container<Pool<String>, Source<String>> container = new ContainerImpl<>(pool, source);
+        // String container
+        Container<Pool<Pipe<String>>, Source<String>> stringContainer =
+            circuit.container(cortex.name("strings"), Composer.pipe());
 
-        assertThat((Object) container.subject().name()).isEqualTo(NameImpl.of("test-source"));
+        // Long container
+        Container<Pool<Pipe<Long>>, Source<Long>> longContainer =
+            circuit.container(cortex.name("longs"), Composer.pipe());
+
+        // Both should work independently
+        stringContainer.get(cortex.name("A")).get(cortex.name("1")).emit("test");
+        longContainer.get(cortex.name("B")).get(cortex.name("2")).emit(42L);
+
+        // Verify separate containers
+        assertThat((Object) stringContainer).isNotSameAs(longContainer);
     }
 
     @Test
-    void shouldHandleMultipleSubscribers() {
-        Pool<String> pool = new PoolImpl<>(name -> "value");
-        SourceImpl<Integer> source = new SourceImpl<>();
+    void shouldSupportArticleStockTradingExample() {
+        // This test directly implements the article's stock trading example
+        cortex = new CortexRuntime();
+        circuit = cortex.circuit();
 
-        ContainerImpl<String, Integer> container = new ContainerImpl<>(pool, source);
+        // Create orders container
+        Container<Pool<Pipe<String>>, Source<String>> container =
+            circuit.container(cortex.name("ORDERS"), Composer.pipe());
 
-        AtomicInteger count1 = new AtomicInteger(0);
-        AtomicInteger count2 = new AtomicInteger(0);
+        // Article's pattern: container.get(name("APPL")).get(BUY).emit(order)
+        Pool<Pipe<String>> applConduit = container.get(cortex.name("APPL"));
+        Pipe<String> buyPipe = applConduit.get(cortex.name("BUY"));
+        buyPipe.emit("Order{symbol=APPL, quantity=200, price=1000000}");
 
-        container.eventSource().subscribe(subscriber((subject, registrar) -> {
-            registrar.register(emission -> count1.incrementAndGet());
-        }));
+        // Different stock - different Conduit
+        Pool<Pipe<String>> msftConduit = container.get(cortex.name("MSFT"));
+        assertThat((Object) msftConduit).isNotSameAs(applConduit);
 
-        container.eventSource().subscribe(subscriber((subject, registrar) -> {
-            registrar.register(emission -> count2.incrementAndGet());
-        }));
+        Pipe<String> sellPipe = msftConduit.get(cortex.name("SELL"));
+        sellPipe.emit("Order{symbol=MSFT, quantity=100, price=500000}");
 
-        notifySource(source, "test-channel", 1);
-        notifySource(source, "test-channel", 2);
-
-        assertThat(count1.get()).isEqualTo(2);
-        assertThat(count2.get()).isEqualTo(2);
-    }
-
-    @Test
-    void shouldSupportGenericTypes() {
-        // Pool of Strings, Source of Integers
-        Pool<String> pool = new PoolImpl<>(name -> "str-" + name.part());
-        SourceImpl<Integer> source = new SourceImpl<>();
-
-        ContainerImpl<String, Integer> container = new ContainerImpl<>(pool, source);
-
-        Pool<String> poolResult = container.get(NameImpl.of("test"));
-        assertThat((Object) poolResult).isSameAs(pool);
-
-        AtomicInteger sum = new AtomicInteger(0);
-        container.eventSource().subscribe(subscriber((subject, registrar) -> {
-            registrar.register(value -> sum.addAndGet(value));
-        }));
-
-        notifySource(source, "test-channel", 10);
-        notifySource(source, "test-channel", 20);
-
-        assertThat(sum.get()).isEqualTo(30);
+        // Verify both Conduits exist
+        ContainerImpl<Pipe<String>, String> containerImpl = (ContainerImpl<Pipe<String>, String>) container;
+        assertThat(containerImpl.getConduits()).hasSize(2);
     }
 }

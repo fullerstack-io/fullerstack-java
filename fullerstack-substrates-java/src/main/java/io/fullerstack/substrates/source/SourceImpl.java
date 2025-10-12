@@ -6,9 +6,12 @@ import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.name.NameImpl;
 import io.fullerstack.substrates.subscription.SubscriptionImpl;
+import io.fullerstack.substrates.sink.CaptureImpl;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -64,17 +67,53 @@ public class SourceImpl<E> implements Source<E> {
     }
 
     /**
-     * INTERNAL: Returns subscribers for Conduit processing.
+     * INTERNAL: Notifies all subscribers of an emission.
      *
-     * TODO: This violates strict API compliance. Should either:
-     * 1. Move SourceImpl and ConduitImpl to same package for package-private access
-     * 2. Redesign architecture so Conduit doesn't need direct subscriber access
-     * 3. Have Source handle invocation instead of exposing subscribers
+     * <p>This is an implementation method (not part of the Substrates API interface)
+     * used by ConduitImpl to route emissions to subscribers. Handles:
+     * <ul>
+     *   <li>Lazy pipe registration - subscriber.accept() called only on first emission from each Subject</li>
+     *   <li>Pipe caching - reuses registered pipes for subsequent emissions</li>
+     *   <li>Multi-dispatch - routes to all registered pipes for each subscriber</li>
+     * </ul>
      *
-     * @return list of subscribers
+     * @param capture the emission capture (Subject + value)
+     * @param pipeCache cache of registered pipes per (Subject Name, Subscriber)
      */
-    public List<Subscriber<E>> getSubscribers() {
-        return subscribers;
+    public void notifySubscribers(
+        Capture<E> capture,
+        Map<Name, Map<Subscriber<E>, List<Pipe<E>>>> pipeCache
+    ) {
+        Subject emittingSubject = capture.subject();
+        Name subjectName = emittingSubject.name();
+
+        // Get or create the subscriber->pipes map for this Subject
+        Map<Subscriber<E>, List<Pipe<E>>> subscriberPipes = pipeCache.computeIfAbsent(
+            subjectName,
+            name -> new ConcurrentHashMap<>()
+        );
+
+        // For each subscriber, get cached pipes or register new ones (first emission only)
+        for (Subscriber<E> subscriber : subscribers) {
+            List<Pipe<E>> pipes = subscriberPipes.computeIfAbsent(subscriber, sub -> {
+                // First emission from this Subject - call subscriber.accept() to register pipes
+                List<Pipe<E>> registeredPipes = new CopyOnWriteArrayList<>();
+
+                sub.accept(emittingSubject, new Registrar<E>() {
+                    @Override
+                    public void register(Pipe<E> pipe) {
+                        registeredPipes.add(pipe);
+                    }
+                });
+
+                return registeredPipes;
+            });
+
+            // Emit to all registered pipes (cached or newly registered)
+            for (Pipe<E> pipe : pipes) {
+                pipe.emit(capture.emission());
+            }
+        }
     }
 
 }

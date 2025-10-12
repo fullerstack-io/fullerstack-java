@@ -62,6 +62,16 @@ public class SubjectImpl implements Subject {
     }
 
     @Override
+    public CharSequence path() {
+        return name.path();
+    }
+
+    @Override
+    public CharSequence path(char separator) {
+        return name.path(separator);
+    }
+
+    @Override
     public String toString() {
         return String.format("Subject[type=%s, name=%s, id=%s]", type, name, id);
     }

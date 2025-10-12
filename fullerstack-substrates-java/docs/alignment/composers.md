@@ -6,7 +6,7 @@
 
 ## Summary
 
-Our `Composer` implementation is fully aligned with the Humainary Composers article. The interface, usage patterns, and integration with Channels and Conduits all correctly implement the article's concepts.
+Our Substrates implementation correctly provides the `Composer` interface and infrastructure as defined in the Humainary article. The Substrates API provides static factories for common cases (`Composer.pipe()`, `Composer.channel()`), while domain-specific Composer implementations belong in application code, not in the Substrates library.
 
 ## Article's Key Requirements
 
@@ -29,26 +29,34 @@ interface Composer<P, E> {
 - `P` - Percept type (what gets returned, e.g., Pipe<E>, Party, Meter<E>)
 - `E` - Emission type (what the channel emits, e.g., String, Long, Signal)
 
-**Our Implementation:**
+**API Provides Static Factories:**
 ```java
-// PipeComposer.java (kafka-obs codebase)
-public class PipeComposer<E> implements Composer<Pipe<E>, E> {
-    @Override
-    public Pipe<E> compose(Channel<E> channel) {
-        return new PipeImpl<>(channel);
-    }
-}
+// From Substrates API
+interface Composer<P, E> {
+    P compose(Channel<E> channel);
 
-// PipeComposer.java (fullerstack codebase)
-public class PipeComposer<E> implements Composer<Pipe<E>, E> {
-    @Override
-    public Pipe<E> compose(Channel<E> channel) {
-        return channel.pipe();
+    // Static factory for Pipe composer (provided by API)
+    static <E> Composer<Pipe<E>, E> pipe() {
+        return Inlet::pipe;
+    }
+
+    // Static factory for Channel composer (identity)
+    static <E> Composer<Channel<E>, E> channel() {
+        return input -> input;
     }
 }
 ```
 
-**Verification**: ✅ Correct - Both implementations follow the Composer<P, E> interface
+**Usage:**
+```java
+// Use API-provided composer
+Conduit<Pipe<Long>, Long> conduit = circuit.conduit(
+    name,
+    Composer.pipe()  // ← API-provided static factory
+);
+```
+
+**Verification**: ✅ Correct - API provides common Composer implementations
 
 ### 2. ✅ Purpose: Constructs Percepts from Channels
 
@@ -118,13 +126,16 @@ class Parties implements Composer<Party, String> {
 }
 ```
 
-**Our Implementation:**
+**Example Implementation:**
 ```java
-// Composer receives Channel which has subject() method
-public Pipe<E> compose(Channel<E> channel) {
-    // Could access: channel.subject() to get Subject
-    // Could use: channel.subject().name() for hierarchical routing
-    return channel.pipe();
+// Domain-specific composer can access Subject
+class MeterComposer<E> implements Composer<Meter<E>, E> {
+    @Override
+    public Meter<E> compose(Channel<E> channel) {
+        // Access to Subject for domain logic
+        Name name = channel.subject().name();
+        return new MeterImpl<>(name, channel.pipe());
+    }
 }
 ```
 
@@ -191,34 +202,33 @@ var conduit = circuit.conduit(
 );
 ```
 
-**Our Implementation:**
+**API Implementation:**
 ```java
-// From Substrates API (inferred from usage)
+// From Substrates API
 interface Composer<P, E> {
   P compose(Channel<E> channel);
 
-  // Static factory method
+  // Static factory method (provided by API)
   static <E> Composer<Pipe<E>, E> pipe() {
-    return channel -> channel.pipe();
+    return Inlet::pipe;  // Method reference
+  }
+
+  // With Sequencer support
+  static <E> Composer<Pipe<E>, E> pipe(
+    Sequencer<? super Segment<E>> sequencer
+  ) {
+    return channel -> channel.pipe(sequencer);
   }
 }
 
-// Usage in tests (fullerstack)
+// Usage in production code
 Conduit<Pipe<Long>, Long> conduit = circuit.conduit(
     cortex.name("test-conduit"),
-    Composer.pipe()  // ← Static factory method
+    Composer.pipe()  // ← API-provided static factory
 );
 ```
 
-**kafka-obs Implementation:**
-```java
-// PipeComposer.java - Static factory
-public static <E> Composer<Pipe<E>, E> create(Class<E> emissionClass) {
-    return new PipeComposer<>();
-}
-```
-
-**Verification**: ✅ Correct - Static factory methods for common composers
+**Verification**: ✅ Correct - API provides static factories for common use cases
 
 ### 7. ✅ Domain-Specific Composers
 
@@ -347,64 +357,58 @@ interface Composer<P, E> {
 }
 ```
 
-### Our Implementations
+### API-Provided Implementations
 
-**kafka-obs PipeComposer:**
+**Substrates API Static Factories:**
 ```java
-public class PipeComposer<E> implements Composer<Pipe<E>, E> {
-    @Override
-    public Pipe<E> compose(Channel<E> channel) {
-        return new PipeImpl<>(channel);
+interface Composer<P, E> {
+    P compose(Channel<E> channel);
+
+    // Pipe composer (most common case)
+    static <E> Composer<Pipe<E>, E> pipe() {
+        return Inlet::pipe;
     }
 
-    public static <E> Composer<Pipe<E>, E> create(Class<E> emissionClass) {
-        return new PipeComposer<>();
-    }
-}
-```
-
-**fullerstack PipeComposer:**
-```java
-public class PipeComposer<E> implements Composer<Pipe<E>, E> {
-    @Override
-    public Pipe<E> compose(Channel<E> channel) {
-        return channel.pipe();
+    // Pipe composer with transformations
+    static <E> Composer<Pipe<E>, E> pipe(
+        Sequencer<? super Segment<E>> sequencer
+    ) {
+        return channel -> channel.pipe(sequencer);
     }
 
-    public static <E> Composer<Pipe<E>, E> create(Class<E> emissionClass) {
-        return new PipeComposer<>();
+    // Channel composer (identity)
+    static <E> Composer<Channel<E>, E> channel() {
+        return input -> input;
     }
 }
 ```
 
-**Verification**: ✅ Full API compliance - compose() method implemented
-
-## Documentation Quality
-
-**kafka-obs PipeComposer JavaDoc:**
+**Domain-Specific Example:**
 ```java
-/**
- * Composer that transforms Channel<E> into Pipe<E>.
- *
- * <p>This is the standard composer used for creating typed pipes from channels.
- *
- * @param <E> the emission type
- */
+// Application code implements domain composers
+public class MeterComposer<E extends Number> implements Composer<Meter<E>, E> {
+    @Override
+    public Meter<E> compose(Channel<E> channel) {
+        return new MeterImpl<>(channel.subject().name(), channel.pipe());
+    }
+}
 ```
 
-**fullerstack PipeComposer JavaDoc:**
-```java
-/**
- * Composer that transforms Channel<E> into Pipe<E>.
- *
- * <p>This is the standard composer used for creating typed pipes from channels.
- * Delegates to Channel.pipe() to obtain the configured Pipe instance.
- *
- * @param <E> the emission type
- */
-```
+**Verification**: ✅ API provides infrastructure, applications provide domain composers
 
-**Verification**: ✅ Documentation accurately reflects article's concepts
+## Architecture Separation
+
+**Substrates Library Responsibilities:**
+- ✅ Provides `Composer<P, E>` interface
+- ✅ Provides static factories for common cases (`Composer.pipe()`, `Composer.channel()`)
+- ✅ Provides infrastructure (Circuit, Conduit, Channel, Pipe, Segment)
+
+**Application Code Responsibilities:**
+- ✅ Implements domain-specific composers (Parties, Meter, Counter, etc.)
+- ✅ Defines domain percept types that compose Channels
+- ✅ Maps domain concepts to Substrates infrastructure
+
+**Verification**: ✅ Clear separation of concerns between library and application
 
 ## Usage Examples from Tests
 
@@ -459,57 +463,43 @@ Subscriber<Long> subscriber = cortex.subscriber(
 source.subscribe(subscriber);
 ```
 
-## Implementation Differences: kafka-obs vs fullerstack
+## Why Substrates Library Doesn't Provide Composer Implementations
 
-### kafka-obs Approach
-
+**Reason 1: API Already Provides Them**
 ```java
-// PipeImpl wraps ChannelImpl directly
-public class PipeImpl<E> implements Pipe<E> {
-    private final ChannelImpl<E> channel;
-
-    public PipeImpl(Channel<E> channel) {
-        if (channel instanceof ChannelImpl) {
-            this.channel = (ChannelImpl<E>) channel;
-        } else {
-            throw new IllegalArgumentException("PipeImpl requires ChannelImpl instance");
-        }
-    }
-
-    @Override
-    public void emit(E value) {
-        channel.emit(value);  // Direct delegation
-    }
-}
+Composer.pipe()      // Already in Substrates API
+Composer.channel()   // Already in Substrates API
 ```
 
-### fullerstack Approach
-
+**Reason 2: Domain-Specific by Nature**
 ```java
-// PipeComposer delegates to Channel.pipe()
-public class PipeComposer<E> implements Composer<Pipe<E>, E> {
-    @Override
-    public Pipe<E> compose(Channel<E> channel) {
-        return channel.pipe();  // Channel creates its own Pipe
-    }
-}
+// These belong in application code, not infrastructure:
+class Parties implements Composer<Party, String> { ... }
+class Meters implements Composer<Meter<E>, E> { ... }
+class Counters implements Composer<Counter, Long> { ... }
 ```
 
-**Both approaches are valid** - the key is that Composer transforms Channel → Pipe
+**Reason 3: Separation of Concerns**
+- **Substrates Library**: Provides abstractions (Composer interface, infrastructure)
+- **Application Code**: Maps domain concepts to infrastructure (domain composers)
+
+**This follows the same pattern as Java's standard library:**
+- `java.util.function.Function<T, R>` - Interface provided
+- `String::toLowerCase` - Implementation in application code
 
 ## Alignment Summary
 
 | Concept | Article Requirement | Our Implementation | Status |
 |---------|-------------------|-------------------|--------|
-| Composer interface | ✓ | PipeComposer implements Composer<Pipe<E>, E> | ✅ |
+| Composer interface | ✓ | Provided by Substrates API | ✅ |
 | compose() method | ✓ | Returns percept from Channel | ✅ |
 | Type safety | ✓ | Generic types P and E enforced | ✅ |
 | On-demand creation | ✓ | Conduit.get() creates via Composer | ✅ |
 | Percept caching | ✓ | Conduit caches by subject name | ✅ |
 | Access to Subject | ✓ | Channel.subject() available | ✅ |
 | Circuit integration | ✓ | Circuit.conduit(Composer) | ✅ |
-| Static factories | ✓ | Composer.pipe(), PipeComposer.create() | ✅ |
-| Domain-specific | ✓ | Pattern supports custom composers | ✅ |
+| Static factories | ✓ | Composer.pipe(), Composer.channel() | ✅ |
+| Domain-specific | ✓ | Applications implement domain composers | ✅ |
 | Code examples work | ✓ | Tests demonstrate article patterns | ✅ |
 
 ## Test Coverage
@@ -575,44 +565,65 @@ void shouldHandleMultipleSubscribers() {
 
 **Status: ✅ FULLY ALIGNED**
 
-Our `Composer` implementations correctly implement all concepts described in the Humainary Composers article:
+Our Substrates implementation correctly provides the Composer pattern as described in the Humainary article:
 
-1. ✅ Composer<P, E> interface with compose() method
+1. ✅ Composer<P, E> interface with compose() method (in API)
 2. ✅ Creates percepts from Channels
 3. ✅ Type-safe percept factory
 4. ✅ On-demand creation via Conduit.get()
 5. ✅ Percept caching by subject name
 6. ✅ Access to Channel's Subject
 7. ✅ Integration with Circuit.conduit()
-8. ✅ Static factory methods (Composer.pipe())
-9. ✅ Supports domain-specific composers
+8. ✅ Static factory methods (Composer.pipe(), Composer.channel())
+9. ✅ Supports domain-specific composers (implemented in application code)
 10. ✅ Article's code examples work
 
-**Both kafka-obs and fullerstack implementations** follow the Composer pattern correctly, with slight differences in how PipeImpl is constructed:
-- **kafka-obs**: PipeImpl wraps ChannelImpl directly
-- **fullerstack**: PipeComposer delegates to Channel.pipe()
+**Correct Architecture:**
+- **Substrates Library**: Provides Composer interface + common static factories
+- **Application Code**: Implements domain-specific composers (Parties, Meter, Counter, etc.)
 
-Both approaches satisfy the Composer contract: **transform Channel<E> → Percept<E>**.
+This separation of concerns matches the article's intent and follows standard library design patterns.
 
-## Future Enhancements
+## Example Domain-Specific Composers (Application Code)
 
-While the implementation is complete and aligned, potential domain-specific composers could include:
+Domain-specific composers should be implemented in application code, not in the Substrates library:
 
 ```java
-// Meter composer for metrics
-class MeterComposer<E extends Number> implements Composer<Meter<E>, E> { ... }
+// Meter composer for metrics (in application code)
+class MeterComposer<E extends Number> implements Composer<Meter<E>, E> {
+    @Override
+    public Meter<E> compose(Channel<E> channel) {
+        return new MeterImpl<>(channel.subject().name(), channel.pipe());
+    }
+}
 
 // Counter composer for incrementing values
-class CounterComposer implements Composer<Counter, Long> { ... }
+class CounterComposer implements Composer<Counter, Long> {
+    @Override
+    public Counter compose(Channel<Long> channel) {
+        return new CounterImpl(channel.subject(), channel.pipe());
+    }
+}
 
 // Gauge composer for instantaneous values
-class GaugeComposer<E> implements Composer<Gauge<E>, E> { ... }
+class GaugeComposer<E> implements Composer<Gauge<E>, E> {
+    @Override
+    public Gauge<E> compose(Channel<E> channel) {
+        return new GaugeImpl<>(channel.subject(), channel.pipe());
+    }
+}
 
-// Histogram composer for distribution tracking
-class HistogramComposer implements Composer<Histogram, Double> { ... }
+// Party composer from article (chat application)
+class Parties implements Composer<Party, String> {
+    @Override
+    public Party compose(Channel<String> channel) {
+        var path = channel.subject().foldTo(...);
+        return new Party(path, new ArrayList<>(), channel.pipe());
+    }
+}
 ```
 
-These would follow the same pattern demonstrated by PipeComposer.
+These domain composers map application concepts to Substrates infrastructure.
 
 ## References
 

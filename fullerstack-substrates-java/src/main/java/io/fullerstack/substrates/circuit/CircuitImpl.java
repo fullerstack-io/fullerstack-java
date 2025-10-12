@@ -25,7 +25,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ul>
  *   <li>Single Queue for backpressure management</li>
  *   <li>Clock caching by name</li>
- *   <li>Conduit caching by name (stub for Story 4.12)</li>
+ *   <li>Conduit caching by (name, composer type) - different composers create different conduits</li>
+ *   <li>Container caching by (name, composer type) - different composers create different containers</li>
  *   <li>Container composition of Pool and Source</li>
  *   <li>State event sourcing via SourceImpl</li>
  *   <li>Resource lifecycle management</li>
@@ -38,8 +39,23 @@ public class CircuitImpl implements Circuit {
     private final Source<State> stateSource;
     private final Queue queue; // Virtual thread is daemon - auto-cleanup on JVM shutdown
     private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
-    private final Map<Name, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
+    private final Map<ConduitKey, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
+    private final Map<ContainerKey, Container<?, ?>> containers = new ConcurrentHashMap<>();
     private volatile boolean closed = false;
+
+    /**
+     * Composite key for Conduit caching.
+     * Conduits are cached by both name AND composer type, since different
+     * composers create different percept types (Pipe vs Channel vs domain types).
+     */
+    private record ConduitKey(Name name, Class<?> composerClass) {}
+
+    /**
+     * Composite key for Container caching.
+     * Containers are cached by both name AND composer type, since different
+     * composers create different percept types (Pipe vs Channel vs domain types).
+     */
+    private record ContainerKey(Name name, Class<?> composerClass) {}
 
     /**
      * Creates a circuit with the specified name.
@@ -77,7 +93,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public Clock clock() {
-        return clock(NameImpl.of("default"));
+        return clock(NameImpl.of("clock"));
     }
 
     @Override
@@ -89,7 +105,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public <P, E> Conduit<P, E> conduit(Composer<? extends P, E> composer) {
-        return conduit(NameImpl.of("default"), composer);
+        return conduit(NameImpl.of("conduit"), composer);
     }
 
     @Override
@@ -98,10 +114,14 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(name, "Conduit name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");
 
+        // Build hierarchical name: circuit.conduit
+        Name hierarchicalName = circuitSubject.name().name(name);
+
+        ConduitKey key = new ConduitKey(name, composer.getClass());
         @SuppressWarnings("unchecked")
         Conduit<P, E> conduit = (Conduit<P, E>) conduits.computeIfAbsent(
-            name,
-            n -> new io.fullerstack.substrates.conduit.ConduitImpl<>(circuitSubject.name(), n, composer)
+            key,
+            k -> new io.fullerstack.substrates.conduit.ConduitImpl<>(hierarchicalName, composer, queue)
         );
         return conduit;
     }
@@ -113,15 +133,22 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(composer, "Composer cannot be null");
         Objects.requireNonNull(sequencer, "Sequencer cannot be null");
 
-        // The Sequencer is applied at the Channel.pipe(sequencer) level
-        // The Composer should call channel.pipe(sequencer) in its compose() method
-        // For now, delegate to the standard conduit method - the Composer handles sequencing
-        return conduit(name, composer);
+        // Build hierarchical name: circuit.conduit
+        Name hierarchicalName = circuitSubject.name().name(name);
+
+        // Create Conduit with Sequencer - transformations apply to ALL channels in this Conduit
+        ConduitKey key = new ConduitKey(name, composer.getClass());
+        @SuppressWarnings("unchecked")
+        Conduit<P, E> conduit = (Conduit<P, E>) conduits.computeIfAbsent(
+            key,
+            k -> new io.fullerstack.substrates.conduit.ConduitImpl<>(hierarchicalName, composer, queue, sequencer)
+        );
+        return conduit;
     }
 
     @Override
     public <P, E> Container<Pool<P>, Source<E>> container(Composer<P, E> composer) {
-        return container(NameImpl.of("default"), composer);
+        return container(NameImpl.of("container"), composer);
     }
 
     @Override
@@ -130,11 +157,15 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(name, "Container name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");
 
-        // Create a Conduit that will use the Composer to create percepts
-        Conduit<P, E> conduit = conduit(name, composer);
-
-        // Container wraps the Conduit, exposing it as Pool + Source
-        return new ContainerImpl<>(conduit, conduit.source());
+        // Container manages a collection of Conduits
+        // Cached by (name, composer) - same as Conduit caching pattern
+        ContainerKey key = new ContainerKey(name, composer.getClass());
+        @SuppressWarnings("unchecked")
+        Container<Pool<P>, Source<E>> container = (Container<Pool<P>, Source<E>>) containers.computeIfAbsent(
+            key,
+            k -> new ContainerImpl<>(name, this, composer)
+        );
+        return container;
     }
 
     @Override
@@ -144,10 +175,15 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(composer, "Composer cannot be null");
         Objects.requireNonNull(sequencer, "Sequencer cannot be null");
 
-        // Create conduit with sequencer
-        Conduit<P, E> conduit = conduit(name, composer, sequencer);
-
-        return new ContainerImpl<>(conduit, conduit.source());
+        // Container with Sequencer - applies transformations to all Conduits created by Container
+        // Cached by (name, composer) - same as Conduit caching pattern
+        ContainerKey key = new ContainerKey(name, composer.getClass());
+        @SuppressWarnings("unchecked")
+        Container<Pool<P>, Source<E>> container = (Container<Pool<P>, Source<E>>) containers.computeIfAbsent(
+            key,
+            k -> new ContainerImpl<>(name, this, composer, sequencer)
+        );
+        return container;
     }
 
     @Override
@@ -172,11 +208,21 @@ public class CircuitImpl implements Circuit {
                 }
             });
 
+            // Close all containers
+            containers.values().forEach(container -> {
+                try {
+                    container.close();
+                } catch (Exception e) {
+                    // Log but continue
+                }
+            });
+
             // Note: Queue uses daemon virtual thread - no explicit shutdown needed
             // Virtual threads are automatically cleaned up on JVM shutdown
 
             clocks.clear();
             conduits.clear();
+            containers.clear();
         }
     }
 

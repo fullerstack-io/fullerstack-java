@@ -1,163 +1,118 @@
-# Fullerstack
+# Fullerstack Java
 
-Event-driven runtime and observability framework for Java 24.
+A collection of Java libraries and implementations by Fullerstack.
 
 ## Overview
 
-**Fullerstack** is a modern Java framework combining:
-- **Substrates**: Pure event-driven runtime implementing the Humainary Substrates API
-- **Serventis**: Signal-based observability domain models
+This repository serves as a monorepo for various Java-based projects and libraries developed by Fullerstack. Each module is independently maintained with its own documentation, tests, and dependencies.
 
-Built on Java 24 with virtual threads, structured concurrency, and modern language features.
+## Current Projects
 
-## Modules
+### [Fullerstack Substrates](fullerstack-substrates-java/)
 
-### fullerstack-substrates-java
-Pure implementation of the [Humainary Substrates API](https://github.com/Humainary/substrates-java):
-- **Circuit**: Event-driven orchestration
-- **Queue**: Backpressure management with virtual threads
-- **Clock**: Periodic event timing
-- **Source**: Event emission and subscriber management
-- **Conduit**: Event transformation pipelines
-- **Container**: Pool and Source composition
+Java implementation of the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java) for building event-driven observability systems.
 
-**Dependencies**: Only Substrates API (no Spring, no Kafka, no Redis)
+**Features:**
+- Circuit-based event orchestration
+- Queue processing with virtual threads
+- Observable streams (Source/Subscriber pattern)
+- Transformation pipelines (Sequencer/Segment)
+- Hierarchical resource management
+- Immutable state management
 
-### fullerstack-serventis-java
-Signal-based observability domain models:
-- **Signal**: Base event types
-- **Percept**: Observation patterns
-- **Situation**: Derived insights
-- **Reporter**: Event output
+**Status:** ✅ Production-ready | 264 tests passing | Apache 2.0
 
-**Dependencies**: Only Substrates API
+**Documentation:** [View README](fullerstack-substrates-java/README.md)
 
-### kafka-fullerstack
-Kafka observability platform built on Fullerstack:
-- Partition health monitoring
-- Consumer lag tracking
-- Cluster health aggregation
-- Failure pattern detection
-- Capacity planning with forecasting
-- Tiered storage (Redis + EBS)
-
-**Dependencies**: Fullerstack Substrates, Fullerstack Serventis, Spring Boot, Kafka, Redis, RocksDB
+---
 
 ## Requirements
 
-- **Java 24** (or higher)
-- Maven 3.8+
+- **Java 24** or higher
+- Maven 3.9+
 
-## Building
+## Building All Projects
 
 ```bash
+# Clone the repository
+git clone https://github.com/fullerstack-io/fullerstack-java.git
+cd fullerstack-java
+
 # Build all modules
 mvn clean install
 
-# Build specific module
-cd fullerstack-substrates-java
-mvn clean install
-
-# Run tests
+# Run all tests
 mvn test
 
 # Skip tests
 mvn clean install -DskipTests
 ```
 
-## Usage
+## Building Individual Projects
 
-### Using Fullerstack Substrates
+Each project can be built independently:
 
-Add to your `pom.xml`:
-
-```xml
-<dependency>
-    <groupId>io.fullerstack</groupId>
-    <artifactId>fullerstack-substrates-java</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-</dependency>
+```bash
+cd fullerstack-substrates-java
+mvn clean install
 ```
 
-Example:
-
-```java
-import io.fullerstack.substrates.CortexRuntime;
-import io.humainary.substrates.api.Substrates.*;
-
-Cortex cortex = new CortexRuntime();
-Circuit circuit = cortex.circuit(cortex.name("my-app"));
-
-// Use queue for script execution
-circuit.queue().post(current -> {
-    System.out.println("Processing event");
-});
-
-// Subscribe to clock for periodic events
-circuit.clock().consume(
-    cortex.name("ticker"),
-    Clock.Cycle.SECOND,
-    instant -> System.out.println("Tick: " + instant)
-);
-```
-
-### Using Fullerstack Serventis
-
-Add to your `pom.xml`:
-
-```xml
-<dependency>
-    <groupId>io.fullerstack</groupId>
-    <artifactId>fullerstack-serventis-java</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-</dependency>
-```
-
-## Architecture
+## Project Structure
 
 ```
 fullerstack-java/
-├── fullerstack-substrates-java/    # Pure runtime (no dependencies)
-│   └── io.fullerstack.substrates
-├── fullerstack-serventis-java/     # Pure domain models
-│   └── io.fullerstack.serventis
-└── kafka-fullerstack/              # Kafka application
-    └── io.fullerstack.kafka
+├── fullerstack-substrates-java/    # Substrates API implementation
+├── [future-project-1]/             # Future Java projects
+├── [future-project-2]/             # Future Java projects
+└── pom.xml                         # Parent POM
 ```
 
-**Dependency Graph:**
-```
-kafka-fullerstack
-    ├── fullerstack-substrates-java
-    └── fullerstack-serventis-java
-```
+## Adding New Projects
 
-## Java 24 Features Used
+New Java projects can be added to this repository by:
 
-- **Virtual Threads**: Lightweight concurrency for Queue processing
-- **Records**: Immutable data carriers
-- **Pattern Matching**: Cleaner type checks
-- **Structured Concurrency**: Coordinated task lifecycle
-- **Preview Features**: Enabled via `--enable-preview`
+1. Creating a new module directory
+2. Adding the module to the parent `pom.xml`
+3. Following the existing project structure conventions
+4. Including comprehensive tests and documentation
 
-## Testing
+## Contributing
 
-All modules include comprehensive test coverage:
-- Unit tests with JUnit 5
-- Integration tests
-- Concurrency tests
-- Edge case validation
+Contributions are welcome! Please:
 
-Run tests:
-```bash
-mvn test
-```
+- Ensure all tests pass before submitting
+- Follow existing code style and conventions
+- Add tests for new functionality
+- Update documentation as needed
+- Maintain project-specific README files
 
 ## License
 
-[Add your license here]
+Each project in this repository may have its own license. Please refer to individual project directories for specific license information.
+
+Currently:
+- **fullerstack-substrates-java:** Apache License 2.0
 
 ## Links
 
-- Website: https://fullerstack.io
-- Humainary Substrates API: https://github.com/Humainary/substrates-java
+- Organization: https://fullerstack.io/
+- GitHub: https://github.com/fullerstack-io
+- Issues: https://github.com/fullerstack-io/fullerstack-java/issues
+
+## Authors
+
+**Fullerstack** - https://fullerstack.io/
+
+---
+
+## Project Acknowledgments
+
+### Fullerstack Substrates
+
+Based on the Humainary Substrates API designed by William Louth.
+
+- API Design: William Louth (Humainary)
+- Implementation: Fullerstack
+- License: Apache 2.0
+
+Learn more: https://humainary.io/ | https://substrates.io/

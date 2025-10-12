@@ -73,7 +73,7 @@ public Clock clock(Name name) {
 }
 
 public Clock clock() {
-    return clock(NameImpl.of("default"));  // ← Uses static "default" name
+    return clock(NameImpl.of("clock"));  // ← Uses type-based default name
 }
 ```
 
@@ -81,7 +81,7 @@ public Clock clock() {
 ```java
 Circuit circuit = cortex.circuit();
 
-// First call creates clock "default"
+// First call creates clock "clock"
 Clock c1 = circuit.clock();
 
 // Second call returns THE SAME clock instance
@@ -398,7 +398,7 @@ public Circuit circuit(Name name) {
 }
 
 public Circuit circuit() {
-    return circuit(NameImpl.of("default"));  // Singleton
+    return circuit(NameImpl.of("circuit"));  // Type-based default name
 }
 ```
 
@@ -406,14 +406,21 @@ public Circuit circuit() {
 ```java
 // CircuitImpl.java
 private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
-private final Map<Name, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
+private final Map<ConduitKey, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
+
+// Composite key for Conduit caching (Name + Composer type)
+private record ConduitKey(Name name, Class<?> composerClass) {}
 
 public Clock clock(Name name) {
     return clocks.computeIfAbsent(name, ClockImpl::new);
 }
 
 public <P, E> Conduit<P, E> conduit(Name name, Composer<? extends P, E> composer) {
-    return conduits.computeIfAbsent(name, n -> new ConduitImpl<>(circuitSubject.name(), n, composer));
+    // Build hierarchical name: circuit.conduit
+    Name hierarchicalName = circuitSubject.name().name(name);
+
+    ConduitKey key = new ConduitKey(name, composer.getClass());
+    return conduits.computeIfAbsent(key, k -> new ConduitImpl<>(hierarchicalName, composer, queue));
 }
 ```
 
@@ -423,8 +430,9 @@ Every component has **two identities**:
 
 1. **`Name`** - Semantic identity for **pooling/caching**
    - Used as cache key in `Map.computeIfAbsent(name, ...)`
-   - Static names like `"default"` create singletons
+   - Type-based default names like `"circuit"`, `"conduit"`, `"clock"` create singletons
    - Custom names allow multiple instances per Circuit
+   - **Conduits also keyed by Composer type** (different Composers create different Conduits)
 
 2. **`Id`** - Unique instance identity
    - Each instance gets a unique UUID
@@ -451,18 +459,22 @@ assert !c1.subject().id().equals(c3.subject().id());  // ✅ Different IDs
 
 **Default Names Pattern:**
 
-No-arg factory methods use static names for singleton behavior:
+No-arg factory methods use type-based default names for singleton behavior:
 
 ```java
-// Uses "default" name internally
-Circuit c1 = cortex.circuit();   // circuit(NameImpl.of("default"))
+// Uses type-based default names internally
+Circuit c1 = cortex.circuit();   // circuit(NameImpl.of("circuit"))
 Circuit c2 = cortex.circuit();   // Returns same instance
 
-Clock clk1 = circuit.clock();    // clock(NameImpl.of("default"))
+Clock clk1 = circuit.clock();    // clock(NameImpl.of("clock"))
 Clock clk2 = circuit.clock();    // Returns same instance
 
-Conduit cd1 = circuit.conduit(Composer.pipe());  // conduit(NameImpl.of("default"), ...)
-Conduit cd2 = circuit.conduit(Composer.pipe());  // Returns same instance
+// Conduits cached by BOTH name AND composer type
+Conduit cd1 = circuit.conduit(Composer.pipe());     // conduit(NameImpl.of("conduit"), Composer.pipe())
+Conduit cd2 = circuit.conduit(Composer.pipe());     // Returns same instance (same name + same composer)
+
+Conduit cd3 = circuit.conduit(Composer.channel());  // conduit(NameImpl.of("conduit"), Composer.channel())
+// cd3 is DIFFERENT from cd1/cd2 - different Composer type!
 ```
 
 **Factory Method + Flyweight Pattern:**

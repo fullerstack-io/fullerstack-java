@@ -6,15 +6,19 @@ import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.closure.ClosureImpl;
 
+import java.util.Deque;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Implementation of Substrates.Scope for hierarchical context management.
  *
  * <p>Scopes support hierarchical resource management and can be nested.
+ * Resources are closed in LIFO (Last In, First Out) order, matching Java's
+ * try-with-resources semantics.
  *
  * @see Scope
  */
@@ -22,7 +26,7 @@ public class ScopeImpl implements Scope {
     private final Name name;
     private final Scope parent;
     private final Map<Name, Scope> childScopes = new ConcurrentHashMap<>();
-    private final Map<Object, Resource> resources = new ConcurrentHashMap<>();
+    private final Deque<Resource> resources = new ConcurrentLinkedDeque<>();
     private volatile boolean closed = false;
 
     /**
@@ -70,7 +74,8 @@ public class ScopeImpl implements Scope {
     @Override
     public <R extends Resource> R register(R resource) {
         checkClosed();
-        resources.put(resource, resource);
+        Objects.requireNonNull(resource, "Resource cannot be null");
+        resources.addFirst(resource);  // Add to front for LIFO closure ordering
         return resource;
     }
 
@@ -88,7 +93,7 @@ public class ScopeImpl implements Scope {
         }
         closed = true;
 
-        // Close all child scopes
+        // Close all child scopes first
         for (Scope scope : childScopes.values()) {
             try {
                 scope.close();
@@ -97,8 +102,9 @@ public class ScopeImpl implements Scope {
             }
         }
 
-        // Close all resources
-        resources.values().forEach(resource -> {
+        // Close all resources in LIFO order (reverse of registration)
+        // Since we use addFirst(), iteration is already in LIFO order
+        resources.forEach(resource -> {
             try {
                 resource.close();
             } catch (Exception e) {

@@ -194,4 +194,54 @@ class CircuitImplTest {
         assertThat((Object) circuit.queue()).isNotNull();
         assertThat((Object) circuit.clock()).isNotNull();
     }
+
+    @Test
+    void shouldCreateDifferentConduitsForDifferentComposers() {
+        circuit = new CircuitImpl(NameImpl.of("test"));
+
+        // Same name, different composers should create DIFFERENT Conduits
+        Conduit<Pipe<Long>, Long> pipes = circuit.conduit(
+            NameImpl.of("metrics"),
+            Composer.pipe()
+        );
+
+        Conduit<Channel<Long>, Long> channels = circuit.conduit(
+            NameImpl.of("metrics"),  // ← SAME NAME
+            Composer.channel()        // ← DIFFERENT COMPOSER
+        );
+
+        // Should be different Conduit instances
+        assertThat((Object) pipes).isNotSameAs(channels);
+    }
+
+    @Test
+    void shouldCreateDifferentConduitsForDifferentComposersWithDefaultName() {
+        circuit = new CircuitImpl(NameImpl.of("test"));
+
+        // Using default name (unnamed), different composers should create DIFFERENT Conduits
+        Conduit<Pipe<Long>, Long> pipes = circuit.conduit(Composer.pipe());
+        Conduit<Channel<Long>, Long> channels = circuit.conduit(Composer.channel());
+
+        // Should be different Conduit instances
+        assertThat((Object) pipes).isNotSameAs(channels);
+    }
+
+    @Test
+    void shouldCacheSameComposerWithSameName() {
+        circuit = new CircuitImpl(NameImpl.of("test"));
+
+        // Same name, same composer should return SAME Conduit
+        Conduit<Pipe<Long>, Long> conduit1 = circuit.conduit(
+            NameImpl.of("metrics"),
+            Composer.pipe()
+        );
+
+        Conduit<Pipe<Long>, Long> conduit2 = circuit.conduit(
+            NameImpl.of("metrics"),
+            Composer.pipe()
+        );
+
+        // Should be the same Conduit instance (cached)
+        assertThat((Object) conduit1).isSameAs(conduit2);
+    }
 }

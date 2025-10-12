@@ -1,79 +1,118 @@
 package io.fullerstack.substrates.container;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Implementation of Substrates.Container combining Pool and Component.
+ * Implementation of Substrates.Container managing a collection of Conduits.
  *
- * <p>Container is typically created by wrapping a Conduit, which provides:
+ * <p>Container is a "Pool of Pools" (Container extends Pool<Pool<P>>), meaning:
  * <ul>
- *   <li>Pool behavior - Conduit.get(Name) returns percepts composed from Channels</li>
- *   <li>Source behavior - Conduit.source() emits events when Channel Subjects emit values</li>
+ *   <li>get(Name) returns Pool<P> representing a Conduit for that name</li>
+ *   <li>Each name gets its own Conduit, created on first access</li>
+ *   <li>source() returns Source<Source<E>> emitting Conduit Sources when created</li>
  * </ul>
  *
- * <p>The Container API exposes Container<Pool<P>, Source<E>>, meaning:
- * <ul>
- *   <li>get(Name) returns the Pool (usually the Conduit itself)</li>
- *   <li>source() returns Source<Source<E>> for nested subscription pattern</li>
- * </ul>
+ * <p><b>Use Case Example (Stock Trading):</b>
+ * <pre>
+ * Container<Pool<Pipe<Order>>, Source<Order>> container =
+ *     circuit.container(cortex.name("orders"), Composer.pipe());
  *
- * @param <P> percept type (what the Pool contains)
- * @param <E> event emission type (what the Source emits)
+ * // Each stock gets its own Conduit
+ * container.get(cortex.name("APPL")).get(cortex.name("BUY")).emit(order);
+ * container.get(cortex.name("MSFT")).get(cortex.name("SELL")).emit(order);
+ * </pre>
+ *
+ * <p><b>Article Reference:</b>
+ * "A Container is a collection of Conduits of the same emittance data type"
+ * - https://humainary.io/blog/observability-x-containers/
+ *
+ * @param <P> percept type (what Conduit's Pool contains, e.g., Pipe<E>)
+ * @param <E> emission type (what Conduit emits, e.g., Order)
  * @see Container
  */
 public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
-    private final Pool<P> pool;
-    private final Source<E> eventSource;
+    private final Name containerName;
+    private final Circuit circuit;
+    private final Composer<? extends P, E> composer;
+    private final Sequencer<Segment<E>> sequencer; // Optional transformation pipeline (nullable)
+    private final Map<Name, Conduit<P, E>> conduits = new ConcurrentHashMap<>();
     private final SourceImpl<Source<E>> containerSource;
-    private final Name name;
+    private final Subject containerSubject;
 
     /**
-     * Creates a container with the specified pool and source.
+     * Creates a container without transformations.
      *
-     * <p>Typically called with a Conduit:
-     * <pre>
-     * Conduit<P, E> conduit = circuit.conduit(name, composer);
-     * Container<Pool<P>, Source<E>> container = new ContainerImpl<>(conduit, conduit.source());
-     * </pre>
-     *
-     * @param pool the pool implementation (usually a Conduit)
-     * @param source the source implementation for events
+     * @param containerName the container's name
+     * @param circuit the circuit used to create Conduits
+     * @param composer the composer used for all Conduits in this container
      */
-    public ContainerImpl(Pool<P> pool, Source<E> source) {
-        this.pool = Objects.requireNonNull(pool, "Pool cannot be null");
-        this.eventSource = Objects.requireNonNull(source, "Source cannot be null");
-        this.name = source.subject().name();
-
-        // Container<Pool<P>, Source<E>> means source() returns Source<Source<E>>
-        // This enables the nested subscription pattern from William Louth's examples:
-        // container.source().subscribe(subject -> source -> source.subscribe(...))
-        this.containerSource = new SourceImpl<>(name);
-
-        // Manually invoke subscribers when they subscribe to containerSource
-        // This makes the eventSource available to subscribers of the container
-        // TODO: Implement proper subscription mechanism without notify()
+    public ContainerImpl(Name containerName, Circuit circuit, Composer<? extends P, E> composer) {
+        this(containerName, circuit, composer, null);
     }
 
-    @Override
-    public Subject subject() {
-        return new SubjectImpl(
+    /**
+     * Creates a container with optional transformation pipeline.
+     *
+     * <p>Each call to get(Name) creates or retrieves a Conduit for that name.
+     * If a Sequencer is provided, all Conduits created by this Container will
+     * apply the same transformation pipeline.
+     *
+     * @param containerName the container's name
+     * @param circuit the circuit used to create Conduits
+     * @param composer the composer used for all Conduits in this container
+     * @param sequencer optional transformation pipeline (null if no transformations)
+     */
+    public ContainerImpl(Name containerName, Circuit circuit, Composer<? extends P, E> composer, Sequencer<Segment<E>> sequencer) {
+        this.containerName = Objects.requireNonNull(containerName, "Container name cannot be null");
+        this.circuit = Objects.requireNonNull(circuit, "Circuit cannot be null");
+        this.composer = Objects.requireNonNull(composer, "Composer cannot be null");
+        this.sequencer = sequencer; // Can be null
+        this.containerSource = new SourceImpl<>(containerName);
+        this.containerSubject = new SubjectImpl(
             IdImpl.generate(),
-            name,
+            containerName,
             StateImpl.empty(),
             Subject.Type.CONTAINER
         );
     }
 
     @Override
+    public Subject subject() {
+        return containerSubject;
+    }
+
+    @Override
     public Pool<P> get(Name name) {
-        return pool;
+        Objects.requireNonNull(name, "Conduit name cannot be null");
+
+        // Get or create Conduit for this name
+        Conduit<P, E> conduit = conduits.computeIfAbsent(name, n -> {
+            // Create hierarchical name: containerName + conduitName
+            Name conduitName = containerName.name(n);
+
+            // Create new Conduit via Circuit, passing Sequencer if present
+            // All Conduits created by this Container share the same transformation pipeline
+            Conduit<P, E> newConduit = sequencer != null
+                ? circuit.conduit(conduitName, composer, sequencer)
+                : circuit.conduit(conduitName, composer);
+
+            // Note: Container's Source<Source<E>> provides subscription mechanism
+            // for observing new Conduit creation. The Source itself doesn't emit -
+            // subscribers would need to subscribe to individual Conduit sources.
+
+            return newConduit;
+        });
+
+        // Conduit implements Pool<P>, so return it directly
+        return conduit;
     }
 
     @Override
@@ -82,18 +121,28 @@ public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
     }
 
     /**
-     * Provides access to the event source for subscribers.
-     * This is a convenience method since Container API requires Source<Source<E>>.
+     * Gets all managed Conduits.
+     * Package-private for testing and inspection.
      *
-     * @return the event source
+     * @return map of conduit names to conduits
      */
-    public Source<E> eventSource() {
-        return eventSource;
+    Map<Name, Conduit<P, E>> getConduits() {
+        return conduits;
     }
 
     @Override
     public void close() {
-        // Container doesn't manage pool/source lifecycle
-        // They are passed in and managed externally
+        // Close all managed Conduits
+        conduits.values().forEach(conduit -> {
+            try {
+                if (conduit instanceof AutoCloseable) {
+                    ((AutoCloseable) conduit).close();
+                }
+            } catch (Exception e) {
+                // Log but continue closing others
+                System.err.println("Error closing conduit in container " + containerName + ": " + e.getMessage());
+            }
+        });
+        conduits.clear();
     }
 }

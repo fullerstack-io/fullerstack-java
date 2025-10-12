@@ -11,6 +11,7 @@ import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.subscriber.SubscriberImpl;
 import io.fullerstack.substrates.name.NameImpl;
 import io.fullerstack.substrates.sink.SinkImpl;
+import io.fullerstack.substrates.sink.CaptureImpl;
 
 import java.lang.reflect.Member;
 import java.util.Iterator;
@@ -58,7 +59,7 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public Circuit circuit() {
-        return circuit(NameImpl.of("default"));
+        return circuit(NameImpl.of("circuit"));
     }
 
     @Override
@@ -269,13 +270,5 @@ public class CortexRuntime implements Cortex {
     public <E> Capture<E> capture(Subject subject, E emission) {
         Objects.requireNonNull(subject, "Capture subject cannot be null");
         return new CaptureImpl<>(subject, emission);
-    }
-
-    // ========== Inner Classes ==========
-
-    /**
-     * Capture implementation.
-     */
-    private record CaptureImpl<E>(Subject subject, E emission) implements Capture<E> {
     }
 }

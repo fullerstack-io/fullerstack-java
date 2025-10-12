@@ -96,13 +96,4 @@ public class SinkImpl<E> implements Sink<E> {
             buffer.clear();
         }
     }
-
-    /**
-     * Simple Capture implementation for buffering.
-     */
-    private record CaptureImpl<E>(Subject subject, E emission) implements Capture<E> {
-        CaptureImpl {
-            Objects.requireNonNull(subject, "Capture subject cannot be null");
-        }
-    }
 }
