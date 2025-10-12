@@ -107,6 +107,35 @@ queue.await();
 - **Scripts execute in circuit context** - Proper ordering guarantees
 - **Current.post() for chaining** - Schedule follow-up work during execution
 
+### QoS Architecture
+
+Queue uses simple **FIFO ordering** (LinkedBlockingQueue) with no priority or reordering within the Queue. Quality of Service is handled at the **Circuit/Conduit level**, not at the Script level:
+
+**Architecture Principle:** From [Observability X - Circuits](https://humainary.io/blog/observability-x-circuits/):
+- **Different priorities** → Create separate Circuits (each has its own Queue)
+- **Different processing characteristics** → Use separate Conduits
+- **Keep Queue simple** → Strict FIFO processing, no Script-level priorities
+
+**Example:**
+```java
+// High-priority circuit with dedicated resources
+Circuit highPriority = cortex.circuit(cortex.name("high-priority"));
+
+// Normal-priority circuit
+Circuit normalPriority = cortex.circuit(cortex.name("normal-priority"));
+
+// Each Circuit has its own Queue with FIFO ordering
+// QoS achieved through separate resource allocation
+```
+
+**Why Not Priority Queues?**
+- Complexity: Priority logic complicates ordering guarantees
+- Observability: Hard to reason about execution order
+- Scalability: Circuit-level separation scales better
+- Architecture: Aligns with Substrates' hierarchical design
+
+**Implementation Note:** QueueImpl uses `LinkedBlockingQueue` (not `LinkedBlockingDeque`) for pure FIFO semantics. The `post(Name, Script)` method accepts a Name for **tagging/tracking** Scripts, not for priority selection.
+
 ## Advanced Segment Operations
 
 Beyond the basic transformations, Segment provides advanced operations for complex pipelines.
@@ -628,26 +657,79 @@ nestedSource.subscribe(
 
 ### Nested Subscription Pattern
 
-The nested Source pattern enables observing when new pools are created:
+Container's hierarchical subscription pattern emits Conduit Sources when NEW Conduits are created (not on cached access).
 
+**Emission Timing:**
+- Container emits **only on FIRST** `container.get(name)` call for new name
+- Subsequent calls return cached Conduit (no emission)
+- Emission contains `Capture<Source<E>>` pairing Conduit Subject with its Source
+
+**Complete Example:**
 ```java
-container.source().subscribe(
+// Create container
+Container<Pool<Pipe<String>>, Source<String>> messages = circuit.container(
+    cortex.name("messaging"),
+    Composer.pipe()
+);
+
+// Subscribe to Container - receives Conduit Sources
+messages.source().subscribe(
     cortex.subscriber(
-        cortex.name("pool-observer"),
-        (poolSubject, registrar) -> {
-            // Called when new Pool created
-            registrar.register(eventSource -> {
-                // eventSource is Source<String>
-                // Subscribe to events from this pool
-                eventSource.subscribe(eventSubscriber);
+        cortex.name("conduit-observer"),
+        (conduitSubject, registrar) -> {
+            System.out.println("New Conduit created: " + conduitSubject.name());
+            // conduitSubject.name() = "messaging.team-A" (for example)
+
+            // Register to receive the Conduit's Source
+            registrar.register(conduitSource -> {
+                // conduitSource is Source<String> for this Conduit
+                System.out.println("Subscribing to Conduit: " + conduitSubject.name());
+
+                // Subscribe to all Channels in this Conduit
+                conduitSource.subscribe(
+                    cortex.subscriber(
+                        cortex.name("message-logger"),
+                        (channelSubject, innerRegistrar) -> {
+                            // channelSubject.name() = "messaging.team-A.chat" (for example)
+                            innerRegistrar.register(message -> {
+                                System.out.println("Message: " + message);
+                            });
+                        }
+                    )
+                );
             });
         }
     )
 );
 
-// Later, accessing a new pool name triggers subscription
-Pool<Pipe<String>> newPool = container.get(cortex.name("new-group"));
-// pool-observer is notified and subscribes to events
+// FIRST access to "team-A" creates Conduit AND emits its Source
+Pool<Pipe<String>> teamA = messages.get(cortex.name("team-A"));
+// ← Output: "New Conduit created: messaging.team-A"
+// ← Output: "Subscribing to Conduit: messaging.team-A"
+// ← conduit-observer receives team-A Conduit's Source and subscribes
+
+// SECOND access to "team-A" returns cached Conduit (no emission)
+Pool<Pipe<String>> teamA2 = messages.get(cortex.name("team-A"));
+// ← No output (teamA == teamA2, cached)
+
+// Different name creates NEW Conduit (emits again)
+Pool<Pipe<String>> teamB = messages.get(cortex.name("team-B"));
+// ← Output: "New Conduit created: messaging.team-B"
+// ← Output: "Subscribing to Conduit: messaging.team-B"
+// ← conduit-observer receives team-B Conduit's Source and subscribes
+
+// Now emit messages
+Pipe<String> teamAChatPipe = teamA.get(cortex.name("chat"));
+teamAChatPipe.emit("Hello from team A!");
+// ← Output: "Message: Hello from team A!"
+```
+
+**Key Points:**
+- Container tracks first-access vs cached-access via `computeIfAbsent()` pattern
+- Emission happens synchronously during `container.get(newName)`
+- Cached Conduits (subsequent `get(sameName)`) do not re-emit
+- Enables dynamic subscription to entities as they're created
+- Hierarchical names maintain Subject tree: container → conduit → channel
 ```
 
 ## Best Practices

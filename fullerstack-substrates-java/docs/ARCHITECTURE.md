@@ -145,6 +145,139 @@ Pipe<String> pipe = conduit.get(cortex.name("producer1"));
 pipe.emit("message");
 ```
 
+### Container
+
+**Role:** Manages a collection of Conduits - implements the "Pool of Pools" pattern.
+
+**Type Signature:**
+```java
+interface Container<P, E> extends Pool<P>, Component<E>
+
+// When created by Circuit:
+Container<Pool<P>, Source<E>> container = circuit.container(name, composer);
+```
+
+**Key Characteristics:**
+- Container IS-A `Pool<Pool<P>>` - get() returns a Pool (Conduit)
+- Container IS-A `Component<Source<E>>` - source() returns Source<Source<E>>
+- Each unique name creates its own Conduit on-demand
+- All Conduits in Container share same Composer and transformations
+- Hierarchical naming: `container-name.conduit-name`
+
+**Architecture:**
+```
+Container
+  ├── conduits: Map<Name, Conduit> ← Conduit cache by name
+  ├── containerSource: Source<Source<E>> ← Emits Conduit Sources
+  └── circuit: Circuit ← Reference for Conduit creation
+
+When container.get(newName):
+  1. Check conduits cache
+  2. If absent: create new Conduit via Circuit
+  3. Emit Conduit's Source to containerSource
+  4. Cache and return Conduit (as Pool<P>)
+  5. Next get(sameName) returns cached Conduit (no emission)
+```
+
+**Implementation Pattern:**
+```java
+// ContainerImpl.java
+private final Map<Name, Conduit<P, E>> conduits = new ConcurrentHashMap<>();
+private final SourceImpl<Source<E>> containerSource;
+
+public Pool<P> get(Name name) {
+    final boolean[] isNewConduit = {false};
+
+    // Get or create Conduit
+    Conduit<P, E> conduit = conduits.computeIfAbsent(name, n -> {
+        // Build hierarchical name
+        Name conduitName = containerName.name(n);
+
+        // Create via Circuit
+        Conduit<P, E> newConduit = sequencer != null
+            ? circuit.conduit(conduitName, composer, sequencer)
+            : circuit.conduit(conduitName, composer);
+
+        isNewConduit[0] = true;
+        return newConduit;
+    });
+
+    // Emit Conduit's Source on first creation
+    if (isNewConduit[0]) {
+        Capture<Source<E>> capture = new CaptureImpl<>(
+            conduit.subject(),
+            conduit.source()
+        );
+        containerSource.emissionHandler().accept(capture);
+    }
+
+    return conduit;  // Conduit implements Pool<P>
+}
+```
+
+**Hierarchical Subscription Pattern:**
+
+Container enables hierarchical subscription - it emits Conduit Sources when new Conduits are created:
+
+```
+Subscribe to Container
+  ↓
+Container.source() returns Source<Source<E>>
+  ↓
+First container.get("AAPL") creates Conduit
+  ↓
+Container emits Capture(conduit.subject(), conduit.source())
+  ↓
+Subscriber receives conduit.source()
+  ↓
+Subscriber can subscribe to Conduit's emissions
+```
+
+**Usage Example:**
+```java
+// Create container
+Container<Pool<Pipe<Order>>, Source<Order>> stockOrders = circuit.container(
+    cortex.name("stock-market"),
+    Composer.pipe()
+);
+
+// Subscribe to Container - receives Conduit Sources
+stockOrders.source().subscribe(
+    cortex.subscriber(
+        cortex.name("stock-observer"),
+        (conduitSubject, registrar) -> {
+            System.out.println("New stock: " + conduitSubject.name());
+
+            // Register to receive Conduit's Source
+            registrar.register(conduitSource -> {
+                // Subscribe to this stock's orders
+                conduitSource.subscribe(orderSubscriber);
+            });
+        }
+    )
+);
+
+// First access creates Conduit + emits
+Pool<Pipe<Order>> applePool = stockOrders.get(cortex.name("AAPL"));
+// ← stock-observer receives AAPL Conduit's Source
+
+// Second access returns cached Conduit (no emission)
+Pool<Pipe<Order>> applePool2 = stockOrders.get(cortex.name("AAPL"));
+// ← No emission (cached)
+```
+
+**When to Use Container:**
+- Dynamic collections of similar entities (stocks, devices, users, etc.)
+- Need to observe creation of new entity types
+- All entities share same processing logic
+- Want automatic Conduit creation on-demand
+
+**Implementation Notes:**
+- Container does NOT cache Conduits by Circuit - it creates them via circuit.conduit()
+- Circuit's Conduit cache handles singleton behavior per Circuit
+- Container's conduits map is purely for emission tracking (first access vs subsequent)
+- Conduits created with hierarchical names for proper Subject hierarchy
+
 ### Source
 
 **Role:** Observable event stream that Subscribers can subscribe to.

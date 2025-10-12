@@ -418,6 +418,9 @@ interface Substrate {
 | **Source** | Observable stream | Provides `subscribe()` for observation |
 | **Subscriber** | Consumer connector | Links consumer Pipes to Source |
 | **Conduit** | Router | Routes from Channels to Pipes |
+| **Container** | Pool manager | Manages collection of Conduits (Pool of Pools) |
+| **Queue** | Coordinator | Coordinates Script execution within Circuit |
+| **Script** | Executable unit | Work unit with `exec(Current)` method |
 
 ### The Flow
 
@@ -515,6 +518,186 @@ source.subscribe(
     )
 );
 ```
+
+### Container - Pool of Pools
+
+**Container** is a higher-level abstraction that manages a **collection of Conduits** of the same emission type.
+
+**Key Concept:** Container is a **"Pool of Pools"** - it implements `Pool<Pool<P>>`:
+- `container.get(name)` returns a `Pool<P>` (which is a Conduit)
+- Each unique name gets its own Conduit, created on-demand
+- All Conduits in a Container share the same Composer and optional transformation pipeline
+
+**Type Signature:**
+```java
+interface Container<P, E> extends Pool<P>, Component<E>
+
+// Circuit creates Container with nested Pool/Source types:
+Container<Pool<Pipe<String>>, Source<String>> container =
+    circuit.container(name, Composer.pipe());
+```
+
+**Basic Usage:**
+```java
+// Create container for stock market data
+Container<Pool<Pipe<Order>>, Source<Order>> stockOrders = circuit.container(
+    cortex.name("stock-market"),
+    Composer.pipe()
+);
+
+// Get Pool for specific stock (creates Conduit on-demand)
+Pool<Pipe<Order>> appleOrders = stockOrders.get(cortex.name("AAPL"));
+Pool<Pipe<Order>> msftOrders = stockOrders.get(cortex.name("MSFT"));
+
+// From each Pool, get Pipes for different order types
+Pipe<Order> buyOrders = appleOrders.get(cortex.name("BUY"));
+Pipe<Order> sellOrders = appleOrders.get(cortex.name("SELL"));
+
+// Emit orders
+buyOrders.emit(new Order("AAPL", "BUY", 100));
+sellOrders.emit(new Order("AAPL", "SELL", 50));
+```
+
+**When to Use Container:**
+- Managing dynamic collections of similar entities (stocks, devices, users)
+- Want automatic Conduit creation for new entities
+- Need to observe when new entity types are created
+- All entities share same processing logic (Composer + transformations)
+
+**When to Use Multiple Conduits Instead:**
+- Fixed set of known entities
+- Each entity needs different processing logic
+- No need to observe entity creation
+
+### Container Hierarchical Subscription
+
+Container provides a powerful **hierarchical subscription pattern** - it emits **Conduit Sources** when new Conduits are created.
+
+**Container's Source Type:**
+```java
+Container<Pool<P>, Source<E>> container = ...;
+
+// container.source() returns Source<Source<E>> - nested!
+Source<Source<E>> containerSource = container.source();
+```
+
+**Hierarchical Subscription Flow:**
+```
+1. Subscribe to Container.source()
+     ↓
+2. Container emits Conduit.source() when NEW Conduit created
+     ↓
+3. Subscriber receives Conduit's Source
+     ↓
+4. Subscriber can then subscribe to that Conduit's emissions
+```
+
+**Example: Observing All Stocks**
+```java
+// Create container
+Container<Pool<Pipe<Order>>, Source<Order>> stockOrders = circuit.container(
+    cortex.name("stock-market"),
+    Composer.pipe()
+);
+
+// Subscribe to Container - receives Conduit Sources
+stockOrders.source().subscribe(
+    cortex.subscriber(
+        cortex.name("stock-observer"),
+        (conduitSubject, registrar) -> {
+            // conduitSubject.name() = "stock-market.AAPL" (for example)
+            System.out.println("New stock Conduit created: " + conduitSubject.name());
+
+            // Register to receive the Conduit's Source
+            registrar.register(conduitSource -> {
+                // conduitSource is Source<Order> for this stock
+                // Subscribe to all orders for this stock
+                conduitSource.subscribe(
+                    cortex.subscriber(
+                        cortex.name("order-logger"),
+                        (channelSubject, innerRegistrar) -> {
+                            // channelSubject.name() = "stock-market.AAPL.BUY" (for example)
+                            innerRegistrar.register(order -> {
+                                System.out.println("Order: " + order);
+                            });
+                        }
+                    )
+                );
+            });
+        }
+    )
+);
+
+// First access to "AAPL" creates Conduit AND emits its Source
+Pool<Pipe<Order>> applePool = stockOrders.get(cortex.name("AAPL"));
+// ← stock-observer receives AAPL Conduit's Source and subscribes
+
+// Second access returns cached Conduit (no emission)
+Pool<Pipe<Order>> applePool2 = stockOrders.get(cortex.name("AAPL"));
+// ← No emission (applePool == applePool2, cached)
+
+// Different stock creates NEW Conduit (emits again)
+Pool<Pipe<Order>> msftPool = stockOrders.get(cortex.name("MSFT"));
+// ← stock-observer receives MSFT Conduit's Source and subscribes
+```
+
+**Key Points:**
+- Container emits **only on FIRST** `get(name)` call for a new name
+- Subsequent calls return the cached Conduit (no emission)
+- Emission contains `Capture<Source<E>>` pairing Conduit's Subject with its Source
+- Enables dynamic subscription to entities as they're created
+- Each Conduit gets hierarchical name: `container-name.conduit-name`
+
+**Reference:** [Observability X - Containers](https://humainary.io/blog/observability-x-containers/)
+
+### Queue, Script, and Current
+
+The Queue subsystem provides **coordination and scheduling** within a Circuit's processing pipeline.
+
+**Quick Overview:**
+- **Queue** - Coordinates execution of Scripts within Circuit
+- **Script** - Executable unit of work with `exec(Current)` method
+- **Current** - @Temporal execution context providing access to Circuit's queue
+
+**Key Methods:**
+```java
+Queue queue = circuit.queue();
+queue.post(Script script);           // Post script for execution
+queue.await();                       // Block until queue empty
+
+interface Script {
+    void exec(Current current);      // Execute with context
+}
+
+interface Current extends Substrate {
+    void post(Runnable runnable);    // Post async work from script
+}
+```
+
+**Usage Example:**
+```java
+Queue queue = circuit.queue();
+
+queue.post(current -> {
+    System.out.println("Script executing in circuit context");
+
+    // Post follow-up work
+    current.post(() -> {
+        System.out.println("Async follow-up work");
+    });
+});
+
+queue.await();  // Wait for all scripts to complete
+```
+
+**QoS Architecture:** Queue uses simple **FIFO ordering** (LinkedBlockingQueue). Quality of Service is handled at the **Circuit/Conduit level**, not at the Script level within a Queue:
+- Need different priorities? → Create separate Circuits (each has its own Queue)
+- Need different processing characteristics? → Use separate Conduits
+- Keep Queue semantics simple: strict FIFO processing
+
+**Reference:** [Observability X - Queues, Scripts, and Currents](https://humainary.io/blog/observability-x-queues-scripts-and-currents/)
+
+**Details:** See [ADVANCED.md - Queue & Script Subsystem](ADVANCED.md#queue--script-subsystem) for complete documentation.
 
 ## Transformation Pipelines
 
