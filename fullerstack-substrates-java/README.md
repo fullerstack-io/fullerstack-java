@@ -227,9 +227,9 @@ The architectural patterns, design principles, and core concepts implemented in 
 
 **Learn more about the Substrates framework:**
 - Humainary: https://humainary.io/
-- Substrates: https://substrates.io/
-- Observability X Blog: https://humainary.io/blog/category/observability-x/
 - Substrates API (Java): https://github.com/humainary-io/substrates-api-java
+- Observability X Blog: https://humainary.io/blog/category/observability-x/
+- William Louth's Articles: https://humainary.io/blog/
 
 ## License
 

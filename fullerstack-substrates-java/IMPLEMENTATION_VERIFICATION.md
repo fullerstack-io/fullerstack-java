@@ -369,4 +369,4 @@ For questions or contributions, please visit:
 - Implementation: https://github.com/fullerstack-io/fullerstack-java
 - API Source: https://github.com/humainary-io/substrates-api-java
 - Humainary: https://humainary.io/
-- Substrates: https://substrates.io/
+- Observability X Blog: https://humainary.io/blog/category/observability-x/

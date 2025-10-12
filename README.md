@@ -117,6 +117,6 @@ Based on the [Humainary Substrates API](https://github.com/humainary-io/substrat
 
 **Learn more:**
 - Humainary: https://humainary.io/
-- Substrates: https://substrates.io/
 - Substrates API (Java): https://github.com/humainary-io/substrates-api-java
 - Observability X Blog: https://humainary.io/blog/category/observability-x/
+- William Louth's Articles: https://humainary.io/blog/
