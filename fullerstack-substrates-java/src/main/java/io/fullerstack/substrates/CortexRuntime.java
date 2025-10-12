@@ -1,6 +1,7 @@
 package io.fullerstack.substrates;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.circuit.CircuitImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pool.PoolImpl;
@@ -11,7 +12,6 @@ import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.subscriber.SubscriberImpl;
 import io.fullerstack.substrates.name.NameImpl;
 import io.fullerstack.substrates.sink.SinkImpl;
-import io.fullerstack.substrates.sink.CaptureImpl;
 
 import java.lang.reflect.Member;
 import java.util.Iterator;

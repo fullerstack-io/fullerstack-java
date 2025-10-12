@@ -1,6 +1,7 @@
 package io.fullerstack.substrates.sink;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;

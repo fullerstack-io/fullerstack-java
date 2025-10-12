@@ -1,12 +1,12 @@
 package io.fullerstack.substrates.source;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.name.NameImpl;
 import io.fullerstack.substrates.subscription.SubscriptionImpl;
-import io.fullerstack.substrates.sink.CaptureImpl;
 
 import java.util.List;
 import java.util.Map;
