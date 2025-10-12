@@ -62,11 +62,8 @@ class SourceImplTest {
         Capture<E> capture = new CaptureImpl<>(subject, emission);
 
         // Use SourceImpl's notification mechanism (like ConduitImpl does)
-        // Pass an empty pipeCache since we're testing Source in isolation
-        java.util.Map<Name, java.util.Map<Subscriber<E>, java.util.List<Pipe<E>>>> pipeCache =
-            new java.util.concurrent.ConcurrentHashMap<>();
-
-        source.notifySubscribers(capture, pipeCache);
+        // Source now manages its own pipeCache internally
+        source.notifySubscribers(capture);
     }
 
     @Test

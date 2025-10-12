@@ -22,6 +22,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * <p>Manages subscribers with thread-safe CopyOnWriteArrayList, suitable for
  * read-heavy workloads (many emissions, fewer subscribe/unsubscribe operations).
  *
+ * <p>Owns the pipe cache for efficient multi-dispatch to subscribers. Pipes are
+ * registered lazily on first emission from each Subject and cached for subsequent
+ * emissions. This cache belongs here because it's fundamentally about subscriber
+ * management - tracking which Pipes to notify for each Subscriber.
+ *
  * @param <E> event emission type
  * @see Source
  * @see Subscriber
@@ -29,6 +34,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class SourceImpl<E> implements Source<E> {
     private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
     private final Subject sourceSubject;
+
+    // Cache: Subject Name -> Subscriber -> List of registered Pipes
+    // Pipes are registered only once per Subject per Subscriber (on first emission)
+    private final Map<Name, Map<Subscriber<E>, List<Pipe<E>>>> pipeCache = new ConcurrentHashMap<>();
 
     /**
      * Creates a source with default name.
@@ -70,20 +79,19 @@ public class SourceImpl<E> implements Source<E> {
      * INTERNAL: Notifies all subscribers of an emission.
      *
      * <p>This is an implementation method (not part of the Substrates API interface)
-     * used by ConduitImpl to route emissions to subscribers. Handles:
+     * called by PipeImpl when emissions occur. Handles:
      * <ul>
      *   <li>Lazy pipe registration - subscriber.accept() called only on first emission from each Subject</li>
      *   <li>Pipe caching - reuses registered pipes for subsequent emissions</li>
      *   <li>Multi-dispatch - routes to all registered pipes for each subscriber</li>
      * </ul>
      *
+     * <p>Source owns the pipe cache because it's fundamentally about subscriber management -
+     * tracking which Pipes to notify for each Subscriber/Subject combination.
+     *
      * @param capture the emission capture (Subject + value)
-     * @param pipeCache cache of registered pipes per (Subject Name, Subscriber)
      */
-    public void notifySubscribers(
-        Capture<E> capture,
-        Map<Name, Map<Subscriber<E>, List<Pipe<E>>>> pipeCache
-    ) {
+    public void notifySubscribers(Capture<E> capture) {
         Subject emittingSubject = capture.subject();
         Name subjectName = emittingSubject.name();
 

@@ -55,10 +55,6 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     private final Queue circuitQueue; // Shared Circuit Queue (single-threaded execution)
     private final Sequencer<Segment<E>> sequencer; // Optional transformation pipeline (nullable)
 
-    // Cache: Subject Name -> Subscriber -> List of registered Pipes
-    // Pipes are registered only once per Subject per Subscriber (on first emission)
-    private final Map<Name, Map<Subscriber<E>, List<Pipe<E>>>> pipeCache = new ConcurrentHashMap<>();
-
     /**
      * Creates a Conduit without transformations.
      */
@@ -102,8 +98,8 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         return percepts.computeIfAbsent(subject, s -> {
             // Build hierarchical channel name: circuit.conduit.channel
             Name hierarchicalChannelName = conduitSubject.name().name(s);
-            // Pass method reference as callback - decouples Channel from Conduit
-            Channel<E> channel = new ChannelImpl<>(hierarchicalChannelName, circuitQueue, this::processEmission, sequencer);
+            // Pass Source directly - eliminates callback passing through layers
+            Channel<E> channel = new ChannelImpl<>(hierarchicalChannelName, circuitQueue, eventSource, sequencer);
             return composer.compose(channel);
         });
     }
@@ -117,20 +113,24 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
 
     /**
      * Processes an emission by routing it to all subscribers.
-     * Public so PipeImpl can post Scripts that call this method via Circuit Queue.
+     *
+     * <p><b>NOTE:</b> This method is now effectively unused. Emissions are now handled
+     * directly by PipeImpl posting Scripts that call Source.notifySubscribers(). This
+     * method remains for backward compatibility but may be removed in a future refactoring.
      *
      * <p>Delegates to SourceImpl for subscriber notification. The Source handles:
      * <ul>
      *   <li>Iterating over subscribers (encapsulated within Source)</li>
      *   <li>Lazy pipe registration (first emission only)</li>
      *   <li>Multi-dispatch to all registered pipes</li>
+     *   <li>Pipe cache management (now internal to Source)</li>
      * </ul>
      *
      * @param capture the emission capture (Subject + value)
      */
     public void processEmission(Capture<E> capture) {
         SourceImpl<E> source = (SourceImpl<E>) eventSource;
-        source.notifySubscribers(capture, pipeCache);
+        source.notifySubscribers(capture);
     }
 
 }
