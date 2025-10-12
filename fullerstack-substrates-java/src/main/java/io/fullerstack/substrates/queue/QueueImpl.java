@@ -7,34 +7,39 @@ import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.name.NameImpl;
 
 import java.util.Objects;
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Implementation of Substrates.Queue for backpressure management.
  *
  * <p>Processes scripts asynchronously using a virtual thread. Scripts are
- * executed in FIFO order by default, with support for priority queuing via Deque.
+ * executed in strict FIFO order.
  *
  * <p>Features:
  * <ul>
  *   <li>Asynchronous script execution via virtual thread</li>
- *   <li>FIFO ordering guarantee (default behavior)</li>
- *   <li>Priority queuing support via post(Name, Script)</li>
+ *   <li>FIFO ordering guarantee</li>
  *   <li>await() blocks until queue is empty</li>
  *   <li>Graceful error handling - continues processing after script errors</li>
  *   <li>Thread-safe concurrent post() operations</li>
  * </ul>
  *
- * <p><b>QoS/Priority Support:</b>
- * Using BlockingDeque allows high-priority scripts to be added to the front of the queue
- * while maintaining FIFO for normal-priority scripts. This enables QoS control across
- * multiple Conduits within a Circuit.
+ * <p><b>QoS/Priority Approach:</b>
+ * Quality of Service is handled at the Circuit/Conduit level, not at the Script level.
+ * If you need priority processing:
+ * <ul>
+ *   <li>Create separate Circuits (each has its own Queue) - circuit-level scaling</li>
+ *   <li>Use separate Conduits with different processing characteristics</li>
+ *   <li>Don't prioritize individual Scripts within a Queue - keep FIFO semantics</li>
+ * </ul>
+ *
+ * <p>Reference: https://humainary.io/blog/observability-x-circuits/
  *
  * @see Queue
  */
 public class QueueImpl implements Queue {
-    private final BlockingDeque<Script> scripts = new LinkedBlockingDeque<>();
+    private final BlockingQueue<Script> scripts = new LinkedBlockingQueue<>();
     private final Thread processor;
     private volatile boolean running = true;
     private volatile boolean executing = false;
@@ -62,17 +67,16 @@ public class QueueImpl implements Queue {
     @Override
     public void post(Script script) {
         if (script != null && running) {
-            scripts.offerLast(script);  // Add to back (FIFO)
+            scripts.offer(script);  // Add to queue (FIFO)
         }
     }
 
     @Override
     public void post(Name name, Script script) {
-        // Named script execution - for future priority/QoS support
-        // For now, all scripts use FIFO (addLast)
-        // Future: Check name for priority markers and use offerFirst() for high-priority
+        // Named script execution - allows tagging/tracking Scripts
+        // QoS/Priority is handled at Circuit/Conduit level, not Script level
         if (script != null && running) {
-            scripts.offerLast(script);  // Add to back (FIFO)
+            scripts.offer(script);  // Add to queue (FIFO)
         }
     }
 
@@ -104,7 +108,7 @@ public class QueueImpl implements Queue {
 
         while (running && !Thread.interrupted()) {
             try {
-                Script script = scripts.takeFirst();  // Take from front (FIFO)
+                Script script = scripts.take();  // Blocking take (FIFO)
                 executing = true;
                 try {
                     script.exec(current);
