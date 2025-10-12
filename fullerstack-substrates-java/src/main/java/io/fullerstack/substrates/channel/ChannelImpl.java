@@ -16,13 +16,15 @@ import java.util.Objects;
  * <p>Provides a subject-based emission port that posts Scripts to Circuit's shared queue.
  *
  * <p>Each Channel has its own Subject identity (WHO), and when creating Pipes,
- * passes this Subject along with the Circuit Queue and parent Conduit reference so that
- * emissions can post Scripts that call the Conduit's processEmission() method.
+ * passes this Subject along with the Circuit Queue and an emission handler callback
+ * (method reference to parent Conduit's processEmission). This decouples Channel from
+ * Conduit implementation while maintaining the emission flow.
  *
  * <p><b>Circuit Queue Architecture:</b>
  * Instead of putting Captures directly on a BlockingQueue, Pipes post Scripts to the
- * Circuit's Queue. Each Script calls the parent Conduit's processEmission() method,
- * ensuring all Conduits share the Circuit's single-threaded execution model.
+ * Circuit's Queue. Each Script calls the emission handler callback (typically
+ * Conduit::processEmission), ensuring all Conduits share the Circuit's single-threaded
+ * execution model.
  *
  * <p><b>Sequencer Support:</b>
  * If the parent Conduit has a Sequencer configured, this Channel creates Pipes with
@@ -76,8 +78,8 @@ public class ChannelImpl<E> implements Channel<E> {
                     if (sequencer != null) {
                         cachedPipe = pipe(sequencer);
                     } else {
-                        // Otherwise, create a plain Pipe
-                        cachedPipe = new PipeImpl<>(circuitQueue, channelSubject, parentConduit);
+                        // Otherwise, create a plain Pipe with method reference callback
+                        cachedPipe = new PipeImpl<>(circuitQueue, channelSubject, parentConduit::processEmission);
                     }
                 }
             }
@@ -93,7 +95,7 @@ public class ChannelImpl<E> implements Channel<E> {
         SegmentImpl<E> segment = new SegmentImpl<>();
         sequencer.apply(segment);
 
-        // Return a Pipe that applies the Segment transformations and knows its Subject
-        return new PipeImpl<>(circuitQueue, channelSubject, parentConduit, segment);
+        // Return a Pipe with method reference callback and Segment transformations
+        return new PipeImpl<>(circuitQueue, channelSubject, parentConduit::processEmission, segment);
     }
 }
