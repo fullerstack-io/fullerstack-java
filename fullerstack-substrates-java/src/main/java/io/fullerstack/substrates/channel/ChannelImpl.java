@@ -1,6 +1,5 @@
 package io.fullerstack.substrates.channel;
 
-import io.fullerstack.substrates.conduit.ConduitImpl;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pipe.PipeImpl;
@@ -9,6 +8,7 @@ import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * Generic implementation of Substrates.Channel interface.
@@ -16,9 +16,9 @@ import java.util.Objects;
  * <p>Provides a subject-based emission port that posts Scripts to Circuit's shared queue.
  *
  * <p>Each Channel has its own Subject identity (WHO), and when creating Pipes,
- * passes this Subject along with the Circuit Queue and an emission handler callback
- * (method reference to parent Conduit's processEmission). This decouples Channel from
- * Conduit implementation while maintaining the emission flow.
+ * passes this Subject along with the Circuit Queue and an emission handler callback.
+ * This completely decouples Channel from Conduit implementation while maintaining
+ * the emission flow.
  *
  * <p><b>Circuit Queue Architecture:</b>
  * Instead of putting Captures directly on a BlockingQueue, Pipes post Scripts to the
@@ -26,10 +26,15 @@ import java.util.Objects;
  * Conduit::processEmission), ensuring all Conduits share the Circuit's single-threaded
  * execution model.
  *
+ * <p><b>Callback Pattern:</b>
+ * Uses Consumer&lt;Capture&lt;E&gt;&gt; to avoid dependencies on Conduit implementation.
+ * The emission handler is provided during construction and passed to all Pipes created
+ * by this Channel.
+ *
  * <p><b>Sequencer Support:</b>
- * If the parent Conduit has a Sequencer configured, this Channel creates Pipes with
- * transformation pipelines (Segments) applied. All Channels from the same Conduit share
- * the same transformation pipeline, as configured at the Conduit level.
+ * If a Sequencer is configured, this Channel creates Pipes with transformation pipelines
+ * (Segments) applied. All Channels from the same Conduit share the same transformation
+ * pipeline, as configured at the Conduit level.
  *
  * <p><b>Pipe Caching:</b>
  * The first call to {@code pipe()} creates and caches a Pipe instance. Subsequent calls
@@ -38,21 +43,32 @@ import java.util.Objects;
  * this Channel, preventing incorrect behavior where multiple Pipe instances would have
  * separate state.
  *
+ * <p>Note: {@code pipe(Sequencer)} is NOT cached - each call creates a new Pipe with
+ * fresh transformations, allowing different custom pipelines per call.
+ *
  * @param <E> the emission type (e.g., MonitorSignal, ServiceSignal)
  */
 public class ChannelImpl<E> implements Channel<E> {
 
     private final Subject channelSubject;
     private final Queue circuitQueue;
-    private final ConduitImpl<?, E> parentConduit;
+    private final Consumer<Capture<E>> emissionHandler; // Callback to process emissions
     private final Sequencer<Segment<E>> sequencer; // Optional transformation pipeline (nullable)
 
     // Cached Pipe instance - ensures Segment state (limits, accumulators, etc.) is shared
     // across multiple calls to pipe()
     private volatile Pipe<E> cachedPipe;
 
-    public ChannelImpl(Name channelName, Queue circuitQueue, ConduitImpl<?, E> parentConduit, Sequencer<Segment<E>> sequencer) {
-        this.parentConduit = Objects.requireNonNull(parentConduit, "Parent conduit cannot be null");
+    /**
+     * Creates a Channel with emission handler callback.
+     *
+     * @param channelName hierarchical channel name (e.g., "circuit.conduit.channel")
+     * @param circuitQueue circuit's shared queue
+     * @param emissionHandler callback to handle emissions (typically Conduit::processEmission)
+     * @param sequencer optional transformation pipeline (null if no transformations)
+     */
+    public ChannelImpl(Name channelName, Queue circuitQueue, Consumer<Capture<E>> emissionHandler, Sequencer<Segment<E>> sequencer) {
+        this.emissionHandler = Objects.requireNonNull(emissionHandler, "Emission handler cannot be null");
         this.channelSubject = new SubjectImpl(
             IdImpl.generate(),
             channelName,  // Already hierarchical (circuit.conduit.channel)
@@ -78,8 +94,8 @@ public class ChannelImpl<E> implements Channel<E> {
                     if (sequencer != null) {
                         cachedPipe = pipe(sequencer);
                     } else {
-                        // Otherwise, create a plain Pipe with method reference callback
-                        cachedPipe = new PipeImpl<>(circuitQueue, channelSubject, parentConduit::processEmission);
+                        // Otherwise, create a plain Pipe with emission handler callback
+                        cachedPipe = new PipeImpl<>(circuitQueue, channelSubject, emissionHandler);
                     }
                 }
             }
@@ -95,7 +111,7 @@ public class ChannelImpl<E> implements Channel<E> {
         SegmentImpl<E> segment = new SegmentImpl<>();
         sequencer.apply(segment);
 
-        // Return a Pipe with method reference callback and Segment transformations
-        return new PipeImpl<>(circuitQueue, channelSubject, parentConduit::processEmission, segment);
+        // Return a Pipe with emission handler callback and Segment transformations
+        return new PipeImpl<>(circuitQueue, channelSubject, emissionHandler, segment);
     }
 }

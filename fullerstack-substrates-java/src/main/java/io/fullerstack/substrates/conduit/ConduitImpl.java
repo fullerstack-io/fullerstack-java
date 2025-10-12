@@ -102,7 +102,8 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         return percepts.computeIfAbsent(subject, s -> {
             // Build hierarchical channel name: circuit.conduit.channel
             Name hierarchicalChannelName = conduitSubject.name().name(s);
-            Channel<E> channel = new ChannelImpl<>(hierarchicalChannelName, circuitQueue, this, sequencer);
+            // Pass method reference as callback - decouples Channel from Conduit
+            Channel<E> channel = new ChannelImpl<>(hierarchicalChannelName, circuitQueue, this::processEmission, sequencer);
             return composer.compose(channel);
         });
     }
