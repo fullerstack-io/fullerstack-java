@@ -109,10 +109,14 @@ Currently:
 
 ### Fullerstack Substrates
 
-Based on the Humainary Substrates API designed by William Louth.
+Based on the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java) designed by [William Louth](https://humainary.io/).
 
-- API Design: William Louth (Humainary)
-- Implementation: Fullerstack
-- License: Apache 2.0
+- **API Design:** [William Louth](https://humainary.io/) ([Humainary](https://github.com/humainary-io))
+- **Implementation:** Fullerstack
+- **License:** Apache 2.0
 
-Learn more: https://humainary.io/ | https://substrates.io/
+**Learn more:**
+- Humainary: https://humainary.io/
+- Substrates: https://substrates.io/
+- Substrates API (Java): https://github.com/humainary-io/substrates-api-java
+- Observability X Blog: https://humainary.io/blog/category/observability-x/
