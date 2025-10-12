@@ -135,10 +135,9 @@ class CircuitIntegrationTest {
         );
         State emission = StateImpl.of(NameImpl.of("event"), 1);
 
-        // Use SourceImpl's notification mechanism (like ConduitImpl does)
-        // Source now manages its own pipeCache internally
+        // Use SourceImpl's emission handler (like inlet Pipes do)
         Capture<State> capture = new CaptureImpl<>(testChannel, emission);
-        sourceImpl.notifySubscribers(capture);
+        sourceImpl.emissionHandler().accept(capture);
 
         assertThat(emissionCount.get()).isEqualTo(1);
     }

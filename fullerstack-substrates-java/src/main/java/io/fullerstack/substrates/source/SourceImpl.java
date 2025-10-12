@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 /**
  * Implementation of Substrates.Source for subscriber management.
@@ -26,6 +27,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * registered lazily on first emission from each Subject and cached for subsequent
  * emissions. This cache belongs here because it's fundamentally about subscriber
  * management - tracking which Pipes to notify for each Subscriber.
+ *
+ * <p><b>Sibling Coordination:</b> Source and Channel are siblings owned by Conduit.
+ * Channel creates inlet Pipes by requesting an emission handler from Source via
+ * {@link #emissionHandler()}. This allows Source to keep its distribution logic
+ * private while providing Channels with the callback they need for Pipe creation.
  *
  * @param <E> event emission type
  * @see Source
@@ -76,10 +82,27 @@ public class SourceImpl<E> implements Source<E> {
     }
 
     /**
-     * INTERNAL: Notifies all subscribers of an emission.
+     * Provides an emission handler for inlet Pipe creation.
      *
-     * <p>This is an implementation method (not part of the Substrates API interface)
-     * called by PipeImpl when emissions occur. Handles:
+     * <p>This method enables sibling coordination between Source and Channel.
+     * Channel requests this handler when creating inlet Pipes, allowing the
+     * Pipe to notify subscribers without exposing Source's internal distribution logic.
+     *
+     * <p><b>Design Pattern:</b> Source and Channel are siblings owned by Conduit.
+     * This is NOT callback passing through layers - it's dependency injection at
+     * construction time between siblings.
+     *
+     * @return callback that routes emissions to subscribers
+     */
+    public Consumer<Capture<E>> emissionHandler() {
+        return this::notifySubscribers;
+    }
+
+    /**
+     * PRIVATE: Notifies all subscribers of an emission.
+     *
+     * <p>This method is private and only accessible via the emission handler callback
+     * provided to inlet Pipes through {@link #emissionHandler()}. Handles:
      * <ul>
      *   <li>Lazy pipe registration - subscriber.accept() called only on first emission from each Subject</li>
      *   <li>Pipe caching - reuses registered pipes for subsequent emissions</li>
@@ -91,7 +114,7 @@ public class SourceImpl<E> implements Source<E> {
      *
      * @param capture the emission capture (Subject + value)
      */
-    public void notifySubscribers(Capture<E> capture) {
+    private void notifySubscribers(Capture<E> capture) {
         Subject emittingSubject = capture.subject();
         Name subjectName = emittingSubject.name();
 

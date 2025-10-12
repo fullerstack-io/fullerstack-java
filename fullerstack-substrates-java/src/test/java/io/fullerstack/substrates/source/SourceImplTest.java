@@ -54,16 +54,15 @@ class SourceImplTest {
     }
 
     /**
-     * Helper to simulate Conduit behavior of invoking subscribers.
-     * Uses SourceImpl.notifySubscribers() like ConduitImpl does.
+     * Helper to simulate inlet Pipe behavior of invoking subscribers.
+     * Uses SourceImpl.emissionHandler() like inlet Pipes do.
      */
     private <E> void notifySource(SourceImpl<E> source, String channelName, E emission) {
         Subject subject = testSubject(channelName);
         Capture<E> capture = new CaptureImpl<>(subject, emission);
 
-        // Use SourceImpl's notification mechanism (like ConduitImpl does)
-        // Source now manages its own pipeCache internally
-        source.notifySubscribers(capture);
+        // Use SourceImpl's emission handler (like inlet Pipes do)
+        source.emissionHandler().accept(capture);
     }
 
     @Test

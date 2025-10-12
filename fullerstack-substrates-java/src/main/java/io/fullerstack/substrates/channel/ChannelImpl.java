@@ -4,30 +4,32 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pipe.PipeImpl;
 import io.fullerstack.substrates.segment.SegmentImpl;
+import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * Generic implementation of Substrates.Channel interface.
  *
  * <p>Provides a subject-based emission port that posts Scripts to Circuit's shared queue.
  *
- * <p>Each Channel has its own Subject identity (WHO), and when creating Pipes,
- * passes this Subject along with the Circuit Queue and a direct Source reference.
- * This completely decouples Channel from Conduit implementation while maintaining
- * the emission flow.
+ * <p>Each Channel has its own Subject identity (WHO). When creating inlet Pipes,
+ * Channel requests an emission handler from Source (its sibling) and passes it to
+ * the Pipe along with the Circuit Queue and Channel Subject.
  *
  * <p><b>Circuit Queue Architecture:</b>
  * Instead of putting Captures directly on a BlockingQueue, Pipes post Scripts to the
- * Circuit's Queue. Each Script calls Source.notifySubscribers() directly, ensuring
+ * Circuit's Queue. Each Script invokes the emission handler callback, ensuring
  * all Conduits share the Circuit's single-threaded execution model.
  *
- * <p><b>Direct Source Reference:</b>
- * Holds a direct reference to Source instead of a callback. This eliminates callback
- * passing through layers (Conduit → Channel → Pipe). The Pipe directly notifies the
- * Source when emissions occur, and Source owns the pipe cache for subscriber management.
+ * <p><b>Sibling Coordination:</b>
+ * Channel and Source are siblings owned by Conduit. Channel gets the emission handler
+ * from Source via {@link SourceImpl#emissionHandler()} when creating inlet Pipes. This
+ * is NOT callback passing through layers - it's dependency injection at construction time
+ * between siblings. Source's distribution logic remains private.
  *
  * <p><b>Sequencer Support:</b>
  * If a Sequencer is configured, this Channel creates Pipes with transformation pipelines
@@ -58,11 +60,11 @@ public class ChannelImpl<E> implements Channel<E> {
     private volatile Pipe<E> cachedPipe;
 
     /**
-     * Creates a Channel with direct Source reference.
+     * Creates a Channel with Source reference for emission handler coordination.
      *
      * @param channelName hierarchical channel name (e.g., "circuit.conduit.channel")
      * @param circuitQueue circuit's shared queue
-     * @param source the Source to notify when emissions occur
+     * @param source sibling Source (provides emission handler for Pipe creation)
      * @param sequencer optional transformation pipeline (null if no transformations)
      */
     public ChannelImpl(Name channelName, Queue circuitQueue, Source<E> source, Sequencer<Segment<E>> sequencer) {
@@ -92,8 +94,9 @@ public class ChannelImpl<E> implements Channel<E> {
                     if (sequencer != null) {
                         cachedPipe = pipe(sequencer);
                     } else {
-                        // Otherwise, create a plain Pipe with direct Source reference
-                        cachedPipe = new PipeImpl<>(circuitQueue, channelSubject, source);
+                        // Otherwise, create a plain Pipe with emission handler from Source
+                        Consumer<Capture<E>> handler = ((SourceImpl<E>) source).emissionHandler();
+                        cachedPipe = new PipeImpl<>(circuitQueue, channelSubject, handler);
                     }
                 }
             }
@@ -109,7 +112,10 @@ public class ChannelImpl<E> implements Channel<E> {
         SegmentImpl<E> segment = new SegmentImpl<>();
         sequencer.apply(segment);
 
-        // Return a Pipe with direct Source reference and Segment transformations
-        return new PipeImpl<>(circuitQueue, channelSubject, source, segment);
+        // Get emission handler from Source (sibling coordination)
+        Consumer<Capture<E>> handler = ((SourceImpl<E>) source).emissionHandler();
+
+        // Return a Pipe with emission handler and Segment transformations
+        return new PipeImpl<>(circuitQueue, channelSubject, handler, segment);
     }
 }

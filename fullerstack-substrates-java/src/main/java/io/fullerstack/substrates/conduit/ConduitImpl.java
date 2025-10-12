@@ -111,26 +111,4 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         return this;
     }
 
-    /**
-     * Processes an emission by routing it to all subscribers.
-     *
-     * <p><b>NOTE:</b> This method is now effectively unused. Emissions are now handled
-     * directly by PipeImpl posting Scripts that call Source.notifySubscribers(). This
-     * method remains for backward compatibility but may be removed in a future refactoring.
-     *
-     * <p>Delegates to SourceImpl for subscriber notification. The Source handles:
-     * <ul>
-     *   <li>Iterating over subscribers (encapsulated within Source)</li>
-     *   <li>Lazy pipe registration (first emission only)</li>
-     *   <li>Multi-dispatch to all registered pipes</li>
-     *   <li>Pipe cache management (now internal to Source)</li>
-     * </ul>
-     *
-     * @param capture the emission capture (Subject + value)
-     */
-    public void processEmission(Capture<E> capture) {
-        SourceImpl<E> source = (SourceImpl<E>) eventSource;
-        source.notifySubscribers(capture);
-    }
-
 }
