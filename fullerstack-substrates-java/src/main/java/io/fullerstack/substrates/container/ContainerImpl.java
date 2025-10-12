@@ -2,6 +2,7 @@ package io.fullerstack.substrates.container;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
+import io.fullerstack.substrates.sink.CaptureImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
@@ -20,14 +21,24 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>source() returns Source<Source<E>> emitting Conduit Sources when created</li>
  * </ul>
  *
- * <p><b>Use Case Example (Stock Trading):</b>
+ * <p><b>Hierarchical Subscription Pattern:</b>
+ * Container's Source emits Conduit Sources (not the actual emissions). This enables
+ * hierarchical subscription:
  * <pre>
- * Container<Pool<Pipe<Order>>, Source<Order>> container =
- *     circuit.container(cortex.name("orders"), Composer.pipe());
+ * // Subscribe to Container - receive Conduit Sources
+ * container.source().subscribe(
+ *   stock -> orders ->           // stock=Conduit Subject, orders=Conduit Source
+ *     orders.subscribe(          // Subscribe to individual Conduit
+ *       type -> order ->         // type=Channel Subject, order=actual emission
+ *         process(order)
+ *     )
+ * );
  *
- * // Each stock gets its own Conduit
+ * // When you call container.get("APPL") for the first time:
+ * // 1. Container creates new Conduit for "APPL"
+ * // 2. Container emits that Conduit's Source to subscribers
+ * // 3. Subscribers receive the Source and can subscribe to it
  * container.get(cortex.name("APPL")).get(cortex.name("BUY")).emit(order);
- * container.get(cortex.name("MSFT")).get(cortex.name("SELL")).emit(order);
  * </pre>
  *
  * <p><b>Article Reference:</b>
@@ -93,6 +104,9 @@ public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
     public Pool<P> get(Name name) {
         Objects.requireNonNull(name, "Conduit name cannot be null");
 
+        // Track if this is a new Conduit creation
+        final boolean[] isNewConduit = {false};
+
         // Get or create Conduit for this name
         Conduit<P, E> conduit = conduits.computeIfAbsent(name, n -> {
             // Create hierarchical name: containerName + conduitName
@@ -104,12 +118,19 @@ public class ContainerImpl<P, E> implements Container<Pool<P>, Source<E>> {
                 ? circuit.conduit(conduitName, composer, sequencer)
                 : circuit.conduit(conduitName, composer);
 
-            // Note: Container's Source<Source<E>> provides subscription mechanism
-            // for observing new Conduit creation. The Source itself doesn't emit -
-            // subscribers would need to subscribe to individual Conduit sources.
-
+            isNewConduit[0] = true;
             return newConduit;
         });
+
+        // Emit the Conduit's Source to Container subscribers (only for new Conduits)
+        if (isNewConduit[0]) {
+            // Create Capture pairing the Conduit's Subject with its Source
+            Capture<Source<E>> capture = new CaptureImpl<>(conduit.subject(), conduit.source());
+
+            // Emit synchronously to notify all Container subscribers
+            // Subscribers can then subscribe to this Conduit's Source
+            containerSource.emissionHandler().accept(capture);
+        }
 
         // Conduit implements Pool<P>, so return it directly
         return conduit;
