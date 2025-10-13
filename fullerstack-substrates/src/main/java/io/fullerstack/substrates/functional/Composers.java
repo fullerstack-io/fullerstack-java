@@ -4,7 +4,6 @@ import io.humainary.substrates.api.Substrates.*;
 import lombok.experimental.UtilityClass;
 
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -96,115 +95,6 @@ public class Composers {
     ) {
         return Streams.hierarchical(name)
             .map(prefix -> circuit.conduit(prefix, composer));
-    }
-
-    // ========== Filtering and Transformation ==========
-
-    /**
-     * Creates a Sequencer that applies a predicate filter.
-     *
-     * <h3>Example:</h3>
-     * <pre>{@code
-     * Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-     *     cortex.name("positive-numbers"),
-     *     Channel::pipe,
-     *     Composers.filter(n -> n > 0)
-     * );
-     * }</pre>
-     *
-     * @param predicate the filter predicate
-     * @param <E> the emission type
-     * @return a sequencer that applies the filter
-     */
-    public static <E> Sequencer<Segment<E>> filter(Predicate<E> predicate) {
-        return segment -> segment.guard(predicate);
-    }
-
-    /**
-     * Creates a Sequencer that limits emissions.
-     *
-     * <h3>Example:</h3>
-     * <pre>{@code
-     * Conduit<Pipe<Signal>, Signal> conduit = circuit.conduit(
-     *     cortex.name("first-10"),
-     *     Channel::pipe,
-     *     Composers.limit(10)
-     * );
-     * }</pre>
-     *
-     * @param maxEmissions the maximum number of emissions
-     * @param <E> the emission type
-     * @return a sequencer that limits emissions
-     */
-    public static <E> Sequencer<Segment<E>> limit(long maxEmissions) {
-        return segment -> segment.limit(maxEmissions);
-    }
-
-    /**
-     * Creates a Sequencer that only emits changed values.
-     *
-     * <h3>Example:</h3>
-     * <pre>{@code
-     * Conduit<Pipe<String>, String> conduit = circuit.conduit(
-     *     cortex.name("changes-only"),
-     *     Channel::pipe,
-     *     Composers.diff()
-     * );
-     * }</pre>
-     *
-     * @param <E> the emission type
-     * @return a sequencer that filters duplicate consecutive values
-     */
-    public static <E> Sequencer<Segment<E>> diff() {
-        return Segment::diff;
-    }
-
-    /**
-     * Creates a Sequencer that samples every Nth emission.
-     *
-     * <h3>Example:</h3>
-     * <pre>{@code
-     * // Only emit every 10th value
-     * Conduit<Pipe<Metric>, Metric> conduit = circuit.conduit(
-     *     cortex.name("sampled"),
-     *     Channel::pipe,
-     *     Composers.sample(10)
-     * );
-     * }</pre>
-     *
-     * @param n the sampling rate (emit every Nth value)
-     * @param <E> the emission type
-     * @return a sequencer that samples emissions
-     */
-    public static <E> Sequencer<Segment<E>> sample(int n) {
-        return segment -> segment.sample(n);
-    }
-
-    /**
-     * Composes multiple Sequencers into one.
-     *
-     * <p>Transformations are applied in order.
-     *
-     * <h3>Example:</h3>
-     * <pre>{@code
-     * Sequencer<Segment<Integer>> pipeline = Composers.compose(
-     *     Composers.filter(n -> n > 0),
-     *     Composers.sample(10),
-     *     Composers.limit(100)
-     * );
-     * }</pre>
-     *
-     * @param sequencers the sequencers to compose
-     * @param <E> the emission type
-     * @return a composed sequencer
-     */
-    @SafeVarargs
-    public static <E> Sequencer<Segment<E>> compose(Sequencer<Segment<E>>... sequencers) {
-        return segment -> {
-            for (Sequencer<Segment<E>> sequencer : sequencers) {
-                sequencer.apply(segment);
-            }
-        };
     }
 
     // ========== Circuit Configuration Helpers ==========

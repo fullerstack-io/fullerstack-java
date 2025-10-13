@@ -81,14 +81,14 @@ class ComposersTest {
 
     @Test
     void filter_appliesPredicateToEmissions() {
-        // Given: Circuit with filtered conduit
+        // Given: Circuit with filtered conduit using direct Pipe API
         Cortex cortex = new CortexRuntime();
         Circuit circuit = cortex.circuit(cortex.name("test"));
 
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
             cortex.name("positive"),
             Channel::pipe,
-            Composers.filter(n -> n > 0)
+            path -> path.guard(n -> n > 0)
         );
 
         // When: Emitting positive and negative values
@@ -121,14 +121,14 @@ class ComposersTest {
 
     @Test
     void limit_restrictsEmissionCount() {
-        // Given: Circuit with limited conduit
+        // Given: Circuit with limited conduit using direct Pipe API
         Cortex cortex = new CortexRuntime();
         Circuit circuit = cortex.circuit(cortex.name("test"));
 
         Conduit<Pipe<String>, String> conduit = circuit.conduit(
             cortex.name("limited"),
             Channel::pipe,
-            Composers.limit(3)
+            path -> path.limit(3)
         );
 
         // When: Emitting more than the limit
@@ -163,14 +163,14 @@ class ComposersTest {
 
     @Test
     void diff_filtersConsecutiveDuplicates() {
-        // Given: Circuit with diff sequencer
+        // Given: Circuit with diff sequencer using direct Pipe API
         Cortex cortex = new CortexRuntime();
         Circuit circuit = cortex.circuit(cortex.name("test"));
 
         Conduit<Pipe<String>, String> conduit = circuit.conduit(
             cortex.name("diff"),
             Channel::pipe,
-            Composers.diff()
+            Segment::diff
         );
 
         // When: Emitting duplicate values
@@ -204,14 +204,14 @@ class ComposersTest {
 
     @Test
     void sample_emitsEveryNth() {
-        // Given: Circuit with sampling
+        // Given: Circuit with sampling using direct Pipe API
         Cortex cortex = new CortexRuntime();
         Circuit circuit = cortex.circuit(cortex.name("test"));
 
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
             cortex.name("sampled"),
             Channel::pipe,
-            Composers.sample(3)  // Every 3rd emission
+            path -> path.sample(3)  // Every 3rd emission
         );
 
         // When: Emitting many values
@@ -243,20 +243,17 @@ class ComposersTest {
 
     @Test
     void compose_appliesMultipleTransformations() {
-        // Given: Circuit with composed transformations
+        // Given: Circuit with composed transformations using direct Pipe API
         Cortex cortex = new CortexRuntime();
         Circuit circuit = cortex.circuit(cortex.name("test"));
-
-        Sequencer<Segment<Integer>> pipeline = Composers.compose(
-            Composers.filter(n -> n > 0),    // Only positive
-            Composers.sample(2),              // Every 2nd
-            Composers.limit(3)                // Max 3
-        );
 
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
             cortex.name("pipeline"),
             Channel::pipe,
-            pipeline
+            path -> path
+                .guard(n -> n > 0)    // Only positive
+                .sample(2)            // Every 2nd
+                .limit(3)             // Max 3
         );
 
         // When: Emitting values
