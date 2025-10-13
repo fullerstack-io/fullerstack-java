@@ -112,6 +112,9 @@ public class SourceImpl<E> implements Source<E> {
      * <p>Source owns the pipe cache because it's fundamentally about subscriber management -
      * tracking which Pipes to notify for each Subscriber/Subject combination.
      *
+     * <p><b>Refactored to functional style:</b> Uses streams instead of imperative loops
+     * for clearer intent and composability.
+     *
      * @param capture the emission capture (Subject + value)
      */
     private void notifySubscribers(Capture<E> capture) {
@@ -124,27 +127,40 @@ public class SourceImpl<E> implements Source<E> {
             name -> new ConcurrentHashMap<>()
         );
 
-        // For each subscriber, get cached pipes or register new ones (first emission only)
-        for (Subscriber<E> subscriber : subscribers) {
-            List<Pipe<E>> pipes = subscriberPipes.computeIfAbsent(subscriber, sub -> {
-                // First emission from this Subject - call subscriber.accept() to register pipes
-                List<Pipe<E>> registeredPipes = new CopyOnWriteArrayList<>();
+        // Functional stream pipeline: resolve pipes for each subscriber, then emit
+        subscribers.stream()
+            .flatMap(subscriber ->
+                resolvePipes(subscriber, emittingSubject, subscriberPipes).stream()
+            )
+            .forEach(pipe -> pipe.emit(capture.emission()));
+    }
 
-                sub.accept(emittingSubject, new Registrar<E>() {
-                    @Override
-                    public void register(Pipe<E> pipe) {
-                        registeredPipes.add(pipe);
-                    }
-                });
+    /**
+     * Resolves pipes for a subscriber, registering them on first emission from a subject.
+     *
+     * @param subscriber the subscriber
+     * @param emittingSubject the subject emitting
+     * @param subscriberPipes cache of subscriber->pipes
+     * @return list of pipes for this subscriber
+     */
+    private List<Pipe<E>> resolvePipes(
+        Subscriber<E> subscriber,
+        Subject emittingSubject,
+        Map<Subscriber<E>, List<Pipe<E>>> subscriberPipes
+    ) {
+        return subscriberPipes.computeIfAbsent(subscriber, sub -> {
+            // First emission from this Subject - call subscriber.accept() to register pipes
+            List<Pipe<E>> registeredPipes = new CopyOnWriteArrayList<>();
 
-                return registeredPipes;
+            sub.accept(emittingSubject, new Registrar<E>() {
+                @Override
+                public void register(Pipe<E> pipe) {
+                    registeredPipes.add(pipe);
+                }
             });
 
-            // Emit to all registered pipes (cached or newly registered)
-            for (Pipe<E> pipe : pipes) {
-                pipe.emit(capture.emission());
-            }
-        }
+            return registeredPipes;
+        });
     }
 
 }
