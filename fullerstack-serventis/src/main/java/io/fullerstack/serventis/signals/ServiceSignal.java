@@ -1,6 +1,7 @@
 package io.fullerstack.serventis.signals;
 
 import io.humainary.modules.serventis.services.api.Services;
+import io.humainary.substrates.api.Substrates.Subject;
 
 import java.time.Instant;
 import java.util.Map;
@@ -12,12 +13,34 @@ import java.util.UUID;
  * <p>Uses the authentic Humainary Services API for signal semantics.
  * Each signal has a Sign (semantic meaning) and Orientation (perspective).
  *
+ * <p><b>Semiotic Interpretation:</b>
+ * Service signals represent the lifecycle of service interactions - calls, starts,
+ * stops, successes, and failures. The Sign enum provides semantic meaning
+ * (CALL, SUCCESS, FAIL) combined with Orientation (RELEASE=self, RECEIPT=observed).
+ *
+ * <p><b>Example Usage:</b>
+ * <pre>{@code
+ * Subject producerSend = cortex.subject(
+ *     cortex.name("kafka.client.interactions"),
+ *     cortex.name("producer-app1.send")
+ * );
+ *
+ * ServiceSignal signal = ServiceSignal.fail(
+ *     producerSend,
+ *     Map.of("error", "TimeoutException", "broker", "broker-1")
+ * );
+ *
+ * if (signal.requiresAttention()) {
+ *     logger.error(signal.interpret());
+ *     // "Service FAIL (RELEASE): Service operation failed"
+ * }
+ * }</pre>
+ *
  * <p>Emitted by ClientSensorInterceptor on send/poll completion.
  * Routed through "kafka.client.interactions" circuit → "services" conduit.
  *
  * @param id unique signal identifier
- * @param circuit circuit name (e.g., "kafka.client.interactions")
- * @param subject subject name (e.g., "producer-app1.send")
+ * @param subject Substrates subject (circuit + entity identity)
  * @param timestamp when signal was emitted
  * @param vectorClock causal ordering clock
  * @param signal Humainary Services.Signal (combines Sign + Orientation)
@@ -25,8 +48,7 @@ import java.util.UUID;
  */
 public record ServiceSignal(
     UUID id,
-    String circuit,
-    String subject,
+    Subject subject,
     Instant timestamp,
     VectorClock vectorClock,
     Services.Signal signal,
@@ -40,15 +62,13 @@ public record ServiceSignal(
     /**
      * Creates a CALL signal (RELEASE orientation) indicating self-initiated service call.
      *
-     * @param circuit circuit name
-     * @param subject subject name
+     * @param subject Substrates subject
      * @param metadata additional context
      * @return new ServiceSignal with CALL/RELEASE
      */
-    public static ServiceSignal call(String circuit, String subject, Map<String, String> metadata) {
+    public static ServiceSignal call(Subject subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
-            circuit,
             subject,
             Instant.now(),
             VectorClock.empty(),
@@ -60,15 +80,13 @@ public record ServiceSignal(
     /**
      * Creates a CALLED signal (RECEIPT orientation) indicating observed incoming call.
      *
-     * @param circuit circuit name
-     * @param subject subject name
+     * @param subject Substrates subject
      * @param metadata additional context
      * @return new ServiceSignal with CALL/RECEIPT
      */
-    public static ServiceSignal called(String circuit, String subject, Map<String, String> metadata) {
+    public static ServiceSignal called(Subject subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
-            circuit,
             subject,
             Instant.now(),
             VectorClock.empty(),
@@ -80,15 +98,13 @@ public record ServiceSignal(
     /**
      * Creates a SUCCESS signal (RELEASE orientation) indicating self-reported successful completion.
      *
-     * @param circuit circuit name
-     * @param subject subject name
+     * @param subject Substrates subject
      * @param metadata additional context
      * @return new ServiceSignal with SUCCESS/RELEASE
      */
-    public static ServiceSignal success(String circuit, String subject, Map<String, String> metadata) {
+    public static ServiceSignal success(Subject subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
-            circuit,
             subject,
             Instant.now(),
             VectorClock.empty(),
@@ -100,15 +116,13 @@ public record ServiceSignal(
     /**
      * Creates a SUCCEEDED signal (RECEIPT orientation) indicating observed successful response.
      *
-     * @param circuit circuit name
-     * @param subject subject name
+     * @param subject Substrates subject
      * @param metadata additional context
      * @return new ServiceSignal with SUCCESS/RECEIPT
      */
-    public static ServiceSignal succeeded(String circuit, String subject, Map<String, String> metadata) {
+    public static ServiceSignal succeeded(Subject subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
-            circuit,
             subject,
             Instant.now(),
             VectorClock.empty(),
@@ -120,15 +134,13 @@ public record ServiceSignal(
     /**
      * Creates a FAIL signal (RELEASE orientation) indicating self-reported failure.
      *
-     * @param circuit circuit name
-     * @param subject subject name
+     * @param subject Substrates subject
      * @param metadata additional context (should include error details)
      * @return new ServiceSignal with FAIL/RELEASE
      */
-    public static ServiceSignal fail(String circuit, String subject, Map<String, String> metadata) {
+    public static ServiceSignal fail(Subject subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
-            circuit,
             subject,
             Instant.now(),
             VectorClock.empty(),
@@ -140,15 +152,13 @@ public record ServiceSignal(
     /**
      * Creates a FAILED signal (RECEIPT orientation) indicating observed failure in response.
      *
-     * @param circuit circuit name
-     * @param subject subject name
+     * @param subject Substrates subject
      * @param metadata additional context (should include error details)
      * @return new ServiceSignal with FAIL/RECEIPT
      */
-    public static ServiceSignal failed(String circuit, String subject, Map<String, String> metadata) {
+    public static ServiceSignal failed(Subject subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
-            circuit,
             subject,
             Instant.now(),
             VectorClock.empty(),
@@ -160,15 +170,13 @@ public record ServiceSignal(
     /**
      * Creates a START signal (RELEASE orientation) indicating work execution started.
      *
-     * @param circuit circuit name
-     * @param subject subject name
+     * @param subject Substrates subject
      * @param metadata additional context
      * @return new ServiceSignal with START/RELEASE
      */
-    public static ServiceSignal start(String circuit, String subject, Map<String, String> metadata) {
+    public static ServiceSignal start(Subject subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
-            circuit,
             subject,
             Instant.now(),
             VectorClock.empty(),
@@ -180,15 +188,13 @@ public record ServiceSignal(
     /**
      * Creates a STARTED signal (RECEIPT orientation) indicating observed work start.
      *
-     * @param circuit circuit name
-     * @param subject subject name
+     * @param subject Substrates subject
      * @param metadata additional context
      * @return new ServiceSignal with START/RECEIPT
      */
-    public static ServiceSignal started(String circuit, String subject, Map<String, String> metadata) {
+    public static ServiceSignal started(Subject subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
-            circuit,
             subject,
             Instant.now(),
             VectorClock.empty(),
@@ -200,15 +206,13 @@ public record ServiceSignal(
     /**
      * Creates a STOP signal (RELEASE orientation) indicating work completion.
      *
-     * @param circuit circuit name
-     * @param subject subject name
+     * @param subject Substrates subject
      * @param metadata additional context
      * @return new ServiceSignal with STOP/RELEASE
      */
-    public static ServiceSignal stop(String circuit, String subject, Map<String, String> metadata) {
+    public static ServiceSignal stop(Subject subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
-            circuit,
             subject,
             Instant.now(),
             VectorClock.empty(),
@@ -220,15 +224,13 @@ public record ServiceSignal(
     /**
      * Creates a STOPPED signal (RECEIPT orientation) indicating observed work completion.
      *
-     * @param circuit circuit name
-     * @param subject subject name
+     * @param subject Substrates subject
      * @param metadata additional context
      * @return new ServiceSignal with STOP/RECEIPT
      */
-    public static ServiceSignal stopped(String circuit, String subject, Map<String, String> metadata) {
+    public static ServiceSignal stopped(Subject subject, Map<String, String> metadata) {
         return new ServiceSignal(
             UUID.randomUUID(),
-            circuit,
             subject,
             Instant.now(),
             VectorClock.empty(),
@@ -237,7 +239,25 @@ public record ServiceSignal(
         );
     }
 
-    // Convenience methods to access Sign and Orientation
+    /**
+     * Creates a RETRY signal indicating a retry attempt.
+     *
+     * @param subject Substrates subject
+     * @param metadata additional context (should include retry count, reason)
+     * @return new ServiceSignal with RETRY
+     */
+    public static ServiceSignal retry(Subject subject, Map<String, String> metadata) {
+        return new ServiceSignal(
+            UUID.randomUUID(),
+            subject,
+            Instant.now(),
+            VectorClock.empty(),
+            Services.Signal.RETRY,
+            metadata
+        );
+    }
+
+    // Services.Service interface implementation
 
     /**
      * @return the semantic Sign of this signal (START, STOP, CALL, SUCCESS, FAIL, etc.)
@@ -251,5 +271,106 @@ public record ServiceSignal(
      */
     public Services.Orientation orientation() {
         return signal.orientation();
+    }
+
+    // Signal interface implementation - Semantic Helpers
+
+    /**
+     * Returns the severity level based on the service sign.
+     *
+     * <p><b>Severity Mapping:</b>
+     * <ul>
+     *   <li>FAIL, FAILED → ERROR</li>
+     *   <li>RETRY → WARNING</li>
+     *   <li>SUCCESS, SUCCEEDED, START, STARTED, STOP, STOPPED, CALL, CALLED → INFO</li>
+     * </ul>
+     */
+    @Override
+    public Severity severity() {
+        return switch (sign()) {
+            case FAIL -> Severity.ERROR;
+            case RETRY -> Severity.WARNING;
+            case SUCCESS, START, STOP, CALL -> Severity.INFO;
+            default -> Severity.INFO;
+        };
+    }
+
+    /**
+     * Checks if this service signal requires attention.
+     *
+     * <p>Requires attention if sign is:
+     * FAIL, FAILED, or RETRY
+     *
+     * @return true if signal indicates a problem
+     */
+    @Override
+    public boolean requiresAttention() {
+        return switch (sign()) {
+            case FAIL, RETRY -> true;
+            default -> false;
+        };
+    }
+
+    /**
+     * Returns a human-readable interpretation of this service signal.
+     *
+     * <p>Example: "Service FAIL (RELEASE): Service operation failed"
+     *
+     * @return interpretable description
+     */
+    @Override
+    public String interpret() {
+        String signText = switch (sign()) {
+            case CALL -> "Service call initiated";
+            case START -> "Service execution started";
+            case STOP -> "Service execution stopped";
+            case SUCCESS -> "Service operation succeeded";
+            case FAIL -> "Service operation failed";
+            case RETRY -> "Service operation being retried";
+            default -> "Service operation: " + sign();
+        };
+
+        return String.format(
+            "Service %s (%s): %s",
+            sign(),
+            orientation(),
+            signText
+        );
+    }
+
+    /**
+     * Checks if the service operation was successful.
+     *
+     * @return true if SUCCESS sign
+     */
+    public boolean isSuccessful() {
+        return sign() == Services.Sign.SUCCESS;
+    }
+
+    /**
+     * Checks if the service operation failed.
+     *
+     * @return true if FAIL sign
+     */
+    public boolean isFailed() {
+        return sign() == Services.Sign.FAIL;
+    }
+
+    /**
+     * Checks if this is a self-reported signal (RELEASE orientation).
+     *
+     * @return true if RELEASE orientation
+     */
+    public boolean isSelfReported() {
+        return orientation() == Services.Orientation.RELEASE;
+    }
+
+    /**
+     * Checks if this is an observed signal (RECEIPT orientation).
+     *
+     * @return true if RECEIPT orientation
+     */
+    public boolean isObserved() {
+        return orientation() == Services.Orientation.RECEIPT;
     }
 }

@@ -18,6 +18,12 @@
     <description>Concrete signal type implementations for the Humainary Serventis observability framework, providing immutable Java records for Monitor, Service, Queue, Reporter, Probe, and Resource signals (Java 24)</description>
 
     <dependencies>
+        <!-- Humainary Substrates API (for Subject types) -->
+        <dependency>
+            <groupId>io.humainary.substrates</groupId>
+            <artifactId>humainary-substrates-api</artifactId>
+        </dependency>
+
         <!-- Humainary Serventis API modules -->
         <dependency>
             <groupId>io.humainary.modules.serventis.monitors</groupId>
