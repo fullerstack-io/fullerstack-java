@@ -187,4 +187,56 @@ public class NameImpl implements Name {
     public int hashCode() {
         return toPath().hashCode();
     }
+
+    // ========== Extent Interface Implementations ==========
+
+    /**
+     * Returns an iterator over the hierarchical path from root to this name.
+     * For "broker.1.heap", iterates: broker → broker.1 → broker.1.heap
+     */
+    @Override
+    public java.util.Iterator<Name> iterator() {
+        // Build list of all names from root to this
+        java.util.List<Name> names = new java.util.ArrayList<>();
+        collectHierarchy(names);
+        return names.iterator();
+    }
+
+    /**
+     * Returns the parent/enclosing name.
+     * For "broker.1.heap", returns Optional.of("broker.1")
+     */
+    @Override
+    public java.util.Optional<Name> enclosure() {
+        return java.util.Optional.ofNullable(parent);
+    }
+
+    /**
+     * Returns the depth of this name (number of parts).
+     * For "broker.1.heap", returns 3
+     */
+    @Override
+    public int depth() {
+        int count = 1;
+        Name current = parent;
+        while (current != null) {
+            count++;
+            if (current instanceof NameImpl impl) {
+                current = impl.parent;
+            } else {
+                break;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Recursively collects all names from root to leaf into a list.
+     */
+    private void collectHierarchy(java.util.List<Name> names) {
+        if (parent != null && parent instanceof NameImpl impl) {
+            impl.collectHierarchy(names);
+        }
+        names.add(this);
+    }
 }
