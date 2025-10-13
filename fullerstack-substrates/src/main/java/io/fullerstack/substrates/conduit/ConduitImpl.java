@@ -7,12 +7,14 @@ import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 
+import lombok.Getter;
+
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Generic implementation of Substrates.Conduit interface.
+ * Generic implementation of Substrates.Conduit interface with Lombok for getters.
  *
  * <p>Routes emitted values from Channels (producers) to Pipes (consumers) via Circuit's shared queue.
  * Manages percepts created from channels via a Composer. Each percept corresponds to a subject
@@ -46,6 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @param <P> the percept type (e.g., Pipe<E>)
  * @param <E> the emission type (e.g., MonitorSignal)
  */
+@Getter
 public class ConduitImpl<P, E> implements Conduit<P, E> {
 
     private final Subject conduitSubject;

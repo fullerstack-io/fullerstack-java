@@ -4,11 +4,13 @@ import io.fullerstack.substrates.capture.CaptureImpl;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.segment.SegmentImpl;
 
+import lombok.Getter;
+
 import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * Implementation of Substrates.Pipe interface.
+ * Implementation of Substrates.Pipe interface with Lombok for getters.
  *
  * <p>A Pipe provides typed emission with optional transformation support via Segment.
  *
@@ -36,6 +38,7 @@ import java.util.function.Consumer;
  *
  * @param <E> the emission type (e.g., MonitorSignal, ServiceSignal)
  */
+@Getter
 public class PipeImpl<E> implements Pipe<E> {
 
     private final Queue circuitQueue; // Circuit's shared Queue for Scripts

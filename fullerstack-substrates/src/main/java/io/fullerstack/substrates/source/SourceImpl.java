@@ -8,6 +8,8 @@ import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.name.NameImpl;
 import io.fullerstack.substrates.subscription.SubscriptionImpl;
 
+import lombok.Getter;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -16,7 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
- * Implementation of Substrates.Source for subscriber management.
+ * Implementation of Substrates.Source for subscriber management with Lombok for getters.
  *
  * <p>SourceImpl manages Subscribers and provides the observable stream interface.
  *
@@ -37,6 +39,7 @@ import java.util.function.Consumer;
  * @see Source
  * @see Subscriber
  */
+@Getter
 public class SourceImpl<E> implements Source<E> {
     private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
     private final Subject sourceSubject;

@@ -8,11 +8,13 @@ import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 
+import lombok.Getter;
+
 import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * Generic implementation of Substrates.Channel interface.
+ * Generic implementation of Substrates.Channel interface with Lombok for getters.
  *
  * <p>Provides a subject-based emission port that posts Scripts to Circuit's shared queue.
  *
@@ -48,6 +50,7 @@ import java.util.function.Consumer;
  *
  * @param <E> the emission type (e.g., MonitorSignal, ServiceSignal)
  */
+@Getter
 public class ChannelImpl<E> implements Channel<E> {
 
     private final Subject channelSubject;

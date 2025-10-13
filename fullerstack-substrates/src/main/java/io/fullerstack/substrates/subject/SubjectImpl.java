@@ -5,37 +5,63 @@ import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.State;
 import io.humainary.substrates.api.Substrates.Subject;
 
-import java.util.Objects;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 /**
- * Implementation of Substrates.Subject.
+ * Implementation of Substrates.Subject using Lombok for boilerplate reduction.
  *
  * <p>Subjects represent identifiable entities in the Substrates system,
  * combining an ID, name, state, and type.
  *
+ * <p>This class uses Lombok annotations to auto-generate:
+ * <ul>
+ *   <li>Public constructor via {@code @AllArgsConstructor}</li>
+ *   <li>Null checks via {@code @NonNull}</li>
+ *   <li>Getter methods via {@code @Getter}</li>
+ *   <li>equals() and hashCode() via {@code @EqualsAndHashCode}</li>
+ *   <li>toString() via {@code @ToString}</li>
+ *   <li>Builder pattern via {@code @Builder}</li>
+ * </ul>
+ *
  * @see Subject
  */
+@Getter
+@ToString
+@EqualsAndHashCode
+@Builder(toBuilder = true)
 public class SubjectImpl implements Subject {
+    /**
+     * Unique identifier for this subject.
+     */
     private final Id id;
+
+    /**
+     * Hierarchical name (e.g., "circuit.conduit.channel").
+     */
     private final Name name;
+
+    /**
+     * Associated state (may be null).
+     */
     private final State state;
+
+    /**
+     * Subject type (CIRCUIT, CONDUIT, CHANNEL, etc.).
+     */
     private final Type type;
 
     /**
-     * Creates a new Subject.
-     *
-     * @param id unique identifier
-     * @param name hierarchical name
-     * @param state associated state (may be null)
-     * @param type subject type
+     * Creates a Subject with all fields.
      */
-    public SubjectImpl(Id id, Name name, State state, Type type) {
-        this.id = Objects.requireNonNull(id, "Subject ID cannot be null");
-        this.name = Objects.requireNonNull(name, "Subject name cannot be null");
+    public SubjectImpl(@NonNull Id id, @NonNull Name name, State state, @NonNull Type type) {
+        this.id = id;
+        this.name = name;
         this.state = state;
-        this.type = Objects.requireNonNull(type, "Subject type cannot be null");
+        this.type = type;
     }
 
+    // Override Subject interface methods
     @Override
     public Id id() {
         return id;
@@ -56,6 +82,8 @@ public class SubjectImpl implements Subject {
         return type;
     }
 
+    // Delegate Name interface methods to the name field
+
     @Override
     public CharSequence part() {
         return name.part();
@@ -69,22 +97,5 @@ public class SubjectImpl implements Subject {
     @Override
     public CharSequence path(char separator) {
         return name.path(separator);
-    }
-
-    @Override
-    public String toString() {
-        return String.format("Subject[type=%s, name=%s, id=%s]", type, name, id);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof SubjectImpl other)) return false;
-        return id.equals(other.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return id.hashCode();
     }
 }
