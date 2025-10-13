@@ -47,8 +47,21 @@ public class Streams {
      * @return a stream of prefix names
      */
     public static Stream<Name> hierarchical(Name name) {
+        String path = name.path().toString();
+        if (path.isEmpty()) {
+            return Stream.empty();
+        }
+
+        String[] parts = path.split("\\.");
         List<Name> prefixes = new ArrayList<>();
-        name.enclosure(prefixes::add);
+
+        // Build each hierarchical level
+        for (int i = 0; i < parts.length; i++) {
+            String[] levelParts = new String[i + 1];
+            System.arraycopy(parts, 0, levelParts, 0, i + 1);
+            prefixes.add(io.fullerstack.substrates.name.NameImpl.of(levelParts));
+        }
+
         return prefixes.stream();
     }
 

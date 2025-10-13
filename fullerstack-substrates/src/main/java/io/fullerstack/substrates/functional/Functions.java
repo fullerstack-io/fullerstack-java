@@ -159,7 +159,7 @@ public class Functions {
      * Memoizes a function, caching its results.
      *
      * <p>This is useful for expensive computations that are called repeatedly
-     * with the same inputs.
+     * with the same inputs. Supports null inputs.
      *
      * <p><b>Warning:</b> This uses a ConcurrentHashMap for caching, which can
      * grow unbounded. Use only for functions with a small input domain.
@@ -171,6 +171,24 @@ public class Functions {
      */
     public static <T, R> Function<T, R> memoized(Function<T, R> function) {
         java.util.Map<T, R> cache = new java.util.concurrent.ConcurrentHashMap<>();
-        return input -> cache.computeIfAbsent(input, function);
+        // Track whether we've computed the null case (ConcurrentHashMap doesn't support null keys)
+        java.util.concurrent.atomic.AtomicReference<R> nullValue = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicBoolean nullComputed = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        return input -> {
+            if (input == null) {
+                // Handle null input separately
+                if (!nullComputed.get()) {
+                    synchronized (nullComputed) {
+                        if (!nullComputed.get()) {
+                            nullValue.set(function.apply(null));
+                            nullComputed.set(true);
+                        }
+                    }
+                }
+                return nullValue.get();
+            }
+            return cache.computeIfAbsent(input, function);
+        };
     }
 }
