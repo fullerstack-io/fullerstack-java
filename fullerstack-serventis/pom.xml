@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.fullerstack</groupId>
+        <artifactId>fullerstack-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>serventis-signals-java</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Serventis Signals (Java)</name>
+    <description>Concrete signal type implementations for the Humainary Serventis observability framework, providing immutable Java records for Monitor, Service, Queue, Reporter, Probe, and Resource signals (Java 24)</description>
+
+    <dependencies>
+        <!-- Humainary Serventis API modules -->
+        <dependency>
+            <groupId>io.humainary.modules.serventis.monitors</groupId>
+            <artifactId>humainary-modules-serventis-monitors-api</artifactId>
+            <version>1.0.0-M13</version>
+        </dependency>
+        <dependency>
+            <groupId>io.humainary.modules.serventis.services</groupId>
+            <artifactId>humainary-modules-serventis-services-api</artifactId>
+            <version>1.0.0-M13</version>
+        </dependency>
+        <dependency>
+            <groupId>io.humainary.modules.serventis.queues</groupId>
+            <artifactId>humainary-modules-serventis-queues-api</artifactId>
+            <version>1.0.0-M13</version>
+        </dependency>
+        <dependency>
+            <groupId>io.humainary.modules.serventis.reporters</groupId>
+            <artifactId>humainary-modules-serventis-reporters-api</artifactId>
+            <version>1.0.0-M13</version>
+        </dependency>
+        <dependency>
+            <groupId>io.humainary.modules.serventis.probes</groupId>
+            <artifactId>humainary-modules-serventis-probes-api</artifactId>
+            <version>1.0.0-M13</version>
+        </dependency>
+        <dependency>
+            <groupId>io.humainary.modules.serventis.resources</groupId>
+            <artifactId>humainary-modules-serventis-resources-api</artifactId>
+            <version>1.0.0-M13</version>
+        </dependency>
+
+        <!-- Testing -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

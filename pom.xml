@@ -15,7 +15,8 @@
     <url>https://github.com/fullerstack-io/fullerstack-java</url>
 
     <modules>
-        <module>fullerstack-substrates-java</module>
+        <module>fullerstack-substrates</module>
+        <module>fullerstack-serventis</module>
     </modules>
 
     <properties>
@@ -27,6 +28,7 @@
 
         <!-- Dependency Versions -->
         <substrates-api.version>1.0.0-M13</substrates-api.version>
+        <serventis-api.version>1.0.0-M13</serventis-api.version>
         <junit.version>5.11.0</junit.version>
         <assertj.version>3.26.3</assertj.version>
         <mockito.version>5.14.1</mockito.version>
@@ -44,6 +46,50 @@
                 <groupId>io.humainary.substrates</groupId>
                 <artifactId>humainary-substrates-api</artifactId>
                 <version>${substrates-api.version}</version>
+            </dependency>
+
+            <!-- Serventis API modules -->
+            <dependency>
+                <groupId>io.humainary.modules.serventis.monitors</groupId>
+                <artifactId>humainary-modules-serventis-monitors-api</artifactId>
+                <version>${serventis-api.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.humainary.modules.serventis.services</groupId>
+                <artifactId>humainary-modules-serventis-services-api</artifactId>
+                <version>${serventis-api.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.humainary.modules.serventis.queues</groupId>
+                <artifactId>humainary-modules-serventis-queues-api</artifactId>
+                <version>${serventis-api.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.humainary.modules.serventis.reporters</groupId>
+                <artifactId>humainary-modules-serventis-reporters-api</artifactId>
+                <version>${serventis-api.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.humainary.modules.serventis.probes</groupId>
+                <artifactId>humainary-modules-serventis-probes-api</artifactId>
+                <version>${serventis-api.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.humainary.modules.serventis.resources</groupId>
+                <artifactId>humainary-modules-serventis-resources-api</artifactId>
+                <version>${serventis-api.version}</version>
+            </dependency>
+
+            <!-- Fullerstack modules -->
+            <dependency>
+                <groupId>io.fullerstack</groupId>
+                <artifactId>substrates-java</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.fullerstack</groupId>
+                <artifactId>serventis-signals-java</artifactId>
+                <version>${project.version}</version>
             </dependency>
 
             <!-- Testing -->
