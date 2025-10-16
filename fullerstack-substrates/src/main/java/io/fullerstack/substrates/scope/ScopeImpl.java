@@ -29,6 +29,9 @@ public class ScopeImpl implements Scope {
     private final Deque<Resource> resources = new ConcurrentLinkedDeque<>();
     private volatile boolean closed = false;
 
+    // Cache Subject - each Scope has a persistent identity
+    private final Subject scopeSubject;
+
     /**
      * Creates a root scope.
      *
@@ -47,16 +50,18 @@ public class ScopeImpl implements Scope {
     public ScopeImpl(Name name, Scope parent) {
         this.name = Objects.requireNonNull(name, "Scope name cannot be null");
         this.parent = parent;
-    }
-
-    @Override
-    public Subject subject() {
-        return new SubjectImpl(
+        // Create Subject once - represents persistent identity of this Scope
+        this.scopeSubject = new SubjectImpl(
             IdImpl.generate(),
             name,
             StateImpl.empty(),
             Subject.Type.SCOPE
         );
+    }
+
+    @Override
+    public Subject subject() {
+        return scopeSubject;
     }
 
     @Override

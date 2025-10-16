@@ -46,20 +46,24 @@ import java.util.stream.Stream;
 public class CortexRuntime implements Cortex {
 
     private final Map<Name, Circuit> circuits = new ConcurrentHashMap<>();
+    private final Map<Name, Scope> scopes = new ConcurrentHashMap<>();
     private final Scope defaultScope;
 
     /**
      * Creates a new Cortex runtime.
      */
     public CortexRuntime() {
-        this.defaultScope = new ScopeImpl(NameImpl.of("cortex"));
+        Name cortexName = createRootName("cortex");
+        this.defaultScope = new ScopeImpl(cortexName);
+        // Cache default scope by its name
+        this.scopes.put(cortexName, defaultScope);
     }
 
     // ========== Circuit Management (2 methods) ==========
 
     @Override
     public Circuit circuit() {
-        return circuit(NameImpl.of("circuit"));
+        return circuit(createRootName("circuit"));
     }
 
     @Override
@@ -76,17 +80,25 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public Name name(String s) {
-        return NameImpl.of(s);
+        return createRootName(s);
     }
 
     @Override
     public Name name(Enum<?> e) {
-        return NameImpl.of(e.name());
+        return createRootName(e.name());
     }
 
     @Override
     public Name name(Iterable<String> parts) {
-        return NameImpl.of(parts);
+        Iterator<String> iter = parts.iterator();
+        if (!iter.hasNext()) {
+            throw new IllegalArgumentException("At least one part required");
+        }
+        Name name = createRootName(iter.next());
+        while (iter.hasNext()) {
+            name = new NameImpl(iter.next(), name);
+        }
+        return name;
     }
 
     @Override
@@ -94,18 +106,18 @@ public class CortexRuntime implements Cortex {
         Name name = null;
         for (T item : items) {
             String part = mapper.apply(item);
-            name = name == null ? NameImpl.of(part) : name.name(part);
+            name = name == null ? createRootName(part) : name.name(part);
         }
-        return name != null ? name : NameImpl.of("empty");
+        return name != null ? name : createRootName("empty");
     }
 
     @Override
     public Name name(Iterator<String> parts) {
         Name name = null;
         while (parts.hasNext()) {
-            name = name == null ? NameImpl.of(parts.next()) : name.name(parts.next());
+            name = name == null ? createRootName(parts.next()) : name.name(parts.next());
         }
-        return name != null ? name : NameImpl.of("empty");
+        return name != null ? name : createRootName("empty");
     }
 
     @Override
@@ -113,19 +125,24 @@ public class CortexRuntime implements Cortex {
         Name name = null;
         while (items.hasNext()) {
             String part = mapper.apply(items.next());
-            name = name == null ? NameImpl.of(part) : name.name(part);
+            name = name == null ? createRootName(part) : name.name(part);
         }
-        return name != null ? name : NameImpl.of("empty");
+        return name != null ? name : createRootName("empty");
     }
 
     @Override
     public Name name(Class<?> clazz) {
-        return NameImpl.of(clazz.getSimpleName());
+        return createRootName(clazz.getSimpleName());
     }
 
     @Override
     public Name name(Member member) {
-        return NameImpl.of(member.getName());
+        return createRootName(member.getName());
+    }
+
+    // Helper method to create root names with caching
+    private Name createRootName(String part) {
+        return NameImpl.ROOT_NAME_CACHE.computeIfAbsent(part, p -> new NameImpl(p, null));
     }
 
     // ========== Pool Management (1 method) ==========
@@ -146,7 +163,8 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public Scope scope(Name name) {
-        return new ScopeImpl(name);
+        Objects.requireNonNull(name, "Scope name cannot be null");
+        return scopes.computeIfAbsent(name, ScopeImpl::new);
     }
 
     // ========== State Factory (9 methods) ==========
