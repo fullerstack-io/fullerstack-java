@@ -9,7 +9,7 @@ import io.fullerstack.substrates.queue.QueueImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 
 import java.util.Map;
 import java.util.Objects;
@@ -93,7 +93,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public Clock clock() {
-        return clock(new NameImpl("clock", null));
+        return clock(new LinkedName("clock", null));
     }
 
     @Override
@@ -105,7 +105,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public <P, E> Conduit<P, E> conduit(Composer<? extends P, E> composer) {
-        return conduit(new NameImpl("conduit", null), composer);
+        return conduit(new LinkedName("conduit", null), composer);
     }
 
     @Override
@@ -148,7 +148,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public <P, E> Container<Pool<P>, Source<E>> container(Composer<P, E> composer) {
-        return container(new NameImpl("container", null), composer);
+        return container(new LinkedName("container", null), composer);
     }
 
     @Override

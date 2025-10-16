@@ -2,7 +2,7 @@ package io.fullerstack.substrates.pool;
 
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pool;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -15,7 +15,7 @@ class PoolImplTest {
     void shouldReturnSameInstanceForSameName() {
         Pool<String> pool = new PoolImpl<>(name -> "value-" + name.value());
 
-        Name name = new NameImpl("test", null);
+        Name name = new LinkedName("test", null);
         String value1 = pool.get(name);
         String value2 = pool.get(name);
 
@@ -26,8 +26,8 @@ class PoolImplTest {
     void shouldReturnDifferentInstancesForDifferentNames() {
         Pool<String> pool = new PoolImpl<>(name -> "value-" + name.value());
 
-        String value1 = pool.get(new NameImpl("test1", null));
-        String value2 = pool.get(new NameImpl("test2", null));
+        String value1 = pool.get(new LinkedName("test1", null));
+        String value2 = pool.get(new LinkedName("test2", null));
 
         assertThat(value1).isNotEqualTo(value2);
         assertThat(value1).isEqualTo("value-test1");
@@ -42,7 +42,7 @@ class PoolImplTest {
             return "value";
         });
 
-        Name name = new NameImpl("test", null);
+        Name name = new LinkedName("test", null);
         pool.get(name);
         pool.get(name);
         pool.get(name);
@@ -54,7 +54,7 @@ class PoolImplTest {
     void shouldSupportComplexObjects() {
         Pool<ComplexObject> pool = new PoolImpl<>(name -> new ComplexObject(name.value()));
 
-        Name name = new NameImpl("1", new NameImpl("broker", new NameImpl("kafka", null)));
+        Name name = new LinkedName("1", new LinkedName("broker", new LinkedName("kafka", null)));
         ComplexObject obj = pool.get(name);
 
         assertThat(obj.value).isEqualTo("kafka.broker.1");
@@ -64,7 +64,7 @@ class PoolImplTest {
     void shouldHandleNullFactory() {
         Pool<String> pool = new PoolImpl<>(name -> null);
 
-        String value = pool.get(new NameImpl("test", null));
+        String value = pool.get(new LinkedName("test", null));
 
         assertThat(value).isNull();
     }
@@ -72,7 +72,7 @@ class PoolImplTest {
     @Test
     void shouldSupportConcurrentAccess() throws Exception {
         Pool<String> pool = new PoolImpl<>(name -> "value-" + name.value());
-        Name name = new NameImpl("concurrent", null);
+        Name name = new LinkedName("concurrent", null);
 
         Thread[] threads = new Thread[10];
         String[] results = new String[10];

@@ -59,8 +59,8 @@ public class Streams {
         Name current = null;
         for (String part : parts) {
             current = current == null
-                ? new io.fullerstack.substrates.name.NameImpl(part, null)
-                : new io.fullerstack.substrates.name.NameImpl(part, current);
+                ? new io.fullerstack.substrates.name.LinkedName(part, null)
+                : new io.fullerstack.substrates.name.LinkedName(part, current);
             prefixes.add(current);
         }
 

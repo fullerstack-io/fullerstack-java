@@ -2,7 +2,7 @@ package io.fullerstack.substrates.integration;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.circuit.CircuitImpl;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -52,14 +52,14 @@ class SequencerIntegrationTest {
 
     @Test
     void shouldApplySequencerTransformationsToEmissions() throws InterruptedException {
-        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
+        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(3);
 
         // Create conduit using API's Composer.pipe(sequencer) factory
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new NameImpl("sensors", null),
+            new LinkedName("sensors", null),
             Composer.pipe(
                 path -> path
                     .guard(value -> value > 0)  // Filter negatives
@@ -71,7 +71,7 @@ class SequencerIntegrationTest {
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
         // Get pipe and emit values
-        Pipe<Integer> pipe = conduit.get(new NameImpl("sensor-1", null));
+        Pipe<Integer> pipe = conduit.get(new LinkedName("sensor-1", null));
         pipe.emit(-5);   // Filtered by guard
         pipe.emit(10);   // Passes
         pipe.emit(0);    // Filtered by guard
@@ -87,14 +87,14 @@ class SequencerIntegrationTest {
 
     @Test
     void shouldApplyReduceTransformation() throws InterruptedException {
-        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
+        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(4);
 
         // Create conduit with reduce (accumulating sum)
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new NameImpl("accumulators", null),
+            new LinkedName("accumulators", null),
             Composer.pipe(
                 path -> path.reduce(0, Integer::sum)
             )
@@ -102,7 +102,7 @@ class SequencerIntegrationTest {
 
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
-        Pipe<Integer> pipe = conduit.get(new NameImpl("accumulator-1", null));
+        Pipe<Integer> pipe = conduit.get(new LinkedName("accumulator-1", null));
         pipe.emit(1);  // 0 + 1 = 1
         pipe.emit(2);  // 1 + 2 = 3
         pipe.emit(3);  // 3 + 3 = 6
@@ -115,14 +115,14 @@ class SequencerIntegrationTest {
 
     @Test
     void shouldApplyReplaceTransformation() throws InterruptedException {
-        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
+        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(3);
 
         // Create conduit with replace (multiply by 2)
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new NameImpl("mappers", null),
+            new LinkedName("mappers", null),
             Composer.pipe(
                 path -> path.replace(value -> value * 2)
             )
@@ -130,7 +130,7 @@ class SequencerIntegrationTest {
 
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
-        Pipe<Integer> pipe = conduit.get(new NameImpl("mapper-1", null));
+        Pipe<Integer> pipe = conduit.get(new LinkedName("mapper-1", null));
         pipe.emit(1);
         pipe.emit(5);
         pipe.emit(10);
@@ -142,14 +142,14 @@ class SequencerIntegrationTest {
 
     @Test
     void shouldApplyDiffTransformation() throws InterruptedException {
-        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
+        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(3);
 
         // Create conduit with diff (only pass changed values)
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new NameImpl("differs", null),
+            new LinkedName("differs", null),
             Composer.pipe(
                 path -> path.diff()
             )
@@ -157,7 +157,7 @@ class SequencerIntegrationTest {
 
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
-        Pipe<Integer> pipe = conduit.get(new NameImpl("differ-1", null));
+        Pipe<Integer> pipe = conduit.get(new LinkedName("differ-1", null));
         pipe.emit(1);  // First value - passes
         pipe.emit(1);  // Duplicate - filtered
         pipe.emit(2);  // Changed - passes
@@ -171,14 +171,14 @@ class SequencerIntegrationTest {
 
     @Test
     void shouldApplySampleTransformation() throws InterruptedException {
-        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
+        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(2);
 
         // Create conduit with sample (every 3rd value)
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new NameImpl("samplers", null),
+            new LinkedName("samplers", null),
             Composer.pipe(
                 path -> path.sample(3)
             )
@@ -186,7 +186,7 @@ class SequencerIntegrationTest {
 
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
-        Pipe<Integer> pipe = conduit.get(new NameImpl("sampler-1", null));
+        Pipe<Integer> pipe = conduit.get(new LinkedName("sampler-1", null));
         pipe.emit(1);  // 1st - filtered
         pipe.emit(2);  // 2nd - filtered
         pipe.emit(3);  // 3rd - passes
@@ -201,14 +201,14 @@ class SequencerIntegrationTest {
 
     @Test
     void shouldApplySiftTransformation() throws InterruptedException {
-        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
+        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(3);
 
         // Create conduit with sift (values above 5)
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new NameImpl("sifters", null),
+            new LinkedName("sifters", null),
             Composer.pipe(
                 path -> path.sift(Integer::compareTo, sift -> sift.above(5))
             )
@@ -216,7 +216,7 @@ class SequencerIntegrationTest {
 
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
-        Pipe<Integer> pipe = conduit.get(new NameImpl("sifter-1", null));
+        Pipe<Integer> pipe = conduit.get(new LinkedName("sifter-1", null));
         pipe.emit(3);   // Below 5 - filtered
         pipe.emit(5);   // Equal to 5 - filtered
         pipe.emit(6);   // Above 5 - passes
@@ -231,14 +231,14 @@ class SequencerIntegrationTest {
 
     @Test
     void shouldChainMultipleTransformations() throws InterruptedException {
-        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
+        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(3);
 
         // Create conduit with chained transformations
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new NameImpl("complex", null),
+            new LinkedName("complex", null),
             Composer.pipe(
                 path -> path
                     .guard(value -> value > 0)        // Filter negatives
@@ -250,7 +250,7 @@ class SequencerIntegrationTest {
 
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
-        Pipe<Integer> pipe = conduit.get(new NameImpl("complex-1", null));
+        Pipe<Integer> pipe = conduit.get(new LinkedName("complex-1", null));
         pipe.emit(-1);  // Filtered by first guard
         pipe.emit(1);   // 1 * 2 = 2, passes
         pipe.emit(5);   // 5 * 2 = 10, passes
@@ -265,14 +265,14 @@ class SequencerIntegrationTest {
 
     @Test
     void shouldSupportMultiplePipesWithDifferentSequencers() throws InterruptedException {
-        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
+        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(4);
 
         // Create conduit
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new NameImpl("multi", null),
+            new LinkedName("multi", null),
             Composer.pipe(
                 path -> path.guard(value -> value > 0)
             )
@@ -281,8 +281,8 @@ class SequencerIntegrationTest {
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
         // Multiple pipes from same conduit, each with own Segment instance
-        Pipe<Integer> pipe1 = conduit.get(new NameImpl("pipe-1", null));
-        Pipe<Integer> pipe2 = conduit.get(new NameImpl("pipe-2", null));
+        Pipe<Integer> pipe1 = conduit.get(new LinkedName("pipe-1", null));
+        Pipe<Integer> pipe2 = conduit.get(new LinkedName("pipe-2", null));
 
         pipe1.emit(10);
         pipe2.emit(20);
@@ -296,7 +296,7 @@ class SequencerIntegrationTest {
 
     @Test
     void shouldApplySequencerAtConduitLevelToAllChannels() throws InterruptedException {
-        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
+        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(6);
@@ -309,7 +309,7 @@ class SequencerIntegrationTest {
         // Create conduit with Sequencer at Conduit level (not via Composer)
         // This means ALL channels/pipes created from this Conduit will apply these transformations
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new NameImpl("conduit-sequencer", null),
+            new LinkedName("conduit-sequencer", null),
             Composer.pipe(),  // Plain composer, no sequencer
             sequencer         // Sequencer applied at Conduit level
         );
@@ -317,9 +317,9 @@ class SequencerIntegrationTest {
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
         // Create multiple channels - all should apply the same transformations
-        Pipe<Integer> channel1 = conduit.get(new NameImpl("channel-1", null));
-        Pipe<Integer> channel2 = conduit.get(new NameImpl("channel-2", null));
-        Pipe<Integer> channel3 = conduit.get(new NameImpl("channel-3", null));
+        Pipe<Integer> channel1 = conduit.get(new LinkedName("channel-1", null));
+        Pipe<Integer> channel2 = conduit.get(new LinkedName("channel-2", null));
+        Pipe<Integer> channel3 = conduit.get(new LinkedName("channel-3", null));
 
         // Emit from channel 1
         channel1.emit(-5);  // Filtered by guard
@@ -344,7 +344,7 @@ class SequencerIntegrationTest {
 
     @Test
     void shouldApplySequencerAtContainerLevelToAllConduits() throws InterruptedException {
-        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
+        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         // Create Sequencer that filters positives only
         Sequencer<Segment<Integer>> sequencer = path -> path.guard(value -> value > 0);
@@ -352,17 +352,17 @@ class SequencerIntegrationTest {
         // Create Container with Sequencer at Container level
         // This means ALL Conduits created by this Container will apply these transformations
         Container<Pool<Pipe<Integer>>, Source<Integer>> container = circuit.container(
-            new NameImpl("container-sequencer", null),
+            new LinkedName("container-sequencer", null),
             Composer.pipe(),  // Plain composer
             sequencer         // Sequencer applied at Container level
         );
 
         // Get two different conduits from the container
-        Pool<Pipe<Integer>> conduit1 = container.get(new NameImpl("conduit-1", null));
-        Pool<Pipe<Integer>> conduit2 = container.get(new NameImpl("conduit-2", null));
+        Pool<Pipe<Integer>> conduit1 = container.get(new LinkedName("conduit-1", null));
+        Pool<Pipe<Integer>> conduit2 = container.get(new LinkedName("conduit-2", null));
 
-        Pipe<Integer> pipe1 = conduit1.get(new NameImpl("channel-1", null));
-        Pipe<Integer> pipe2 = conduit2.get(new NameImpl("channel-2", null));
+        Pipe<Integer> pipe1 = conduit1.get(new LinkedName("channel-1", null));
+        Pipe<Integer> pipe2 = conduit2.get(new LinkedName("channel-2", null));
 
         // Emit values
         pipe1.emit(-5);  // Filtered

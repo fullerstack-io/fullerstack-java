@@ -20,7 +20,7 @@ import java.util.function.Function;
  *
  * @see Name
  */
-public class NameImpl implements Name {
+public class LinkedName implements Name {
     /**
      * INTERNAL: Cache for root names. Public for CortexRuntime access only.
      * External code must use Cortex.name() to create names.
@@ -39,7 +39,7 @@ public class NameImpl implements Name {
      * INTERNAL: Constructor for creating names. Public for CortexRuntime access only.
      * External code must use Cortex.name() to create names.
      */
-    public NameImpl(String part, Name parent) {
+    public LinkedName(String part, Name parent) {
         this.part = Objects.requireNonNull(part, "Name part cannot be null");
         this.parent = parent;
 
@@ -49,7 +49,7 @@ public class NameImpl implements Name {
             this.cachedPath = part;
         } else {
             // Parent's path is already cached, just concatenate
-            this.cachedPath = ((NameImpl) parent).cachedPath + SEPARATOR + part;
+            this.cachedPath = ((LinkedName) parent).cachedPath + SEPARATOR + part;
         }
         this.cachedHashCode = cachedPath.hashCode();
     }
@@ -62,33 +62,33 @@ public class NameImpl implements Name {
     @Override
     public Name name(Name suffix) {
         // If suffix has no parent, create new Name with suffix's part and this as parent
-        if (suffix instanceof NameImpl impl && impl.parent == null) {
-            return new NameImpl(impl.part, this);
+        if (suffix instanceof LinkedName impl && impl.parent == null) {
+            return new LinkedName(impl.part, this);
         }
         // Otherwise, suffix is already hierarchical - need to rebuild with this as base
         // This handles cases where suffix itself has structure
         Name current = this;
         for (Name part : suffix) {
-            current = new NameImpl(((NameImpl)part).part, current);
+            current = new LinkedName(((LinkedName)part).part, current);
         }
         return current;
     }
 
     @Override
     public Name name(String s) {
-        return new NameImpl(s, this);
+        return new LinkedName(s, this);
     }
 
     @Override
     public Name name(Enum<?> e) {
-        return new NameImpl(e.name(), this);
+        return new LinkedName(e.name(), this);
     }
 
     @Override
     public Name name(Iterable<String> parts) {
         Name current = this;
         for (String part : parts) {
-            current = new NameImpl(part, current);
+            current = new LinkedName(part, current);
         }
         return current;
     }
@@ -97,7 +97,7 @@ public class NameImpl implements Name {
     public <T> Name name(Iterable<? extends T> items, Function<T, String> mapper) {
         Name current = this;
         for (T item : items) {
-            current = new NameImpl(mapper.apply(item), current);
+            current = new LinkedName(mapper.apply(item), current);
         }
         return current;
     }
@@ -106,7 +106,7 @@ public class NameImpl implements Name {
     public Name name(Iterator<String> parts) {
         Name current = this;
         while (parts.hasNext()) {
-            current = new NameImpl(parts.next(), current);
+            current = new LinkedName(parts.next(), current);
         }
         return current;
     }
@@ -115,19 +115,19 @@ public class NameImpl implements Name {
     public <T> Name name(Iterator<? extends T> items, Function<T, String> mapper) {
         Name current = this;
         while (items.hasNext()) {
-            current = new NameImpl(mapper.apply(items.next()), current);
+            current = new LinkedName(mapper.apply(items.next()), current);
         }
         return current;
     }
 
     @Override
     public Name name(Class<?> clazz) {
-        return new NameImpl(clazz.getSimpleName(), this);
+        return new LinkedName(clazz.getSimpleName(), this);
     }
 
     @Override
     public Name name(Member member) {
-        return new NameImpl(member.getName(), this);
+        return new LinkedName(member.getName(), this);
     }
 
     @Override
@@ -166,7 +166,7 @@ public class NameImpl implements Name {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof NameImpl other)) return false;
+        if (!(o instanceof LinkedName other)) return false;
         // Fast path: compare cached hashCode first (cheap int comparison)
         // This eliminates most non-equal cases without string comparison
         if (this.cachedHashCode != other.cachedHashCode) return false;
@@ -212,7 +212,7 @@ public class NameImpl implements Name {
         Name current = parent;
         while (current != null) {
             count++;
-            if (current instanceof NameImpl impl) {
+            if (current instanceof LinkedName impl) {
                 current = impl.parent;
             } else {
                 break;
@@ -225,7 +225,7 @@ public class NameImpl implements Name {
      * Recursively collects all names from root to leaf into a list.
      */
     private void collectHierarchy(java.util.List<Name> names) {
-        if (parent != null && parent instanceof NameImpl impl) {
+        if (parent != null && parent instanceof LinkedName impl) {
             impl.collectHierarchy(names);
         }
         names.add(this);

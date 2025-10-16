@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.benchmark;
 
 import io.fullerstack.substrates.CortexRuntime;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import io.humainary.substrates.api.Substrates.*;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;

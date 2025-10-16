@@ -10,7 +10,7 @@ import io.fullerstack.substrates.slot.SlotImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.subscriber.SubscriberImpl;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import io.fullerstack.substrates.sink.SinkImpl;
 
 import java.lang.reflect.Member;
@@ -96,7 +96,7 @@ public class CortexRuntime implements Cortex {
         }
         Name name = createRootName(iter.next());
         while (iter.hasNext()) {
-            name = new NameImpl(iter.next(), name);
+            name = new LinkedName(iter.next(), name);
         }
         return name;
     }
@@ -142,7 +142,7 @@ public class CortexRuntime implements Cortex {
 
     // Helper method to create root names with caching
     private Name createRootName(String part) {
-        return NameImpl.ROOT_NAME_CACHE.computeIfAbsent(part, p -> new NameImpl(p, null));
+        return LinkedName.ROOT_NAME_CACHE.computeIfAbsent(part, p -> new LinkedName(p, null));
     }
 
     // ========== Pool Management (1 method) ==========

@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.sink;
 
 import io.fullerstack.substrates.CortexRuntime;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import io.humainary.substrates.api.Substrates.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

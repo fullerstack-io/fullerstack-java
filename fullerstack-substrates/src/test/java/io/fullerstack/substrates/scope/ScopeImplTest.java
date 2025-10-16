@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -16,7 +16,7 @@ class ScopeImplTest {
 
     @Test
     void shouldCreateScopeWithName() {
-        Scope scope = new ScopeImpl(new NameImpl("test", null));
+        Scope scope = new ScopeImpl(new LinkedName("test", null));
 
         assertThat((Object) scope).isNotNull();
         assertThat((Object) scope.subject()).isNotNull();
@@ -25,8 +25,8 @@ class ScopeImplTest {
 
     @Test
     void shouldCreateChildScope() {
-        Scope parent = new ScopeImpl(new NameImpl("parent", null));
-        Scope child = parent.scope(new NameImpl("child", null));
+        Scope parent = new ScopeImpl(new LinkedName("parent", null));
+        Scope child = parent.scope(new LinkedName("child", null));
 
         assertThat((Object) child).isNotNull();
         assertThat(child.part()).isEqualTo("child");
@@ -34,17 +34,17 @@ class ScopeImplTest {
 
     @Test
     void shouldCacheChildScopesByName() {
-        Scope parent = new ScopeImpl(new NameImpl("parent", null));
+        Scope parent = new ScopeImpl(new LinkedName("parent", null));
 
-        Scope child1 = parent.scope(new NameImpl("child", null));
-        Scope child2 = parent.scope(new NameImpl("child", null));
+        Scope child1 = parent.scope(new LinkedName("child", null));
+        Scope child2 = parent.scope(new LinkedName("child", null));
 
         assertThat((Object) child1).isSameAs(child2);
     }
 
     @Test
     void shouldRegisterResource() {
-        Scope scope = new ScopeImpl(new NameImpl("test", null));
+        Scope scope = new ScopeImpl(new LinkedName("test", null));
         TestResource resource = new TestResource();
 
         TestResource registered = scope.register(resource);
@@ -54,7 +54,7 @@ class ScopeImplTest {
 
     @Test
     void shouldCloseRegisteredResources() {
-        Scope scope = new ScopeImpl(new NameImpl("test", null));
+        Scope scope = new ScopeImpl(new LinkedName("test", null));
         TestResource resource1 = new TestResource();
         TestResource resource2 = new TestResource();
 
@@ -68,8 +68,8 @@ class ScopeImplTest {
 
     @Test
     void shouldCloseChildScopes() {
-        Scope parent = new ScopeImpl(new NameImpl("parent", null));
-        Scope child = parent.scope(new NameImpl("child", null));
+        Scope parent = new ScopeImpl(new LinkedName("parent", null));
+        Scope child = parent.scope(new LinkedName("child", null));
         TestResource childResource = new TestResource();
 
         child.register(childResource);
@@ -80,7 +80,7 @@ class ScopeImplTest {
 
     @Test
     void shouldSupportClosure() {
-        Scope scope = new ScopeImpl(new NameImpl("test", null));
+        Scope scope = new ScopeImpl(new LinkedName("test", null));
         TestResource resource = new TestResource();
         AtomicBoolean consumed = new AtomicBoolean(false);
 
@@ -95,7 +95,7 @@ class ScopeImplTest {
 
     @Test
     void shouldPreventOperationsAfterClose() {
-        Scope scope = new ScopeImpl(new NameImpl("test", null));
+        Scope scope = new ScopeImpl(new LinkedName("test", null));
         scope.close();
 
         assertThatThrownBy(() -> scope.scope())
@@ -109,7 +109,7 @@ class ScopeImplTest {
 
     @Test
     void shouldAllowMultipleCloses() {
-        Scope scope = new ScopeImpl(new NameImpl("test", null));
+        Scope scope = new ScopeImpl(new LinkedName("test", null));
 
         scope.close();
         scope.close(); // Should not throw
@@ -129,7 +129,7 @@ class ScopeImplTest {
         public Subject subject() {
             return new SubjectImpl(
                 IdImpl.generate(),
-                new NameImpl("test-resource", null),
+                new LinkedName("test-resource", null),
                 StateImpl.empty(),
                 Subject.Type.SOURCE
             );

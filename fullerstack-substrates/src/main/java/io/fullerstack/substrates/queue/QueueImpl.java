@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
@@ -89,7 +89,7 @@ public class QueueImpl implements Queue {
         Current current = new Current() {
             private final Subject currentSubject = new SubjectImpl(
                 currentId,
-                new NameImpl("queue-current", null).name(currentId.toString()),
+                new LinkedName("queue-current", null).name(currentId.toString()),
                 StateImpl.empty(),
                 Subject.Type.SCRIPT
             );

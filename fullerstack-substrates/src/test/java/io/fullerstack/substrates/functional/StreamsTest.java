@@ -1,6 +1,6 @@
 package io.fullerstack.substrates.functional;
 
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import io.humainary.substrates.api.Substrates.Name;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +18,7 @@ class StreamsTest {
     @Test
     void hierarchical_producesAllPrefixes() {
         // Given: A hierarchical name
-        Name name = new NameImpl("broker.1.heap", null);
+        Name name = new LinkedName("broker.1.heap", null);
 
         // When: Getting hierarchical stream
         List<String> prefixes = Streams.hierarchical(name)
@@ -36,7 +36,7 @@ class StreamsTest {
     @Test
     void hierarchical_withSingleSegment() {
         // Given: A single-segment name
-        Name name = new NameImpl("broker", null);
+        Name name = new LinkedName("broker", null);
 
         // When: Getting hierarchical stream
         List<String> prefixes = Streams.hierarchical(name)
@@ -50,7 +50,7 @@ class StreamsTest {
     @Test
     void hierarchical_withFactory() {
         // Given: A hierarchical name and a factory
-        Name name = new NameImpl("broker.1", null);
+        Name name = new LinkedName("broker.1", null);
 
         // When: Applying factory to each prefix
         List<String> results = Streams.hierarchical(name, n -> "Conduit[" + n.path().toString() + "]")
@@ -66,7 +66,7 @@ class StreamsTest {
     @Test
     void depths_returnsDepthLevels() {
         // Given: A hierarchical name
-        Name name = new NameImpl("broker.1.heap", null);
+        Name name = new LinkedName("broker.1.heap", null);
 
         // When: Getting depth levels
         List<Integer> depths = Streams.depths(name)
@@ -79,9 +79,9 @@ class StreamsTest {
     @Test
     void depth_calculatesCorrectly() {
         // Given: Various names
-        Name single = new NameImpl("broker", null);
-        Name double_ = new NameImpl("broker.1", null);
-        Name triple = new NameImpl("broker.1.heap", null);
+        Name single = new LinkedName("broker", null);
+        Name double_ = new LinkedName("broker.1", null);
+        Name triple = new LinkedName("broker.1.heap", null);
 
         // When: Calculating depth
         int depth1 = Streams.depth(single);
@@ -97,7 +97,7 @@ class StreamsTest {
     @Test
     void atDepth_filtersCorrectly() {
         // Given: Hierarchical name
-        Name name = new NameImpl("broker.1.heap", null);
+        Name name = new LinkedName("broker.1.heap", null);
 
         // When: Filtering at depth 2
         List<String> atDepth2 = Streams.hierarchical(name)
@@ -129,7 +129,7 @@ class StreamsTest {
     @Test
     void hierarchical_integration_withMultipleLevels() {
         // Given: A deep hierarchical name
-        Name name = new NameImpl("partition.topic-1.0.offset", null);
+        Name name = new LinkedName("partition.topic-1.0.offset", null);
 
         // When: Processing each level
         List<String> processed = Streams.hierarchical(name)

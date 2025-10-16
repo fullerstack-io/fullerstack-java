@@ -6,7 +6,7 @@ import io.humainary.substrates.api.Substrates.State;
 import io.humainary.substrates.api.Substrates.Subject;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,7 +16,7 @@ class SubjectImplTest {
     @Test
     void shouldCreateSubjectWithAllComponents() {
         Id id = IdImpl.generate();
-        Name name = new NameImpl("test-subject", null);
+        Name name = new LinkedName("test-subject", null);
         State state = StateImpl.empty();
         Subject.Type type = Subject.Type.SCOPE;
 
@@ -30,7 +30,7 @@ class SubjectImplTest {
 
     @Test
     void shouldReturnPartFromName() {
-        Name name = new NameImpl("1", new NameImpl("broker", new NameImpl("kafka", null)));
+        Name name = new LinkedName("1", new LinkedName("broker", new LinkedName("kafka", null)));
         Subject subject = new SubjectImpl(
             IdImpl.generate(),
             name,
@@ -46,7 +46,7 @@ class SubjectImplTest {
         for (Subject.Type type : Subject.Type.values()) {
             Subject subject = new SubjectImpl(
                 IdImpl.generate(),
-                new NameImpl("test", null),
+                new LinkedName("test", null),
                 StateImpl.empty(),
                 type
             );
@@ -58,12 +58,12 @@ class SubjectImplTest {
     @Test
     void shouldIncludeStateInSubject() {
         State state = new StateImpl()
-            .state(new NameImpl("count", null), 42)
-            .state(new NameImpl("active", null), true);
+            .state(new LinkedName("count", null), 42)
+            .state(new LinkedName("active", null), true);
 
         Subject subject = new SubjectImpl(
             IdImpl.generate(),
-            new NameImpl("test", null),
+            new LinkedName("test", null),
             state,
             Subject.Type.CIRCUIT
         );

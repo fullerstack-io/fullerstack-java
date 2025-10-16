@@ -5,7 +5,7 @@ import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -61,7 +61,7 @@ public class ClockImpl implements Clock {
      * Creates a clock with default name.
      */
     public ClockImpl() {
-        this(new NameImpl("clock", null));
+        this(new LinkedName("clock", null));
     }
 
     @Override

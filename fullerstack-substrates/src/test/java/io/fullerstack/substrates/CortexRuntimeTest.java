@@ -1,7 +1,7 @@
 package io.fullerstack.substrates;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +33,7 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateNamedCircuit() {
-        Circuit circuit = cortex.circuit(new NameImpl("test-circuit", null));
+        Circuit circuit = cortex.circuit(new LinkedName("test-circuit", null));
 
         assertThat(circuit).isNotNull();
         assertThat(circuit.subject().name().value()).contains("test-circuit");
@@ -41,7 +41,7 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCacheCircuitsByName() {
-        Name name = new NameImpl("cached", null);
+        Name name = new LinkedName("cached", null);
 
         Circuit c1 = cortex.circuit(name);
         Circuit c2 = cortex.circuit(name);
@@ -96,7 +96,7 @@ class CortexRuntimeTest {
         Pool<String> pool = cortex.pool("test-value");
 
         assertThat(pool).isNotNull();
-        assertThat(pool.get(new NameImpl("any", null))).isEqualTo("test-value");
+        assertThat(pool.get(new LinkedName("any", null))).isEqualTo("test-value");
     }
 
     // ========== Scope Management (2 methods) ==========
@@ -111,7 +111,7 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateNamedScope() {
-        Scope scope = cortex.scope(new NameImpl("test-scope", null));
+        Scope scope = cortex.scope(new LinkedName("test-scope", null));
 
         assertThat((Object) scope).isNotNull();
         assertThat(scope.subject().name().value()).contains("test-scope");
@@ -128,57 +128,57 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateStateWithInt() {
-        State state = cortex.state(new NameImpl("count", null), 42);
+        State state = cortex.state(new LinkedName("count", null), 42);
 
         assertThat((Object) state).isNotNull();
     }
 
     @Test
     void shouldCreateStateWithLong() {
-        State state = cortex.state(new NameImpl("timestamp", null), 123456789L);
+        State state = cortex.state(new LinkedName("timestamp", null), 123456789L);
 
         assertThat((Object) state).isNotNull();
     }
 
     @Test
     void shouldCreateStateWithFloat() {
-        State state = cortex.state(new NameImpl("ratio", null), 0.5f);
+        State state = cortex.state(new LinkedName("ratio", null), 0.5f);
 
         assertThat((Object) state).isNotNull();
     }
 
     @Test
     void shouldCreateStateWithDouble() {
-        State state = cortex.state(new NameImpl("percentage", null), 75.5);
+        State state = cortex.state(new LinkedName("percentage", null), 75.5);
 
         assertThat((Object) state).isNotNull();
     }
 
     @Test
     void shouldCreateStateWithBoolean() {
-        State state = cortex.state(new NameImpl("active", null), true);
+        State state = cortex.state(new LinkedName("active", null), true);
 
         assertThat((Object) state).isNotNull();
     }
 
     @Test
     void shouldCreateStateWithString() {
-        State state = cortex.state(new NameImpl("message", null), "hello");
+        State state = cortex.state(new LinkedName("message", null), "hello");
 
         assertThat((Object) state).isNotNull();
     }
 
     @Test
     void shouldCreateStateWithName() {
-        State state = cortex.state(new NameImpl("key", null), new NameImpl("value", null));
+        State state = cortex.state(new LinkedName("key", null), new LinkedName("value", null));
 
         assertThat((Object) state).isNotNull();
     }
 
     @Test
     void shouldCreateStateWithState() {
-        State innerState = cortex.state(new NameImpl("inner", null), 42);
-        State outerState = cortex.state(new NameImpl("outer", null), innerState);
+        State innerState = cortex.state(new LinkedName("inner", null), 42);
+        State outerState = cortex.state(new LinkedName("outer", null), innerState);
 
         assertThat(outerState).isNotNull();
     }
@@ -187,7 +187,7 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateBooleanSlot() {
-        Slot<Boolean> slot = cortex.slot(new NameImpl("enabled", null), true);
+        Slot<Boolean> slot = cortex.slot(new LinkedName("enabled", null), true);
 
         assertThat(slot.value()).isTrue();
         assertThat(slot.type()).isEqualTo(Boolean.class);
@@ -195,7 +195,7 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateIntegerSlot() {
-        Slot<Integer> slot = cortex.slot(new NameImpl("count", null), 42);
+        Slot<Integer> slot = cortex.slot(new LinkedName("count", null), 42);
 
         assertThat(slot.value()).isEqualTo(42);
         assertThat(slot.type()).isEqualTo(Integer.class);
@@ -203,7 +203,7 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateLongSlot() {
-        Slot<Long> slot = cortex.slot(new NameImpl("timestamp", null), 123456L);
+        Slot<Long> slot = cortex.slot(new LinkedName("timestamp", null), 123456L);
 
         assertThat(slot.value()).isEqualTo(123456L);
         assertThat(slot.type()).isEqualTo(Long.class);
@@ -211,7 +211,7 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateDoubleSlot() {
-        Slot<Double> slot = cortex.slot(new NameImpl("percentage", null), 75.5);
+        Slot<Double> slot = cortex.slot(new LinkedName("percentage", null), 75.5);
 
         assertThat(slot.value()).isEqualTo(75.5);
         assertThat(slot.type()).isEqualTo(Double.class);
@@ -219,7 +219,7 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateFloatSlot() {
-        Slot<Float> slot = cortex.slot(new NameImpl("ratio", null), 0.5f);
+        Slot<Float> slot = cortex.slot(new LinkedName("ratio", null), 0.5f);
 
         assertThat(slot.value()).isEqualTo(0.5f);
         assertThat(slot.type()).isEqualTo(Float.class);
@@ -227,7 +227,7 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateStringSlot() {
-        Slot<String> slot = cortex.slot(new NameImpl("name", null), "test");
+        Slot<String> slot = cortex.slot(new LinkedName("name", null), "test");
 
         assertThat(slot.value()).isEqualTo("test");
         assertThat(slot.type()).isEqualTo(String.class);
@@ -235,8 +235,8 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateNameSlot() {
-        Name value = new NameImpl("test", null);
-        Slot<Name> slot = cortex.slot(new NameImpl("key", null), value);
+        Name value = new LinkedName("test", null);
+        Slot<Name> slot = cortex.slot(new LinkedName("key", null), value);
 
         assertThat((Object) slot.value()).isEqualTo(value);
         assertThat(slot.type()).isEqualTo(Name.class);
@@ -244,8 +244,8 @@ class CortexRuntimeTest {
 
     @Test
     void shouldCreateStateSlot() {
-        State value = cortex.state(new NameImpl("inner", null), 42);
-        Slot<State> slot = cortex.slot(new NameImpl("outer", null), value);
+        State value = cortex.state(new LinkedName("inner", null), 42);
+        Slot<State> slot = cortex.slot(new LinkedName("outer", null), value);
 
         assertThat(slot.value()).isEqualTo(value);
         assertThat(slot.type()).isEqualTo(State.class);
@@ -256,7 +256,7 @@ class CortexRuntimeTest {
     @Test
     void shouldCreateSubscriberWithFunction() {
         Subscriber<String> subscriber = cortex.subscriber(
-            new NameImpl("test", null),
+            new LinkedName("test", null),
             (subject, registrar) -> {}
         );
 
@@ -267,7 +267,7 @@ class CortexRuntimeTest {
     @Test
     void shouldCreateSubscriberWithPool() {
         Pool<Pipe<String>> pool = new io.fullerstack.substrates.pool.PoolImpl<>(name -> null);
-        Subscriber<String> subscriber = cortex.subscriber(new NameImpl("test", null), pool);
+        Subscriber<String> subscriber = cortex.subscriber(new LinkedName("test", null), pool);
 
         assertThat((Object) subscriber).isNotNull();
         assertThat((Object) subscriber.subject()).isNotNull();
@@ -302,26 +302,26 @@ class CortexRuntimeTest {
     void shouldImplementAllCortexMethods() {
         // Verify all 38 methods are callable and return non-null
         assertThat((Object) cortex.circuit()).isNotNull();
-        assertThat(cortex.circuit(new NameImpl("test", null))).isNotNull();
+        assertThat(cortex.circuit(new LinkedName("test", null))).isNotNull();
         assertThat((Object) cortex.name("test")).isNotNull();
         assertThat((Object) cortex.name(List.of("a", "b"))).isNotNull();
         assertThat(cortex.pool("value")).isNotNull();
         assertThat((Object) cortex.scope()).isNotNull();
-        assertThat((Object) cortex.scope(new NameImpl("test", null))).isNotNull();
+        assertThat((Object) cortex.scope(new LinkedName("test", null))).isNotNull();
         assertThat((Object) cortex.state()).isNotNull();
-        assertThat((Object) cortex.state(new NameImpl("n", null), 1)).isNotNull();
-        assertThat((Object) cortex.state(new NameImpl("n", null), 1L)).isNotNull();
-        assertThat((Object) cortex.state(new NameImpl("n", null), 1.0f)).isNotNull();
-        assertThat((Object) cortex.state(new NameImpl("n", null), 1.0)).isNotNull();
-        assertThat((Object) cortex.state(new NameImpl("n", null), true)).isNotNull();
-        assertThat((Object) cortex.state(new NameImpl("n", null), "s")).isNotNull();
-        assertThat((Object) cortex.slot(new NameImpl("n", null), true)).isNotNull();
-        assertThat((Object) cortex.slot(new NameImpl("n", null), 1)).isNotNull();
-        assertThat((Object) cortex.slot(new NameImpl("n", null), 1L)).isNotNull();
-        assertThat((Object) cortex.slot(new NameImpl("n", null), 1.0)).isNotNull();
-        assertThat((Object) cortex.slot(new NameImpl("n", null), 1.0f)).isNotNull();
-        assertThat((Object) cortex.slot(new NameImpl("n", null), "s")).isNotNull();
-        assertThat((Object) cortex.subscriber(new NameImpl("s", null), (sub, reg) -> {})).isNotNull();
+        assertThat((Object) cortex.state(new LinkedName("n", null), 1)).isNotNull();
+        assertThat((Object) cortex.state(new LinkedName("n", null), 1L)).isNotNull();
+        assertThat((Object) cortex.state(new LinkedName("n", null), 1.0f)).isNotNull();
+        assertThat((Object) cortex.state(new LinkedName("n", null), 1.0)).isNotNull();
+        assertThat((Object) cortex.state(new LinkedName("n", null), true)).isNotNull();
+        assertThat((Object) cortex.state(new LinkedName("n", null), "s")).isNotNull();
+        assertThat((Object) cortex.slot(new LinkedName("n", null), true)).isNotNull();
+        assertThat((Object) cortex.slot(new LinkedName("n", null), 1)).isNotNull();
+        assertThat((Object) cortex.slot(new LinkedName("n", null), 1L)).isNotNull();
+        assertThat((Object) cortex.slot(new LinkedName("n", null), 1.0)).isNotNull();
+        assertThat((Object) cortex.slot(new LinkedName("n", null), 1.0f)).isNotNull();
+        assertThat((Object) cortex.slot(new LinkedName("n", null), "s")).isNotNull();
+        assertThat((Object) cortex.subscriber(new LinkedName("s", null), (sub, reg) -> {})).isNotNull();
         assertThat((Object) cortex.capture(cortex.scope().subject(), "e")).isNotNull();
     }
 }

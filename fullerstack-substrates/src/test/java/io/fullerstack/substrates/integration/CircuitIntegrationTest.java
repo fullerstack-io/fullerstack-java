@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.CortexRuntime;
 import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.circuit.CircuitImpl;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
@@ -53,7 +53,7 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldExecuteScriptsViaQueue() throws Exception {
-        circuit = new CircuitImpl(new NameImpl("test", null));
+        circuit = new CircuitImpl(new LinkedName("test", null));
         Queue queue = circuit.queue();
 
         AtomicInteger counter = new AtomicInteger(0);
@@ -79,14 +79,14 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldEmitPeriodicEventsViaClock() throws Exception {
-        circuit = new CircuitImpl(new NameImpl("test", null));
-        Clock clock = circuit.clock(new NameImpl("timer", null));
+        circuit = new CircuitImpl(new LinkedName("test", null));
+        Clock clock = circuit.clock(new LinkedName("timer", null));
 
         AtomicInteger tickCount = new AtomicInteger(0);
         CountDownLatch latch = new CountDownLatch(3);
 
         Subscription subscription = clock.consume(
-            new NameImpl("ticker", null),
+            new LinkedName("ticker", null),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 tickCount.incrementAndGet();
@@ -102,7 +102,7 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldBroadcastStateEventsViaSource() {
-        circuit = new CircuitImpl(new NameImpl("test", null));
+        circuit = new CircuitImpl(new LinkedName("test", null));
         Source<State> source = circuit.source();
 
         AtomicInteger emissionCount = new AtomicInteger(0);
@@ -112,7 +112,7 @@ class CircuitIntegrationTest {
             public Subject subject() {
                 return new io.fullerstack.substrates.subject.SubjectImpl(
                     io.fullerstack.substrates.id.IdImpl.generate(),
-                    new NameImpl("subscriber", null),
+                    new LinkedName("subscriber", null),
                     io.fullerstack.substrates.state.StateImpl.empty(),
                     Subject.Type.SUBSCRIBER
                 );
@@ -129,11 +129,11 @@ class CircuitIntegrationTest {
             (io.fullerstack.substrates.source.SourceImpl<State>) source;
         Subject testChannel = new SubjectImpl(
             IdImpl.generate(),
-            new NameImpl("test-channel", null),
+            new LinkedName("test-channel", null),
             StateImpl.empty(),
             Subject.Type.CHANNEL
         );
-        State emission = StateImpl.of(new NameImpl("event", null), 1);
+        State emission = StateImpl.of(new LinkedName("event", null), 1);
 
         // Use SourceImpl's emission handler (like inlet Pipes do)
         Capture<State> capture = new CaptureImpl<>(testChannel, emission);
@@ -144,7 +144,7 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldIntegrateQueueAndClock() throws Exception {
-        circuit = new CircuitImpl(new NameImpl("integration", null));
+        circuit = new CircuitImpl(new LinkedName("integration", null));
         Queue queue = circuit.queue();
         Clock clock = circuit.clock();
 
@@ -165,7 +165,7 @@ class CircuitIntegrationTest {
 
         // Start clock
         Subscription subscription = clock.consume(
-            new NameImpl("ticker", null),
+            new LinkedName("ticker", null),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 clockTicks.incrementAndGet();
@@ -184,10 +184,10 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldSupportMultipleClocksWithDifferentCycles() throws Exception {
-        circuit = new CircuitImpl(new NameImpl("test", null));
+        circuit = new CircuitImpl(new LinkedName("test", null));
 
-        Clock fastClock = circuit.clock(new NameImpl("fast", null));
-        Clock slowClock = circuit.clock(new NameImpl("slow", null));
+        Clock fastClock = circuit.clock(new LinkedName("fast", null));
+        Clock slowClock = circuit.clock(new LinkedName("slow", null));
 
         AtomicInteger fastTicks = new AtomicInteger(0);
         AtomicInteger slowTicks = new AtomicInteger(0);
@@ -195,7 +195,7 @@ class CircuitIntegrationTest {
         CountDownLatch slowLatch = new CountDownLatch(2);
 
         Subscription fastSub = fastClock.consume(
-            new NameImpl("fast-ticker", null),
+            new LinkedName("fast-ticker", null),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 fastTicks.incrementAndGet();
@@ -204,7 +204,7 @@ class CircuitIntegrationTest {
         );
 
         Subscription slowSub = slowClock.consume(
-            new NameImpl("slow-ticker", null),
+            new LinkedName("slow-ticker", null),
             Clock.Cycle.SECOND,
             instant -> {
                 slowTicks.incrementAndGet();
@@ -224,17 +224,17 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldCleanupAllResourcesOnClose() throws Exception {
-        circuit = new CircuitImpl(new NameImpl("test", null));
+        circuit = new CircuitImpl(new LinkedName("test", null));
 
         // Create all components
         Queue queue = circuit.queue();
-        Clock clock1 = circuit.clock(new NameImpl("clock1", null));
-        Clock clock2 = circuit.clock(new NameImpl("clock2", null));
+        Clock clock1 = circuit.clock(new LinkedName("clock1", null));
+        Clock clock2 = circuit.clock(new LinkedName("clock2", null));
         Source<State> source = circuit.source();
 
         AtomicInteger clockTicks = new AtomicInteger(0);
         clock1.consume(
-            new NameImpl("ticker", null),
+            new LinkedName("ticker", null),
             Clock.Cycle.MILLISECOND,
             instant -> clockTicks.incrementAndGet()
         );
@@ -253,18 +253,18 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldProvideAccessToAllComponents() {
-        circuit = new CircuitImpl(new NameImpl("test", null));
+        circuit = new CircuitImpl(new LinkedName("test", null));
 
         assertThat((Object) circuit.subject()).isNotNull();
         assertThat((Object) circuit.source()).isNotNull();
         assertThat((Object) circuit.queue()).isNotNull();
         assertThat((Object) circuit.clock()).isNotNull();
-        assertThat((Object) circuit.clock(new NameImpl("custom", null))).isNotNull();
+        assertThat((Object) circuit.clock(new LinkedName("custom", null))).isNotNull();
     }
 
     @Test
     void shouldSupportTapPatternForFunctionalChaining() {
-        circuit = new CircuitImpl(new NameImpl("test", null));
+        circuit = new CircuitImpl(new LinkedName("test", null));
 
         AtomicInteger tapCount = new AtomicInteger(0);
 

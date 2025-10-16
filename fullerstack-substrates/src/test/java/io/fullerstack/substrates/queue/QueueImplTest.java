@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.queue;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -84,7 +84,7 @@ class QueueImplTest {
         queue = new QueueImpl();
         AtomicInteger counter = new AtomicInteger(0);
 
-        queue.post(new NameImpl("test-script", null), script(() -> counter.incrementAndGet()));
+        queue.post(new LinkedName("test-script", null), script(() -> counter.incrementAndGet()));
 
         queue.await();
 

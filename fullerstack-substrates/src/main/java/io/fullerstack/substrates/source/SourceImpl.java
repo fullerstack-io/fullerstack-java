@@ -5,7 +5,7 @@ import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameImpl;
+import io.fullerstack.substrates.name.LinkedName;
 import io.fullerstack.substrates.subscription.SubscriptionImpl;
 
 import lombok.Getter;
@@ -52,7 +52,7 @@ public class SourceImpl<E> implements Source<E> {
      * Creates a source with default name.
      */
     public SourceImpl() {
-        this(new NameImpl("source", null));
+        this(new LinkedName("source", null));
     }
 
     /**
