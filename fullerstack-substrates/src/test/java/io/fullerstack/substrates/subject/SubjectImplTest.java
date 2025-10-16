@@ -16,7 +16,7 @@ class SubjectImplTest {
     @Test
     void shouldCreateSubjectWithAllComponents() {
         Id id = IdImpl.generate();
-        Name name = NameImpl.of("test-subject");
+        Name name = new NameImpl("test-subject", null);
         State state = StateImpl.empty();
         Subject.Type type = Subject.Type.SCOPE;
 
@@ -30,7 +30,7 @@ class SubjectImplTest {
 
     @Test
     void shouldReturnPartFromName() {
-        Name name = NameImpl.of("kafka", "broker", "1");
+        Name name = new NameImpl("1", new NameImpl("broker", new NameImpl("kafka", null)));
         Subject subject = new SubjectImpl(
             IdImpl.generate(),
             name,
@@ -46,7 +46,7 @@ class SubjectImplTest {
         for (Subject.Type type : Subject.Type.values()) {
             Subject subject = new SubjectImpl(
                 IdImpl.generate(),
-                NameImpl.of("test"),
+                new NameImpl("test", null),
                 StateImpl.empty(),
                 type
             );
@@ -58,12 +58,12 @@ class SubjectImplTest {
     @Test
     void shouldIncludeStateInSubject() {
         State state = new StateImpl()
-            .state(NameImpl.of("count"), 42)
-            .state(NameImpl.of("active"), true);
+            .state(new NameImpl("count", null), 42)
+            .state(new NameImpl("active", null), true);
 
         Subject subject = new SubjectImpl(
             IdImpl.generate(),
-            NameImpl.of("test"),
+            new NameImpl("test", null),
             state,
             Subject.Type.CIRCUIT
         );

@@ -84,7 +84,7 @@ class QueueImplTest {
         queue = new QueueImpl();
         AtomicInteger counter = new AtomicInteger(0);
 
-        queue.post(NameImpl.of("test-script"), script(() -> counter.incrementAndGet()));
+        queue.post(new NameImpl("test-script", null), script(() -> counter.incrementAndGet()));
 
         queue.await();
 

@@ -93,7 +93,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public Clock clock() {
-        return clock(NameImpl.of("clock"));
+        return clock(new NameImpl("clock", null));
     }
 
     @Override
@@ -105,7 +105,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public <P, E> Conduit<P, E> conduit(Composer<? extends P, E> composer) {
-        return conduit(NameImpl.of("conduit"), composer);
+        return conduit(new NameImpl("conduit", null), composer);
     }
 
     @Override
@@ -148,7 +148,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public <P, E> Container<Pool<P>, Source<E>> container(Composer<P, E> composer) {
-        return container(NameImpl.of("container"), composer);
+        return container(new NameImpl("container", null), composer);
     }
 
     @Override

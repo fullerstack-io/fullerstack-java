@@ -98,8 +98,9 @@ public class ChannelImpl<E> implements Channel<E> {
                         cachedPipe = pipe(sequencer);
                     } else {
                         // Otherwise, create a plain Pipe with emission handler from Source
-                        Consumer<Capture<E>> handler = ((SourceImpl<E>) source).emissionHandler();
-                        cachedPipe = new PipeImpl<>(circuitQueue, channelSubject, handler);
+                        SourceImpl<E> sourceImpl = (SourceImpl<E>) source;
+                        Consumer<Capture<E>> handler = sourceImpl.emissionHandler();
+                        cachedPipe = new PipeImpl<>(circuitQueue, channelSubject, handler, sourceImpl);
                     }
                 }
             }
@@ -116,9 +117,10 @@ public class ChannelImpl<E> implements Channel<E> {
         sequencer.apply(segment);
 
         // Get emission handler from Source (sibling coordination)
-        Consumer<Capture<E>> handler = ((SourceImpl<E>) source).emissionHandler();
+        SourceImpl<E> sourceImpl = (SourceImpl<E>) source;
+        Consumer<Capture<E>> handler = sourceImpl.emissionHandler();
 
-        // Return a Pipe with emission handler and Segment transformations
-        return new PipeImpl<>(circuitQueue, channelSubject, handler, segment);
+        // Return a Pipe with emission handler, Source reference, and Segment transformations
+        return new PipeImpl<>(circuitQueue, channelSubject, handler, sourceImpl, segment);
     }
 }

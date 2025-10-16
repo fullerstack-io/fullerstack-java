@@ -13,7 +13,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateBooleanSlot() {
-        Name name = NameImpl.of("enabled");
+        Name name = new NameImpl("enabled", null);
         Slot<Boolean> slot = SlotImpl.of(name, true);
 
         assertThat((Object) slot.name()).isEqualTo(name);
@@ -23,7 +23,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateIntegerSlot() {
-        Name name = NameImpl.of("count");
+        Name name = new NameImpl("count", null);
         Slot<Integer> slot = SlotImpl.of(name, 42);
 
         assertThat(slot.type()).isEqualTo(Integer.class);
@@ -32,7 +32,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateLongSlot() {
-        Name name = NameImpl.of("timestamp");
+        Name name = new NameImpl("timestamp", null);
         Slot<Long> slot = SlotImpl.of(name, 123456L);
 
         assertThat(slot.type()).isEqualTo(Long.class);
@@ -41,7 +41,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateDoubleSlot() {
-        Name name = NameImpl.of("percentage");
+        Name name = new NameImpl("percentage", null);
         Slot<Double> slot = SlotImpl.of(name, 75.5);
 
         assertThat(slot.type()).isEqualTo(Double.class);
@@ -50,7 +50,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateFloatSlot() {
-        Name name = NameImpl.of("ratio");
+        Name name = new NameImpl("ratio", null);
         Slot<Float> slot = SlotImpl.of(name, 0.5f);
 
         assertThat(slot.type()).isEqualTo(Float.class);
@@ -59,7 +59,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateStringSlot() {
-        Name name = NameImpl.of("message");
+        Name name = new NameImpl("message", null);
         Slot<String> slot = SlotImpl.of(name, "hello");
 
         assertThat(slot.type()).isEqualTo(String.class);
@@ -68,8 +68,8 @@ class SlotImplTest {
 
     @Test
     void shouldCreateNameSlot() {
-        Name name = NameImpl.of("key");
-        Name value = NameImpl.of("value");
+        Name name = new NameImpl("key", null);
+        Name value = new NameImpl("value", null);
         Slot<Name> slot = SlotImpl.of(name, value, Name.class);
 
         assertThat(slot.type()).isEqualTo(Name.class);
@@ -78,8 +78,8 @@ class SlotImplTest {
 
     @Test
     void shouldCreateStateSlot() {
-        Name name = NameImpl.of("nested");
-        State value = StateImpl.of(NameImpl.of("inner"), 42);
+        Name name = new NameImpl("nested", null);
+        State value = StateImpl.of(new NameImpl("inner", null), 42);
         Slot<State> slot = SlotImpl.of(name, value, State.class);
 
         assertThat(slot.type()).isEqualTo(State.class);
@@ -89,7 +89,7 @@ class SlotImplTest {
     @Test
     void shouldBeImmutable() {
         // Slots are immutable - value cannot change after creation
-        Name name = NameImpl.of("count");
+        Name name = new NameImpl("count", null);
         Slot<Integer> slot = SlotImpl.of(name, 42);
 
         assertThat(slot.value()).isEqualTo(42);
@@ -104,7 +104,7 @@ class SlotImplTest {
 
     @Test
     void shouldReturnNamePart() {
-        Name name = NameImpl.of("kafka", "broker", "count");
+        Name name = new NameImpl("count", new NameImpl("broker", new NameImpl("kafka", null)));
         Slot<Integer> slot = SlotImpl.of(name, 42);
 
         assertThat(name.part()).isEqualTo("count");
@@ -112,8 +112,8 @@ class SlotImplTest {
 
     @Test
     void shouldSupportEquality() {
-        Name name1 = NameImpl.of("test");
-        Name name2 = NameImpl.of("test");
+        Name name1 = new NameImpl("test", null);
+        Name name2 = new NameImpl("test", null);
 
         Slot<Integer> slot1 = SlotImpl.of(name1, 42);
         Slot<Integer> slot2 = SlotImpl.of(name2, 42);

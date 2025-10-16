@@ -36,7 +36,7 @@ public class SubscriptionImpl implements Subscription {
         this.subscriptionId = IdImpl.generate();
         this.subscriptionSubject = new SubjectImpl(
             subscriptionId,
-            NameImpl.of("subscription").name(subscriptionId.toString()),
+            new NameImpl("subscription", null).name(subscriptionId.toString()),
             StateImpl.empty(),
             Subject.Type.SUBSCRIPTION
         );

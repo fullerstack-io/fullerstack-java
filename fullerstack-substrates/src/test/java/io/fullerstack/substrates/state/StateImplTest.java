@@ -19,7 +19,7 @@ class StateImplTest {
 
     @Test
     void shouldStoreIntegerValue() {
-        Name name = NameImpl.of("count");
+        Name name = new NameImpl("count", null);
         State state = StateImpl.of(name, 42);
 
         assertThat(state.stream().count()).isEqualTo(1);
@@ -29,9 +29,9 @@ class StateImplTest {
     void shouldStoreMultipleValues() {
         // State is immutable - each state() returns a NEW State
         State state = new StateImpl()
-            .state(NameImpl.of("count"), 42)
-            .state(NameImpl.of("name"), "test")
-            .state(NameImpl.of("active"), true);
+            .state(new NameImpl("count", null), 42)
+            .state(new NameImpl("name", null), "test")
+            .state(new NameImpl("active", null), true);
 
         assertThat(state.stream().count()).isEqualTo(3);
     }
@@ -39,15 +39,15 @@ class StateImplTest {
     @Test
     void shouldSupportMethodChaining() {
         State state = new StateImpl()
-            .state(NameImpl.of("count"), 42)
-            .state(NameImpl.of("name"), "test");
+            .state(new NameImpl("count", null), 42)
+            .state(new NameImpl("name", null), "test");
 
         assertThat(state.stream().count()).isEqualTo(2);
     }
 
     @Test
     void shouldStoreAllPrimitiveTypes() {
-        Name name = NameImpl.of("test");
+        Name name = new NameImpl("test", null);
 
         State intState = StateImpl.of(name, 42);
         State longState = StateImpl.of(name, 42L);
@@ -68,8 +68,8 @@ class StateImplTest {
     void shouldBeImmutable() {
         // State is immutable - each state() returns a NEW instance
         State s1 = new StateImpl();
-        State s2 = s1.state(NameImpl.of("count"), 1);
-        State s3 = s2.state(NameImpl.of("count"), 2);
+        State s2 = s1.state(new NameImpl("count", null), 1);
+        State s3 = s2.state(new NameImpl("count", null), 2);
 
         assertThat(s1).isNotSameAs(s2);
         assertThat(s2).isNotSameAs(s3);
@@ -82,9 +82,9 @@ class StateImplTest {
     void shouldAllowDuplicateNames() {
         // State allows duplicate names (uses List, not Map)
         State state = new StateImpl()
-            .state(NameImpl.of("timeout"), 30)   // First value
-            .state(NameImpl.of("retries"), 3)
-            .state(NameImpl.of("timeout"), 60);  // Duplicate name!
+            .state(new NameImpl("timeout", null), 30)   // First value
+            .state(new NameImpl("retries", null), 3)
+            .state(new NameImpl("timeout", null), 60);  // Duplicate name!
 
         assertThat(state.stream().count()).isEqualTo(3);  // 3 slots (2 have same name)
     }
@@ -93,9 +93,9 @@ class StateImplTest {
     void shouldCompactRemoveDuplicates() {
         // compact() removes duplicates, keeping last occurrence
         State state = new StateImpl()
-            .state(NameImpl.of("timeout"), 30)   // First value
-            .state(NameImpl.of("retries"), 3)
-            .state(NameImpl.of("timeout"), 60);  // Override
+            .state(new NameImpl("timeout", null), 30)   // First value
+            .state(new NameImpl("retries", null), 3)
+            .state(new NameImpl("timeout", null), 60);  // Override
 
         State compacted = state.compact();
 
@@ -105,7 +105,7 @@ class StateImplTest {
 
     @Test
     void shouldReturnLastValueWhenDuplicates() {
-        Name timeoutName = NameImpl.of("timeout");
+        Name timeoutName = new NameImpl("timeout", null);
 
         State state = new StateImpl()
             .state(timeoutName, 30)
@@ -118,7 +118,7 @@ class StateImplTest {
 
     @Test
     void shouldReturnAllValuesForDuplicates() {
-        Name timeoutName = NameImpl.of("timeout");
+        Name timeoutName = new NameImpl("timeout", null);
 
         State state = new StateImpl()
             .state(timeoutName, 30)
@@ -137,9 +137,9 @@ class StateImplTest {
         // API: "Returns the value of a slot matching the specified slot
         //      or the value of the specified slot when not found"
 
-        Name missingName = NameImpl.of("missing");
+        Name missingName = new NameImpl("missing", null);
         State state = new StateImpl()
-            .state(NameImpl.of("existing"), 100);
+            .state(new NameImpl("existing", null), 100);
 
         // Slot provides fallback value (42)
         Integer result = state.value(io.fullerstack.substrates.slot.SlotImpl.of(missingName, 42));
@@ -150,15 +150,15 @@ class StateImplTest {
     @Test
     void shouldSupportNestedState() {
         // State can contain State (hierarchical config)
-        Name dbConfigName = NameImpl.of("database");
+        Name dbConfigName = new NameImpl("database", null);
 
         State innerState = new StateImpl()
-            .state(NameImpl.of("host"), "localhost")
-            .state(NameImpl.of("port"), 3306);
+            .state(new NameImpl("host", null), "localhost")
+            .state(new NameImpl("port", null), 3306);
 
         State outerState = new StateImpl()
             .state(dbConfigName, innerState)
-            .state(NameImpl.of("timeout"), 30);
+            .state(new NameImpl("timeout", null), 30);
 
         // Retrieve nested State
         State retrieved = outerState.value(
@@ -171,7 +171,7 @@ class StateImplTest {
     @Test
     void shouldMatchByBothNameAndType() {
         // Per article: "A State stores the type with the name, only matching when both are exact matches"
-        Name XYZ = NameImpl.of("XYZ");
+        Name XYZ = new NameImpl("XYZ", null);
 
         // Create slots with different types
         var intSlot = io.fullerstack.substrates.slot.SlotImpl.of(XYZ, 0);
@@ -197,7 +197,7 @@ class StateImplTest {
     @Test
     void shouldCompactByNameAndType() {
         // compact() should only remove duplicates with same (name, type) pair
-        Name XYZ = NameImpl.of("XYZ");
+        Name XYZ = new NameImpl("XYZ", null);
 
         State state = new StateImpl()
             .state(XYZ, 1)      // Integer #1

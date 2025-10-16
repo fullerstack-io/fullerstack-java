@@ -61,7 +61,7 @@ public class ClockImpl implements Clock {
      * Creates a clock with default name.
      */
     public ClockImpl() {
-        this(NameImpl.of("clock"));
+        this(new NameImpl("clock", null));
     }
 
     @Override

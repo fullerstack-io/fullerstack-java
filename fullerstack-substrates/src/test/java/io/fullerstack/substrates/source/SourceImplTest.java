@@ -28,7 +28,7 @@ class SourceImplTest {
             public Subject subject() {
                 return new SubjectImpl(
                     IdImpl.of(java.util.UUID.randomUUID()),
-                    NameImpl.of("test-subscriber"),
+                    new NameImpl("test-subscriber", null),
                     StateImpl.empty(),
                     Subject.Type.SUBSCRIBER
                 );
@@ -47,7 +47,7 @@ class SourceImplTest {
     private Subject testSubject(String name) {
         return new SubjectImpl(
             IdImpl.generate(),
-            NameImpl.of(name),
+            new NameImpl(name, null),
             StateImpl.empty(),
             Subject.Type.CHANNEL
         );
@@ -76,7 +76,7 @@ class SourceImplTest {
 
     @Test
     void shouldCreateSourceWithCustomName() {
-        Name name = NameImpl.of("custom-source");
+        Name name = new NameImpl("custom-source", null);
         SourceImpl<String> source = new SourceImpl<>(name);
 
         assertThat((Object) source.subject().name()).isEqualTo(name);

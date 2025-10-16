@@ -54,17 +54,17 @@ class PipeCachingTest {
 
     @Test
     void shouldReturnSamePipeInstanceOnMultipleCalls() {
-        circuit = new CircuitImpl(NameImpl.of("test-circuit"));
+        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
 
         // Create conduit with limit transformation
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            NameImpl.of("test-conduit"),
+            new NameImpl("test-conduit", null),
             Composer.pipe(path -> path.limit(3))
         );
 
         // Get the same channel twice - should be same instance (cached by Conduit)
-        Pipe<Integer> pipe1 = conduit.get(NameImpl.of("channel-1"));
-        Pipe<Integer> pipe2 = conduit.get(NameImpl.of("channel-1"));
+        Pipe<Integer> pipe1 = conduit.get(new NameImpl("channel-1", null));
+        Pipe<Integer> pipe2 = conduit.get(new NameImpl("channel-1", null));
 
         // Should return the SAME Pipe instance (cached by Conduit)
         assertThat(pipe1).isSameAs(pipe2);
@@ -72,22 +72,22 @@ class PipeCachingTest {
 
     @Test
     void shouldShareSegmentStateAcrossMultiplePipeCalls() throws InterruptedException {
-        circuit = new CircuitImpl(NameImpl.of("test-circuit"));
+        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(3);
 
         // Create conduit with limit(3)
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            NameImpl.of("test-conduit"),
+            new NameImpl("test-conduit", null),
             Composer.pipe(path -> path.limit(3))
         );
 
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
         // Get pipe and verify it's the same instance on multiple calls
-        Pipe<Integer> pipe1 = conduit.get(NameImpl.of("channel-1"));
-        Pipe<Integer> pipe2 = conduit.get(NameImpl.of("channel-1"));
+        Pipe<Integer> pipe1 = conduit.get(new NameImpl("channel-1", null));
+        Pipe<Integer> pipe2 = conduit.get(new NameImpl("channel-1", null));
 
         assertThat(pipe1).isSameAs(pipe2);
 
@@ -104,22 +104,22 @@ class PipeCachingTest {
 
     @Test
     void shouldShareReduceAccumulatorState() throws InterruptedException {
-        circuit = new CircuitImpl(NameImpl.of("test-circuit"));
+        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(4);
 
         // Create conduit with reduce (accumulating sum)
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            NameImpl.of("test-conduit"),
+            new NameImpl("test-conduit", null),
             Composer.pipe(path -> path.reduce(0, Integer::sum))
         );
 
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
 
         // Get pipe twice - should be same instance
-        Pipe<Integer> pipe1 = conduit.get(NameImpl.of("accumulator"));
-        Pipe<Integer> pipe2 = conduit.get(NameImpl.of("accumulator"));
+        Pipe<Integer> pipe1 = conduit.get(new NameImpl("accumulator", null));
+        Pipe<Integer> pipe2 = conduit.get(new NameImpl("accumulator", null));
 
         assertThat(pipe1).isSameAs(pipe2);
 

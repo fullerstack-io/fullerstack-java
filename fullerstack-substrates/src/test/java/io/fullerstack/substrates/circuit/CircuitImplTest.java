@@ -20,7 +20,7 @@ class CircuitImplTest {
 
     @Test
     void shouldCreateCircuitWithName() {
-        circuit = new CircuitImpl(NameImpl.of("test-circuit"));
+        circuit = new CircuitImpl(new NameImpl("test-circuit", null));
 
         assertThat((Object) circuit).isNotNull();
         assertThat((Object) circuit.subject()).isNotNull();
@@ -29,7 +29,7 @@ class CircuitImplTest {
 
     @Test
     void shouldProvideStateSource() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         Source<State> source = circuit.source();
 
@@ -38,7 +38,7 @@ class CircuitImplTest {
 
     @Test
     void shouldProvideQueue() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         Queue queue = circuit.queue();
 
@@ -47,7 +47,7 @@ class CircuitImplTest {
 
     @Test
     void shouldProvideDefaultClock() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         Clock clock = circuit.clock();
 
@@ -56,36 +56,36 @@ class CircuitImplTest {
 
     @Test
     void shouldProvideNamedClock() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
-        Clock clock = circuit.clock(NameImpl.of("custom-clock"));
+        Clock clock = circuit.clock(new NameImpl("custom-clock", null));
 
         assertThat((Object) clock).isNotNull();
     }
 
     @Test
     void shouldCacheClocksByName() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
-        Clock clock1 = circuit.clock(NameImpl.of("shared"));
-        Clock clock2 = circuit.clock(NameImpl.of("shared"));
+        Clock clock1 = circuit.clock(new NameImpl("shared", null));
+        Clock clock2 = circuit.clock(new NameImpl("shared", null));
 
         assertThat((Object) clock1).isSameAs(clock2);
     }
 
     @Test
     void shouldCreateIndependentClocksForDifferentNames() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
-        Clock clock1 = circuit.clock(NameImpl.of("clock1"));
-        Clock clock2 = circuit.clock(NameImpl.of("clock2"));
+        Clock clock1 = circuit.clock(new NameImpl("clock1", null));
+        Clock clock2 = circuit.clock(new NameImpl("clock2", null));
 
         assertThat((Object) clock1).isNotSameAs(clock2);
     }
 
     @Test
     void shouldSupportTapPattern() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         Circuit result = circuit.tap(c -> {
             assertThat((Object) c).isSameAs(circuit);
@@ -104,7 +104,7 @@ class CircuitImplTest {
 
     @Test
     void shouldRequireNonNullClockName() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         assertThatThrownBy(() -> circuit.clock(null))
             .isInstanceOf(NullPointerException.class)
@@ -113,7 +113,7 @@ class CircuitImplTest {
 
     @Test
     void shouldRequireNonNullConduitName() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         assertThatThrownBy(() -> circuit.conduit(null, composer -> null))
             .isInstanceOf(NullPointerException.class)
@@ -122,16 +122,16 @@ class CircuitImplTest {
 
     @Test
     void shouldRequireNonNullComposer() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
-        assertThatThrownBy(() -> circuit.conduit(NameImpl.of("test"), null))
+        assertThatThrownBy(() -> circuit.conduit(new NameImpl("test", null), null))
             .isInstanceOf(NullPointerException.class)
             .hasMessageContaining("Composer cannot be null");
     }
 
     @Test
     void shouldRequireNonNullTapConsumer() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         assertThatThrownBy(() -> circuit.tap(null))
             .isInstanceOf(NullPointerException.class)
@@ -140,7 +140,7 @@ class CircuitImplTest {
 
     @Test
     void shouldPreventOperationsAfterClose() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
         circuit.close();
 
         assertThatThrownBy(() -> circuit.queue())
@@ -158,7 +158,7 @@ class CircuitImplTest {
 
     @Test
     void shouldAllowMultipleCloses() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         circuit.close();
         circuit.close(); // Should not throw
@@ -168,16 +168,16 @@ class CircuitImplTest {
 
     @Test
     void shouldCloseAllClocksOnCircuitClose() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
-        Clock clock1 = circuit.clock(NameImpl.of("clock1"));
-        Clock clock2 = circuit.clock(NameImpl.of("clock2"));
+        Clock clock1 = circuit.clock(new NameImpl("clock1", null));
+        Clock clock2 = circuit.clock(new NameImpl("clock2", null));
 
         circuit.close();
 
         // Clocks should be closed - verify by checking they throw on consume
         assertThatThrownBy(() -> ((io.fullerstack.substrates.clock.ClockImpl) clock1).consume(
-            NameImpl.of("test"),
+            new NameImpl("test", null),
             Clock.Cycle.SECOND,
             instant -> {}
         ))
@@ -186,7 +186,7 @@ class CircuitImplTest {
 
     @Test
     void shouldProvideAccessToAllComponents() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         // Verify all components are accessible
         assertThat((Object) circuit.subject()).isNotNull();
@@ -197,16 +197,16 @@ class CircuitImplTest {
 
     @Test
     void shouldCreateDifferentConduitsForDifferentComposers() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         // Same name, different composers should create DIFFERENT Conduits
         Conduit<Pipe<Long>, Long> pipes = circuit.conduit(
-            NameImpl.of("metrics"),
+            new NameImpl("metrics", null),
             Composer.pipe()
         );
 
         Conduit<Channel<Long>, Long> channels = circuit.conduit(
-            NameImpl.of("metrics"),  // ← SAME NAME
+            new NameImpl("metrics", null),  // ← SAME NAME
             Composer.channel()        // ← DIFFERENT COMPOSER
         );
 
@@ -216,7 +216,7 @@ class CircuitImplTest {
 
     @Test
     void shouldCreateDifferentConduitsForDifferentComposersWithDefaultName() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         // Using default name (unnamed), different composers should create DIFFERENT Conduits
         Conduit<Pipe<Long>, Long> pipes = circuit.conduit(Composer.pipe());
@@ -228,16 +228,16 @@ class CircuitImplTest {
 
     @Test
     void shouldCacheSameComposerWithSameName() {
-        circuit = new CircuitImpl(NameImpl.of("test"));
+        circuit = new CircuitImpl(new NameImpl("test", null));
 
         // Same name, same composer should return SAME Conduit
         Conduit<Pipe<Long>, Long> conduit1 = circuit.conduit(
-            NameImpl.of("metrics"),
+            new NameImpl("metrics", null),
             Composer.pipe()
         );
 
         Conduit<Pipe<Long>, Long> conduit2 = circuit.conduit(
-            NameImpl.of("metrics"),
+            new NameImpl("metrics", null),
             Composer.pipe()
         );
 

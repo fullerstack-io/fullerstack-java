@@ -89,7 +89,7 @@ public class QueueImpl implements Queue {
         Current current = new Current() {
             private final Subject currentSubject = new SubjectImpl(
                 currentId,
-                NameImpl.of("queue-current").name(currentId.toString()),
+                new NameImpl("queue-current", null).name(currentId.toString()),
                 StateImpl.empty(),
                 Subject.Type.SCRIPT
             );

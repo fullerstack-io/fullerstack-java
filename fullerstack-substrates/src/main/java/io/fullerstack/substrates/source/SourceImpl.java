@@ -52,7 +52,7 @@ public class SourceImpl<E> implements Source<E> {
      * Creates a source with default name.
      */
     public SourceImpl() {
-        this(NameImpl.of("source"));
+        this(new NameImpl("source", null));
     }
 
     /**
@@ -82,6 +82,18 @@ public class SourceImpl<E> implements Source<E> {
 
         // Return subscription that removes subscriber on close()
         return new SubscriptionImpl(() -> subscribers.remove(subscriber));
+    }
+
+    /**
+     * Checks if there are any active subscribers.
+     *
+     * <p>Used by Pipes for early exit optimization - avoids allocating Capture
+     * and posting Script when no subscribers are registered.
+     *
+     * @return true if at least one subscriber exists, false otherwise
+     */
+    public boolean hasSubscribers() {
+        return !subscribers.isEmpty();
     }
 
     /**

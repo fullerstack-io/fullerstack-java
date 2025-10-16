@@ -35,7 +35,7 @@ class ClockImplTest {
 
     @Test
     void shouldCreateClockWithCustomName() {
-        Name name = NameImpl.of("custom-clock");
+        Name name = new NameImpl("custom-clock", null);
         clock = new ClockImpl(name);
 
         assertThat((Object) clock.subject().name()).isEqualTo(name);
@@ -57,7 +57,7 @@ class ClockImplTest {
         CountDownLatch latch = new CountDownLatch(3);
 
         Subscription subscription = clock.consume(
-            NameImpl.of("test"),
+            new NameImpl("test", null),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 emissions.add(instant);
@@ -79,7 +79,7 @@ class ClockImplTest {
         AtomicInteger count = new AtomicInteger(0);
 
         Subscription subscription = clock.consume(
-            NameImpl.of("test"),
+            new NameImpl("test", null),
             Clock.Cycle.MILLISECOND,
             instant -> count.incrementAndGet()
         );
@@ -102,7 +102,7 @@ class ClockImplTest {
         CountDownLatch latch = new CountDownLatch(6);
 
         Subscription sub1 = clock.consume(
-            NameImpl.of("sub1"),
+            new NameImpl("sub1", null),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 count1.incrementAndGet();
@@ -111,7 +111,7 @@ class ClockImplTest {
         );
 
         Subscription sub2 = clock.consume(
-            NameImpl.of("sub2"),
+            new NameImpl("sub2", null),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 count2.incrementAndGet();
@@ -142,10 +142,10 @@ class ClockImplTest {
         assertThatThrownBy(() -> clock.consume(null, Clock.Cycle.SECOND, instant -> {}))
             .isInstanceOf(NullPointerException.class);
 
-        assertThatThrownBy(() -> clock.consume(NameImpl.of("test"), null, instant -> {}))
+        assertThatThrownBy(() -> clock.consume(new NameImpl("test", null), null, instant -> {}))
             .isInstanceOf(NullPointerException.class);
 
-        assertThatThrownBy(() -> clock.consume(NameImpl.of("test"), Clock.Cycle.SECOND, null))
+        assertThatThrownBy(() -> clock.consume(new NameImpl("test", null), Clock.Cycle.SECOND, null))
             .isInstanceOf(NullPointerException.class);
     }
 
@@ -155,7 +155,7 @@ class ClockImplTest {
         clock.close();
 
         assertThatThrownBy(() -> clock.consume(
-            NameImpl.of("test"),
+            new NameImpl("test", null),
             Clock.Cycle.SECOND,
             instant -> {}
         ))
@@ -178,7 +178,7 @@ class ClockImplTest {
         clock = new ClockImpl();
 
         Subscription subscription = clock.consume(
-            NameImpl.of("test"),
+            new NameImpl("test", null),
             Clock.Cycle.SECOND,
             instant -> {}
         );
@@ -196,7 +196,7 @@ class ClockImplTest {
         CountDownLatch latch = new CountDownLatch(2);
 
         Subscription subscription = clock.consume(
-            NameImpl.of("test"),
+            new NameImpl("test", null),
             Clock.Cycle.SECOND,
             instant -> {
                 count.incrementAndGet();
@@ -218,7 +218,7 @@ class ClockImplTest {
         AtomicInteger count = new AtomicInteger(0);
 
         clock.consume(
-            NameImpl.of("test"),
+            new NameImpl("test", null),
             Clock.Cycle.MILLISECOND,
             instant -> count.incrementAndGet()
         );

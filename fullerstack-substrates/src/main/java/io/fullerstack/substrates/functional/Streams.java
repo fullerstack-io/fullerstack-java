@@ -55,10 +55,13 @@ public class Streams {
         String[] parts = path.split("\\.");
         List<Name> prefixes = new ArrayList<>();
 
-        // Build each hierarchical level using List.subList for correct ordering
-        List<String> partsList = java.util.Arrays.asList(parts);
-        for (int i = 1; i <= parts.length; i++) {
-            prefixes.add(io.fullerstack.substrates.name.NameImpl.of(partsList.subList(0, i)));
+        // Build each hierarchical level
+        Name current = null;
+        for (String part : parts) {
+            current = current == null
+                ? new io.fullerstack.substrates.name.NameImpl(part, null)
+                : new io.fullerstack.substrates.name.NameImpl(part, current);
+            prefixes.add(current);
         }
 
         return prefixes.stream();
