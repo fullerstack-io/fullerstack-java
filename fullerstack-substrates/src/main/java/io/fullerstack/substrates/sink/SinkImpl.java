@@ -34,6 +34,9 @@ public class SinkImpl<E> implements Sink<E> {
     private final Subscription subscription;
     private volatile boolean closed = false;
 
+    // Cache the internal subscriber's Subject - represents persistent identity
+    private final Subject internalSubscriberSubject;
+
     /**
      * Creates a Sink that subscribes to the given Source.
      *
@@ -47,21 +50,24 @@ public class SinkImpl<E> implements Sink<E> {
         Id sinkId = IdImpl.generate();
         this.sinkSubject = new SubjectImpl(
             sinkId,
-            NameImpl.of("sink").name(sinkId.toString()),
+            new NameImpl("sink", null).name(sinkId.toString()),
             StateImpl.empty(),
             Subject.Type.SINK
+        );
+
+        // Create internal subscriber's Subject once
+        this.internalSubscriberSubject = new SubjectImpl(
+            IdImpl.generate(),
+            new NameImpl("sink-subscriber", null),
+            StateImpl.empty(),
+            Subject.Type.SUBSCRIBER
         );
 
         // Subscribe to source and buffer all emissions
         this.subscription = source.subscribe(new Subscriber<E>() {
             @Override
             public Subject subject() {
-                return new SubjectImpl(
-                    IdImpl.generate(),
-                    NameImpl.of("sink-subscriber"),
-                    StateImpl.empty(),
-                    Subject.Type.SUBSCRIBER
-                );
+                return internalSubscriberSubject;
             }
 
             @Override
