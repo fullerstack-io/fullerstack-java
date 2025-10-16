@@ -5,7 +5,8 @@ import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameFactory;
+import io.fullerstack.substrates.name.InternedNameFactory;
 import io.fullerstack.substrates.subscription.SubscriptionImpl;
 
 import lombok.Getter;
@@ -49,10 +50,10 @@ public class SourceImpl<E> implements Source<E> {
     private final Map<Name, Map<Subscriber<E>, List<Pipe<E>>>> pipeCache = new ConcurrentHashMap<>();
 
     /**
-     * Creates a source with default name.
+     * Creates a source with default name using {@link InternedNameFactory}.
      */
     public SourceImpl() {
-        this(new LinkedName("source", null));
+        this(InternedNameFactory.getInstance().createRoot("source"));
     }
 
     /**

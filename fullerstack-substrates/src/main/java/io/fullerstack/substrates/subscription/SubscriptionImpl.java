@@ -2,7 +2,8 @@ package io.fullerstack.substrates.subscription;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameFactory;
+import io.fullerstack.substrates.name.InternedNameFactory;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 
@@ -34,9 +35,10 @@ public class SubscriptionImpl implements Subscription {
     public SubscriptionImpl(Runnable onClose) {
         this.onClose = Objects.requireNonNull(onClose, "onClose cannot be null");
         this.subscriptionId = IdImpl.generate();
+        NameFactory nameFactory = InternedNameFactory.getInstance();
         this.subscriptionSubject = new SubjectImpl(
             subscriptionId,
-            new LinkedName("subscription", null).name(subscriptionId.toString()),
+            nameFactory.createRoot("subscription").name(subscriptionId.toString()),
             StateImpl.empty(),
             Subject.Type.SUBSCRIPTION
         );

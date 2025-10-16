@@ -4,22 +4,24 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameFactory;
+import io.fullerstack.substrates.name.InternedNameFactory;
 
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
- * Implementation of Substrates.Queue for backpressure management.
+ * LinkedBlockingQueue-based implementation of Substrates.Queue for backpressure management.
  *
- * <p>Processes scripts asynchronously using a virtual thread. Scripts are
- * executed in strict FIFO order.
+ * <p>Processes scripts asynchronously using a virtual thread with blocking FIFO semantics.
+ * Scripts are executed in strict FIFO order using {@link java.util.concurrent.LinkedBlockingQueue}.
  *
- * <p>Features:
+ * <p><b>Characteristics:</b>
  * <ul>
  *   <li>Asynchronous script execution via virtual thread</li>
- *   <li>FIFO ordering guarantee</li>
+ *   <li>Blocking FIFO ordering guarantee</li>
+ *   <li>Unbounded capacity (linked-list backed)</li>
  *   <li>await() blocks until queue is empty</li>
  *   <li>Graceful error handling - continues processing after script errors</li>
  *   <li>Thread-safe concurrent post() operations</li>
@@ -34,20 +36,28 @@ import java.util.concurrent.LinkedBlockingQueue;
  *   <li>Don't prioritize individual Scripts within a Queue - keep FIFO semantics</li>
  * </ul>
  *
+ * <p><b>Alternative implementations:</b> Other Queue strategies could include:
+ * <ul>
+ *   <li>PriorityBlockingQueueImpl - Priority-based weighted script execution</li>
+ *   <li>ArrayBlockingQueueImpl - Bounded queue with backpressure feedback</li>
+ *   <li>BatchingQueueImpl - Batching queue for throughput optimization</li>
+ * </ul>
+ *
  * <p>Reference: https://humainary.io/blog/observability-x-circuits/
  *
  * @see Queue
+ * @see java.util.concurrent.LinkedBlockingQueue
  */
-public class QueueImpl implements Queue {
+public class LinkedBlockingQueueImpl implements Queue {
     private final BlockingQueue<Script> scripts = new LinkedBlockingQueue<>();
     private final Thread processor;
     private volatile boolean running = true;
     private volatile boolean executing = false;
 
     /**
-     * Creates a queue and starts background processing.
+     * Creates a LinkedBlockingQueue-based queue and starts background processing.
      */
-    public QueueImpl() {
+    public LinkedBlockingQueueImpl() {
         this.processor = Thread.startVirtualThread(this::processQueue);
     }
 
@@ -87,9 +97,10 @@ public class QueueImpl implements Queue {
         // Create a Current instance for script execution with stable Subject
         Id currentId = IdImpl.generate();
         Current current = new Current() {
+            private final NameFactory nameFactory = InternedNameFactory.getInstance();
             private final Subject currentSubject = new SubjectImpl(
                 currentId,
-                new LinkedName("queue-current", null).name(currentId.toString()),
+                nameFactory.createRoot("queue-current").name(currentId.toString()),
                 StateImpl.empty(),
                 Subject.Type.SCRIPT
             );
@@ -102,7 +113,7 @@ public class QueueImpl implements Queue {
             @Override
             public void post(Runnable runnable) {
                 // Post runnable as a script
-                QueueImpl.this.post(curr -> runnable.run());
+                LinkedBlockingQueueImpl.this.post(curr -> runnable.run());
             }
         };
 

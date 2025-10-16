@@ -5,11 +5,13 @@ import io.fullerstack.substrates.clock.ClockImpl;
 import io.fullerstack.substrates.container.ContainerImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pool.PoolImpl;
-import io.fullerstack.substrates.queue.QueueImpl;
+import io.fullerstack.substrates.queue.QueueFactory;
+import io.fullerstack.substrates.queue.LinkedBlockingQueueFactory;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameFactory;
+import io.fullerstack.substrates.name.InternedNameFactory;
 
 import java.util.Map;
 import java.util.Objects;
@@ -35,6 +37,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @see Circuit
  */
 public class CircuitImpl implements Circuit {
+    private final NameFactory nameFactory;
+    private final QueueFactory queueFactory;
     private final Subject circuitSubject;
     private final Source<State> stateSource;
     private final Queue queue; // Virtual thread is daemon - auto-cleanup on JVM shutdown
@@ -58,12 +62,37 @@ public class CircuitImpl implements Circuit {
     private record ContainerKey(Name name, Class<?> composerClass) {}
 
     /**
-     * Creates a circuit with the specified name.
+     * Creates a circuit with the specified name using defaults:
+     * {@link InternedNameFactory} and {@link LinkedBlockingQueueFactory}.
      *
      * @param name circuit name
      */
     public CircuitImpl(Name name) {
+        this(name, InternedNameFactory.getInstance(), LinkedBlockingQueueFactory.getInstance());
+    }
+
+    /**
+     * Creates a circuit with the specified name and custom {@link NameFactory},
+     * using default {@link LinkedBlockingQueueFactory}.
+     *
+     * @param name circuit name
+     * @param nameFactory the factory to use for creating Name instances
+     */
+    public CircuitImpl(Name name, NameFactory nameFactory) {
+        this(name, nameFactory, LinkedBlockingQueueFactory.getInstance());
+    }
+
+    /**
+     * Creates a circuit with the specified name and custom factories.
+     *
+     * @param name circuit name
+     * @param nameFactory the factory to use for creating Name instances
+     * @param queueFactory the factory to use for creating Queue instances
+     */
+    public CircuitImpl(Name name, NameFactory nameFactory, QueueFactory queueFactory) {
         Objects.requireNonNull(name, "Circuit name cannot be null");
+        this.nameFactory = Objects.requireNonNull(nameFactory, "NameFactory cannot be null");
+        this.queueFactory = Objects.requireNonNull(queueFactory, "QueueFactory cannot be null");
         Id id = IdImpl.generate();
         this.circuitSubject = new SubjectImpl(
             id,
@@ -72,7 +101,7 @@ public class CircuitImpl implements Circuit {
             Subject.Type.CIRCUIT
         );
         this.stateSource = new SourceImpl<>(name);
-        this.queue = new QueueImpl();
+        this.queue = queueFactory.create();
     }
 
     @Override
@@ -93,7 +122,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public Clock clock() {
-        return clock(new LinkedName("clock", null));
+        return clock(nameFactory.createRoot("clock"));
     }
 
     @Override
@@ -105,7 +134,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public <P, E> Conduit<P, E> conduit(Composer<? extends P, E> composer) {
-        return conduit(new LinkedName("conduit", null), composer);
+        return conduit(nameFactory.createRoot("conduit"), composer);
     }
 
     @Override
@@ -114,8 +143,10 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(name, "Conduit name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");
 
-        // Build hierarchical name: circuit.conduit
-        Name hierarchicalName = circuitSubject.name().name(name);
+        // Build hierarchical name: circuit.conduit using factory for compatibility
+        String circuitPath = circuitSubject.name().value();
+        String conduitPath = name.value();
+        Name hierarchicalName = nameFactory.create(circuitPath + "." + conduitPath);
 
         ConduitKey key = new ConduitKey(name, composer.getClass());
         @SuppressWarnings("unchecked")
@@ -133,8 +164,10 @@ public class CircuitImpl implements Circuit {
         Objects.requireNonNull(composer, "Composer cannot be null");
         Objects.requireNonNull(sequencer, "Sequencer cannot be null");
 
-        // Build hierarchical name: circuit.conduit
-        Name hierarchicalName = circuitSubject.name().name(name);
+        // Build hierarchical name: circuit.conduit using factory for compatibility
+        String circuitPath = circuitSubject.name().value();
+        String conduitPath = name.value();
+        Name hierarchicalName = nameFactory.create(circuitPath + "." + conduitPath);
 
         // Create Conduit with Sequencer - transformations apply to ALL channels in this Conduit
         ConduitKey key = new ConduitKey(name, composer.getClass());
@@ -148,7 +181,7 @@ public class CircuitImpl implements Circuit {
 
     @Override
     public <P, E> Container<Pool<P>, Source<E>> container(Composer<P, E> composer) {
-        return container(new LinkedName("container", null), composer);
+        return container(nameFactory.createRoot("container"), composer);
     }
 
     @Override

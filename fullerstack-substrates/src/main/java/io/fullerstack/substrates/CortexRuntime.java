@@ -10,7 +10,10 @@ import io.fullerstack.substrates.slot.SlotImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.subscriber.SubscriberImpl;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameFactory;
+import io.fullerstack.substrates.name.InternedNameFactory;
+import io.fullerstack.substrates.queue.QueueFactory;
+import io.fullerstack.substrates.queue.LinkedBlockingQueueFactory;
 import io.fullerstack.substrates.sink.SinkImpl;
 
 import java.lang.reflect.Member;
@@ -41,19 +44,75 @@ import java.util.stream.Stream;
  *   <li>Capture creation (1 method)</li>
  * </ul>
  *
+ * <p><b>Factory Injection:</b>
+ * CortexRuntime uses constructor injection for pluggable implementations:
+ * <ul>
+ *   <li>{@link NameFactory} - Pluggable Name implementations (default: {@link InternedNameFactory})</li>
+ *   <li>{@link QueueFactory} - Pluggable Queue implementations (default: {@link LinkedBlockingQueueFactory})</li>
+ * </ul>
+ *
  * @see Cortex
+ * @see NameFactory
+ * @see QueueFactory
  */
 public class CortexRuntime implements Cortex {
 
+    private final NameFactory nameFactory;
+    private final QueueFactory queueFactory;
     private final Map<Name, Circuit> circuits = new ConcurrentHashMap<>();
     private final Map<Name, Scope> scopes = new ConcurrentHashMap<>();
     private final Scope defaultScope;
 
     /**
-     * Creates a new Cortex runtime.
+     * Creates a new Cortex runtime with defaults:
+     * {@link InternedNameFactory} and {@link LinkedBlockingQueueFactory}.
+     *
+     * <p>This is the recommended constructor for production use.
      */
     public CortexRuntime() {
-        Name cortexName = createRootName("cortex");
+        this(InternedNameFactory.getInstance(), LinkedBlockingQueueFactory.getInstance());
+    }
+
+    /**
+     * Creates a new Cortex runtime with a custom {@link NameFactory},
+     * using default {@link LinkedBlockingQueueFactory}.
+     *
+     * <p>This constructor allows you to inject a different Name implementation,
+     * useful for testing or when you need specific Name characteristics.
+     *
+     * <p><b>Available Name factories:</b>
+     * <ul>
+     *   <li>{@link InternedNameFactory} - Recommended for production (weak interning)</li>
+     *   <li>{@link io.fullerstack.substrates.name.LinkedNameFactory} - Simple baseline</li>
+     *   <li>{@link io.fullerstack.substrates.name.SegmentArrayNameFactory} - Array-backed</li>
+     *   <li>{@link io.fullerstack.substrates.name.LRUCachedNameFactory} - LRU cache</li>
+     * </ul>
+     *
+     * @param nameFactory the factory to use for creating Name instances
+     * @throws NullPointerException if nameFactory is null
+     */
+    public CortexRuntime(NameFactory nameFactory) {
+        this(nameFactory, LinkedBlockingQueueFactory.getInstance());
+    }
+
+    /**
+     * Creates a new Cortex runtime with custom factories.
+     *
+     * <p>This constructor provides full control over pluggable implementations.
+     *
+     * <p><b>Available Queue factories:</b>
+     * <ul>
+     *   <li>{@link LinkedBlockingQueueFactory} - Unbounded FIFO (recommended)</li>
+     * </ul>
+     *
+     * @param nameFactory the factory to use for creating Name instances
+     * @param queueFactory the factory to use for creating Queue instances
+     * @throws NullPointerException if either factory is null
+     */
+    public CortexRuntime(NameFactory nameFactory, QueueFactory queueFactory) {
+        this.nameFactory = Objects.requireNonNull(nameFactory, "NameFactory cannot be null");
+        this.queueFactory = Objects.requireNonNull(queueFactory, "QueueFactory cannot be null");
+        Name cortexName = nameFactory.createRoot("cortex");
         this.defaultScope = new ScopeImpl(cortexName);
         // Cache default scope by its name
         this.scopes.put(cortexName, defaultScope);
@@ -63,7 +122,7 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public Circuit circuit() {
-        return circuit(createRootName("circuit"));
+        return circuit(nameFactory.createRoot("circuit"));
     }
 
     @Override
@@ -73,76 +132,49 @@ public class CortexRuntime implements Cortex {
     }
 
     private Circuit createCircuit(Name name) {
-        return new CircuitImpl(name);
+        return new CircuitImpl(name, nameFactory, queueFactory);
     }
 
     // ========== Name Factory (8 methods) ==========
 
     @Override
     public Name name(String s) {
-        return createRootName(s);
+        return nameFactory.create(s);
     }
 
     @Override
     public Name name(Enum<?> e) {
-        return createRootName(e.name());
+        return nameFactory.create(e);
     }
 
     @Override
     public Name name(Iterable<String> parts) {
-        Iterator<String> iter = parts.iterator();
-        if (!iter.hasNext()) {
-            throw new IllegalArgumentException("At least one part required");
-        }
-        Name name = createRootName(iter.next());
-        while (iter.hasNext()) {
-            name = new LinkedName(iter.next(), name);
-        }
-        return name;
+        return nameFactory.create(parts);
     }
 
     @Override
     public <T> Name name(Iterable<? extends T> items, Function<T, String> mapper) {
-        Name name = null;
-        for (T item : items) {
-            String part = mapper.apply(item);
-            name = name == null ? createRootName(part) : name.name(part);
-        }
-        return name != null ? name : createRootName("empty");
+        return nameFactory.create(items, mapper);
     }
 
     @Override
     public Name name(Iterator<String> parts) {
-        Name name = null;
-        while (parts.hasNext()) {
-            name = name == null ? createRootName(parts.next()) : name.name(parts.next());
-        }
-        return name != null ? name : createRootName("empty");
+        return nameFactory.create(parts);
     }
 
     @Override
     public <T> Name name(Iterator<? extends T> items, Function<T, String> mapper) {
-        Name name = null;
-        while (items.hasNext()) {
-            String part = mapper.apply(items.next());
-            name = name == null ? createRootName(part) : name.name(part);
-        }
-        return name != null ? name : createRootName("empty");
+        return nameFactory.create(items, mapper);
     }
 
     @Override
     public Name name(Class<?> clazz) {
-        return createRootName(clazz.getSimpleName());
+        return nameFactory.create(clazz);
     }
 
     @Override
     public Name name(Member member) {
-        return createRootName(member.getName());
-    }
-
-    // Helper method to create root names with caching
-    private Name createRootName(String part) {
-        return LinkedName.ROOT_NAME_CACHE.computeIfAbsent(part, p -> new LinkedName(p, null));
+        return nameFactory.create(member);
     }
 
     // ========== Pool Management (1 method) ==========

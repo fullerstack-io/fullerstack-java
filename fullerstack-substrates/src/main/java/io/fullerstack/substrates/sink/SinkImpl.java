@@ -5,7 +5,8 @@ import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameFactory;
+import io.fullerstack.substrates.name.InternedNameFactory;
 
 import java.util.List;
 import java.util.Objects;
@@ -46,11 +47,12 @@ public class SinkImpl<E> implements Sink<E> {
     public SinkImpl(Source<E> source) {
         Objects.requireNonNull(source, "Source cannot be null");
 
+        NameFactory nameFactory = InternedNameFactory.getInstance();
         this.source = source;
         Id sinkId = IdImpl.generate();
         this.sinkSubject = new SubjectImpl(
             sinkId,
-            new LinkedName("sink", null).name(sinkId.toString()),
+            nameFactory.createRoot("sink").name(sinkId.toString()),
             StateImpl.empty(),
             Subject.Type.SINK
         );
@@ -58,7 +60,7 @@ public class SinkImpl<E> implements Sink<E> {
         // Create internal subscriber's Subject once
         this.internalSubscriberSubject = new SubjectImpl(
             IdImpl.generate(),
-            new LinkedName("sink-subscriber", null),
+            nameFactory.createRoot("sink-subscriber"),
             StateImpl.empty(),
             Subject.Type.SUBSCRIBER
         );

@@ -13,8 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class QueueImplTest {
-    private QueueImpl queue;
+class LinkedBlockingQueueImplTest {
+    private LinkedBlockingQueueImpl queue;
 
     /**
      * Helper to create a Script from a Runnable.
@@ -32,7 +32,7 @@ class QueueImplTest {
 
     @Test
     void shouldExecuteScriptsInFifoOrder() throws Exception {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
         CopyOnWriteArrayList<Integer> executionOrder = new CopyOnWriteArrayList<>();
 
         queue.post(script(() -> executionOrder.add(1)));
@@ -46,7 +46,7 @@ class QueueImplTest {
 
     @Test
     void shouldBlockUntilQueueEmpty() throws Exception {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
         AtomicInteger counter = new AtomicInteger(0);
         CountDownLatch scriptStarted = new CountDownLatch(1);
 
@@ -72,7 +72,7 @@ class QueueImplTest {
 
     @Test
     void shouldHandleNullScript() {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
 
         queue.post(null); // Should not throw
 
@@ -81,7 +81,7 @@ class QueueImplTest {
 
     @Test
     void shouldHandleNamedScript() throws Exception {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
         AtomicInteger counter = new AtomicInteger(0);
 
         queue.post(new LinkedName("test-script", null), script(() -> counter.incrementAndGet()));
@@ -93,7 +93,7 @@ class QueueImplTest {
 
     @Test
     void shouldContinueProcessingAfterScriptError() throws Exception {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
         CopyOnWriteArrayList<Integer> executed = new CopyOnWriteArrayList<>();
 
         queue.post(script(() -> executed.add(1)));
@@ -110,7 +110,7 @@ class QueueImplTest {
 
     @Test
     void shouldHandleConcurrentPosts() throws Exception {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
         int threadCount = 10;
         int postsPerThread = 100;
         AtomicInteger totalExecuted = new AtomicInteger(0);
@@ -138,7 +138,7 @@ class QueueImplTest {
 
     @Test
     void shouldHandleInterruptDuringAwait() throws Exception {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
 
         // Post a long-running script
         queue.post(script(() -> {
@@ -169,7 +169,7 @@ class QueueImplTest {
 
     @Test
     void shouldExecuteMultipleScriptsSequentially() throws Exception {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
         CopyOnWriteArrayList<String> events = new CopyOnWriteArrayList<>();
 
         queue.post(script(() -> {
@@ -194,7 +194,7 @@ class QueueImplTest {
 
     @Test
     void shouldNotAcceptPostsAfterShutdown() throws Exception {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
         AtomicInteger counter = new AtomicInteger(0);
 
         queue.post(script(() -> counter.incrementAndGet()));
@@ -214,7 +214,7 @@ class QueueImplTest {
 
     @Test
     void shouldHandleEmptyQueueAwait() {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
 
         // await() on empty queue should return immediately
         queue.await();
@@ -224,7 +224,7 @@ class QueueImplTest {
 
     @Test
     void shouldHandleRapidPostAndAwaitCycles() throws Exception {
-        queue = new QueueImpl();
+        queue = new LinkedBlockingQueueImpl();
 
         for (int i = 0; i < 10; i++) {
             AtomicInteger counter = new AtomicInteger(0);
