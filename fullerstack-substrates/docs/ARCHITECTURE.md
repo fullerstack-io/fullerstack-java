@@ -102,31 +102,32 @@ assert c1 != c3;  // ✅ Different instance
 ```
 Channel.emit(value)
   ↓
-Conduit's BlockingQueue
+Pipe.emit(value) [applies transformations if configured]
   ↓
-Queue Processor Thread (daemon virtual thread)
+Early exit if no subscribers (optimization)
   ↓
-processEmission(value)
+Synchronous callback to Source.emissionHandler()
   ↓
-Source.emit(value) [via Pipe interface]
+Source notifies all Subscribers
   ↓
-All Subscribers notified
-  ↓
-Subscriber registers consumer Pipes
+Subscriber.accept() registers consumer Pipes (lazy, first emission)
   ↓
 Consumer Pipes receive emission
 ```
 
+**Performance Optimization:** Pipe emission is synchronous (no queue posting) for sub-nanosecond hot-path performance. This means subscriber callbacks execute in the emitter's thread. See [Performance Analysis](performance-analysis.md) for benchmarks.
+
 **Key Components:**
 - **Composer** - Transforms Channel into Percept (e.g., Pipe, custom domain object)
-- **BlockingQueue** - Shared queue (default 10,000 capacity)
 - **Source** - Observable stream for subscriptions
-- **Queue Processor** - Background thread processing emissions
+- **SourceImpl** - Manages subscribers and pipes emission to registered Pipes
+- **Circuit Queue** - Available for async coordination via queue.post(Script)
 
 **Implementation Details:**
-- Percepts cached by Name in `ConcurrentHashMap`
-- Queue processor is daemon virtual thread
-- Source is also a Pipe (dual interface pattern)
+- Percepts (Channels) cached by Name in `ConcurrentHashMap`
+- Source caches registered Pipes per Subject per Subscriber
+- Early subscriber check optimization (hasSubscribers() → 6.6ns hot path)
+- Synchronous emission handler for minimal latency
 
 ### Channel
 
@@ -452,56 +453,69 @@ scope.close();
    ┌──────────────────────────────────────┐
    │ pipe.emit(value)                     │
    │   → channel.pipe().emit(value)       │
-   │   → PipeImpl checks transformations  │
-   │   → Puts value on Conduit's queue    │
+   │   → PipeImpl applies transformations │
+   │   → Early exit if no subscribers     │
+   │   → Synchronous emission handler     │
    └──────────────────────────────────────┘
 
-2. Conduit Processing (Async)
+2. Source Dispatch (Synchronous)
    ┌──────────────────────────────────────┐
-   │ Queue Processor Thread               │
-   │   → queue.take() (blocking)          │
-   │   → processEmission(value)           │
-   │   → emitter.emit(value)              │
-   │      [SourceImpl via Pipe interface] │
-   └──────────────────────────────────────┘
-
-3. Source Dispatch
-   ┌──────────────────────────────────────┐
-   │ SourceImpl.emit(emission)            │
-   │   → Iterate all Subscribers          │
+   │ Source.emissionHandler()             │
+   │   → Checks hasSubscribers() (fast)   │
+   │   → Creates Capture(subject, value)  │
+   │   → Iterates all Subscribers         │
    │   → For each Subscriber:             │
-   │     - Create Registrar               │
-   │     - subscriber.accept(subject, reg)│
-   │     - Collect registered Pipes       │
+   │     - Lazy pipe registration         │
+   │       (first emission per Subject)   │
+   │     - Pipes cached for reuse         │
    │     - Emit to each consumer Pipe     │
    └──────────────────────────────────────┘
 
-4. Consumer Side
+3. Consumer Side (Synchronous)
    ┌──────────────────────────────────────┐
    │ subscriber.accept(subject, registrar)│
+   │   → Called on FIRST emission         │
    │   → registrar.register(consumerPipe) │
-   │   → consumerPipe.emit(emission)      │
+   │   → Pipes cached per Subject         │
+   │                                      │
+   │ cachedPipe.emit(emission)            │
+   │   → Subsequent emissions use cache   │
    │   → Consumer processes emission      │
    └──────────────────────────────────────┘
 ```
 
+**Performance:** All operations are synchronous for minimal latency:
+- Pipe emission: ~6.6ns (hot path with early subscriber check)
+- Full path (lookup + emit): ~97ns
+- Multi-threaded (4 threads): ~27ns per thread
+
+See [Performance Analysis](performance-analysis.md) for detailed benchmarks.
+
 ### Transformation Flow (with Sequencer)
 
 ```
-Channel.pipe(sequencer)
+Conduit creation with Sequencer:
+  circuit.conduit(name, Composer.pipe(segment -> segment...))
+    ↓
+  Sequencer.apply(segment)
+    [User configures: segment.guard(...).limit(...).sample(...)]
+    ↓
+  Conduit stores Sequencer, passed to all Channels
+
+Channel.pipe() execution:
   ↓
-Sequencer.apply(segment)
-  [User configures: segment.guard(...).limit(...).sample(...)]
-  ↓
-PipeImpl created with SegmentImpl
+PipeImpl created with SegmentImpl from Conduit's Sequencer
   ↓
 PipeImpl.emit(value)
   ↓
 segment.apply(value)
   [Applies all transformations in order]
   ↓
-Transformed value → queue (or filtered/limited)
+If value passes filters → Create Capture → Synchronous emission
+If value filtered out → Early return (no allocation)
 ```
+
+**Transformation Performance:** ~15ns overhead for 3-stage pipeline (filter + map + limit), or ~5ns per transformation stage.
 
 ## Design Principles
 
