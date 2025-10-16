@@ -1,10 +1,10 @@
 package io.fullerstack.substrates.benchmark;
 
 import io.fullerstack.substrates.name.InternedName;
-import io.fullerstack.substrates.registry.BaselineNameRegistry;
+import io.fullerstack.substrates.registry.StringSplitTrieRegistry;
 import io.fullerstack.substrates.registry.LazyTrieRegistry;
-import io.fullerstack.substrates.registry.OptimizedNameRegistry;
-import io.fullerstack.substrates.registry.SimpleConcurrentMapRegistry;
+import io.fullerstack.substrates.registry.EagerTrieRegistry;
+import io.fullerstack.substrates.registry.FlatMapRegistry;
 import io.humainary.substrates.api.Substrates.Name;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
@@ -14,9 +14,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Comprehensive benchmark comparing FOUR registry implementations:
- * 1. SimpleConcurrentMapRegistry - plain ConcurrentHashMap
- * 2. BaselineNameRegistry - eager dual-index with string splitting
- * 3. OptimizedNameRegistry - eager dual-index leveraging InternedName structure
+ * 1. FlatMapRegistry - plain ConcurrentHashMap (no hierarchy support)
+ * 2. StringSplitTrieRegistry - eager trie with string splitting
+ * 3. EagerTrieRegistry - eager trie leveraging InternedName parent chain
  * 4. LazyTrieRegistry - lazy trie with identity map fast path (RECOMMENDED)
  *
  * <p>Tests:
@@ -68,15 +68,15 @@ public class RegistryBenchmark {
     private Name deepQueryPrefix;
 
     // Registry instances (pre-populated for read tests)
-    private SimpleConcurrentMapRegistry<String> simpleRegistryPopulated;
-    private BaselineNameRegistry<String> baselineRegistryPopulated;
-    private OptimizedNameRegistry<String> optimizedRegistryPopulated;
+    private FlatMapRegistry<String> flatMapRegistryPopulated;
+    private StringSplitTrieRegistry<String> stringSplitRegistryPopulated;
+    private EagerTrieRegistry<String> eagerTrieRegistryPopulated;
     private LazyTrieRegistry<String> lazyTrieRegistryPopulated;
 
     // Empty registries for write tests
-    private SimpleConcurrentMapRegistry<String> simpleRegistryEmpty;
-    private BaselineNameRegistry<String> baselineRegistryEmpty;
-    private OptimizedNameRegistry<String> optimizedRegistryEmpty;
+    private FlatMapRegistry<String> flatMapRegistryEmpty;
+    private StringSplitTrieRegistry<String> stringSplitRegistryEmpty;
+    private EagerTrieRegistry<String> eagerTrieRegistryEmpty;
     private LazyTrieRegistry<String> lazyTrieRegistryEmpty;
 
     @Setup(Level.Trial)
@@ -91,16 +91,16 @@ public class RegistryBenchmark {
         deepQueryPrefix = InternedName.of("kafka.broker.1.jvm");
 
         // Populate registries for read tests
-        simpleRegistryPopulated = new SimpleConcurrentMapRegistry<>();
-        baselineRegistryPopulated = new BaselineNameRegistry<>();
-        optimizedRegistryPopulated = new OptimizedNameRegistry<>();
+        flatMapRegistryPopulated = new FlatMapRegistry<>();
+        stringSplitRegistryPopulated = new StringSplitTrieRegistry<>();
+        eagerTrieRegistryPopulated = new EagerTrieRegistry<>();
         lazyTrieRegistryPopulated = new LazyTrieRegistry<>();
 
         for (int i = 0; i < names.length; i++) {
             String value = "value-" + i;
-            simpleRegistryPopulated.put(names[i], value);
-            baselineRegistryPopulated.put(names[i], value);
-            optimizedRegistryPopulated.put(names[i], value);
+            flatMapRegistryPopulated.put(names[i], value);
+            stringSplitRegistryPopulated.put(names[i], value);
+            eagerTrieRegistryPopulated.put(names[i], value);
             lazyTrieRegistryPopulated.put(names[i], value);
         }
     }
@@ -108,27 +108,27 @@ public class RegistryBenchmark {
     @Setup(Level.Invocation)
     public void setupInvocation() {
         // Fresh empty registries for write tests
-        simpleRegistryEmpty = new SimpleConcurrentMapRegistry<>();
-        baselineRegistryEmpty = new BaselineNameRegistry<>();
-        optimizedRegistryEmpty = new OptimizedNameRegistry<>();
+        flatMapRegistryEmpty = new FlatMapRegistry<>();
+        stringSplitRegistryEmpty = new StringSplitTrieRegistry<>();
+        eagerTrieRegistryEmpty = new EagerTrieRegistry<>();
         lazyTrieRegistryEmpty = new LazyTrieRegistry<>();
     }
 
     // ========== DIRECT LOOKUP (GET) ==========
 
     @Benchmark
-    public String benchmark01_SimpleMap_get_shallow() {
-        return simpleRegistryPopulated.get(names[0]); // "kafka"
+    public String benchmark01_FlatMap_get_shallow() {
+        return flatMapRegistryPopulated.get(names[0]); // "kafka"
     }
 
     @Benchmark
-    public String benchmark02_Baseline_get_shallow() {
-        return baselineRegistryPopulated.get(names[0]);
+    public String benchmark02_StringSplit_get_shallow() {
+        return stringSplitRegistryPopulated.get(names[0]);
     }
 
     @Benchmark
-    public String benchmark03_Optimized_get_shallow() {
-        return optimizedRegistryPopulated.get(names[0]);
+    public String benchmark03_Eager_get_shallow() {
+        return eagerTrieRegistryPopulated.get(names[0]);
     }
 
     @Benchmark
@@ -137,18 +137,18 @@ public class RegistryBenchmark {
     }
 
     @Benchmark
-    public String benchmark05_SimpleMap_get_deep() {
-        return simpleRegistryPopulated.get(names[4]); // "kafka.broker.1.jvm.heap.used"
+    public String benchmark05_FlatMap_get_deep() {
+        return flatMapRegistryPopulated.get(names[4]); // "kafka.broker.1.jvm.heap.used"
     }
 
     @Benchmark
-    public String benchmark06_Baseline_get_deep() {
-        return baselineRegistryPopulated.get(names[4]);
+    public String benchmark06_StringSplit_get_deep() {
+        return stringSplitRegistryPopulated.get(names[4]);
     }
 
     @Benchmark
-    public String benchmark07_Optimized_get_deep() {
-        return optimizedRegistryPopulated.get(names[4]);
+    public String benchmark07_Eager_get_deep() {
+        return eagerTrieRegistryPopulated.get(names[4]);
     }
 
     @Benchmark
@@ -159,18 +159,18 @@ public class RegistryBenchmark {
     // ========== INSERTION (PUT) ==========
 
     @Benchmark
-    public void benchmark09_SimpleMap_put_shallow() {
-        simpleRegistryEmpty.put(names[0], "value");
+    public void benchmark09_FlatMap_put_shallow() {
+        flatMapRegistryEmpty.put(names[0], "value");
     }
 
     @Benchmark
-    public void benchmark10_Baseline_put_shallow() {
-        baselineRegistryEmpty.put(names[0], "value");
+    public void benchmark10_StringSplit_put_shallow() {
+        stringSplitRegistryEmpty.put(names[0], "value");
     }
 
     @Benchmark
-    public void benchmark11_Optimized_put_shallow() {
-        optimizedRegistryEmpty.put(names[0], "value");
+    public void benchmark11_Eager_put_shallow() {
+        eagerTrieRegistryEmpty.put(names[0], "value");
     }
 
     @Benchmark
@@ -179,18 +179,18 @@ public class RegistryBenchmark {
     }
 
     @Benchmark
-    public void benchmark13_SimpleMap_put_deep() {
-        simpleRegistryEmpty.put(names[4], "value");
+    public void benchmark13_FlatMap_put_deep() {
+        flatMapRegistryEmpty.put(names[4], "value");
     }
 
     @Benchmark
-    public void benchmark14_Baseline_put_deep() {
-        baselineRegistryEmpty.put(names[4], "value");
+    public void benchmark14_StringSplit_put_deep() {
+        stringSplitRegistryEmpty.put(names[4], "value");
     }
 
     @Benchmark
-    public void benchmark15_Optimized_put_deep() {
-        optimizedRegistryEmpty.put(names[4], "value");
+    public void benchmark15_Eager_put_deep() {
+        eagerTrieRegistryEmpty.put(names[4], "value");
     }
 
     @Benchmark
@@ -201,24 +201,24 @@ public class RegistryBenchmark {
     // ========== BULK INSERT ==========
 
     @Benchmark
-    public void benchmark17_SimpleMap_bulkInsert() {
-        SimpleConcurrentMapRegistry<String> reg = new SimpleConcurrentMapRegistry<>();
+    public void benchmark17_FlatMap_bulkInsert() {
+        FlatMapRegistry<String> reg = new FlatMapRegistry<>();
         for (int i = 0; i < names.length; i++) {
             reg.put(names[i], "value-" + i);
         }
     }
 
     @Benchmark
-    public void benchmark18_Baseline_bulkInsert() {
-        BaselineNameRegistry<String> reg = new BaselineNameRegistry<>();
+    public void benchmark18_StringSplit_bulkInsert() {
+        StringSplitTrieRegistry<String> reg = new StringSplitTrieRegistry<>();
         for (int i = 0; i < names.length; i++) {
             reg.put(names[i], "value-" + i);
         }
     }
 
     @Benchmark
-    public void benchmark19_Optimized_bulkInsert() {
-        OptimizedNameRegistry<String> reg = new OptimizedNameRegistry<>();
+    public void benchmark19_Eager_bulkInsert() {
+        EagerTrieRegistry<String> reg = new EagerTrieRegistry<>();
         for (int i = 0; i < names.length; i++) {
             reg.put(names[i], "value-" + i);
         }
@@ -235,18 +235,18 @@ public class RegistryBenchmark {
     // ========== GET-OR-CREATE ==========
 
     @Benchmark
-    public String benchmark21_SimpleMap_getOrCreate_hit() {
-        return simpleRegistryPopulated.getOrCreate(names[4], () -> "new-value");
+    public String benchmark21_FlatMap_getOrCreate_hit() {
+        return flatMapRegistryPopulated.getOrCreate(names[4], () -> "new-value");
     }
 
     @Benchmark
-    public String benchmark22_Baseline_getOrCreate_hit() {
-        return baselineRegistryPopulated.getOrCreate(names[4], () -> "new-value");
+    public String benchmark22_StringSplit_getOrCreate_hit() {
+        return stringSplitRegistryPopulated.getOrCreate(names[4], () -> "new-value");
     }
 
     @Benchmark
-    public String benchmark23_Optimized_getOrCreate_hit() {
-        return optimizedRegistryPopulated.getOrCreate(names[4], () -> "new-value");
+    public String benchmark23_Eager_getOrCreate_hit() {
+        return eagerTrieRegistryPopulated.getOrCreate(names[4], () -> "new-value");
     }
 
     @Benchmark
@@ -255,21 +255,21 @@ public class RegistryBenchmark {
     }
 
     @Benchmark
-    public String benchmark25_SimpleMap_getOrCreate_miss() {
+    public String benchmark25_FlatMap_getOrCreate_miss() {
         Name newName = InternedName.of("kafka.broker.99.new");
-        return simpleRegistryEmpty.getOrCreate(newName, () -> "new-value");
+        return flatMapRegistryEmpty.getOrCreate(newName, () -> "new-value");
     }
 
     @Benchmark
-    public String benchmark26_Baseline_getOrCreate_miss() {
+    public String benchmark26_StringSplit_getOrCreate_miss() {
         Name newName = InternedName.of("kafka.broker.99.new");
-        return baselineRegistryEmpty.getOrCreate(newName, () -> "new-value");
+        return stringSplitRegistryEmpty.getOrCreate(newName, () -> "new-value");
     }
 
     @Benchmark
-    public String benchmark27_Optimized_getOrCreate_miss() {
+    public String benchmark27_Eager_getOrCreate_miss() {
         Name newName = InternedName.of("kafka.broker.99.new");
-        return optimizedRegistryEmpty.getOrCreate(newName, () -> "new-value");
+        return eagerTrieRegistryEmpty.getOrCreate(newName, () -> "new-value");
     }
 
     @Benchmark
@@ -281,18 +281,18 @@ public class RegistryBenchmark {
     // ========== SUBTREE QUERIES ==========
 
     @Benchmark
-    public Map<Name, String> benchmark29_SimpleMap_subtree_shallow() {
-        return simpleRegistryPopulated.subtree(queryPrefix); // "kafka.broker.1" -> 8 results
+    public Map<Name, String> benchmark29_FlatMap_subtree_shallow() {
+        return flatMapRegistryPopulated.subtree(queryPrefix); // "kafka.broker.1" -> 8 results
     }
 
     @Benchmark
-    public Map<Name, String> benchmark30_Baseline_subtree_shallow() {
-        return baselineRegistryPopulated.subtree(queryPrefix);
+    public Map<Name, String> benchmark30_StringSplit_subtree_shallow() {
+        return stringSplitRegistryPopulated.subtree(queryPrefix);
     }
 
     @Benchmark
-    public Map<Name, String> benchmark31_Optimized_subtree_shallow() {
-        return optimizedRegistryPopulated.subtree(queryPrefix);
+    public Map<Name, String> benchmark31_Eager_subtree_shallow() {
+        return eagerTrieRegistryPopulated.subtree(queryPrefix);
     }
 
     @Benchmark
@@ -301,18 +301,18 @@ public class RegistryBenchmark {
     }
 
     @Benchmark
-    public Map<Name, String> benchmark33_SimpleMap_subtree_deep() {
-        return simpleRegistryPopulated.subtree(deepQueryPrefix); // "kafka.broker.1.jvm" -> 4 results
+    public Map<Name, String> benchmark33_FlatMap_subtree_deep() {
+        return flatMapRegistryPopulated.subtree(deepQueryPrefix); // "kafka.broker.1.jvm" -> 4 results
     }
 
     @Benchmark
-    public Map<Name, String> benchmark34_Baseline_subtree_deep() {
-        return baselineRegistryPopulated.subtree(deepQueryPrefix);
+    public Map<Name, String> benchmark34_StringSplit_subtree_deep() {
+        return stringSplitRegistryPopulated.subtree(deepQueryPrefix);
     }
 
     @Benchmark
-    public Map<Name, String> benchmark35_Optimized_subtree_deep() {
-        return optimizedRegistryPopulated.subtree(deepQueryPrefix);
+    public Map<Name, String> benchmark35_Eager_subtree_deep() {
+        return eagerTrieRegistryPopulated.subtree(deepQueryPrefix);
     }
 
     @Benchmark
@@ -323,8 +323,8 @@ public class RegistryBenchmark {
     // ========== MIXED WORKLOAD (80% read, 20% write) ==========
 
     @Benchmark
-    public void benchmark37_SimpleMap_mixedWorkload(Blackhole bh) {
-        SimpleConcurrentMapRegistry<String> reg = new SimpleConcurrentMapRegistry<>();
+    public void benchmark37_FlatMap_mixedWorkload(Blackhole bh) {
+        FlatMapRegistry<String> reg = new FlatMapRegistry<>();
 
         // Insert base data
         for (int i = 0; i < names.length; i++) {
@@ -341,8 +341,8 @@ public class RegistryBenchmark {
     }
 
     @Benchmark
-    public void benchmark38_Baseline_mixedWorkload(Blackhole bh) {
-        BaselineNameRegistry<String> reg = new BaselineNameRegistry<>();
+    public void benchmark38_StringSplit_mixedWorkload(Blackhole bh) {
+        StringSplitTrieRegistry<String> reg = new StringSplitTrieRegistry<>();
 
         for (int i = 0; i < names.length; i++) {
             reg.put(names[i], "value-" + i);
@@ -357,8 +357,8 @@ public class RegistryBenchmark {
     }
 
     @Benchmark
-    public void benchmark39_Optimized_mixedWorkload(Blackhole bh) {
-        OptimizedNameRegistry<String> reg = new OptimizedNameRegistry<>();
+    public void benchmark39_Eager_mixedWorkload(Blackhole bh) {
+        EagerTrieRegistry<String> reg = new EagerTrieRegistry<>();
 
         for (int i = 0; i < names.length; i++) {
             reg.put(names[i], "value-" + i);
@@ -391,18 +391,18 @@ public class RegistryBenchmark {
     // ========== CONTAINS CHECK ==========
 
     @Benchmark
-    public boolean benchmark41_SimpleMap_contains() {
-        return simpleRegistryPopulated.contains(names[4]);
+    public boolean benchmark41_FlatMap_contains() {
+        return flatMapRegistryPopulated.contains(names[4]);
     }
 
     @Benchmark
-    public boolean benchmark42_Baseline_contains() {
-        return baselineRegistryPopulated.contains(names[4]);
+    public boolean benchmark42_StringSplit_contains() {
+        return stringSplitRegistryPopulated.contains(names[4]);
     }
 
     @Benchmark
-    public boolean benchmark43_Optimized_contains() {
-        return optimizedRegistryPopulated.contains(names[4]);
+    public boolean benchmark43_Eager_contains() {
+        return eagerTrieRegistryPopulated.contains(names[4]);
     }
 
     @Benchmark
@@ -413,18 +413,18 @@ public class RegistryBenchmark {
     // ========== SIZE OPERATION ==========
 
     @Benchmark
-    public int benchmark45_SimpleMap_size() {
-        return simpleRegistryPopulated.size();
+    public int benchmark45_FlatMap_size() {
+        return flatMapRegistryPopulated.size();
     }
 
     @Benchmark
-    public int benchmark46_Baseline_size() {
-        return baselineRegistryPopulated.size();
+    public int benchmark46_StringSplit_size() {
+        return stringSplitRegistryPopulated.size();
     }
 
     @Benchmark
-    public int benchmark47_Optimized_size() {
-        return optimizedRegistryPopulated.size();
+    public int benchmark47_Eager_size() {
+        return eagerTrieRegistryPopulated.size();
     }
 
     @Benchmark

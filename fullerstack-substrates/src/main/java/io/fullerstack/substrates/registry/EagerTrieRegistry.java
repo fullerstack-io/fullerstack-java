@@ -11,21 +11,21 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 
 /**
- * Optimized hierarchical registry leveraging InternedName structure.
+ * Eager trie registry with InternedName optimizations and ReadWriteLock.
  *
- * <p><b>Optimizations over baseline:</b>
+ * <p><b>Design:</b>
  * <ul>
+ *   <li>Dual-index: Identity map (fast path) + flat map (fallback)</li>
+ *   <li>Eager trie construction on every insertion</li>
  *   <li>Zero string splitting - uses InternedName parent chain traversal</li>
- *   <li>Identity-based fast path for InternedName lookups</li>
- *   <li>Atomic dual-index updates via ReadWriteLock</li>
- *   <li>Cached path construction eliminates joinUntil() overhead</li>
- *   <li>Reduced allocation pressure (no String[] arrays)</li>
+ *   <li>Identity-based fast path for InternedName lookups (== comparison)</li>
+ *   <li>ReadWriteLock for atomic consistency between indexes</li>
  * </ul>
  *
  * <p><b>Performance characteristics:</b>
  * <ul>
  *   <li>get(): O(1) with fast path for InternedName (identity check)</li>
- *   <li>put(): O(d) where d = depth, but faster due to no string ops</li>
+ *   <li>put(): O(d) where d = depth (eager trie + lock overhead)</li>
  *   <li>subtree(): O(n) where n = subtree size</li>
  * </ul>
  *
@@ -36,8 +36,11 @@ import java.util.function.Supplier;
  *   <li>Exclusive writer (put, remove, clear)</li>
  *   <li>Atomic consistency between flat map and trie</li>
  * </ul>
+ *
+ * <p><b>Use case:</b>
+ * Legacy applications. Consider migrating to LazyTrieRegistry for better performance.
  */
-public final class OptimizedNameRegistry<T> {
+public final class EagerTrieRegistry<T> {
 
     /** Fast path for InternedName - uses identity equality */
     private final Map<Name, T> identityMap = Collections.synchronizedMap(new IdentityHashMap<>());

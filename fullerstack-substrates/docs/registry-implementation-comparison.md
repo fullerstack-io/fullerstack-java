@@ -11,13 +11,13 @@ This document compares FOUR implementations of Name-based object registries, eva
 
 ### Implementations Tested
 
-1. **SimpleConcurrentMapRegistry** (Simple Baseline)
+1. **FlatMapRegistry** (Simple StringSplit)
    - Plain ConcurrentHashMap implementation
    - O(1) direct lookups via hash table
    - O(n) subtree queries (full scan with string prefix matching)
    - Best for: Simple use cases, minimal hierarchy queries
 
-2. **BaselineNameRegistry** (Eager Dual-Index)
+2. **StringSplitTrieRegistry** (Eager Dual-Index)
    - Dual-index design: flat map + trie structure
    - O(1) direct lookups
    - O(k) subtree queries (k = result set size)
@@ -25,7 +25,7 @@ This document compares FOUR implementations of Name-based object registries, eva
    - Eager trie maintenance
    - Best for: Works with any Name implementation
 
-3. **OptimizedNameRegistry** (Eager Optimized)
+3. **EagerTrieRegistry** (Eager Eager)
    - Dual-index leveraging InternedName parent chain
    - Identity map fast path for interned instances
    - Zero string splitting overhead
@@ -45,8 +45,8 @@ This document compares FOUR implementations of Name-based object registries, eva
 
 **Use LazyTrieRegistry with InternedName for production.** It provides:
 - Excellent direct lookup performance (fastest via identity map fast path)
-- Best-in-class hierarchical subtree queries (46-108% faster than SimpleMap)
-- Competitive write performance (only 22-45% slower than SimpleMap)
+- Best-in-class hierarchical subtree queries (46-108% faster than FlatMap)
+- Competitive write performance (only 22-45% slower than FlatMap)
 - Lazy trie construction (zero overhead until needed)
 - Balanced performance across diverse workloads
 
@@ -60,21 +60,21 @@ Tests the performance of retrieving values by Name key.
 
 #### Shallow Path Lookup (`"kafka"`)
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
 | **LazyTrieRegistry** | **35.2** | **1.0× faster** | ±5.20 |
-| SimpleConcurrentMapRegistry | 36.2 | baseline | ±1.04 |
-| BaselineNameRegistry | 37.0 | 1.0× slower | ±8.21 |
-| OptimizedNameRegistry | 50.2 | 1.4× slower | ±8.58 |
+| FlatMapRegistry | 36.2 | baseline | ±1.04 |
+| StringSplitTrieRegistry | 37.0 | 1.0× slower | ±8.21 |
+| EagerTrieRegistry | 50.2 | 1.4× slower | ±8.58 |
 
 #### Deep Path Lookup (`"kafka.broker.1.jvm.heap.used"`)
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
 | **LazyTrieRegistry** | **35.0** | **1.0× faster** | ±2.07 |
-| SimpleConcurrentMapRegistry | 35.5 | baseline | ±5.82 |
-| BaselineNameRegistry | 38.1 | 1.1× slower | ±12.0 |
-| OptimizedNameRegistry | 55.4 | 1.6× slower | ±10.4 |
+| FlatMapRegistry | 35.5 | baseline | ±5.82 |
+| StringSplitTrieRegistry | 38.1 | 1.1× slower | ±12.0 |
+| EagerTrieRegistry | 55.4 | 1.6× slower | ±10.4 |
 
 **Analysis:** LazyTrieRegistry's identity map fast path (`==` operator for InternedName) makes it the fastest for direct lookups.
 
@@ -86,23 +86,23 @@ Tests the cost of adding new Name-value pairs to the registry.
 
 #### Shallow Path Insertion (`"kafka"`)
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
-| SimpleConcurrentMapRegistry | **60.7** | **baseline** | ±11.3 |
+| FlatMapRegistry | **60.7** | **baseline** | ±11.3 |
 | **LazyTrieRegistry** | 74.0 | 1.2× slower | ±13.0 |
-| OptimizedNameRegistry | 96.9 | 1.6× slower | ±28.6 |
-| BaselineNameRegistry | 141.2 | 2.3× slower | ±43.9 |
+| EagerTrieRegistry | 96.9 | 1.6× slower | ±28.6 |
+| StringSplitTrieRegistry | 141.2 | 2.3× slower | ±43.9 |
 
 #### Deep Path Insertion (`"kafka.broker.1.jvm.heap.used"`)
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
-| SimpleConcurrentMapRegistry | **51.0** | **baseline** | ±2.23 |
+| FlatMapRegistry | **51.0** | **baseline** | ±2.23 |
 | **LazyTrieRegistry** | 73.6 | 1.4× slower | ±15.6 |
-| OptimizedNameRegistry | 314.7 | 6.2× slower | ±185 |
-| BaselineNameRegistry | 835.3 | 16.4× slower | ±136 |
+| EagerTrieRegistry | 314.7 | 6.2× slower | ±185 |
+| StringSplitTrieRegistry | 835.3 | 16.4× slower | ±136 |
 
-**Analysis:** SimpleConcurrentMapRegistry fastest (single map update). LazyTrieRegistry competitive (only 22-44% slower). BaselineNameRegistry very slow due to string splitting overhead.
+**Analysis:** FlatMapRegistry fastest (single map update). LazyTrieRegistry competitive (only 22-44% slower). StringSplitTrieRegistry very slow due to string splitting overhead.
 
 ---
 
@@ -110,14 +110,14 @@ Tests the cost of adding new Name-value pairs to the registry.
 
 Tests inserting 18 hierarchical Kafka monitoring paths in sequence.
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
-| SimpleConcurrentMapRegistry | **622** | **baseline** | ±88.5 |
+| FlatMapRegistry | **622** | **baseline** | ±88.5 |
 | **LazyTrieRegistry** | 1,100 | 1.8× slower | ±199 |
-| OptimizedNameRegistry | 2,216 | 3.6× slower | ±175 |
-| BaselineNameRegistry | 7,355 | 11.8× slower | ±1,011 |
+| EagerTrieRegistry | 2,216 | 3.6× slower | ±175 |
+| StringSplitTrieRegistry | 7,355 | 11.8× slower | ±1,011 |
 
-**Analysis:** SimpleConcurrentMapRegistry fastest. LazyTrieRegistry 2nd best, demonstrating minimal per-insert overhead.
+**Analysis:** FlatMapRegistry fastest. LazyTrieRegistry 2nd best, demonstrating minimal per-insert overhead.
 
 ---
 
@@ -127,23 +127,23 @@ Tests atomic get-or-create operations using computeIfAbsent pattern.
 
 #### Cache Hit (Key Exists)
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
 | **LazyTrieRegistry** | **33.5** | **1.1× faster** | ±1.31 |
-| BaselineNameRegistry | 33.9 | 1.1× faster | ±1.06 |
-| SimpleConcurrentMapRegistry | 35.6 | baseline | ±3.92 |
-| OptimizedNameRegistry | 45.8 | 1.3× slower | ±3.20 |
+| StringSplitTrieRegistry | 33.9 | 1.1× faster | ±1.06 |
+| FlatMapRegistry | 35.6 | baseline | ±3.92 |
+| EagerTrieRegistry | 45.8 | 1.3× slower | ±3.20 |
 
 #### Cache Miss (Key Does Not Exist)
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
-| SimpleConcurrentMapRegistry | **71.6** | **baseline** | ±14.5 |
+| FlatMapRegistry | **71.6** | **baseline** | ±14.5 |
 | **LazyTrieRegistry** | 76.2 | 1.1× slower | ±15.1 |
-| OptimizedNameRegistry | 372.5 | 5.2× slower | ±309 |
-| BaselineNameRegistry | 808.8 | 11.3× slower | ±822 |
+| EagerTrieRegistry | 372.5 | 5.2× slower | ±309 |
+| StringSplitTrieRegistry | 808.8 | 11.3× slower | ±822 |
 
-**Analysis:** Cache hits fast for all. LazyTrieRegistry wins hits, competitive on misses (only 6% slower than SimpleMap).
+**Analysis:** Cache hits fast for all. LazyTrieRegistry wins hits, competitive on misses (only 6% slower than FlatMap).
 
 ---
 
@@ -153,23 +153,23 @@ Tests hierarchical prefix matching to retrieve all Names under a given prefix.
 
 #### Shallow Subtree (`"kafka.broker.1"` → 8 results)
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
 | **LazyTrieRegistry** | **306** | **1.9× faster** | ±51.0 |
-| OptimizedNameRegistry | 352 | 1.6× faster | ±51.3 |
-| BaselineNameRegistry | 448 | 1.3× faster | ±49.0 |
-| SimpleConcurrentMapRegistry | 567 | baseline | ±165 |
+| EagerTrieRegistry | 352 | 1.6× faster | ±51.3 |
+| StringSplitTrieRegistry | 448 | 1.3× faster | ±49.0 |
+| FlatMapRegistry | 567 | baseline | ±165 |
 
 #### Deep Subtree (`"kafka.broker.1.jvm"` → 4 results)
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
 | **LazyTrieRegistry** | **188** | **2.1× faster** | ±15.3 |
-| OptimizedNameRegistry | 197 | 2.0× faster | ±18.6 |
-| BaselineNameRegistry | 301 | 1.3× faster | ±40.8 |
-| SimpleConcurrentMapRegistry | 391 | baseline | ±70.5 |
+| EagerTrieRegistry | 197 | 2.0× faster | ±18.6 |
+| StringSplitTrieRegistry | 301 | 1.3× faster | ±40.8 |
+| FlatMapRegistry | 391 | baseline | ±70.5 |
 
-**Analysis:** 🎯 **LazyTrieRegistry DOMINATES subtree queries!** 46-108% faster than SimpleConcurrentMapRegistry. Lazy trie construction provides best query performance without upfront overhead.
+**Analysis:** 🎯 **LazyTrieRegistry DOMINATES subtree queries!** 46-108% faster than FlatMapRegistry. Lazy trie construction provides best query performance without upfront overhead.
 
 ---
 
@@ -177,14 +177,14 @@ Tests hierarchical prefix matching to retrieve all Names under a given prefix.
 
 Tests realistic workload: bulk insert 18 paths, then 80 reads + 20 writes.
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
-| SimpleConcurrentMapRegistry | **1,498** | **baseline** | ±163 |
+| FlatMapRegistry | **1,498** | **baseline** | ±163 |
 | **LazyTrieRegistry** | 2,112 | 1.4× slower | ±231 |
-| OptimizedNameRegistry | 5,483 | 3.7× slower | ±601 |
-| BaselineNameRegistry | 10,814 | 7.2× slower | ±2,101 |
+| EagerTrieRegistry | 5,483 | 3.7× slower | ±601 |
+| StringSplitTrieRegistry | 10,814 | 7.2× slower | ±2,101 |
 
-**Analysis:** SimpleConcurrentMapRegistry wins mixed workloads. LazyTrieRegistry 2nd place, much better than eager dual-index approaches.
+**Analysis:** FlatMapRegistry wins mixed workloads. LazyTrieRegistry 2nd place, much better than eager dual-index approaches.
 
 ---
 
@@ -192,14 +192,14 @@ Tests realistic workload: bulk insert 18 paths, then 80 reads + 20 writes.
 
 Tests existence checking without retrieving values.
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
 | **LazyTrieRegistry** | **32.5** | **1.0× faster** | ±0.829 |
-| SimpleConcurrentMapRegistry | 32.6 | baseline | ±0.899 |
-| BaselineNameRegistry | 32.9 | 1.0× slower | ±2.22 |
-| OptimizedNameRegistry | 41.5 | 1.3× slower | ±3.61 |
+| FlatMapRegistry | 32.6 | baseline | ±0.899 |
+| StringSplitTrieRegistry | 32.9 | 1.0× slower | ±2.22 |
+| EagerTrieRegistry | 41.5 | 1.3× slower | ±3.61 |
 
-**Analysis:** LazyTrieRegistry ties SimpleMap/Baseline for metadata operations.
+**Analysis:** LazyTrieRegistry ties FlatMap/StringSplit for metadata operations.
 
 ---
 
@@ -207,20 +207,20 @@ Tests existence checking without retrieving values.
 
 Tests retrieving the total number of entries in the registry.
 
-| Implementation | Time (ns/op) | vs SimpleMap | Error (±) |
+| Implementation | Time (ns/op) | vs FlatMap | Error (±) |
 |----------------|--------------|--------------|-----------|
-| BaselineNameRegistry | **29.7** | **1.0× faster** | ±0.917 |
-| SimpleConcurrentMapRegistry | 29.8 | baseline | ±0.581 |
+| StringSplitTrieRegistry | **29.7** | **1.0× faster** | ±0.917 |
+| FlatMapRegistry | 29.8 | baseline | ±0.581 |
 | **LazyTrieRegistry** | 29.9 | 1.0× slower | ±2.04 |
-| OptimizedNameRegistry | 41.9 | 1.4× slower | ±4.20 |
+| EagerTrieRegistry | 41.9 | 1.4× slower | ±4.20 |
 
-**Analysis:** All flat-map implementations (Simple, Baseline, LazyTrie) identical performance. OptimizedNameRegistry slightly slower.
+**Analysis:** All flat-map implementations (Simple, StringSplit, LazyTrie) identical performance. EagerTrieRegistry slightly slower.
 
 ---
 
 ## Implementation Characteristics
 
-### SimpleConcurrentMapRegistry
+### FlatMapRegistry
 
 **Strengths:**
 - Simplest implementation (minimal code)
@@ -245,7 +245,7 @@ Tests retrieving the total number of entries in the registry.
 
 ---
 
-### BaselineNameRegistry
+### StringSplitTrieRegistry
 
 **Strengths:**
 - Works with any Name implementation
@@ -270,7 +270,7 @@ Tests retrieving the total number of entries in the registry.
 
 ---
 
-### OptimizedNameRegistry
+### EagerTrieRegistry
 
 **Strengths:**
 - Zero string splitting (uses parent chain)
@@ -290,7 +290,7 @@ Tests retrieving the total number of entries in the registry.
 - Lock overhead (ReadWriteLock instance)
 
 **Use Cases:**
-- Legacy applications already using OptimizedNameRegistry
+- Legacy applications already using EagerTrieRegistry
 - ⚠️ Consider migrating to LazyTrieRegistry for better performance
 
 ---
@@ -299,8 +299,8 @@ Tests retrieving the total number of entries in the registry.
 
 **Strengths:**
 - **Fastest direct lookups** (identity map fast path)
-- **Best subtree query performance** (46-108% faster than SimpleMap)
-- **Competitive write performance** (only 22-45% slower than SimpleMap)
+- **Best subtree query performance** (46-108% faster than FlatMap)
+- **Competitive write performance** (only 22-45% slower than FlatMap)
 - **Lazy trie construction** (zero overhead until first subtree query)
 - **Zero string splitting** (uses InternedName parent chain)
 - **Balanced performance** across all operations
@@ -332,16 +332,16 @@ Tests retrieving the total number of entries in the registry.
 
 | Category | Winner | 2nd Place | Notes |
 |----------|--------|-----------|-------|
-| **GET (direct)** | **LazyTrieRegistry** | SimpleMap | Identity map fast path |
-| **PUT (writes)** | SimpleMap | **LazyTrieRegistry** | LazyTrie only 22-45% slower |
-| **Subtree queries** | **LazyTrieRegistry** | Optimized | **46-108% faster than SimpleMap!** |
-| **Mixed workload** | SimpleMap | **LazyTrieRegistry** | LazyTrie 41% slower but balanced |
+| **GET (direct)** | **LazyTrieRegistry** | FlatMap | Identity map fast path |
+| **PUT (writes)** | FlatMap | **LazyTrieRegistry** | LazyTrie only 22-45% slower |
+| **Subtree queries** | **LazyTrieRegistry** | Eager | **46-108% faster than FlatMap!** |
+| **Mixed workload** | FlatMap | **LazyTrieRegistry** | LazyTrie 41% slower but balanced |
 | **Metadata ops** | **Tie (all)** | | All similar performance |
-| **Overall** | **LazyTrieRegistry** | SimpleMap | Best for production use |
+| **Overall** | **LazyTrieRegistry** | FlatMap | Best for production use |
 
 ### Key Performance Wins for LazyTrieRegistry
 
-1. **Subtree queries: 46-108% faster** than SimpleConcurrentMapRegistry ⭐⭐⭐
+1. **Subtree queries: 46-108% faster** than FlatMapRegistry ⭐⭐⭐
 2. **GET operations: Fastest** thanks to identity map
 3. **Balanced profile:** Never the slowest, often the fastest
 4. **Production-ready:** Good performance across diverse workloads
@@ -360,20 +360,20 @@ Tests retrieving the total number of entries in the registry.
 - ✅ Performance-critical monitoring systems
 - ✅ When you want best overall performance
 
-### Choose **SimpleConcurrentMapRegistry** for:
+### Choose **FlatMapRegistry** for:
 - ✅ Simple key-value storage
 - ✅ **No hierarchical query requirements**
 - ✅ Prototyping and testing
 - ✅ Absolute maximum write throughput
 - ⚠️ **Not recommended if subtree queries are needed**
 
-### Choose **BaselineNameRegistry** for:
+### Choose **StringSplitTrieRegistry** for:
 - ⚠️ Mixed Name implementations (not InternedName)
 - ⚠️ Read-only workloads with rare writes
 - ⚠️ Legacy compatibility only
 - ❌ **Not recommended for production** (slow writes)
 
-### Choose **OptimizedNameRegistry** for:
+### Choose **EagerTrieRegistry** for:
 - ⚠️ Legacy applications already using it
 - ⚠️ Consider migrating to LazyTrieRegistry
 - ❌ **Not recommended for new code**
@@ -382,19 +382,19 @@ Tests retrieving the total number of entries in the registry.
 
 ## Performance Scalability
 
-**SimpleConcurrentMapRegistry:**
+**FlatMapRegistry:**
 - Lookups: O(1) - constant
 - Inserts: O(1) - constant
 - Subtree: O(n) - **linear with registry size** ⚠️
 - Scales poorly for hierarchical queries
 
-**BaselineNameRegistry:**
+**StringSplitTrieRegistry:**
 - Lookups: O(1) - constant
 - Inserts: O(d) - linear with path depth (string split overhead)
 - Subtree: O(k) - linear with result size
 - Poor scalability for inserts ⚠️
 
-**OptimizedNameRegistry:**
+**EagerTrieRegistry:**
 - Lookups: O(1) - constant (identity fast path)
 - Inserts: O(d) - linear with path depth (eager trie + lock contention)
 - Subtree: O(k) - linear with result size
@@ -455,8 +455,8 @@ Based on comprehensive performance testing across direct lookups, insertions, hi
 
 LazyTrieRegistry provides the best overall balance of:
 - ✅ **Fastest direct lookups** via identity-based fast path
-- ✅ **Best-in-class subtree queries** (46-108% faster than SimpleMap)
-- ✅ **Competitive write performance** (only 22-45% slower than SimpleMap)
+- ✅ **Best-in-class subtree queries** (46-108% faster than FlatMap)
+- ✅ **Competitive write performance** (only 22-45% slower than FlatMap)
 - ✅ **Lazy trie construction** (zero overhead until needed)
 - ✅ **Zero-allocation** design using InternedName parent chain
 - ✅ **Balanced performance** across all operation types

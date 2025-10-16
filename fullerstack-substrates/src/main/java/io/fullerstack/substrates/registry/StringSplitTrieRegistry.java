@@ -9,13 +9,14 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
 /**
- * Baseline hierarchical registry using string splitting approach.
+ * Hierarchical registry using string splitting approach for eager trie construction.
  *
  * <p><b>Design:</b>
  * <ul>
  *   <li>Flat ConcurrentHashMap for O(1) direct lookups</li>
- *   <li>Trie structure for hierarchical subtree queries</li>
- *   <li>String splitting to extract path segments</li>
+ *   <li>Eager trie structure built on every insertion</li>
+ *   <li>String splitting to extract path segments (high overhead)</li>
+ *   <li>Works with any Name implementation</li>
  * </ul>
  *
  * <p><b>Performance characteristics:</b>
@@ -24,8 +25,12 @@ import java.util.function.Supplier;
  *   <li>put(): O(d) where d = depth (string splitting + trie insertion)</li>
  *   <li>subtree(): O(n) where n = subtree size</li>
  * </ul>
+ *
+ * <p><b>Use case:</b>
+ * When working with mixed Name implementations (not InternedName).
+ * Not recommended for production due to slow write performance.
  */
-public final class BaselineNameRegistry<T> {
+public final class StringSplitTrieRegistry<T> {
 
     /** O(1) direct lookups */
     private final ConcurrentMap<Name, T> flat = new ConcurrentHashMap<>();

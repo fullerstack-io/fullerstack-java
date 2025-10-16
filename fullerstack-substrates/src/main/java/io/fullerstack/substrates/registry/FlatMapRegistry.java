@@ -28,7 +28,7 @@ import java.util.function.Supplier;
  * Best when subtree queries are rare or not needed. Ideal for simple
  * key-value lookups where hierarchical structure is not important.
  */
-public final class SimpleConcurrentMapRegistry<T> {
+public final class FlatMapRegistry<T> {
 
     /** Simple flat map */
     private final ConcurrentMap<Name, T> map = new ConcurrentHashMap<>();
