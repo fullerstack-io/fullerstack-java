@@ -29,15 +29,27 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <p><b>How to Run</b>:
  * <pre>
- * mvn clean test-compile
- * mvn exec:java -Dexec.mainClass="io.fullerstack.substrates.benchmark.SubstratesLoadBenchmark"
+ * # Build the shaded JAR with all dependencies
+ * mvn clean package -DskipTests
+ *
+ * # Run all benchmarks
+ * java -jar target/benchmarks.jar
+ *
+ * # Run specific benchmarks (regex pattern)
+ * java -jar target/benchmarks.jar "SubstratesLoadBenchmark.benchmark(03|05|08)"
+ *
+ * # Run with custom JMH options
+ * java -jar target/benchmarks.jar -h  # Show help
  * </pre>
  *
+ * <p><b>⚠️ IMPORTANT</b>: Always use the shaded JAR (<code>target/benchmarks.jar</code>) to run benchmarks.
+ * Do NOT use <code>mvn exec:java</code> as it will fail with JMH forking classpath issues.
+ *
  * <p><b>JMH Configuration</b>:
- * - Warmup: 3 iterations × 2 seconds each
- * - Measurement: 5 iterations × 3 seconds each
- * - Fork: 2 JVM forks for statistical accuracy
- * - Threads: Varies by benchmark
+ * - Warmup: 2 iterations × 1 second each
+ * - Measurement: 3 iterations × 2 seconds each
+ * - Fork: 0 (in-process, for faster iteration during development)
+ * - Threads: 1 (except multi-threading benchmarks)
  *
  * @author Winston (Architect)
  */
@@ -46,7 +58,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @org.openjdk.jmh.annotations.State(org.openjdk.jmh.annotations.Scope.Benchmark)
 @Warmup(iterations = 2, time = 1)
 @Measurement(iterations = 3, time = 2)
-@Fork(value = 1, jvmArgs = {"-Xms512M", "-Xmx512M", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=10"})
+@Fork(value = 0)  // Run in-process to avoid JMH classpath issues
 public class SubstratesLoadBenchmark {
 
     // ========== Benchmark State ==========
@@ -375,22 +387,24 @@ public class SubstratesLoadBenchmark {
     /**
      * Run all benchmarks with JMH.
      *
-     * <p>Command line:
+     * <p><b>Recommended:</b> Build and run via shaded JAR:
      * <pre>
-     * mvn exec:java -Dexec.mainClass="io.fullerstack.substrates.benchmark.SubstratesLoadBenchmark"
+     * mvn clean package -DskipTests
+     * java -jar target/benchmarks.jar
      * </pre>
+     *
+     * <p>This main() method is for programmatic execution only.
      */
     public static void main(String[] args) throws Exception {
-        // Quick run: 1 fork, 2 warmup, 3 measurement for faster results
+        // Quick run: 0 forks (in-process), 2 warmup, 3 measurement for faster results
         Options opt = new OptionsBuilder()
             .include(SubstratesLoadBenchmark.class.getSimpleName())
-            .forks(1)
+            .forks(0)  // Run in-process to avoid classpath issues
             .warmupIterations(2)
             .warmupTime(org.openjdk.jmh.runner.options.TimeValue.seconds(1))
             .measurementIterations(3)
             .measurementTime(org.openjdk.jmh.runner.options.TimeValue.seconds(2))
             .threads(1)
-            .jvmArgs("-Xms512M", "-Xmx512M", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=10")
             .shouldFailOnError(true)
             .build();
 
