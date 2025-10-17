@@ -12,11 +12,17 @@ This is the **authoritative performance guide** for the Substrates framework, co
 
 ### Production-Ready Performance
 
-**Hot-Path (Critical for emission):**
-- **Pipe Emission: 3.3ns** - Blazingly fast metric emission
+**Hot-Path (Cached/Warm - steady-state after initialization):**
+- **Pipe Emission: 3.3ns** - Blazingly fast metric emission (cached pipe)
 - **Cached Lookups: 4-5ns** - Identity map fast path delivers 5× speedup
-- **Full Path: 101ns** - End-to-end lookup + emit
+- **Full Path: 101ns** - End-to-end get-or-create chain (all cached hits)
 - **Multi-threading: 26.7ns** - Excellent under 4-thread contention
+
+**Cold-Path (First-time creation - one-time startup cost):**
+- **Conduit Creation: ~60μs** - First call to `conduit()` creates new instance
+- **Pipe Creation: ~4μs** - First call to `get()` creates new pipe
+- **Name Creation: ~36ns** - Name parsing and interning
+- **Total Startup: ~64μs** per unique metric path (one-time only)
 
 **For Kafka Monitoring (100k metrics @ 1Hz):**
 - **CPU Overhead: 0.033%** - Negligible system impact
@@ -48,15 +54,27 @@ This is the **authoritative performance guide** for the Substrates framework, co
 
 ### Performance at a Glance
 
+**Warm/Cached (Steady-State Production Performance):**
+
 | Operation | Time | Throughput | Use Case |
 |-----------|------|------------|----------|
-| **Pipe Emission** | 3.3ns | 302M ops/sec | Metric collection hot-path |
-| **Pipe Lookup (Cached)** | 4.4ns | 227M ops/sec | Get cached pipe |
-| **Circuit Lookup (Cached)** | 5.1ns | 196M ops/sec | Get cached circuit |
-| **Full Path** | 101ns | 9.9M ops/sec | Lookup + emit combined |
+| **Pipe Emission** | 3.3ns | 302M ops/sec | Metric collection hot-path (cached pipe) |
+| **Pipe Lookup (Warm)** | 4.4ns | 227M ops/sec | Get-or-create pipe (cached hit) |
+| **Circuit Lookup (Warm)** | 5.1ns | 196M ops/sec | Get-or-create circuit (cached hit) |
+| **Conduit Lookup (Warm)** | 78.6ns | 12.7M ops/sec | Get-or-create conduit (cached hit) |
+| **Full Path (Warm)** | 101ns | 9.9M ops/sec | Full chain get-or-create (all cached) |
 | **Container Get** | 83.9ns | 11.9M ops/sec | Dynamic broker discovery |
 | **Subtree Query (Deep)** | 185ns | 5.4M ops/sec | Hierarchical metric queries |
 | **Multi-thread (4 threads)** | 26.7ns | 37.5M ops/sec | Concurrent emission |
+
+**Cold (First-Time Creation - One-Time Startup Cost):**
+
+| Operation | Time | Use Case |
+|-----------|------|----------|
+| **Conduit Creation** | ~60μs | First `conduit()` call for new metric type |
+| **Pipe Creation** | ~4μs | First `get()` call for new channel |
+| **Name Creation** | ~36ns | Parse and intern new hierarchical name |
+| **Full Cold Path** | ~64μs | Complete initialization of new metric path |
 
 ### Recommendations Matrix
 
@@ -149,7 +167,7 @@ Regression: 85% slower (was 42.4ns)
 
 ---
 
-### Full Path: Lookup + Emit
+### Full Path: Lookup + Emit (Warm/Cached)
 
 **Benchmark:** `SubstratesLoadBenchmark.benchmark08_fullPath_lookupAndEmit`
 
@@ -158,16 +176,70 @@ Time: 101ns ± 148ns
 Stable: +4% change (was 97.2ns)
 ```
 
-**Breakdown:**
-```
-Conduit lookup:  78.6ns  (was 42.4ns, +36ns)
-Pipe lookup:      4.4ns  (was 23.2ns, -19ns)
-Emission:         3.3ns  (was 6.6ns, -3ns)
-Overhead:        ~15ns   (method calls, etc.)
-Total:           101ns   (was 97ns, +4ns)
+**⚠️ IMPORTANT:** This is **warm/cached** performance - all lookups hit existing cached entries. This is **NOT** cold startup performance.
+
+**What this measures:**
+```java
+// This entire chain runs every iteration (all warm after first call)
+cortex.circuit(circuitName)         // Get-or-create circuit: ~5ns (cached)
+      .conduit(conduitName, ...)    // Get-or-create conduit: ~79ns (cached)
+      .get(channelName)             // Get-or-create pipe: ~4ns (cached)
+      .emit(value);                 // Emission: ~3ns
 ```
 
-**Key Insight:** Individual improvements offset regressions, maintaining stable end-to-end performance.
+**⚠️ CRITICAL:** All methods are **get-or-create** (using `computeIfAbsent`):
+- **First call:** Creates the object (~60μs for conduit, slower)
+- **Subsequent calls:** Returns cached instance (~79ns for conduit, fast)
+- **Benchmark measures:** Cached path after warmup (thousands of iterations)
+
+**Breakdown (all cached/warm):**
+```
+Circuit lookup:   ~5ns   (get-or-create circuit, cached hit)
+Conduit lookup:  78.6ns  (get-or-create conduit, cached hit, composite key)
+Pipe lookup:      4.4ns  (get-or-create pipe, cached hit, identity map fast path)
+Emission:         3.3ns  (hot path)
+Method overhead: ~10ns   (call stack, parameter passing)
+──────────────────────
+Total:           101ns   (steady-state, all warm)
+```
+
+**Cold vs Warm:**
+```
+COLD (first call):
+  Conduit creation: ~60μs  (new ConduitImpl + initialization)
+  Pipe creation:    ~4μs   (new PipeImpl + subscriber setup)
+  Total first call: ~64μs
+
+WARM (cached, what benchmark measures):
+  Conduit lookup:   79ns  (computeIfAbsent cache hit)
+  Pipe lookup:      4ns   (computeIfAbsent cache hit)
+  Total:           101ns
+```
+
+**Key Insights:**
+- ✅ **101ns is excellent** for full chain traversal with 3 map lookups + emission
+- ✅ **All lookups are warm** - this is steady-state performance, not cold startup
+- ✅ **Real hot-path is 3.3ns** when you cache the pipe reference (recommended pattern)
+- ⚠️ **Cold startup** (first-time creation) is much slower (~60μs for conduit creation, see Cold-Path section)
+
+**Recommended Usage Pattern:**
+```java
+// ✅ GOOD - Cache pipe, use hot path (3.3ns)
+Pipe<Long> pipe = circuit.conduit(name, Composer.pipe()).get(channelName);
+for (int i = 0; i < 1000; i++) {
+    pipe.emit(value);  // 3.3ns per emission
+}
+
+// ⚠️ ACCEPTABLE - Full chain each time (101ns) for occasional emissions
+circuit.conduit(name, Composer.pipe()).get(channelName).emit(value);
+
+// ❌ AVOID - Full chain in tight loop (wasteful)
+for (int i = 0; i < 1000; i++) {
+    circuit.conduit(name, Composer.pipe()).get(channelName).emit(value);  // 101ns × 1000!
+}
+```
+
+**For Production:** Cache pipe references and use the 3.3ns hot path. The 101ns full-path is for convenience or infrequent operations.
 
 ---
 
