@@ -13,6 +13,7 @@ This document covers advanced Substrates features and subsystems that go beyond 
 - [Tap Pattern](#tap-pattern)
 - [Pool Access Patterns](#pool-access-patterns)
 - [Container Type System](#container-type-system)
+- [Performance Optimization](#performance-optimization)
 
 ## Queue & Script Subsystem
 
@@ -732,6 +733,231 @@ teamAChatPipe.emit("Hello from team A!");
 - Hierarchical names maintain Subject tree: container → conduit → channel
 ```
 
+## Performance Optimization
+
+### Factory Pattern Selection
+
+Substrates uses three pluggable factories for performance optimization. Understanding when to use defaults vs custom implementations is crucial for optimal performance.
+
+#### Default Factories (Recommended for Production)
+
+```java
+// ✅ Use defaults - optimized for production
+Cortex cortex = new CortexRuntime();
+// Equivalent to:
+Cortex cortex = new CortexRuntime(
+    InternedNameFactory.getInstance(),      // Identity map fast path
+    LinkedBlockingQueueFactory.getInstance(), // Simple FIFO
+    LazyTrieRegistryFactory.getInstance()    // Dual-index with identity map
+);
+```
+
+**Performance Characteristics:**
+- **InternedName**: Weak reference interning enables pointer equality (==) for identity map lookups
+- **LazyTrieRegistry**: Identity map fast path (2-5ns) + fallback hash lookup (15-20ns) + lazy trie for hierarchical queries
+- **LinkedBlockingQueue**: Simple FIFO with blocking take for virtual threads
+
+#### Name Implementation Selection
+
+| Implementation | Use Case | Lookup Speed | Memory | Best For |
+|---------------|----------|--------------|--------|----------|
+| **InternedName** (default) | Production | 2-5ns (identity map) | Low (weak refs) | ✅ 99% of use cases |
+| LinkedName | Legacy | 15-20ns (hash) | Low | Compatibility |
+| SegmentArrayName | Specific | 15-20ns (hash) | Medium | Array operations |
+| LRUCachedName | High churn | Variable | High (cache) | Dynamic names |
+
+**Performance Impact:**
+```java
+// InternedName + LazyTrieRegistry = Identity map fast path
+Name name = nameFactory.createRoot("kafka.broker.1");
+Circuit circuit = cortex.circuit(name);  // 2-5ns lookup (pointer equality)
+
+// LinkedName + ConcurrentHashMap = Hash lookup
+Name name = linkedFactory.createRoot("kafka.broker.1");
+Circuit circuit = cortex.circuit(name);  // 15-20ns lookup (hashCode + equals)
+```
+
+#### Registry Implementation Selection
+
+| Implementation | Use Case | Lookup | Hierarchical Queries | Memory | Trie Construction |
+|---------------|----------|--------|---------------------|--------|------------------|
+| **LazyTrieRegistry** (default) | Production | 2-5ns (identity), 15-20ns (hash) | ✅ Lazy (on-demand) | 2× (dual index) | On first subtree query |
+| **FlatMapRegistry** | Simple cases | 15-20ns (hash only) | ❌ No | 1× | None |
+| **EagerTrieRegistry** | Frequent hierarchical | 15-20ns (hash) + trie | ✅ Eager (upfront) | 2.5× | On every insertion |
+| **StringSplitTrieRegistry** | Testing/compatibility | 15-20ns (hash) + trie | ✅ Eager (upfront) | 2× | String split per insert |
+
+**When to Use LazyTrieRegistry (Default):**
+- ✅ Hot-path performance critical (emission/lookups)
+- ✅ InternedName in use (identity map fast path enables 2-5ns lookups)
+- ✅ Occasional hierarchical queries needed
+- ✅ Production deployments
+- ❌ Memory constrained (uses 2× memory for dual index)
+
+**When to Use FlatMapRegistry:**
+- ✅ Memory constrained (single ConcurrentHashMap)
+- ✅ No hierarchical queries needed
+- ✅ Simple use cases without identity map optimization
+- ❌ Don't need identity map fast path
+- ❌ Don't need subtree queries
+
+**When to Use EagerTrieRegistry:**
+- ✅ Frequent hierarchical queries (trie pre-built)
+- ✅ Query performance more important than write performance
+- ✅ InternedName with parent chain (uses parent navigation)
+- ❌ Don't mind upfront trie construction cost on every insertion
+- ❌ Write-heavy workloads (trie rebuild overhead)
+
+**When to Use StringSplitTrieRegistry:**
+- ✅ Testing with mixed Name implementations
+- ✅ Compatibility when InternedName not available
+- ❌ **NOT recommended for production** (high string split overhead)
+- ❌ Performance-critical paths (slow writes)
+
+### Caching and Lookup Optimization
+
+#### Caching Pipes for Maximum Performance
+
+```java
+// ⚠️ ACCEPTABLE: Lookup each time (still fast with identity map)
+for (int i = 0; i < 1000000; i++) {
+    conduit.get(name).emit(value);  // ~7ns: lookup (4ns) + emit (3.3ns)
+}
+
+// ✅ BEST: Cache pipe for maximum performance
+Pipe<T> pipe = conduit.get(name);  // One-time lookup: 4ns
+for (int i = 0; i < 1000000; i++) {
+    pipe.emit(value);  // 3.3ns per emit
+}
+```
+
+**Performance Gain:** 2× faster (7ns → 3.3ns) - For ultra-high-frequency emissions, caching provides the absolute best performance
+
+#### Problem: Circuit/Conduit Creation in Loops
+
+```java
+// ❌ BAD: Creates/looks up circuit on every iteration
+for (BrokerMetric metric : metrics) {
+    Circuit circuit = cortex.circuit(cortex.name("kafka-cluster"));  // 5ns lookup each time
+    Conduit conduit = circuit.conduit(name, composer);  // 4ns lookup each time
+    // ...
+}
+
+// ✅ GOOD: Create once, reuse
+Circuit circuit = cortex.circuit(cortex.name("kafka-cluster"));  // One-time: 5ns
+Conduit conduit = circuit.conduit(name, composer);  // One-time: 4ns
+for (BrokerMetric metric : metrics) {
+    Pipe pipe = conduit.get(metric.name());
+    pipe.emit(metric.value());
+}
+```
+
+#### Hierarchical Query Optimization
+
+LazyTrieRegistry builds trie lazily on first hierarchical query:
+
+```java
+// First subtree query triggers trie construction
+LazyTrieRegistry<Circuit> registry = (LazyTrieRegistry<Circuit>) cortex.circuits;
+Map<Name, Circuit> brokers = registry.getSubtree(cortex.name("kafka.brokers"));
+// ← One-time cost: ~100-200μs for 1000 entries
+
+// Subsequent subtree queries are fast
+Map<Name, Circuit> consumers = registry.getSubtree(cortex.name("kafka.consumers"));
+// ← Fast: ~50-100ns (trie already built)
+```
+
+**Trade-off:**
+- ✅ Hot-path lookups stay fast (no trie overhead until needed)
+- ✅ Hierarchical queries available when needed
+- ❌ First hierarchical query pays construction cost
+
+### Performance Budget for Kafka Monitoring
+
+Real-world example: Monitoring 100 Kafka brokers with 1000 metrics each at 1Hz.
+
+**Scenario:**
+- 100 brokers × 1000 metrics = 100,000 metrics
+- 1Hz emission rate = 100,000 emissions/sec
+- Per-metric operations: lookup + emit
+
+**Cost Analysis:**
+
+| Operation | Time | Cost per Metric | Total/sec |
+|-----------|------|-----------------|-----------|
+| Cached pipe lookup | 4ns | 4ns | 400μs |
+| Pipe emission | 3.3ns | 3.3ns | 330μs |
+| **Total** | **7.3ns** | **7.3ns** | **730μs** |
+
+**CPU Utilization:** 730μs / 1000ms = **0.073% of one CPU core**
+
+**With 4 CPU cores:** 0.073% / 4 = **0.018% total CPU**
+
+**Performance Headroom:**
+- Current: 100k metrics @ 1Hz = 0.073% CPU
+- 10Hz rate: 1M emissions/sec = 0.73% CPU
+- 100Hz rate: 10M emissions/sec = 7.3% CPU
+- **100× headroom** available
+
+### Memory Considerations
+
+#### LazyTrieRegistry Memory Overhead
+
+```java
+// LazyTrieRegistry has 2× memory overhead (dual index)
+Map<Name, Circuit> circuits = new LazyTrieRegistry<>();
+circuits.put(name, circuit);
+// Stored in:
+// 1. identityMap (IdentityHashMap) - for fast path
+// 2. registry (ConcurrentHashMap) - for fallback
+// Total: 2 map entries per item
+```
+
+**When Memory is Constrained:**
+```java
+// Use FlatMapRegistry (single hash map)
+Cortex cortex = new CortexRuntime(
+    InternedNameFactory.getInstance(),
+    LinkedBlockingQueueFactory.getInstance(),
+    FlatMapRegistryFactory.getInstance()  // 1× memory, no identity map
+);
+```
+
+**Trade-off:** Lookups become 15-20ns (hash only) instead of 2-5ns (identity map)
+
+#### InternedName Memory Management
+
+```java
+// InternedName uses weak references - GC automatically cleans up
+Name name1 = nameFactory.createRoot("temporary.metric");
+name1 = null;  // Weak reference allows GC when no strong refs remain
+```
+
+**Memory Safety:**
+- Weak reference interning prevents memory leaks
+- Names GC'd when no longer referenced
+- Automatic cleanup, no manual management needed
+
+### Benchmarking Your Use Case
+
+```java
+// Run SubstratesLoadBenchmark to measure your workload
+@Benchmark
+public void yourWorkload(Blackhole bh) {
+    // Your code here
+    Pipe<T> pipe = conduit.get(cachedName);
+    pipe.emit(value);
+    bh.consume(pipe);
+}
+```
+
+**Key Metrics to Track:**
+1. **Cached lookups:** Should be 2-5ns with identity map
+2. **Hot-path emission:** Should be ~3.3ns
+3. **Full path (lookup + emit):** Should be <10ns for cached names
+4. **Memory usage:** Monitor heap for LazyTrieRegistry overhead
+
+See [Performance Guide](PERFORMANCE.md) for comprehensive benchmark results and analysis.
+
 ## Best Practices
 
 ### Queue & Script
@@ -764,8 +990,24 @@ teamAChatPipe.emit("Hello from team A!");
 2. **Conduits as processing units** - Each conduit = computational step
 3. **Container for pools** - Manage multiple device shadows
 
+### Performance Optimization
+
+1. **Use default factories** - InternedName + LazyTrieRegistry optimized for production
+2. **Cache pipes** - Get once, emit many times (30× faster)
+3. **Monitor hot paths** - Profile with JMH benchmarks
+4. **Choose registry wisely** - LazyTrie for performance, FlatMap for memory
+5. **Measure your workload** - Run SubstratesLoadBenchmark with your patterns
+
+### Factory Selection
+
+1. **InternedName (default)** - Best for 99% of use cases, enables identity map fast path
+2. **LazyTrieRegistry (default)** - Best overall performance, 2-5ns lookups
+3. **FlatMapRegistry** - Use when memory constrained, 15-20ns lookups
+4. **EagerTrieRegistry** - Use when frequent hierarchical queries
+
 ## See Also
 
 - [Core Concepts](CONCEPTS.md) - Fundamental abstractions
 - [Architecture Guide](ARCHITECTURE.md) - Design and implementation
-- [Examples](examples/) - Practical code examples
+- [Performance Guide](PERFORMANCE.md) - Comprehensive performance analysis
+- [Examples](examples/README.md) - Practical code examples

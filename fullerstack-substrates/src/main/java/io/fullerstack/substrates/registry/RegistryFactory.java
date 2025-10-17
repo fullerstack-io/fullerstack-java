@@ -1,5 +1,8 @@
 package io.fullerstack.substrates.registry;
 
+import io.humainary.substrates.api.Substrates.Name;
+import java.util.Map;
+
 /**
  * Factory interface for creating Registry implementations.
  *
@@ -65,6 +68,9 @@ public interface RegistryFactory {
 
     /**
      * Creates a new Registry instance.
+     *
+     * <p><b>Note:</b> {@link LazyTrieRegistry} implements {@link Map} interface,
+     * so callers can cast the result to {@code Map<Name, T>} when using LazyTrieRegistryFactory.
      *
      * @param <T> the type of values stored in the registry
      * @return a new Registry implementation

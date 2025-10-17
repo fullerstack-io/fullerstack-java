@@ -11,7 +11,7 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>substrates-java</artifactId>
+    <artifactId>fullerstack-substrates</artifactId>
     <packaging>jar</packaging>
 
     <name>Substrates (Java)</name>

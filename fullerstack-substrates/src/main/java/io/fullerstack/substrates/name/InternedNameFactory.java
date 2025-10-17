@@ -7,7 +7,7 @@ import java.util.Objects;
 /**
  * Factory for creating InternedName instances.
  *
- * <p>This is the <b>recommended factory for production use</b>. It creates
+ * <p>This is the <b>recommended factory for general use</b>. It creates
  * {@link InternedName} instances which use weak reference interning for
  * memory efficiency and fast equality checks.
  *

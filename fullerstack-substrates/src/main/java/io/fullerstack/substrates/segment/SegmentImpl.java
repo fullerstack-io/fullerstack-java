@@ -11,6 +11,10 @@ import java.util.function.*;
 /**
  * Implementation of Substrates.Segment for emission transformation pipelines.
  *
+ * <p><b>Note:</b> Segment is the current name for what was originally called "Path" in early
+ * Humainary blog articles. The API evolved to use "Segment" to better align with the
+ * "assembly line" metaphor where each segment performs specific operations on emissions.
+ *
  * <p>Segment provides a fluent API for building transformation pipelines that are applied
  * to emissions flowing through a Pipe. Transformations include filtering, mapping, reducing,
  * sampling, and comparison-based sifting.
@@ -26,7 +30,7 @@ import java.util.function.*;
  * <p>Usage (from blog examples):
  * <pre>
  * channel.pipe(
- *   path -> path
+ *   segment -> segment
  *     .guard(value -> value > 0)
  *     .limit(10)
  *     .reduce(0, Integer::sum)
@@ -34,6 +38,8 @@ import java.util.function.*;
  * </pre>
  *
  * @param <E> emission type
+ * @see <a href="https://humainary.io/blog/observability-x-channels/">Observability X - Channels</a>
+ * @see <a href="https://humainary.io/blog/observability-x-staging-state/">Observability X - Staging State</a>
  */
 public class SegmentImpl<E> implements Segment<E> {
 

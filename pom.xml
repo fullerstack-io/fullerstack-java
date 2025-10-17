@@ -20,10 +20,10 @@
     </modules>
 
     <properties>
-        <!-- Java 24 -->
-        <java.version>24</java.version>
-        <maven.compiler.source>24</maven.compiler.source>
-        <maven.compiler.target>24</maven.compiler.target>
+        <!-- Java 25 -->
+        <java.version>25</java.version>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Dependency Versions -->
@@ -83,12 +83,12 @@
             <!-- Fullerstack modules -->
             <dependency>
                 <groupId>io.fullerstack</groupId>
-                <artifactId>substrates-java</artifactId>
+                <artifactId>fullerstack-substrates</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.fullerstack</groupId>
-                <artifactId>serventis-signals-java</artifactId>
+                <artifactId>fullerstack-serventis</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

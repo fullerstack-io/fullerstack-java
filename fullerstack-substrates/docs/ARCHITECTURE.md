@@ -13,7 +13,7 @@ This document explains the architecture and design principles of the Fullerstack
 
 ## Overview
 
-Substrates implements an event-driven architecture for observability, based on William Louth's vision of **semiotic observability**. The system routes emissions from producers (Channels) to consumers (Subscriber Pipes) through a central processing engine (Circuit).
+Substrates implements an event-driven architecture for observability, based on William Louth's vision of **semiotic observability**. The system routes emissions from producer code (using Pipes) to consumer code (using registered Pipes) through Conduits, Channels, and Sources, all coordinated by a central Circuit.
 
 ### High-Level Architecture
 
@@ -58,22 +58,27 @@ Substrates implements an event-driven architecture for observability, based on W
 - `close()` - Closes all managed resources
 
 **Implementation Details:**
-- Uses `ConcurrentHashMap` for thread-safe component caching
+- Uses `LazyTrieRegistry` (implements Map) for component caching with identity map fast path
 - Implements lazy initialization via `computeIfAbsent()`
 - **Name is the cache key** - same Name returns same instance
+- **RegistryFactory injected** for pluggable registry implementations
 - Daemon virtual threads auto-cleanup on JVM shutdown
 
 **Caching Pattern:**
 ```java
 // CircuitImpl.java
-private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
+@SuppressWarnings("unchecked")
+public CircuitImpl(Name name, NameFactory nameFactory, QueueFactory queueFactory, RegistryFactory registryFactory) {
+    // ...
+    this.clocks = (Map<Name, Clock>) registryFactory.create();  // LazyTrieRegistry by default
+}
 
 public Clock clock(Name name) {
-    return clocks.computeIfAbsent(name, ClockImpl::new);  // ← Singleton per Name
+    return clocks.computeIfAbsent(name, ClockImpl::new);  // ← Singleton per Name, identity map fast path
 }
 
 public Clock clock() {
-    return clock(NameImpl.of("clock"));  // ← Uses type-based default name
+    return clock(nameFactory.createRoot("clock"));  // ← Uses type-based default name
 }
 ```
 
@@ -96,26 +101,30 @@ assert c1 != c3;  // ✅ Different instance
 
 ### Conduit
 
-**Role:** Routes emissions from Channels (producers) to Pipes (consumers).
+**Role:** Creates named Channels and routes emissions from producer Pipes to consumer Pipes via Source subscription.
 
 **Data Flow:**
 ```
-Channel.emit(value)
+Producer code: conduit.get(name) → returns Pipe (backed by Channel)
   ↓
-Pipe.emit(value) [applies transformations if configured]
+Producer code: pipe.emit(value)
+  ↓
+Pipe applies transformations (if configured via Sequencer)
   ↓
 Early exit if no subscribers (optimization)
   ↓
-Synchronous callback to Source.emissionHandler()
+Synchronous emission to Source
   ↓
 Source notifies all Subscribers
   ↓
 Subscriber.accept() registers consumer Pipes (lazy, first emission)
   ↓
 Consumer Pipes receive emission
+  ↓
+Consumer code processes value
 ```
 
-**Performance Optimization:** Pipe emission is synchronous (no queue posting) for sub-nanosecond hot-path performance. This means subscriber callbacks execute in the emitter's thread. See [Performance Analysis](performance-analysis.md) for benchmarks.
+**Performance Optimization:** Pipe emission is synchronous (no queue posting) for sub-nanosecond hot-path performance. This means subscriber callbacks execute in the emitter's thread. See [Performance Guide](PERFORMANCE.md) for benchmarks.
 
 **Key Components:**
 - **Composer** - Transforms Channel into Percept (e.g., Pipe, custom domain object)
@@ -124,14 +133,15 @@ Consumer Pipes receive emission
 - **Circuit Queue** - Available for async coordination via queue.post(Script)
 
 **Implementation Details:**
-- Percepts (Channels) cached by Name in `ConcurrentHashMap`
-- Source caches registered Pipes per Subject per Subscriber
-- Early subscriber check optimization (hasSubscribers() → 6.6ns hot path)
+- Percepts (instruments wrapping Channels) cached by Name in LazyTrieRegistry (identity map fast path)
+- Source caches registered Pipes per Channel Subject (keyed by Subject Name) per Subscriber
+- Early subscriber check optimization (hasSubscribers() → 3.3ns hot path with identity map)
 - Synchronous emission handler for minimal latency
+- RegistryFactory propagated from Circuit for consistent registry implementation
 
 ### Channel
 
-**Role:** Entry point where producers emit data into a Conduit.
+**Role:** Named connector that links producers and consumers; provides access to a Pipe for emission.
 
 **Characteristics:**
 - Named entry point (has Subject)
@@ -183,7 +193,7 @@ When container.get(newName):
 **Implementation Pattern:**
 ```java
 // ContainerImpl.java
-private final Map<Name, Conduit<P, E>> conduits = new ConcurrentHashMap<>();
+private final Map<Name, Conduit<P, E>> conduits;  // LazyTrieRegistry via RegistryFactory
 private final SourceImpl<Source<E>> containerSource;
 
 public Pool<P> get(Name name) {
@@ -281,18 +291,21 @@ Pool<Pipe<Order>> applePool2 = stockOrders.get(cortex.name("AAPL"));
 
 ### Source
 
-**Role:** Observable event stream that Subscribers can subscribe to.
+**Role:** Observable context that Subscribers can subscribe to for dynamic observation of Subjects/Channels.
 
 **Characteristics:**
-- Provides `subscribe(Subscriber)` method
-- Notifies subscribers when emissions occur
+- Obtained from Context (Conduit provides Source via `source()`)
+- Provides `subscribe(Subscriber)` method for dynamic observation
+- Notifies subscribers when Subjects emit
 - Returns Subscription for lifecycle control
+- Enables conditional Pipe registration based on Subject characteristics
 
 **Implementation (SourceImpl):**
-- Implements both `Source` and `Pipe` interfaces
-- Source interface: external code subscribes
-- Pipe interface: Conduit emits to it
-- Acts as event dispatcher
+- Implements `Source` interface for subscription management
+- Manages subscribers with thread-safe CopyOnWriteArrayList
+- Caches registered Pipes per Channel Subject per Subscriber
+- Provides emission handler callback for sibling Channels to dispatch emissions
+- Acts as observable context coordinating emission to all registered consumer Pipes
 
 ### Subscriber
 
@@ -442,7 +455,7 @@ scope.close();
 ### Complete Emission Flow
 
 ```
-1. Producer Side (Channel)
+1. Producer Side
    ┌──────────────────────────────────────┐
    │ conduit.get(name)                    │
    │   → Creates/retrieves Channel        │
@@ -484,12 +497,17 @@ scope.close();
    └──────────────────────────────────────┘
 ```
 
-**Performance:** All operations are synchronous for minimal latency:
-- Pipe emission: ~6.6ns (hot path with early subscriber check)
-- Full path (lookup + emit): ~97ns
+**Performance:** All operations are synchronous for minimal latency with identity map fast path:
+- Pipe emission: ~3.3ns (hot path with identity map + early subscriber check)
+- Cached pipe lookup: ~4ns (identity map fast path)
+- Full path (lookup + emit): ~101ns
 - Multi-threaded (4 threads): ~27ns per thread
 
-See [Performance Analysis](performance-analysis.md) for detailed benchmarks.
+**Performance Improvement from LazyTrieRegistry Integration:**
+- Hot-path emission: 6.6ns → 3.3ns (2× faster)
+- Cached lookups: 23-28ns → 4-5ns (5× faster via identity map)
+
+See [Performance Guide](PERFORMANCE.md) for comprehensive benchmarks and analysis.
 
 ### Transformation Flow (with Sequencer)
 
@@ -519,47 +537,79 @@ If value filtered out → Early return (no allocation)
 
 ## Design Principles
 
-### 1. Name-Based Component Caching
+### 1. Name-Based Component Caching with Factory Injection
 
-**Pattern:** Components are cached by Name using `Map.computeIfAbsent()`.
+**Pattern:** Components are cached by Name using `Map.computeIfAbsent()` with pluggable RegistryFactory.
 
-**Architecture:**
+**Factory Architecture:**
+```
+CortexRuntime (Entry Point)
+    ├── NameFactory (creates interned Names)
+    ├── QueueFactory (creates Queues)
+    ├── RegistryFactory (creates LazyTrieRegistry)  ← NEW: Pluggable registry
+    │
+    └── Propagates factories down the hierarchy
+            ├── Circuit (receives all 3 factories)
+            ├── Conduit (receives registryFactory)
+            └── Scope (receives registryFactory)
+```
+
+**Component Caching with LazyTrieRegistry:**
 ```
 CortexRuntime (Global)
-    ├── circuits: Map<Name, Circuit>     ← Level 1: Circuit cache by Name
+    ├── circuits: LazyTrieRegistry<Circuit>     ← Level 1: Circuit cache with identity map
+    ├── scopes: LazyTrieRegistry<Scope>         ← Level 1: Scope cache with identity map
     │
     └── Each Circuit contains:
-            ├── clocks: Map<Name, Clock>      ← Level 2: Clock cache by Name
-            └── conduits: Map<Name, Conduit>  ← Level 2: Conduit cache by Name
+            ├── clocks: LazyTrieRegistry<Clock>      ← Level 2: Clock cache with identity map
+            └── conduits: LazyTrieRegistry<Conduit>  ← Level 2: Conduit cache with identity map
 ```
 
-**Two-Level Caching:**
-
-**Level 1 - Cortex caches Circuits:**
+**Level 1 - Cortex caches Circuits and Scopes:**
 ```java
 // CortexRuntime.java
-private final Map<Name, Circuit> circuits = new ConcurrentHashMap<>();
+@SuppressWarnings("unchecked")
+public CortexRuntime(NameFactory nameFactory, QueueFactory queueFactory, RegistryFactory registryFactory) {
+    this.nameFactory = nameFactory;
+    this.queueFactory = queueFactory;
+    this.registryFactory = registryFactory;
+
+    // LazyTrieRegistry provides identity map fast path
+    this.circuits = (Map<Name, Circuit>) registryFactory.create();
+    this.scopes = (Map<Name, Scope>) registryFactory.create();
+
+    Name cortexName = nameFactory.createRoot("cortex");
+    this.defaultScope = new ScopeImpl(cortexName, registryFactory);
+}
 
 public Circuit circuit(Name name) {
-    return circuits.computeIfAbsent(name, this::createCircuit);
+    return circuits.computeIfAbsent(name, this::createCircuit);  // Identity map: 2-5ns
 }
 
 public Circuit circuit() {
-    return circuit(NameImpl.of("circuit"));  // Type-based default name
+    return circuit(nameFactory.createRoot("circuit"));  // Type-based default name
 }
 ```
 
 **Level 2 - Circuit caches Clocks and Conduits:**
 ```java
 // CircuitImpl.java
-private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
-private final Map<ConduitKey, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
+@SuppressWarnings("unchecked")
+public CircuitImpl(Name name, NameFactory nameFactory, QueueFactory queueFactory, RegistryFactory registryFactory) {
+    this.nameFactory = nameFactory;
+    this.queueFactory = queueFactory;
+    this.registryFactory = registryFactory;
+
+    // LazyTrieRegistry with identity map fast path
+    this.clocks = (Map<Name, Clock>) registryFactory.create();
+    this.conduits = (Map<ConduitKey, Conduit<?, ?>>) registryFactory.create();
+}
 
 // Composite key for Conduit caching (Name + Composer type)
 private record ConduitKey(Name name, Class<?> composerClass) {}
 
 public Clock clock(Name name) {
-    return clocks.computeIfAbsent(name, ClockImpl::new);
+    return clocks.computeIfAbsent(name, ClockImpl::new);  // Identity map fast path
 }
 
 public <P, E> Conduit<P, E> conduit(Name name, Composer<? extends P, E> composer) {
@@ -567,24 +617,50 @@ public <P, E> Conduit<P, E> conduit(Name name, Composer<? extends P, E> composer
     Name hierarchicalName = circuitSubject.name().name(name);
 
     ConduitKey key = new ConduitKey(name, composer.getClass());
-    return conduits.computeIfAbsent(key, k -> new ConduitImpl<>(hierarchicalName, composer, queue));
+    return conduits.computeIfAbsent(key, k ->
+        new ConduitImpl<>(hierarchicalName, composer, queue, registryFactory, sequencer)
+    );
 }
 ```
 
-**Name = Cache Key, Id = Instance Identity:**
+**Identity Map Fast Path Performance:**
 
-Every component has **two identities**:
+The combination of **InternedName** (via NameFactory) + **LazyTrieRegistry** (via RegistryFactory) provides dramatic performance improvement:
 
-1. **`Name`** - Semantic identity for **pooling/caching**
+```java
+// InternedName ensures pointer equality
+Name name1 = nameFactory.createRoot("kafka.broker.1");
+Name name2 = nameFactory.createRoot("kafka.broker.1");
+assert name1 == name2;  // ✅ Same instance (interned)
+
+// LazyTrieRegistry uses identity map for O(1) lookup
+Circuit c = circuits.computeIfAbsent(name1, this::createCircuit);
+// → identityMap.get(name1)  // 2ns via pointer equality (==)
+// → Fallback to hash map if identity miss: 15-20ns
+```
+
+**Performance Results:**
+- Cached circuit lookups: 28ns → 5ns (5× faster)
+- Cached pipe lookups: 23ns → 4ns (5× faster)
+- Hot-path emission: 6.6ns → 3.3ns (2× faster)
+
+**Name = External Cache Key, Id = Component Identity:**
+
+**Key Design Principle:** Name is **external infrastructure**, not a component property:
+
+1. **`Name`** - External key in the registry/namespace
+   - Name is the KEY, component is the VALUE in `Map<Name, Component>`
+   - Component doesn't store its own Name - Name identifies the component externally
    - Used as cache key in `Map.computeIfAbsent(name, ...)`
    - Type-based default names like `"circuit"`, `"conduit"`, `"clock"` create singletons
    - Custom names allow multiple instances per Circuit
-   - **Conduits also keyed by Composer type** (different Composers create different Conduits)
+   - **Conduits keyed by (Name, Composer type)** - different Composers create different Conduits
 
-2. **`Id`** - Unique instance identity
-   - Each instance gets a unique UUID
+2. **`Id`** - Component's actual identity
+   - Each component instance gets a unique UUID
    - Generated once during construction
-   - Used in Subject for instance tracking
+   - Stored in component's Subject for instance tracking
+   - This is the component's **internal identity**, not the external registry key
 
 **Example:**
 ```java
@@ -700,7 +776,6 @@ private final Pipe<E> emitter;
 private final SourceImpl<E> source;
 ```
 
-**Rationale:** Aligns with William Louth's precise architectural vision, enables flexibility.
 
 ### 3. @Temporal Types Are Not Retained
 
@@ -800,10 +875,18 @@ while (!Thread.currentThread().isInterrupted()) {
 
 ### Thread Safety
 
-- **ConcurrentHashMap** for component caches
+- **LazyTrieRegistry** (implements Map) for component caches - dual-index with ConcurrentHashMap + IdentityHashMap
 - **CopyOnWriteArrayList** for subscriber lists
 - **BlockingQueue** for emission queuing
-- **volatile** for closed flags
+- **volatile** for closed flags and trie root
+
+**Registry Thread Safety:**
+```java
+// LazyTrieRegistry uses thread-safe structures
+private final Map<Name, T> identityMap = new IdentityHashMap<>();  // Synchronized access
+private final Map<Name, T> registry = new ConcurrentHashMap<>();   // Concurrent access
+private volatile TrieNode<T> trieRoot = null;                       // Volatile for lazy construction
+```
 
 ## Resource Lifecycle
 
@@ -854,12 +937,15 @@ sub.close();
 
 ## Performance Considerations
 
-### Subscriber Performance
+### Emission Performance
 
-From William Louth's blog:
-- 29 ns per leaf emit call (Mac M4)
-- 6 ns per Pipe emit
-- Efficient multi-dispatch
+Fullerstack implementation benchmarks (with identity map optimization):
+- **Hot-path emission:** 3.3ns (cached pipe, early subscriber check)
+- **Cached pipe lookup:** 4ns (identity map fast path)
+- **Full path (lookup + emit):** 101ns (includes circuit/conduit/channel traversal)
+- **Multi-threaded (4 threads):** ~27ns per thread (concurrent emissions)
+
+See [Performance Guide](PERFORMANCE.md) for comprehensive benchmarks and methodology.
 
 ### Queue Sizing
 

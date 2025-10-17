@@ -12,6 +12,9 @@ import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.name.NameFactory;
 import io.fullerstack.substrates.name.InternedNameFactory;
+import io.fullerstack.substrates.registry.LazyTrieRegistry;
+import io.fullerstack.substrates.registry.RegistryFactory;
+import io.fullerstack.substrates.registry.LazyTrieRegistryFactory;
 
 import java.util.Map;
 import java.util.Objects;
@@ -39,10 +42,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CircuitImpl implements Circuit {
     private final NameFactory nameFactory;
     private final QueueFactory queueFactory;
+    private final RegistryFactory registryFactory;
     private final Subject circuitSubject;
     private final Source<State> stateSource;
     private final Queue queue; // Virtual thread is daemon - auto-cleanup on JVM shutdown
-    private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
+    private final Map<Name, Clock> clocks;
     private final Map<ConduitKey, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
     private final Map<ContainerKey, Container<?, ?>> containers = new ConcurrentHashMap<>();
     private volatile boolean closed = false;
@@ -63,23 +67,23 @@ public class CircuitImpl implements Circuit {
 
     /**
      * Creates a circuit with the specified name using defaults:
-     * {@link InternedNameFactory} and {@link LinkedBlockingQueueFactory}.
+     * {@link InternedNameFactory}, {@link LinkedBlockingQueueFactory}, and {@link LazyTrieRegistryFactory}.
      *
      * @param name circuit name
      */
     public CircuitImpl(Name name) {
-        this(name, InternedNameFactory.getInstance(), LinkedBlockingQueueFactory.getInstance());
+        this(name, InternedNameFactory.getInstance(), LinkedBlockingQueueFactory.getInstance(), LazyTrieRegistryFactory.getInstance());
     }
 
     /**
      * Creates a circuit with the specified name and custom {@link NameFactory},
-     * using default {@link LinkedBlockingQueueFactory}.
+     * using default {@link LinkedBlockingQueueFactory} and {@link LazyTrieRegistryFactory}.
      *
      * @param name circuit name
      * @param nameFactory the factory to use for creating Name instances
      */
     public CircuitImpl(Name name, NameFactory nameFactory) {
-        this(name, nameFactory, LinkedBlockingQueueFactory.getInstance());
+        this(name, nameFactory, LinkedBlockingQueueFactory.getInstance(), LazyTrieRegistryFactory.getInstance());
     }
 
     /**
@@ -88,11 +92,15 @@ public class CircuitImpl implements Circuit {
      * @param name circuit name
      * @param nameFactory the factory to use for creating Name instances
      * @param queueFactory the factory to use for creating Queue instances
+     * @param registryFactory the factory to use for creating Registry instances
      */
-    public CircuitImpl(Name name, NameFactory nameFactory, QueueFactory queueFactory) {
+    @SuppressWarnings("unchecked")
+    public CircuitImpl(Name name, NameFactory nameFactory, QueueFactory queueFactory, RegistryFactory registryFactory) {
         Objects.requireNonNull(name, "Circuit name cannot be null");
         this.nameFactory = Objects.requireNonNull(nameFactory, "NameFactory cannot be null");
         this.queueFactory = Objects.requireNonNull(queueFactory, "QueueFactory cannot be null");
+        this.registryFactory = Objects.requireNonNull(registryFactory, "RegistryFactory cannot be null");
+        this.clocks = (Map<Name, Clock>) registryFactory.create();
         Id id = IdImpl.generate();
         this.circuitSubject = new SubjectImpl(
             id,
@@ -152,7 +160,7 @@ public class CircuitImpl implements Circuit {
         @SuppressWarnings("unchecked")
         Conduit<P, E> conduit = (Conduit<P, E>) conduits.computeIfAbsent(
             key,
-            k -> new io.fullerstack.substrates.conduit.ConduitImpl<>(hierarchicalName, composer, queue)
+            k -> new io.fullerstack.substrates.conduit.ConduitImpl<>(hierarchicalName, composer, queue, registryFactory)
         );
         return conduit;
     }
@@ -174,7 +182,7 @@ public class CircuitImpl implements Circuit {
         @SuppressWarnings("unchecked")
         Conduit<P, E> conduit = (Conduit<P, E>) conduits.computeIfAbsent(
             key,
-            k -> new io.fullerstack.substrates.conduit.ConduitImpl<>(hierarchicalName, composer, queue, sequencer)
+            k -> new io.fullerstack.substrates.conduit.ConduitImpl<>(hierarchicalName, composer, queue, registryFactory, sequencer)
         );
         return conduit;
     }

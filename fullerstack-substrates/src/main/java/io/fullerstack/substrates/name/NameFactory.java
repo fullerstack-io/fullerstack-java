@@ -21,7 +21,7 @@ import java.util.function.Function;
  *
  * <p><b>Available implementations:</b>
  * <ul>
- *   <li>{@link InternedNameFactory} - Recommended for production (weak interning)</li>
+ *   <li>{@link InternedNameFactory} - Recommended default (weak interning)</li>
  *   <li>{@link LinkedNameFactory} - Simple linked list (baseline)</li>
  *   <li>{@link SegmentArrayNameFactory} - Array-backed with O(1) depth</li>
  *   <li>{@link LRUCachedNameFactory} - Strong LRU cache (10k entries)</li>

@@ -11,7 +11,7 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>serventis-signals-java</artifactId>
+    <artifactId>fullerstack-serventis</artifactId>
     <packaging>jar</packaging>
 
     <name>Serventis Signals (Java)</name>

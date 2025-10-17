@@ -43,7 +43,7 @@ This document compares FOUR implementations of Name-based object registries, eva
 
 ### Recommendation
 
-**Use LazyTrieRegistry with InternedName for production.** It provides:
+**Use LazyTrieRegistry with InternedName as the recommended default.** It provides:
 - Excellent direct lookup performance (fastest via identity map fast path)
 - Best-in-class hierarchical subtree queries (46-108% faster than FlatMap)
 - Competitive write performance (only 22-45% slower than FlatMap)
@@ -344,7 +344,7 @@ Tests retrieving the total number of entries in the registry.
 1. **Subtree queries: 46-108% faster** than FlatMapRegistry ⭐⭐⭐
 2. **GET operations: Fastest** thanks to identity map
 3. **Balanced profile:** Never the slowest, often the fastest
-4. **Production-ready:** Good performance across diverse workloads
+4. **Performant across diverse workloads:** Good performance for various use cases
 5. **Lazy design:** No overhead until trie actually needed
 
 ---
@@ -460,9 +460,9 @@ LazyTrieRegistry provides the best overall balance of:
 - ✅ **Lazy trie construction** (zero overhead until needed)
 - ✅ **Zero-allocation** design using InternedName parent chain
 - ✅ **Balanced performance** across all operation types
-- ✅ **Production-ready** without tuning or configuration
+- ✅ **Performant** without requiring tuning or configuration
 
-When paired with **InternedName** (the recommended Name implementation), LazyTrieRegistry provides production-grade performance for all registry operations without requiring manual tuning or cache management.
+When paired with **InternedName** (the recommended Name implementation), LazyTrieRegistry provides excellent performance for all registry operations without requiring manual tuning or cache management.
 
 **Key Insight:** The lazy trie design eliminates the overhead of eager dual-index maintenance while delivering superior subtree query performance when needed. This makes LazyTrieRegistry the optimal choice for production monitoring systems.
 

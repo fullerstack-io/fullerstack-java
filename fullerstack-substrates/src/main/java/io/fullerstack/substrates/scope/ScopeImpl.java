@@ -5,12 +5,14 @@ import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.closure.ClosureImpl;
+import io.fullerstack.substrates.registry.LazyTrieRegistry;
+import io.fullerstack.substrates.registry.RegistryFactory;
+import io.fullerstack.substrates.registry.LazyTrieRegistryFactory;
 
 import java.util.Deque;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
@@ -25,7 +27,8 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class ScopeImpl implements Scope {
     private final Name name;
     private final Scope parent;
-    private final Map<Name, Scope> childScopes = new ConcurrentHashMap<>();
+    private final RegistryFactory registryFactory;
+    private final Map<Name, Scope> childScopes;
     private final Deque<Resource> resources = new ConcurrentLinkedDeque<>();
     private volatile boolean closed = false;
 
@@ -33,23 +36,47 @@ public class ScopeImpl implements Scope {
     private final Subject scopeSubject;
 
     /**
-     * Creates a root scope.
+     * Creates a root scope with default {@link LazyTrieRegistryFactory}.
      *
      * @param name scope name
      */
     public ScopeImpl(Name name) {
-        this(name, null);
+        this(name, null, LazyTrieRegistryFactory.getInstance());
     }
 
     /**
-     * Creates a child scope.
+     * Creates a root scope with custom {@link RegistryFactory}.
+     *
+     * @param name scope name
+     * @param registryFactory the factory to use for creating Registry instances
+     */
+    public ScopeImpl(Name name, RegistryFactory registryFactory) {
+        this(name, null, registryFactory);
+    }
+
+    /**
+     * Creates a child scope (inherits RegistryFactory from parent).
      *
      * @param name scope name
      * @param parent parent scope
      */
-    public ScopeImpl(Name name, Scope parent) {
+    private ScopeImpl(Name name, ScopeImpl parent) {
+        this(name, parent, parent != null ? parent.registryFactory : LazyTrieRegistryFactory.getInstance());
+    }
+
+    /**
+     * Internal constructor for full control.
+     *
+     * @param name scope name
+     * @param parent parent scope (nullable)
+     * @param registryFactory the factory to use for creating Registry instances
+     */
+    @SuppressWarnings("unchecked")
+    private ScopeImpl(Name name, Scope parent, RegistryFactory registryFactory) {
         this.name = Objects.requireNonNull(name, "Scope name cannot be null");
         this.parent = parent;
+        this.registryFactory = Objects.requireNonNull(registryFactory, "RegistryFactory cannot be null");
+        this.childScopes = (Map<Name, Scope>) registryFactory.create();
         // Create Subject once - represents persistent identity of this Scope
         this.scopeSubject = new SubjectImpl(
             IdImpl.generate(),

@@ -11,6 +11,9 @@ import java.util.function.Supplier;
 /**
  * Hybrid registry optimized for both direct lookups and hierarchical subtree queries.
  *
+ * <p>Implements {@link Map} interface for drop-in compatibility with ConcurrentHashMap,
+ * plus adds hierarchical query capabilities via {@link #getSubtree(Name)}.
+ *
  * <p>Uses a dual-index approach with lazy trie construction:
  * <ul>
  *   <li><b>Primary index:</b> ConcurrentHashMap for O(1) direct lookups</li>
@@ -35,21 +38,21 @@ import java.util.function.Supplier;
  *
  * <h3>Example Usage:</h3>
  * <pre>{@code
- * LazyTrieRegistry<MetricValue> registry = new LazyTrieRegistry<>();
+ * Map<Name, MetricValue> registry = new LazyTrieRegistry<>();
  *
- * // Fast direct lookups - no trie overhead
+ * // Standard Map operations - O(1) performance
  * Name brokerMetric = InternedName.of("kafka.broker.1.jvm.heap.used");
  * registry.put(brokerMetric, new MetricValue(12345));
- * MetricValue value = registry.get(brokerMetric);  // O(1) lookup
+ * MetricValue value = registry.get(brokerMetric);
  *
  * // Hierarchical subtree query - builds trie on first call
  * Name prefix = InternedName.of("kafka.broker.1");
- * Map<Name, MetricValue> subtree = registry.getSubtree(prefix);  // All metrics under kafka.broker.1.*
+ * Map<Name, MetricValue> subtree = ((LazyTrieRegistry<MetricValue>) registry).getSubtree(prefix);
  * }</pre>
  *
  * @param <T> the type of values stored in the registry
  */
-public class LazyTrieRegistry<T> {
+public class LazyTrieRegistry<T> implements Map<Name, T> {
 
     /** Primary index: ConcurrentHashMap for O(1) direct lookups */
     private final ConcurrentMap<Name, T> registry = new ConcurrentHashMap<>();
@@ -361,10 +364,69 @@ public class LazyTrieRegistry<T> {
     /**
      * Removes all entries from the registry and resets the trie.
      */
+    @Override
     public void clear() {
         registry.clear();
         identityMap.clear();
         root = null;
         trieBuilt = false;
+    }
+
+    // ========== Map Interface Implementation ==========
+
+    @Override
+    public T get(Object key) {
+        if (key instanceof Name) {
+            return get((Name) key);
+        }
+        return null;
+    }
+
+    @Override
+    public T remove(Object key) {
+        if (key instanceof Name) {
+            return remove((Name) key);
+        }
+        return null;
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+        if (key instanceof Name) {
+            return containsKey((Name) key);
+        }
+        return false;
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+        return registry.containsValue(value);
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return registry.isEmpty();
+    }
+
+    @Override
+    public void putAll(Map<? extends Name, ? extends T> m) {
+        for (Map.Entry<? extends Name, ? extends T> entry : m.entrySet()) {
+            put(entry.getKey(), entry.getValue());
+        }
+    }
+
+    @Override
+    public Set<Name> keySet() {
+        return registry.keySet();
+    }
+
+    @Override
+    public Collection<T> values() {
+        return registry.values();
+    }
+
+    @Override
+    public Set<Map.Entry<Name, T>> entrySet() {
+        return registry.entrySet();
     }
 }

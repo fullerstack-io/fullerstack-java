@@ -48,7 +48,7 @@ Substrates provides the **runtime substrate** for this observability stack.
 **What:** Hierarchical reference system for identifying entities.
 
 **Components:**
-- **Id** - Unique instance identifier (UUID-based)
+- **Id** - Unique instance identifier (UUID-based, used internally)
 - **Name** - Hierarchical semantic identity (like a namespace)
 - **State** - Immutable key-value data
 - **Type** - Category (CHANNEL, CIRCUIT, CLOCK, etc.)
@@ -58,84 +58,43 @@ Substrates provides the **runtime substrate** for this observability stack.
 Subject subject = channel.subject();
 System.out.println(subject.name());  // e.g., "circuit.conduit.channel1"
 System.out.println(subject.type());  // CHANNEL
-System.out.println(subject.id());    // Unique UUID
+System.out.println(subject.id());    // Unique UUID (rarely accessed directly)
 ```
 
-### Id and @Identity
-
-Substrates defines **two related identity concepts**:
-
-#### 1. `Id` Interface - Unique Instance Identity
-
-**What:** Marker interface for unique identifier **values** (like UUIDs).
-
-**Purpose:** Distinguishes between different instances of the same type.
-
-**Example:**
-```java
-Id id1 = IdImpl.generate();  // UUID: a1b2c3d4-...
-Id id2 = IdImpl.generate();  // UUID: e5f6g7h8-...
-
-assert !id1.equals(id2);  // Different IDs
-```
-
-**Usage in Subject:**
-```java
-Subject subject1 = circuit1.subject();
-Subject subject2 = circuit2.subject();
-
-// Even if both circuits have the same name, they have unique IDs
-assert !subject1.id().equals(subject2.id());
-```
-
-#### 2. `@Identity` Annotation - Reference Equality Semantics
-
-**What:** Type-level annotation indicating instances should be compared by **reference** (==), not value.
-
-**Applied to:** `Id`, `Name`, `Subject` interfaces
-
-**Purpose:** Signals these are singletons/flyweights - don't copy them, compare by reference.
-
-**Example:**
-```java
-@Identity
-@Provided
-interface Id {
-}
-
-@Identity
-@Provided
-interface Name extends Extent<Name> {
-}
-```
-
-**Meaning:** When you have a `Name` or `Id`, comparing `name1 == name2` is meaningful because they're meant to be unique references.
-
-**Key Insight:** Every component has **two identities**:
-1. **`Id`** - Unique instance identity (UUID)
-2. **`Name`** - Semantic identity for pooling/caching (see below)
-
-**Hierarchy:**
-```java
-Name name = cortex.name("app.service.endpoint");
-name.enclosure().ifPresent(parent -> {
-    System.out.println(parent);  // "app.service"
-});
-```
+**Note:** While every Subject has an Id for unique instance identification, you'll primarily work with **Name** for component lookup and caching. The Id is managed internally by the framework.
 
 ### Name
 
 **What:** Hierarchical semantic identity used for both naming and caching.
+
+**Key Design Philosophy:** Name is **separate from the instrument/component itself**. The instrument doesn't need to maintain its own name - the Name serves as an **external key** in the registry that maps to the instrument.
 
 **Features:**
 - Dot-separated parts: `"app.service.endpoint"`
 - Implements `Extent<Name>` for hierarchical navigation
 - Immutable and comparable
 - **Used as cache key** in Circuit/Cortex component pools
+- **External to the instrument** - Name is the key, not part of the value
+- **Interned by default** for identity map fast path
 
 **Dual Purpose:**
 1. **Semantic Identity** - Human-readable hierarchical names
 2. **Cache Key** - Enables singleton pattern for named components
+
+**Separation of Concerns:**
+```java
+// Name is the KEY, Pipe is the VALUE
+Map<Name, Pipe<String>> registry = ...;
+
+// Pipe doesn't store its name - Name is external
+Pipe<String> pipe = registry.get(name);
+// pipe.name() doesn't exist - the NAME identifies the pipe in the namespace
+
+// This separation allows:
+// - Multiple names can reference same instrument (aliasing)
+// - Instrument is lightweight (no name storage overhead)
+// - Name can be used for routing without touching the instrument
+```
 
 **Usage:**
 ```java
@@ -159,6 +118,17 @@ Circuit c2 = cortex.circuit(cortex.name("kafka-cluster"));
 
 assert c1 == c2;  // ✅ Singleton pattern via Name caching
 ```
+
+**Name Implementations:**
+
+| Implementation | Use Case | Key Characteristics |
+|---------------|----------|---------------------|
+| **InternedName** (default) | Production | Weak reference interning, pointer equality, identity map fast path |
+| LinkedName | Legacy | Linked parent chain, no interning |
+| SegmentArrayName | Specific cases | Array-based segments |
+| LRUCachedName | High churn | LRU cache for name strings |
+
+**Default Recommendation:** Use InternedName (default) - optimized for identity map fast path performance.
 
 **Type-Based Default Names Create Singletons:**
 ```java
@@ -213,6 +183,200 @@ public Clock clock(Name name) {
 - Direct construction → bypasses cache → breaks singleton pattern
 
 See [Architecture Guide - Factory Method + Flyweight Pattern](ARCHITECTURE.md#1-name-based-component-caching) for detailed explanation.
+
+### Factory Patterns
+
+**What:** Pluggable factory interfaces for creating Name, Queue, and Registry instances throughout the framework.
+
+**Three Core Factories:**
+
+1. **NameFactory** - Creates Name instances
+   - Default: `InternedNameFactory` (weak reference interning)
+   - Ensures same name string → same Name instance
+   - Enables identity map fast path via pointer equality
+
+2. **QueueFactory** - Creates Queue instances
+   - Default: `LinkedBlockingQueueFactory`
+   - One queue per Circuit for ordered execution
+   - Virtual thread per Circuit processes queue
+
+3. **RegistryFactory** - Creates Registry instances
+   - Default: `LazyTrieRegistryFactory`
+   - Returns Map-compatible registries for Name-keyed collections
+   - Used in: CortexRuntime (circuits, scopes), CircuitImpl (clocks), ConduitImpl (percepts), ScopeImpl (childScopes)
+
+**Usage:**
+```java
+// ✅ Use defaults (optimized for production)
+Cortex cortex = new CortexRuntime();
+
+// Custom factories (advanced use cases)
+Cortex cortex = new CortexRuntime(
+    InternedNameFactory.getInstance(),
+    LinkedBlockingQueueFactory.getInstance(),
+    LazyTrieRegistryFactory.getInstance()
+);
+```
+
+**Why Factories:**
+- **Pluggability** - Swap implementations without changing code
+- **Consistency** - Same factory used throughout component hierarchy
+- **Performance** - Default implementations are optimized for production
+- **Testing** - Easy to inject mock implementations
+
+**Propagation Pattern:**
+```java
+// CortexRuntime injects factories down the hierarchy
+Circuit circuit = new CircuitImpl(name, nameFactory, queueFactory, registryFactory);
+
+// Circuit propagates to Conduit
+Conduit conduit = new ConduitImpl(name, composer, queue, registryFactory, sequencer);
+
+// Same factory used everywhere = consistent behavior
+```
+
+### Identity Map Fast Path
+
+**What:** Performance optimization in LazyTrieRegistry using pointer equality (==) for InternedName instances instead of hash-based lookup.
+
+**How It Works:**
+```java
+// LazyTrieRegistry with dual indexes
+public class LazyTrieRegistry<T> implements Map<Name, T> {
+    private final Map<Name, T> identityMap = new IdentityHashMap<>();  // Pointer equality
+    private final Map<Name, T> registry = new ConcurrentHashMap<>();   // Hash equality
+
+    @Override
+    public T get(Object key) {
+        if (!(key instanceof Name)) return null;
+        Name name = (Name) key;
+
+        // Fast path: identity map using pointer equality (==)
+        T value = identityMap.get(name);  // ~2ns
+        if (value != null) return value;   // ✅ Hit!
+
+        // Fallback: hash-based lookup
+        return registry.get(name);         // ~15-20ns
+    }
+}
+```
+
+**Why It's Fast:**
+- **Identity check:** 2ns (simple pointer comparison: `this == that`)
+- **Hash lookup:** 15-20ns (compute hashCode(), equals(), bucket search)
+- **Speedup:** 5-10× for cached Name instances
+
+**InternedName Enables This:**
+```java
+// InternedNameFactory ensures same string → same instance
+Name name1 = nameFactory.createRoot("kafka.broker.1");
+Name name2 = nameFactory.createRoot("kafka.broker.1");
+
+// Pointer equality works!
+assert name1 == name2;  // ✅ Same instance (interned)
+
+// Identity map can use pointer equality
+identityMap.get(name1);  // 2ns lookup via ==
+```
+
+**Performance Results:**
+- **Cached pipe lookups:** 23ns → 4ns (5× faster)
+- **Cached circuit lookups:** 28ns → 5ns (5× faster)
+- **Hot-path emission:** 6.6ns → 3.3ns (2× faster)
+
+**Design Philosophy:**
+- Most lookups hit identity map (common case)
+- Hash lookup provides fallback safety
+- Zero behavioral change, pure performance win
+
+### LazyTrieRegistry
+
+**What:** Hybrid dual-index registry with identity map fast path AND hierarchical trie for subtree queries.
+
+**Dual-Index Design:**
+```java
+public class LazyTrieRegistry<T> implements Map<Name, T> {
+    // Fast path: O(1) identity-based lookup
+    private final Map<Name, T> identityMap = new IdentityHashMap<>();
+
+    // Primary storage: O(1) hash-based lookup
+    private final Map<Name, T> registry = new ConcurrentHashMap<>();
+
+    // Lazy trie: built on-demand for hierarchical queries
+    private volatile TrieNode<T> trieRoot = null;
+}
+```
+
+**Three Access Patterns:**
+
+1. **Fast Path (identity map)** - 2-5ns
+   ```java
+   Pipe pipe = conduit.get(cachedName);  // Pointer equality
+   ```
+
+2. **Standard Lookup (hash map)** - 15-20ns
+   ```java
+   Circuit circuit = cortex.circuit(name);  // Hash equality
+   ```
+
+3. **Hierarchical Query (lazy trie)** - Built on first subtree query
+   ```java
+   // Cast to access trie-specific methods
+   LazyTrieRegistry<Circuit> registry = (LazyTrieRegistry<Circuit>) cortex.circuits;
+   Map<Name, Circuit> brokers = registry.getSubtree(cortex.name("kafka.brokers"));
+   ```
+
+**Lazy Trie Construction:**
+- Trie is NOT built during normal operations
+- Built only when `getSubtree()` or trie-specific methods called
+- One-time construction cost: ~100-200μs for 1000 entries
+- Future subtree queries are fast: ~50-100ns
+
+**Map Interface Implementation:**
+```java
+// ✅ Works with standard Map operations
+Map<Name, Circuit> circuits = (Map<Name, Circuit>) registryFactory.create();
+circuits.computeIfAbsent(name, this::createCircuit);  // Standard Map API
+circuits.values().forEach(Circuit::close);            // Standard iteration
+circuits.containsKey(name);                           // Standard lookup
+
+// ✅ PLUS trie-specific operations when needed
+LazyTrieRegistry<Circuit> registry = (LazyTrieRegistry<Circuit>) circuits;
+registry.getSubtree(prefix);  // Hierarchical query
+```
+
+**Where It's Used:**
+- **CortexRuntime:** circuits, scopes maps
+- **CircuitImpl:** clocks map
+- **ConduitImpl:** percepts map (pipes/channels)
+- **ScopeImpl:** childScopes map
+
+**Performance Characteristics:**
+- **Identity lookups:** 2-5ns (most common)
+- **Hash lookups:** 15-20ns (fallback)
+- **Subtree queries:** 50-100ns after trie built
+- **Memory:** ~2× overhead (identity map + hash map)
+- **Thread-safe:** All operations safe for concurrent access
+
+**Why Lazy Construction:**
+```java
+// Most code never needs hierarchical queries
+for (int i = 0; i < 1000000; i++) {
+    pipe.emit(value);  // Identity map only, no trie needed
+}
+
+// Trie built ONLY if you need it
+if (monitoring) {
+    registry.getSubtree(prefix).values().forEach(this::collectMetrics);
+}
+```
+
+**Trade-offs:**
+- ✅ Fast identity lookups for common case
+- ✅ Hierarchical queries when needed
+- ✅ Map-compatible API
+- ❌ 2× memory for dual indexes
+- ❌ One-time trie construction cost (if used)
 
 ### State
 
@@ -409,15 +573,51 @@ interface Substrate {
 
 ## Producer-Consumer Model
 
+### Context Pattern
+
+**What is Context?**
+
+A **Context** is an abstraction that provides access to a Source for observation. In Substrates:
+- **Conduit IS-A Context** - provides Source via `source()` method
+- **Context provides Source** - Source enables dynamic subscription to observe Subjects/Channels
+- Enables "live, adaptable connections" between information sources and observers
+
+**Key Insight:** Rather than passive data collection, Context/Source enables active observation where:
+- Subscribers conditionally register Pipes based on Subject characteristics
+- Observers dynamically adapt to what they observe
+- Connections are established on-demand as Subjects emit
+
+**Example:**
+```java
+// Conduit is a Context
+Conduit<Pipe<String>, String> conduit = circuit.conduit(name, composer);
+
+// Context provides Source for observation
+Source<String> source = conduit.source();  // Get Source from Context
+
+// Subscribe to Source for dynamic observation
+source.subscribe(
+    cortex.subscriber(
+        cortex.name("observer"),
+        (subject, registrar) -> {
+            // Conditionally register based on Subject
+            if (subject.name().value().contains("important")) {
+                registrar.register(msg -> processImportant(msg));
+            }
+        }
+    )
+);
+```
+
 ### Terminology
 
 | Term | Role | Description |
 |------|------|-------------|
-| **Channel** | Producer entry point | Where data enters the system |
-| **Pipe** | Transport | Mechanism with `emit()` method |
-| **Source** | Observable stream | Provides `subscribe()` for observation |
-| **Subscriber** | Consumer connector | Links consumer Pipes to Source |
-| **Conduit** | Router | Routes from Channels to Pipes |
+| **Channel** | Connector | Named conduit linking producers and consumers; provides access to Pipe |
+| **Pipe** | Transport | Dual-purpose mechanism with `emit()` - used by producers to emit AND consumers to receive |
+| **Source** | Observable context | Provides `subscribe()` for dynamic observation of Subjects/Channels |
+| **Subscriber** | Observer factory | Registers consumer Pipes with Source when Subjects emit |
+| **Conduit** | Context | Creates Channels and provides Source for subscription (Conduit IS-A Context) |
 | **Container** | Pool manager | Manages collection of Conduits (Pool of Pools) |
 | **Queue** | Coordinator | Coordinates Script execution within Circuit |
 | **Script** | Executable unit | Work unit with `exec(Current)` method |
@@ -425,23 +625,21 @@ interface Substrate {
 ### The Flow
 
 ```
-Producer creates data
+Producer code calls emit
   ↓
-Channel (entry point)
+Conduit.get(name) → returns Channel-backed Pipe
   ↓
-Pipe.emit(value)
+Pipe.emit(value)  [Producer uses Pipe to emit]
   ↓
-Conduit's Queue
+Conduit's Source notified
   ↓
-Queue Processor
+Source dispatches to Subscribers
   ↓
-Source (via Pipe interface)
+Subscriber callback invoked with Subject
   ↓
-Subscribers notified
+Registrar registers consumer Pipes  [Consumers use Pipes to receive]
   ↓
-Registrar registers consumer Pipes
-  ↓
-Consumer Pipes receive data
+Consumer Pipes receive emissions
   ↓
 Consumer processes data
 ```
@@ -1112,16 +1310,18 @@ All components implement `Substrate`, providing a `Subject` for identification a
 ### 2. Pipes Are Dual-Purpose
 
 Pipes have `emit()` method and are used:
-- By producers (Channel provides Pipe)
-- By consumers (Subscriber registers Pipe)
-- Internally (Source implements Pipe)
+- **By producers:** Conduit.get() returns a Pipe (backed by Channel) for emitting
+- **By consumers:** Subscriber registers consumer Pipes to receive emissions
+- **Internally:** Source implements Pipe for dispatching to registered consumer Pipes
 
-### 3. Source ≠ Producer
+### 3. Source = Observable Context
 
-**Source** is not a producer - it's an **observable stream**:
-- You subscribe TO a Source
-- Conduit emits INTO Source (via Pipe interface)
-- Source dispatches to Subscribers
+**Source** is not a producer - it's an **observable context** for dynamic subscription:
+- Obtained from a Context (Conduit provides Source via `source()`)
+- Enables subscription to observe Subjects/Channels
+- Subscribers register Pipes conditionally based on Subject characteristics
+- Source dispatches emissions to registered consumer Pipes
+- Context pattern allows "live, adaptable connections" between sources and observers
 
 ### 4. @Temporal = Don't Retain
 
@@ -1147,6 +1347,6 @@ All background threads are virtual and daemon:
 ## Next Steps
 
 - Read [Architecture Guide](ARCHITECTURE.md) for implementation details
-- See [Examples](examples/) for complete working examples
+- See [Examples](examples/README.md) for complete working examples
 - Review [Substrates API JavaDoc](https://github.com/humainary-io/substrates-api-java)
 - Explore [William Louth's Blog](https://humainary.io/blog)

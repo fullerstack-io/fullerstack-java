@@ -6,12 +6,13 @@ import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
+import io.fullerstack.substrates.registry.LazyTrieRegistry;
+import io.fullerstack.substrates.registry.RegistryFactory;
 
 import lombok.Getter;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Generic implementation of Substrates.Conduit interface with Lombok for getters.
@@ -53,7 +54,7 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
 
     private final Subject conduitSubject;
     private final Composer<? extends P, E> composer;
-    private final Map<Name, P> percepts = new ConcurrentHashMap<>();
+    private final Map<Name, P> percepts;
     private final Source<E> eventSource; // Observable stream - external code subscribes to this
     private final Queue circuitQueue; // Shared Circuit Queue (single-threaded execution)
     private final Sequencer<Segment<E>> sequencer; // Optional transformation pipeline (nullable)
@@ -61,8 +62,8 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     /**
      * Creates a Conduit without transformations.
      */
-    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Queue circuitQueue) {
-        this(conduitName, composer, circuitQueue, null);
+    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Queue circuitQueue, RegistryFactory registryFactory) {
+        this(conduitName, composer, circuitQueue, registryFactory, null);
     }
 
     /**
@@ -71,9 +72,11 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
      * @param conduitName hierarchical conduit name (e.g., "circuit.conduit")
      * @param composer composer for creating percepts
      * @param circuitQueue circuit's shared queue
+     * @param registryFactory the factory to use for creating Registry instances
      * @param sequencer optional transformation pipeline (null if no transformations)
      */
-    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Queue circuitQueue, Sequencer<Segment<E>> sequencer) {
+    @SuppressWarnings("unchecked")
+    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Queue circuitQueue, RegistryFactory registryFactory, Sequencer<Segment<E>> sequencer) {
         this.conduitSubject = new SubjectImpl(
             IdImpl.generate(),
             conduitName,
@@ -81,6 +84,7 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
             Subject.Type.CONDUIT
         );
         this.composer = composer;
+        this.percepts = (Map<Name, P>) registryFactory.create();
         this.eventSource = new SourceImpl<>(conduitName);
         this.circuitQueue = java.util.Objects.requireNonNull(circuitQueue, "Circuit queue cannot be null");
         this.sequencer = sequencer; // Can be null

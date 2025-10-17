@@ -15,12 +15,14 @@ import io.fullerstack.substrates.name.InternedNameFactory;
 import io.fullerstack.substrates.queue.QueueFactory;
 import io.fullerstack.substrates.queue.LinkedBlockingQueueFactory;
 import io.fullerstack.substrates.sink.SinkImpl;
+import io.fullerstack.substrates.registry.LazyTrieRegistry;
+import io.fullerstack.substrates.registry.RegistryFactory;
+import io.fullerstack.substrates.registry.LazyTrieRegistryFactory;
 
 import java.lang.reflect.Member;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -49,40 +51,43 @@ import java.util.stream.Stream;
  * <ul>
  *   <li>{@link NameFactory} - Pluggable Name implementations (default: {@link InternedNameFactory})</li>
  *   <li>{@link QueueFactory} - Pluggable Queue implementations (default: {@link LinkedBlockingQueueFactory})</li>
+ *   <li>{@link RegistryFactory} - Pluggable Registry implementations (default: {@link LazyTrieRegistryFactory})</li>
  * </ul>
  *
  * @see Cortex
  * @see NameFactory
  * @see QueueFactory
+ * @see RegistryFactory
  */
 public class CortexRuntime implements Cortex {
 
     private final NameFactory nameFactory;
     private final QueueFactory queueFactory;
-    private final Map<Name, Circuit> circuits = new ConcurrentHashMap<>();
-    private final Map<Name, Scope> scopes = new ConcurrentHashMap<>();
+    private final RegistryFactory registryFactory;
+    private final Map<Name, Circuit> circuits;
+    private final Map<Name, Scope> scopes;
     private final Scope defaultScope;
 
     /**
      * Creates a new Cortex runtime with defaults:
-     * {@link InternedNameFactory} and {@link LinkedBlockingQueueFactory}.
+     * {@link InternedNameFactory}, {@link LinkedBlockingQueueFactory}, and {@link LazyTrieRegistryFactory}.
      *
-     * <p>This is the recommended constructor for production use.
+     * <p>This is the recommended default constructor.
      */
     public CortexRuntime() {
-        this(InternedNameFactory.getInstance(), LinkedBlockingQueueFactory.getInstance());
+        this(InternedNameFactory.getInstance(), LinkedBlockingQueueFactory.getInstance(), LazyTrieRegistryFactory.getInstance());
     }
 
     /**
      * Creates a new Cortex runtime with a custom {@link NameFactory},
-     * using default {@link LinkedBlockingQueueFactory}.
+     * using default {@link LinkedBlockingQueueFactory} and {@link LazyTrieRegistryFactory}.
      *
      * <p>This constructor allows you to inject a different Name implementation,
      * useful for testing or when you need specific Name characteristics.
      *
      * <p><b>Available Name factories:</b>
      * <ul>
-     *   <li>{@link InternedNameFactory} - Recommended for production (weak interning)</li>
+     *   <li>{@link InternedNameFactory} - Recommended default (weak interning)</li>
      *   <li>{@link io.fullerstack.substrates.name.LinkedNameFactory} - Simple baseline</li>
      *   <li>{@link io.fullerstack.substrates.name.SegmentArrayNameFactory} - Array-backed</li>
      *   <li>{@link io.fullerstack.substrates.name.LRUCachedNameFactory} - LRU cache</li>
@@ -92,7 +97,7 @@ public class CortexRuntime implements Cortex {
      * @throws NullPointerException if nameFactory is null
      */
     public CortexRuntime(NameFactory nameFactory) {
-        this(nameFactory, LinkedBlockingQueueFactory.getInstance());
+        this(nameFactory, LinkedBlockingQueueFactory.getInstance(), LazyTrieRegistryFactory.getInstance());
     }
 
     /**
@@ -105,15 +110,27 @@ public class CortexRuntime implements Cortex {
      *   <li>{@link LinkedBlockingQueueFactory} - Unbounded FIFO (recommended)</li>
      * </ul>
      *
+     * <p><b>Available Registry factories:</b>
+     * <ul>
+     *   <li>{@link LazyTrieRegistryFactory} - Lazy trie construction (recommended)</li>
+     *   <li>{@link io.fullerstack.substrates.registry.EagerTrieRegistryFactory} - Eager trie</li>
+     *   <li>{@link io.fullerstack.substrates.registry.FlatMapRegistryFactory} - Simple HashMap</li>
+     * </ul>
+     *
      * @param nameFactory the factory to use for creating Name instances
      * @param queueFactory the factory to use for creating Queue instances
-     * @throws NullPointerException if either factory is null
+     * @param registryFactory the factory to use for creating Registry instances
+     * @throws NullPointerException if any factory is null
      */
-    public CortexRuntime(NameFactory nameFactory, QueueFactory queueFactory) {
+    @SuppressWarnings("unchecked")
+    public CortexRuntime(NameFactory nameFactory, QueueFactory queueFactory, RegistryFactory registryFactory) {
         this.nameFactory = Objects.requireNonNull(nameFactory, "NameFactory cannot be null");
         this.queueFactory = Objects.requireNonNull(queueFactory, "QueueFactory cannot be null");
+        this.registryFactory = Objects.requireNonNull(registryFactory, "RegistryFactory cannot be null");
+        this.circuits = (Map<Name, Circuit>) registryFactory.create();
+        this.scopes = (Map<Name, Scope>) registryFactory.create();
         Name cortexName = nameFactory.createRoot("cortex");
-        this.defaultScope = new ScopeImpl(cortexName);
+        this.defaultScope = new ScopeImpl(cortexName, registryFactory);
         // Cache default scope by its name
         this.scopes.put(cortexName, defaultScope);
     }
@@ -132,7 +149,7 @@ public class CortexRuntime implements Cortex {
     }
 
     private Circuit createCircuit(Name name) {
-        return new CircuitImpl(name, nameFactory, queueFactory);
+        return new CircuitImpl(name, nameFactory, queueFactory, registryFactory);
     }
 
     // ========== Name Factory (8 methods) ==========
@@ -196,7 +213,7 @@ public class CortexRuntime implements Cortex {
     @Override
     public Scope scope(Name name) {
         Objects.requireNonNull(name, "Scope name cannot be null");
-        return scopes.computeIfAbsent(name, ScopeImpl::new);
+        return scopes.computeIfAbsent(name, n -> new ScopeImpl(n, registryFactory));
     }
 
     // ========== State Factory (9 methods) ==========

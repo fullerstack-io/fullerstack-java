@@ -37,7 +37,7 @@ This document compares four implementations of the `Substrates.Name` interface, 
 
 ### Recommendation
 
-**Use InternedName for production.** It provides:
+**Use InternedName as the recommended default.** It provides:
 - Excellent creation performance through instance reuse
 - Balanced memory characteristics with weak references
 - Consistent performance across all operations
@@ -316,7 +316,7 @@ The `equals()` method leverages interning guarantees:
 ## Use Case Recommendations
 
 ### Choose **InternedName** for:
-- ✅ Production applications (recommended default)
+- ✅ General use (recommended default)
 - ✅ High-frequency repeated paths
 - ✅ Long-running applications
 - ✅ Memory-constrained environments
@@ -382,7 +382,7 @@ JVM Options: -Xms512M -Xmx512M -XX:+UseG1GC -XX:+AlwaysPreTouch
 
 Based on comprehensive performance testing across creation, composition, equality, string operations, and memory characteristics:
 
-### Production Recommendation: **InternedName**
+### Recommended Default: **InternedName**
 
 InternedName provides the best overall balance of:
 - ✅ Excellent performance through instance reuse

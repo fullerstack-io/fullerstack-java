@@ -9,13 +9,32 @@ Substrates provides a flexible framework for building event-driven and observabi
 ## Features
 
 - **Circuit** - Central processing engine with precise ordering guarantees for events
-- **Conduit** - Routes emissions from Channels (producers) to Pipes (consumers)
-- **Channel** - Named entry points where producers emit data
-- **Source** - Observable event streams that can be subscribed to
+- **Conduit** - Context that creates Channels and provides Source for subscription
+- **Channel** - Named connector linking producers and consumers; provides access to Pipe
+- **Source** - Observable context for dynamic observation of Subjects/Channels
 - **Sequencer/Segment** - Transformation pipelines (filter, map, reduce, limit, sample, sift)
 - **Clock** - Timer utility for time-driven behaviors
 - **Scope** - Hierarchical resource lifecycle management
 - **Queue** - Coordinates execution and script scheduling
+- **Factory Patterns** - Pluggable NameFactory, QueueFactory, RegistryFactory for customization
+- **Identity Map Fast Path** - InternedName + LazyTrieRegistry for 5× faster cached lookups
+
+## Performance
+
+Substrates is optimized for high-throughput, low-latency observability:
+
+- **Hot-path emission:** 3.3ns (2× faster with identity map optimization)
+- **Cached lookups:** 4-5ns (5× faster via identity map fast path)
+- **Full path (lookup + emit):** 101ns
+- **Kafka monitoring:** 0.033% CPU for 100k metrics @ 1Hz
+
+**Example: 100 Kafka brokers with 1000 metrics each:**
+- 100,000 metrics emitted @ 1Hz
+- 730μs total time per second
+- 0.073% of one CPU core
+- **100× performance headroom** available
+
+See [Performance Guide](docs/PERFORMANCE.md) for comprehensive benchmarks and analysis.
 
 ## Quick Start
 
@@ -24,7 +43,7 @@ Substrates provides a flexible framework for building event-driven and observabi
 ```xml
 <dependency>
     <groupId>io.fullerstack</groupId>
-    <artifactId>substrates-java</artifactId>
+    <artifactId>fullerstack-substrates</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
 ```
@@ -136,9 +155,23 @@ scope.close();
 
 ## Documentation
 
-- **[Architecture Guide](docs/ARCHITECTURE.md)** - Design principles and data flow
-- **[Core Concepts](docs/CONCEPTS.md)** - Detailed explanation of key abstractions
-- **[Examples](docs/examples/)** - Common usage patterns and recipes
+### Getting Started
+- **[Documentation Index](docs/DOCS-INDEX.md)** - Complete documentation map and navigation guide
+- **[Core Concepts](docs/CONCEPTS.md)** - Entities, relationships, and factory patterns
+- **[Examples](docs/examples/)** - Hands-on examples from simple to complex
+
+### Architecture & Implementation
+- **[Architecture Guide](docs/ARCHITECTURE.md)** - System design, data flow, and factory injection
+- **[Implementation Guide](docs/IMPLEMENTATION-GUIDE.md)** - Best practices and recommended patterns
+- **[Advanced Topics](docs/ADVANCED.md)** - Performance optimization, custom implementations, extensions
+
+### Performance
+- **[Performance Guide](docs/PERFORMANCE.md)** - ⭐ Authoritative performance analysis and benchmarks
+- **[Name Implementation Comparison](docs/name-implementation-comparison.md)** - Name strategy selection guide
+
+### Alignment
+- **[Substrates 101](docs/archive/alignment/substrates-101.md)** - Core philosophy and concepts (archived)
+- **[Alignment Overview](docs/archive/alignment/README.md)** - Humainary Substrates API alignment (archived)
 
 ## Key Concepts
 
@@ -168,26 +201,67 @@ Consumer Side:
 
 ### Terminology
 
-- **Channel** = Producer (entry point where data enters)
-- **Pipe** = Transport mechanism (has `emit()`, used on both sides)
-- **Source** = Observable stream (provides `subscribe()`)
-- **Subscriber** = Connects consumer Pipes to a Source
-- **Conduit** = Routes emissions from Channels (producers) to Pipes (consumers)
+- **Channel** = Named connector linking producers and consumers; provides Pipe access
+- **Pipe** = Dual-purpose transport (producers emit, consumers receive via registered Pipes)
+- **Source** = Observable context (provides `subscribe()` for dynamic observation)
+- **Subscriber** = Observer factory; registers consumer Pipes when Subjects emit
+- **Conduit** = Context that creates Channels and provides Source (Conduit IS-A Context)
 
 ### Design Principles
 
-1. **Interface Types** - All fields use interface types, not implementation types
-2. **@Temporal Types** - Transient types (Registrar, Sift, Closure) are not retained
-3. **Virtual Threads** - Daemon threads auto-cleanup on JVM shutdown
-4. **Resource Lifecycle** - Component extends Resource, all have `close()`
-5. **Precise Ordering** - Circuit guarantees event ordering
-6. **Immutable State** - State is immutable, built via fluent API
+1. **Factory Injection** - Pluggable NameFactory, QueueFactory, RegistryFactory for customization
+2. **Identity Map Fast Path** - InternedName + LazyTrieRegistry for 5× faster cached lookups
+3. **Interface Types** - All fields use interface types, not implementation types
+4. **@Temporal Types** - Transient types (Registrar, Sift, Closure) are not retained
+5. **Virtual Threads** - Daemon threads auto-cleanup on JVM shutdown
+6. **Resource Lifecycle** - Component extends Resource, all have `close()`
+7. **Precise Ordering** - Circuit guarantees event ordering
+8. **Immutable State** - State is immutable, built via fluent API
+
+### Performance Best Practices
+
+```java
+// ✅ GOOD: Use defaults (optimized for production)
+Cortex cortex = new CortexRuntime();
+// → InternedName + LazyTrieRegistry = identity map fast path
+
+// ✅ GOOD: Cache pipes for repeated emissions
+Pipe<T> pipe = conduit.get(name);  // One-time lookup: 4ns
+for (int i = 0; i < 1000000; i++) {
+    pipe.emit(value);  // 3.3ns per emit
+}
+
+// ❌ BAD: Lookup on every emission
+for (int i = 0; i < 1000000; i++) {
+    conduit.get(name).emit(value);  // 101ns per emit (30× slower!)
+}
+```
 
 ## Building from Source
 
+### Prerequisites
+
+This project depends on the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java), which is not published to Maven Central. You must install it locally first:
+
+```bash
+# Clone and install Humainary Substrates API
+git clone https://github.com/humainary-io/substrates-api-java.git
+cd substrates-api-java
+mvn clean install
+cd ..
+
+# Clone and install Humainary Serventis API (if using serventis module)
+git clone https://github.com/humainary-io/serventis-api-java.git
+cd serventis-api-java
+mvn clean install
+cd ..
+```
+
+### Building Fullerstack Substrates
+
 ```bash
 git clone https://github.com/fullerstack-io/fullerstack-java.git
-cd fullerstack-java/fullerstack-substrates-java
+cd fullerstack-java/fullerstack-substrates
 mvn clean install
 ```
 
@@ -201,16 +275,30 @@ All 264 tests should pass.
 
 ## Requirements
 
-- Java 24 or later (uses Virtual Threads)
+- Java 25 or later (LTS - uses Virtual Threads)
 - Maven 3.9+
 
 ## References
 
 - [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java)
-- [Observability X Blog Series](https://humainary.io/blog/category/observability-x/)
-  - [Channels](https://humainary.io/blog/observability-x-channels/)
-  - [Sources](https://humainary.io/blog/observability-x-sources/)
-  - [Subscribers](https://humainary.io/blog/observability-x-subscribers/)
+- [Observability X Blog Series](https://humainary.io/blog/category/observability-x/) - Complete series by William Louth:
+  - [Substrates 101](https://humainary.io/blog/observability-x-substrates-101/) - Introduction to the framework
+  - [Channels](https://humainary.io/blog/observability-x-channels/) - Named connectors
+  - [Sources](https://humainary.io/blog/observability-x-sources/) - Observable contexts
+  - [Subscribers](https://humainary.io/blog/observability-x-subscribers/) - Observer pattern
+  - [Composers](https://humainary.io/blog/observability-x-composers/) - Instrument factories
+  - [Contexts](https://humainary.io/blog/observability-x-contexts/) - Contextual instrumentation
+  - [Circuits](https://humainary.io/blog/observability-x-circuits/) - Processing engines
+  - [Containers](https://humainary.io/blog/observability-x-containers/) - Pool management
+  - [Pipes & Pathways](https://humainary.io/blog/observability-x-pipes-pathways/) - Data transport
+  - [Subjects](https://humainary.io/blog/observability-x-subjects/) - Observable entities
+  - [States and Slots](https://humainary.io/blog/observability-x-states-and-slots/) - State management
+  - [Staging State](https://humainary.io/blog/observability-x-staging-state/) - State coordination
+  - [Naming Percepts](https://humainary.io/blog/observability-x-naming-percepts/) - Hierarchical naming
+  - [Queues, Scripts, and Currents](https://humainary.io/blog/observability-x-queues-scripts-and-currents/) - Execution control
+  - [Resources, Scopes, and Closures](https://humainary.io/blog/observability-x-resources-scopes-and-closures/) - Lifecycle management
+  - [eXtensibility](https://humainary.io/blog/observability-x-extensibility/) - Extension patterns
+  - [Location Agnostic](https://humainary.io/blog/observability-x-location-agnostic/) - Distribution
 - [William Louth on Semiotic Observability](https://humainary.io)
 
 ## Acknowledgments

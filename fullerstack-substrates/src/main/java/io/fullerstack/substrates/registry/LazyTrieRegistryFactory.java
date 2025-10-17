@@ -27,14 +27,14 @@ package io.fullerstack.substrates.registry;
  * <p><b>Usage:</b>
  * <pre>
  * RegistryFactory factory = LazyTrieRegistryFactory.getInstance();
- * LazyTrieRegistry&lt;MetricValue&gt; registry = factory.create();
+ * Map&lt;Name, MetricValue&gt; registry = factory.create(); // LazyTrieRegistry implements Map
  *
- * // Direct lookup - O(1), no trie overhead
+ * // Standard Map operations - O(1), no trie overhead
  * registry.put(name, value);
  * MetricValue v = registry.get(name);
  *
- * // Hierarchical query - builds trie on first call
- * Map&lt;Name, MetricValue&gt; subtree = registry.getSubtree(prefix);
+ * // Hierarchical query - cast to LazyTrieRegistry for getSubtree
+ * Map&lt;Name, MetricValue&gt; subtree = ((LazyTrieRegistry&lt;MetricValue&gt;) registry).getSubtree(prefix);
  * </pre>
  *
  * @see LazyTrieRegistry
