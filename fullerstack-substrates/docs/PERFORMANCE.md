@@ -204,8 +204,8 @@ cortex.circuit(circuitName)         // Get-or-create circuit: ~6ns (cached)
 ```
 
 **⚠️ CRITICAL:** All methods are **get-or-create** (using `computeIfAbsent`):
-- **First call:** Creates the object (~60μs for conduit, slower)
-- **Subsequent calls:** Returns cached instance (~79ns for conduit, fast)
+- **First call:** Creates the object (~10.7μs for conduit, one-time cost)
+- **Subsequent calls:** Returns cached instance (~7ns for conduit, very fast!)
 - **Benchmark measures:** Cached path after warmup (thousands of iterations)
 
 **Breakdown (all cached/warm):**
@@ -236,7 +236,7 @@ WARM (cached, what benchmark measures):
 - 🚀 **30ns is outstanding!** - 3.4× faster thanks to slot optimization
 - ✅ **All lookups are warm** - this is steady-state performance, not cold startup
 - ✅ **Real hot-path is 3.3ns** when you cache the pipe reference (recommended pattern)
-- ⚠️ **Cold startup** (first-time creation) is much slower (~10μs for conduit creation, see Cold-Path section)
+- ⚠️ **Cold startup** (first-time creation) is much slower (~10.7μs for conduit creation, see Cold-Path section)
 
 **Recommended Usage Pattern:**
 ```java
