@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @org.openjdk.jmh.annotations.State(org.openjdk.jmh.annotations.Scope.Benchmark)
 @Warmup(iterations = 2, time = 1)
 @Measurement(iterations = 3, time = 2)
-@Fork(value = 0)  // Run in-process to avoid JMH classpath issues
+@Fork(value = 1)  // Run in forked JVM with shaded JAR (use: java -jar target/benchmarks.jar)
 public class SubstratesLoadBenchmark {
 
     // ========== Benchmark State ==========
