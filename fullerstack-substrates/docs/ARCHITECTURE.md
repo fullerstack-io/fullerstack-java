@@ -497,10 +497,10 @@ scope.close();
    └──────────────────────────────────────┘
 ```
 
-**Performance:** All operations are synchronous for minimal latency with identity map fast path:
+**Performance:** All operations are synchronous for minimal latency with identity map + slot optimization:
 - Pipe emission: ~3.3ns (hot path with identity map + early subscriber check)
 - Cached pipe lookup: ~4ns (identity map fast path)
-- Full path (lookup + emit): ~101ns
+- Full path (lookup + emit): ~30ns (3.4× faster with slot optimization!)
 - Multi-threaded (4 threads): ~27ns per thread
 
 **Performance Improvement from LazyTrieRegistry Integration:**
@@ -939,10 +939,10 @@ sub.close();
 
 ### Emission Performance
 
-Fullerstack implementation benchmarks (with identity map optimization):
+Fullerstack implementation benchmarks (with identity map + slot optimization):
 - **Hot-path emission:** 3.3ns (cached pipe, early subscriber check)
 - **Cached pipe lookup:** 4ns (identity map fast path)
-- **Full path (lookup + emit):** 101ns (includes circuit/conduit/channel traversal)
+- **Full path (lookup + emit):** 30ns (includes circuit/conduit/channel traversal - 3.4× faster!)
 - **Multi-threaded (4 threads):** ~27ns per thread (concurrent emissions)
 
 See [Performance Guide](PERFORMANCE.md) for comprehensive benchmarks and methodology.

@@ -205,14 +205,14 @@ for (int i = 0; i < 1000000; i++) {
 
 // ❌ AVOID - Full path from circuit
 for (int i = 0; i < 1000000; i++) {
-    circuit.conduit(name, composer).get(channelName).emit("event-" + i);  // 101ns per emit!
+    circuit.conduit(name, composer).get(channelName).emit("event-" + i);  // 30ns per emit!
 }
 ```
 
 **Performance Impact:**
 - Cached pipe: 3.3ns (best)
 - With conduit.get(): ~7ns (2× slower, but still fast)
-- Full circuit path: 101ns (30× slower!)
+- Full circuit path: 30ns (9× slower!)
 
 ---
 

@@ -24,15 +24,15 @@ Substrates provides a flexible framework for building event-driven and observabi
 Substrates is optimized for high-throughput, low-latency observability:
 
 - **Hot-path emission:** 3.3ns (2× faster with identity map optimization)
-- **Cached lookups:** 4-5ns (5× faster via identity map fast path)
-- **Full path (lookup + emit):** 101ns
+- **Cached lookups:** 4-7ns (5-12× faster via identity map + slot optimization)
+- **Full path (lookup + emit):** 30ns (3.4× faster with slot optimization!)
 - **Kafka monitoring:** 0.033% CPU for 100k metrics @ 1Hz
 
 **Example: 100 Kafka brokers with 1000 metrics each:**
 - 100,000 metrics emitted @ 1Hz
-- 730μs total time per second
-- 0.073% of one CPU core
-- **100× performance headroom** available
+- 330μs total time per second (was 730μs)
+- 0.033% of one CPU core (improved from 0.073%)
+- **300× performance headroom** available
 
 See [Performance Guide](docs/PERFORMANCE.md) for comprehensive benchmarks and analysis.
 
@@ -233,7 +233,7 @@ for (int i = 0; i < 1000000; i++) {
 
 // ❌ BAD: Lookup on every emission
 for (int i = 0; i < 1000000; i++) {
-    conduit.get(name).emit(value);  // 101ns per emit (30× slower!)
+    conduit.get(name).emit(value);  // 30ns per emit (9× slower!)
 }
 ```
 

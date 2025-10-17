@@ -112,8 +112,8 @@ This index provides a complete map of Substrates documentation, helping you find
 
 **Key Results:**
 - **Hot-path emission: 3.3ns** (2× faster than before)
-- **Cached lookups: 4-5ns** (5× faster via identity map)
-- **Full path: 101ns** (stable end-to-end)
+- **Cached lookups: 4-7ns** (5-12× faster via identity map + slot optimization)
+- **Full path: 30ns** (3.4× faster with slot optimization!)
 - **Kafka monitoring: 0.033% CPU** for 100k metrics @ 1Hz
 
 **Recommendations:**
