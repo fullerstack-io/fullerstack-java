@@ -286,6 +286,90 @@ public class SubstratesLoadBenchmark {
         return cortex.name("broker." + counter.incrementAndGet() + ".partition.0");
     }
 
+    // ========== Benchmark 15: Conduit Slot - Single Composer (Hot) ==========
+
+    /**
+     * Measures conduit lookup with single composer (95% case) - HOT path (cached).
+     * This tests the optimized ConduitSlot fast path with identity map.
+     * Target: < 10ns (15× faster than old composite key approach)
+     */
+    @Benchmark
+    public Conduit<Pipe<Long>, Long> benchmark15_conduitSlot_singleComposer_hot() {
+        // Same name, same composer - hits primary slot (FAST PATH)
+        return cachedCircuit.conduit(conduitName, Composer.pipe());
+    }
+
+    // ========== Benchmark 16: Conduit Slot - Single Composer (Cold) ==========
+
+    /**
+     * Measures conduit creation with single composer - COLD path (first access).
+     * Target: < 70µs
+     */
+    @Benchmark
+    public Conduit<Pipe<Long>, Long> benchmark16_conduitSlot_singleComposer_cold() {
+        // Unique name each time - creates new conduit with primary slot
+        return cachedCircuit.conduit(
+            cortex.name("single-slot-" + counter.incrementAndGet()),
+            Composer.pipe()
+        );
+    }
+
+    // ========== Benchmark 17: Conduit Slot - Dual Composer (Hot) ==========
+
+    /**
+     * Measures conduit lookup with TWO composers (5% case) - HOT path.
+     * First lookup hits primary slot, second hits overflow map.
+     * Target: Primary ~5ns, Overflow ~15ns
+     */
+    @Benchmark
+    public void benchmark17_conduitSlot_dualComposer_hot(Blackhole bh) {
+        Name sharedName = cortex.name("dual-composer");
+
+        // First composer - primary slot (FAST)
+        Conduit<Pipe<Long>, Long> pipes = cachedCircuit.conduit(sharedName, Composer.pipe());
+        bh.consume(pipes);
+
+        // Second composer - overflow map (SLOWER but still fast)
+        Conduit<Channel<Long>, Long> channels = cachedCircuit.conduit(sharedName, Composer.channel());
+        bh.consume(channels);
+    }
+
+    // ========== Benchmark 18: Conduit Slot - Dual Composer (Cold) ==========
+
+    /**
+     * Measures creating TWO conduits for same name - COLD path.
+     * First creates primary slot, second adds to overflow map.
+     * Target: < 140µs total (2× single composer)
+     */
+    @Benchmark
+    public void benchmark18_conduitSlot_dualComposer_cold(Blackhole bh) {
+        Name uniqueName = cortex.name("dual-cold-" + counter.incrementAndGet());
+
+        // First composer - creates primary slot
+        Conduit<Pipe<Long>, Long> pipes = cachedCircuit.conduit(uniqueName, Composer.pipe());
+        bh.consume(pipes);
+
+        // Second composer - adds overflow map
+        Conduit<Channel<Long>, Long> channels = cachedCircuit.conduit(uniqueName, Composer.channel());
+        bh.consume(channels);
+    }
+
+    // ========== Benchmark 19: Full Path - Single Slot Optimization ==========
+
+    /**
+     * Measures full emission path with optimized conduit slot lookup.
+     * Compare with benchmark08 to see improvement from slot optimization.
+     * Target: < 35ns (was ~101ns before optimization)
+     */
+    @Benchmark
+    public void benchmark19_fullPath_optimized_singleSlot(Blackhole bh) {
+        cortex.circuit(circuitName)
+              .conduit(conduitName, Composer.pipe())  // Should be ~5ns now (was ~79ns)
+              .get(channelName)
+              .emit(counter.incrementAndGet());
+        bh.consume(counter.get());
+    }
+
     // ========== Main Entry Point for Manual Execution ==========
 
     /**
