@@ -221,14 +221,18 @@ Total:            30ns   (steady-state, all warm) - 3.4× FASTER!
 
 **Cold vs Warm:**
 ```
-COLD (first call):
+COLD (first call - one-time cost per unique path):
   Conduit creation: ~10.7μs  (new ConduitImpl + initialization)
   Pipe creation:    ~4μs     (new PipeImpl + subscriber setup)
   Total first call: ~14.7μs
 
-WARM (cached, what benchmark measures):
-  Conduit lookup:    7ns  (computeIfAbsent cache hit, OPTIMIZED!)
-  Pipe lookup:       4ns  (computeIfAbsent cache hit)
+WARM (cached, what benchmark08 measures - full chain):
+  Circuit lookup:    6ns  (get-or-create, cached hit)
+  Conduit lookup:    7ns  (get-or-create, cached hit, OPTIMIZED!)
+  Pipe lookup:       4ns  (get-or-create, cached hit)
+  Emission:          3ns  (hot path)
+  Method overhead:  10ns  (call stack, chaining)
+  ────────────────────
   Total:            30ns  (3.4× faster than before!)
 ```
 
