@@ -20,6 +20,60 @@ interface Cell<I, E> extends Pipe<I>, Container<Cell<I, E>, E>
 **Critical insight about Composer:**
 The `Composer<Pipe<I>, E>` passed to `Circuit.cell()` cannot create just a simple Pipe - since Cell implements BOTH Pipe<I> AND Container<Cell<I,E>, E>, the Composer must somehow create or compose Cells, not just Pipes. This is the source of my architectural questions.
 
+## Reactive Programming Context
+
+Through researching RxJava and reactive patterns, I recognize Cell's dual nature maps to **BehaviorSubject**:
+
+### RxJava → Substrates Mapping
+
+| Substrates Concept | RxJava Equivalent | Description |
+|-------------------|-------------------|-------------|
+| **Cell** | `BehaviorSubject` | Holds state and replays to new subscribers |
+| **Pipe** | `map()`, `filter()`, operators | Transforms or filters data stream |
+| **Channel** | `Subject` | Connects producers and consumers |
+| **Conduit** | `ConnectableObservable` | Hot-emitting transport for shared streams |
+| **Source** | `Observable` / `Publisher` | Upstream emitter of values/events |
+| **Subscriber** | `Observer` | Consumes data and reacts to updates |
+
+### Understanding Cell as BehaviorSubject
+
+**RxJava's BehaviorSubject:**
+- IS-A `Observable` (can be subscribed to - producers emit to it)
+- IS-A `Observer` (can receive values - consumers subscribe to it)
+- Stores current state
+- Replays last value to new subscribers
+
+**Substrates' Cell:**
+- IS-A `Pipe<I>` (receives input - like Observer)
+- IS-A `Container<Cell<I,E>, E>` (manages children that emit - like Observable)
+- Performs type transformation I → E
+- Children receive emissions and emit transformed results
+
+### Type Transformation Pattern
+
+This pattern mirrors RxJava's operator chaining:
+
+```java
+// RxJava pattern
+BehaviorSubject<SensorReading> sensor = BehaviorSubject.create();
+Observable<Alert> alerts = sensor.map(reading -> toAlert(reading));
+
+// Substrates pattern
+Cell<SensorReading, Alert> cell = circuit.cell(
+    composer,  // The transformation logic (reading → alert)
+    flow -> flow.map(...)
+);
+```
+
+**What I understand:**
+- Cell's dual nature (Pipe + Container) matches reactive Subject pattern
+- The I → E transformation is analogous to RxJava's `.map()` operator
+- Composer provides the transformation logic
+
+**What I'm uncertain about:**
+- How Composer creates objects that satisfy both Pipe<I> AND Cell<I,E> interfaces
+- Whether there's a Cell-specific Composer pattern I'm missing
+
 ## Implementation Questions
 
 ### Question 1: Is there a Composer.cell() method?
@@ -63,13 +117,40 @@ Since Cell<I,E> extends BOTH Pipe<I> AND Container<Cell<I,E>, E>, the Composer<P
 
 ### Question 3: What is Cell's intended use case?
 
-I initially thought of a "neural network" pattern where Cells form connections, but the API doesn't seem to support this. What are the intended scenarios for using Cell?
+I'm building a Kafka cluster observability framework. Based on the RxJava mapping, I see Cell as ideal for **stateful type transformation** scenarios.
 
-**Possible patterns I considered:**
-- Hierarchical type transformation (raw sensor data → processed events)
-- Fan-out with transformation (one input type, multiple output types)
-- Adaptive signal processing networks
-- Something else entirely?
+**My use case - Kafka metrics monitoring:**
+
+```java
+// Transform raw Kafka metrics into alerts
+Cell<KafkaMetric, Alert> monitoringCell = circuit.cell(
+    composer,
+    flow -> flow
+        .filter(metric -> metric.value() > threshold)
+        .map(metric -> Alert.create(metric))
+);
+
+// Child cells for different metric types
+Cell<KafkaMetric, Alert> cpuMonitor = monitoringCell.get(name("cpu"));
+Cell<KafkaMetric, Alert> lagMonitor = monitoringCell.get(name("lag"));
+
+// Emit metrics (type I)
+cpuMonitor.emit(new KafkaMetric("cpu.usage", 95.0));
+
+// Subscribe to transformed alerts (type E)
+monitoringCell.source().subscribe(subscriber(
+    name("alert-handler"),
+    (subject, registrar) -> registrar.register(alert -> handleAlert(alert))
+));
+```
+
+**Pattern I see:**
+- **Input (I)**: Raw metrics from Kafka JMX
+- **Transformation**: Filter thresholds, enrich with context, categorize severity
+- **Output (E)**: Structured alerts with metadata
+- **Container role**: Each child Cell monitors a specific metric type
+
+**Is this the intended pattern?** Type transformation with hierarchical organization?
 
 ### Question 4: How do Cells compose hierarchically?
 
