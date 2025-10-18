@@ -166,9 +166,14 @@ pipe1.emit("value"); // String → Source<String>
 **Cell Pattern:**
 ```java
 // Type transformation - receives I, children emit E
+// Transformation happens in Composer, not in Flow
 Cell<KafkaMetric, Alert> cell = circuit.cell(
-    composer,
-    flow -> flow.filter(...).map(metric -> new Alert(metric))
+    CellComposer.typeTransforming(
+        circuit,
+        registryFactory,
+        metric -> new Alert(metric)  // I → E transformation in Composer
+    ),
+    flow -> flow.guard(...)  // E → E filtering only
 );
 
 Cell<KafkaMetric, Alert> child = cell.get(name("cpu"));

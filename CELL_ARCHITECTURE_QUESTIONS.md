@@ -59,9 +59,15 @@ BehaviorSubject<SensorReading> sensor = BehaviorSubject.create();
 Observable<Alert> alerts = sensor.map(reading -> toAlert(reading));
 
 // Substrates pattern
+// Flow API only supports E → E transformations (replace, guard, limit)
+// I → E type transformation happens in the Composer using TransformingPipe
 Cell<SensorReading, Alert> cell = circuit.cell(
-    composer,  // The transformation logic (reading → alert)
-    flow -> flow.map(...)
+    CellComposer.typeTransforming(
+        circuit,
+        registryFactory,
+        reading -> new Alert(reading)  // I → E transformation in Composer
+    ),
+    flow -> flow.guard(...).limit(...)  // E → E filtering/limiting
 );
 ```
 
@@ -92,13 +98,15 @@ If `Composer.cell()` exists, it should follow the same pattern:
 // Composer.pipe() pattern:
 Composer<Pipe<E>, E> pipeComposer = Composer.pipe();
 Composer<Pipe<E>, E> transformingComposer = Composer.pipe(
-    flow -> flow.filter(...).map(...)
+    flow -> flow.guard(...).replace(...)  // E → E transformations only
 );
 
-// Expected Composer.cell() pattern:
-Composer<Cell<I,E>, E> cellComposer = Composer.cell();
-Composer<Cell<I,E>, E> transformingCellComposer = Composer.cell(
-    flow -> flow.filter(...).map(...)  // I → E transformation
+// CellComposer pattern (custom implementation):
+// Since Flow doesn't support I → E, transformation happens in Composer
+Composer<Pipe<I>, E> typeTransformingComposer = CellComposer.typeTransforming(
+    scheduler,
+    registryFactory,
+    i -> transformToE(i)  // I → E transformation in TransformingPipe
 );
 ```
 
@@ -136,11 +144,14 @@ Kafka cluster observability - transforming metrics to alerts:
 
 ```java
 // Transform raw Kafka metrics into alerts
+// Type transformation (KafkaMetric → Alert) happens in Composer
 Cell<KafkaMetric, Alert> monitoringCell = circuit.cell(
-    composer,
-    flow -> flow
-        .filter(metric -> metric.value() > threshold)
-        .map(metric -> Alert.create(metric))
+    CellComposer.typeTransforming(
+        circuit,
+        registryFactory,
+        metric -> Alert.create(metric)  // I → E transformation
+    ),
+    flow -> flow.guard(alert -> alert.severity() > threshold)  // E → E filtering
 );
 
 // Child cells for different metric types
@@ -159,34 +170,51 @@ monitoringCell.source().subscribe(subscriber(
 
 This pattern makes sense conceptually - the question is just how to implement Cell.get() properly to create child Cells without unsafe casting.
 
-## Proposed Solution: CellComposer Pattern
+## Current Understanding: Cell Type Transformation
 
-While awaiting confirmation from the Substrates maintainer, I've implemented a **working solution** using a custom Composer factory.
+**Critical Discovery:** Flow API doesn't support I → E type transformation!
 
-### Implementation
+Flow methods:
+- `guard()` - filtering (E → E or filter)
+- `limit()` - limiting (E → E)
+- `replace(UnaryOperator<E>)` - **same-type transformation** (E → E)
+- `reduce()` - accumulation (E → E)
+- No `map()` or type-changing operators
 
-**File:** `fullerstack-substrates/src/main/java/io/fullerstack/substrates/functional/CellComposer.java`
+**This means:**
+1. `Cell<I, E>` signature suggests type transformation
+2. But `Consumer<Flow<E>>` can only do E → E transformations
+3. **The I → E transformation must happen in the Composer itself, not in Flow**
 
-The `CellComposer` utility creates Composers that return `CellImpl` instances instead of generic Pipes:
+### Two Implementation Approaches:
 
+**Approach 1: Same-Type Cells (Simpler)**
 ```java
-// Create a Cell Composer that transforms KafkaMetric → Alert
-Composer<Pipe<KafkaMetric>, Alert> composer = CellComposer.fromCircuit(
+// Cell<E, E> - no type transformation, just hierarchical organization
+Composer<Pipe<Alert>, Alert> composer = CellComposer.fromCircuit(
     circuit,
-    LazyTrieRegistryFactory.getInstance(),
-    flow -> flow
-        .filter(m -> m.value() > threshold)
-        .map(m -> new Alert(m))
+    LazyTrieRegistryFactory.getInstance()
 );
 
-// Use with Circuit.cell()
-Cell<KafkaMetric, Alert> cell = circuit.cell(composer);
-
-// Now Cell.get() can safely cast because Composer returns Cells
-Cell<KafkaMetric, Alert> child = cell.get(name("cpu"));
+Cell<Alert, Alert> cell = circuit.cell(composer, flow -> flow.guard(...).limit(...));
 ```
 
-**Key insight:** Since `Cell<I, E>` extends `Pipe<I>`, a Composer that creates `CellImpl` instances satisfies the `Composer<Pipe<I>, E>` interface while actually returning Cells.
+**Approach 2: Type-Transforming Composer (Complex)**
+```java
+// Custom Composer that does I → E transformation
+// Would need to wrap Channel<E> and transform I → E before emitting
+Composer<Pipe<KafkaMetric>, Alert> composer = channel -> {
+    // Create a Pipe<KafkaMetric> that transforms to Alert
+    // This requires custom Pipe implementation
+    return new TransformingPipe<>(channel, metric -> new Alert(metric));
+};
+
+Cell<KafkaMetric, Alert> cell = circuit.cell(composer);
+```
+
+**Implemented Solution:** `CellComposer.java` currently uses **Approach 1** (same-type)
+
+This creates Cells that return `Cell<E, E>` for hierarchical organization without type transformation.
 
 ### Test Coverage
 

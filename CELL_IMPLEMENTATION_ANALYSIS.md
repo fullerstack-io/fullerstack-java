@@ -91,14 +91,20 @@ Observable<String> transformed = source.map(i -> "Value: " + i);
 source.onNext(42);  // Transformation applied here → emits "Value: 42"
 ```
 
-**Current CellImpl:**
+**Substrates CellImpl:**
 ```java
+// Flow API doesn't support I → E transformation - only E → E
+// Transformation must happen in Composer using TransformingPipe
 Cell<KafkaMetric, Alert> cell = circuit.cell(
-    composer,  // Contains transformation logic
-    flow -> flow.filter(...).map(...)
+    CellComposer.typeTransforming(
+        circuit,
+        registryFactory,
+        metric -> new Alert(metric)  // I → E transformation in Composer
+    ),
+    flow -> flow.guard(...)  // E → E filtering only
 );
 
-cell.emit(kafkaMetric);  // ← Where does I → E transformation happen?
+cell.emit(kafkaMetric);  // ← Transformation happens in child Cells via TransformingPipe
 ```
 
 **Issue**: The Composer is stored (line 47) but I don't see where it's actually applied to transform `I` to `E`:
