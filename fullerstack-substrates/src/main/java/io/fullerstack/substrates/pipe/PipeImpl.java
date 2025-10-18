@@ -3,7 +3,8 @@ package io.fullerstack.substrates.pipe;
 import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.segment.SegmentImpl;
+import io.fullerstack.substrates.flow.FlowImpl;
+import io.fullerstack.substrates.circuit.Scheduler;
 
 import lombok.Getter;
 
@@ -13,7 +14,7 @@ import java.util.function.Consumer;
 /**
  * Implementation of Substrates.Pipe interface with Lombok for getters.
  *
- * <p>A Pipe provides typed emission with optional transformation support via Segment.
+ * <p>A Pipe provides typed emission with optional transformation support via Flow.
  *
  * <p><b>Circuit Queue Architecture:</b>
  * Instead of putting Captures directly on a BlockingQueue, Pipes post Scripts to the
@@ -21,8 +22,8 @@ import java.util.function.Consumer;
  * This ensures all Conduits share the Circuit's single-threaded execution model
  * ("Virtual CPU Core" design principle).
  *
- * <p>When created without a Segment, emissions pass through directly.
- * When created with a Segment, emissions are transformed (filtered, mapped, reduced, etc.)
+ * <p>When created without a Flow, emissions pass through directly.
+ * When created with a Flow, emissions are transformed (filtered, mapped, reduced, etc.)
  * before being posted as Scripts.
  *
  * <p><b>Subject Propagation:</b> Each Pipe knows its Channel's Subject, which is paired
@@ -42,54 +43,54 @@ import java.util.function.Consumer;
 @Getter
 public class PipeImpl<E> implements Pipe<E> {
 
-    private final Queue circuitQueue; // Circuit's shared Queue for Scripts
+    private final Scheduler scheduler; // Circuit's scheduler (retained for potential future use)
     private final Subject channelSubject; // WHO this pipe belongs to
     private final Consumer<Capture<E>> emissionHandler; // Callback to route emissions to Source
     private final SourceImpl<E> source; // Source reference for early subscriber check optimization
-    private final SegmentImpl<E> segment; // SegmentImpl for apply() and hasReachedLimit()
+    private final FlowImpl<E> flow; // FlowImpl for apply() and hasReachedLimit()
 
     /**
      * Creates a Pipe without transformations.
      *
-     * @param circuitQueue the Circuit's Queue to post Scripts to
+     * @param scheduler the Circuit's scheduler
      * @param channelSubject the Subject of the Channel this Pipe belongs to
      * @param emissionHandler callback to route emissions (provided by Source)
      * @param source the Source instance for subscriber check optimization
      */
-    public PipeImpl(Queue circuitQueue, Subject channelSubject, Consumer<Capture<E>> emissionHandler, SourceImpl<E> source) {
-        this(circuitQueue, channelSubject, emissionHandler, source, null);
+    public PipeImpl(Scheduler scheduler, Subject channelSubject, Consumer<Capture<E>> emissionHandler, SourceImpl<E> source) {
+        this(scheduler, channelSubject, emissionHandler, source, null);
     }
 
     /**
-     * Creates a Pipe with transformations defined by a Segment.
+     * Creates a Pipe with transformations defined by a Flow.
      *
-     * @param circuitQueue the Circuit's Queue to post Scripts to
+     * @param scheduler the Circuit's scheduler
      * @param channelSubject the Subject of the Channel this Pipe belongs to
      * @param emissionHandler callback to route emissions (provided by Source)
      * @param source the Source instance for subscriber check optimization
-     * @param segment the transformation pipeline (null for no transformations)
+     * @param flow the transformation pipeline (null for no transformations)
      */
-    public PipeImpl(Queue circuitQueue, Subject channelSubject, Consumer<Capture<E>> emissionHandler, SourceImpl<E> source, SegmentImpl<E> segment) {
-        this.circuitQueue = Objects.requireNonNull(circuitQueue, "Circuit queue cannot be null");
+    public PipeImpl(Scheduler scheduler, Subject channelSubject, Consumer<Capture<E>> emissionHandler, SourceImpl<E> source, FlowImpl<E> flow) {
+        this.scheduler = Objects.requireNonNull(scheduler, "Scheduler cannot be null");
         this.channelSubject = Objects.requireNonNull(channelSubject, "Channel subject cannot be null");
         this.emissionHandler = Objects.requireNonNull(emissionHandler, "Emission handler cannot be null");
         this.source = Objects.requireNonNull(source, "Source cannot be null");
-        this.segment = segment;
+        this.flow = flow;
     }
 
     @Override
     public void emit(E value) {
-        if (segment == null) {
+        if (flow == null) {
             // No transformations - post Script directly
             postScript(value);
         } else {
             // Apply transformations before posting
-            if (segment.hasReachedLimit()) {
+            if (flow.hasReachedLimit()) {
                 // Limit reached - drop emission
                 return;
             }
 
-            E transformed = segment.apply(value);
+            E transformed = flow.apply(value);
             if (transformed != null) {
                 // Transformation passed - post Script with result
                 postScript(transformed);
@@ -99,37 +100,29 @@ public class PipeImpl<E> implements Pipe<E> {
     }
 
     /**
-     * Processes emission by invoking subscriber callbacks synchronously.
+     * Posts emission to Circuit's queue for ordered processing.
      *
-     * <p><b>OPTIMIZATION 1 (Phase 1):</b> Early exit if no subscribers - avoids allocating
-     * Capture when no subscribers are registered. This eliminates 208 MB/sec allocation rate
-     * in zero-subscriber scenarios.
+     * <p><b>Architecture:</b> Emissions are posted as Scripts to the Circuit's queue.
+     * Each Script creates a Capture and invokes subscriber callbacks in the Circuit's
+     * single-threaded execution context. This ensures ordering guarantees as specified
+     * by the Substrates API.
      *
-     * <p><b>OPTIMIZATION 2 (Phase 3):</b> Synchronous callback execution - invokes emission
-     * handler directly in the emitting thread instead of posting to virtual thread queue.
-     * This eliminates ~100µs of virtual thread overhead, improving subscriber callback
-     * latency from 126µs to ~20µs (6X faster).
-     *
-     * <p><b>Trade-off:</b> Subscriber callbacks execute synchronously in the emitter's thread.
-     * Slow subscribers may block emission. This is acceptable for observability use cases
-     * where subscribers typically perform fast operations (updating metrics, logging).
+     * <p><b>OPTIMIZATION:</b> Early exit if no subscribers - avoids allocating Capture
+     * and posting to queue when no subscribers are registered.
      *
      * @param value the emission value (after transformations, if any)
      */
     private void postScript(E value) {
-        // OPTIMIZATION 1: Early exit if no subscribers
-        // Avoids: Capture allocation (24 bytes)
-        // Result: Zero allocation, emit() returns in ~8ns
+        // OPTIMIZATION: Early exit if no subscribers
+        // Avoids: Capture allocation + queue posting when nothing is listening
         if (!source.hasSubscribers()) {
             return;
         }
 
-        // Create Capture in emitting thread
-        Capture<E> capture = new CaptureImpl<>(channelSubject, value);
-
-        // OPTIMIZATION 2: Synchronous callback - execute directly, no queue
-        // Avoids: Script lambda allocation (80 bytes) + queue posting (10ns) + virtual thread overhead (~100µs)
-        // Result: Subscriber callbacks complete in ~20µs (was ~126µs)
-        emissionHandler.accept(capture);
+        // Post to Circuit's queue - ensures ordering guarantees
+        scheduler.schedule(() -> {
+            Capture<E> capture = new CaptureImpl<>(channelSubject, value);
+            emissionHandler.accept(capture);
+        });
     }
 }

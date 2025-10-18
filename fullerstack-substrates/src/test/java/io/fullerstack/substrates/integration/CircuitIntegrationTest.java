@@ -52,26 +52,34 @@ class CircuitIntegrationTest {
     }
 
     @Test
-    void shouldExecuteScriptsViaQueue() throws Exception {
-        circuit = new CircuitImpl(new LinkedName("test", null));
-        Queue queue = circuit.queue();
+    void shouldProcessEmissionsViaCircuitQueue() throws Exception {
+        // M15+ API: Queue is internal, access via Pipe emissions
+        Cortex cortex = new CortexRuntime();
+        circuit = cortex.circuit(cortex.name("test"));
 
         AtomicInteger counter = new AtomicInteger(0);
         CountDownLatch latch = new CountDownLatch(3);
 
-        // Post 3 scripts
-        queue.post(current -> {
-            counter.incrementAndGet();
-            latch.countDown();
-        });
-        queue.post(current -> {
-            counter.incrementAndGet();
-            latch.countDown();
-        });
-        queue.post(current -> {
-            counter.incrementAndGet();
-            latch.countDown();
-        });
+        // Create a conduit to emit through
+        Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+            cortex.name("test-conduit"),
+            Composer.pipe()
+        );
+
+        // Subscribe to receive emissions
+        conduit.source().subscribe(cortex.subscriber(
+            cortex.name("subscriber"),
+            (subject, registrar) -> registrar.register(value -> {
+                counter.incrementAndGet();
+                latch.countDown();
+            })
+        ));
+
+        // Emit 3 values (posts to circuit's internal queue)
+        Pipe<Integer> pipe = conduit.get(cortex.name("channel"));
+        pipe.emit(1);
+        pipe.emit(2);
+        pipe.emit(3);
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
         assertThat(counter.get()).isEqualTo(3);
@@ -143,27 +151,37 @@ class CircuitIntegrationTest {
     }
 
     @Test
-    void shouldIntegrateQueueAndClock() throws Exception {
-        circuit = new CircuitImpl(new LinkedName("integration", null));
-        Queue queue = circuit.queue();
-        Clock clock = circuit.clock();
+    void shouldIntegratePipeEmissionsAndClock() throws Exception {
+        // M15+ API: Test Pipe emissions + Clock working together
+        Cortex cortex = new CortexRuntime();
+        circuit = cortex.circuit(cortex.name("integration"));
 
-        AtomicInteger queueExecutions = new AtomicInteger(0);
+        AtomicInteger pipeEmissions = new AtomicInteger(0);
         AtomicInteger clockTicks = new AtomicInteger(0);
-        CountDownLatch queueLatch = new CountDownLatch(2);
+        CountDownLatch pipeLatch = new CountDownLatch(2);
         CountDownLatch clockLatch = new CountDownLatch(2);
 
-        // Post scripts to queue
-        queue.post(current -> {
-            queueExecutions.incrementAndGet();
-            queueLatch.countDown();
-        });
-        queue.post(current -> {
-            queueExecutions.incrementAndGet();
-            queueLatch.countDown();
-        });
+        // Create conduit for pipe emissions
+        Conduit<Pipe<String>, String> conduit = circuit.conduit(
+            cortex.name("test-conduit"),
+            Composer.pipe()
+        );
+
+        conduit.source().subscribe(cortex.subscriber(
+            cortex.name("subscriber"),
+            (subject, registrar) -> registrar.register(value -> {
+                pipeEmissions.incrementAndGet();
+                pipeLatch.countDown();
+            })
+        ));
+
+        // Emit values through pipe
+        Pipe<String> pipe = conduit.get(cortex.name("channel"));
+        pipe.emit("emission-1");
+        pipe.emit("emission-2");
 
         // Start clock
+        Clock clock = circuit.clock();
         Subscription subscription = clock.consume(
             new LinkedName("ticker", null),
             Clock.Cycle.MILLISECOND,
@@ -173,12 +191,12 @@ class CircuitIntegrationTest {
             }
         );
 
-        assertThat(queueLatch.await(2, TimeUnit.SECONDS)).isTrue();
+        assertThat(pipeLatch.await(2, TimeUnit.SECONDS)).isTrue();
         assertThat(clockLatch.await(500, TimeUnit.MILLISECONDS)).isTrue();
 
         subscription.close();
 
-        assertThat(queueExecutions.get()).isEqualTo(2);
+        assertThat(pipeEmissions.get()).isEqualTo(2);
         assertThat(clockTicks.get()).isGreaterThanOrEqualTo(2);
     }
 
@@ -226,8 +244,7 @@ class CircuitIntegrationTest {
     void shouldCleanupAllResourcesOnClose() throws Exception {
         circuit = new CircuitImpl(new LinkedName("test", null));
 
-        // Create all components
-        Queue queue = circuit.queue();
+        // Create all components (M15+: no queue() method)
         Clock clock1 = circuit.clock(new LinkedName("clock1", null));
         Clock clock2 = circuit.clock(new LinkedName("clock2", null));
         Source<State> source = circuit.source();
@@ -255,9 +272,9 @@ class CircuitIntegrationTest {
     void shouldProvideAccessToAllComponents() {
         circuit = new CircuitImpl(new LinkedName("test", null));
 
+        // M15+ API: queue() is internal, not exposed publicly
         assertThat((Object) circuit.subject()).isNotNull();
         assertThat((Object) circuit.source()).isNotNull();
-        assertThat((Object) circuit.queue()).isNotNull();
         assertThat((Object) circuit.clock()).isNotNull();
         assertThat((Object) circuit.clock(new LinkedName("custom", null))).isNotNull();
     }

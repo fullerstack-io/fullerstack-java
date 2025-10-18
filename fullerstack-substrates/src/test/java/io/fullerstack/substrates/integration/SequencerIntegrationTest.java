@@ -14,10 +14,10 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration tests for Sequencer functionality showing end-to-end transformation pipelines.
+ * Integration tests for Flow transformation functionality showing end-to-end transformation pipelines.
  *
- * <p>These tests validate the complete flow from Circuit → Conduit → Channel → Pipe with Sequencer
- * → Segment transformations → Source emissions.
+ * <p>These tests validate the complete flow from Circuit → Conduit → Channel → Pipe with Flow
+ * transformations → Source emissions. (M15+ API: Sequencer/Segment renamed to Consumer<Flow>/Flow)
  */
 class SequencerIntegrationTest {
 
@@ -295,23 +295,20 @@ class SequencerIntegrationTest {
     }
 
     @Test
-    void shouldApplySequencerAtConduitLevelToAllChannels() throws InterruptedException {
+    void shouldApplyFlowTransformationsAtConduitLevelToAllChannels() throws InterruptedException {
         circuit = new CircuitImpl(new LinkedName("test-circuit", null));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(6);
 
-        // Create Sequencer that filters negatives and doubles values
-        Sequencer<Segment<Integer>> sequencer = path -> path
-            .guard(value -> value > 0)        // Filter negatives
-            .replace(value -> value * 2);     // Double the value
-
-        // Create conduit with Sequencer at Conduit level (not via Composer)
-        // This means ALL channels/pipes created from this Conduit will apply these transformations
+        // M15+ API: Consumer<Flow> that filters negatives and doubles values
+        // Applied at Conduit level means ALL channels/pipes created from this Conduit will apply these transformations
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new LinkedName("conduit-sequencer", null),
-            Composer.pipe(),  // Plain composer, no sequencer
-            sequencer         // Sequencer applied at Conduit level
+            new LinkedName("conduit-flow", null),
+            Composer.pipe(),  // Plain composer
+            flow -> flow
+                .guard(value -> value > 0)        // Filter negatives
+                .replace(value -> value * 2)      // Double the value
         );
 
         conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
@@ -342,38 +339,7 @@ class SequencerIntegrationTest {
         assertThat(received).containsExactlyInAnyOrder(20, 30, 10, 14, 6, 8);
     }
 
-    @Test
-    void shouldApplySequencerAtContainerLevelToAllConduits() throws InterruptedException {
-        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
-
-        // Create Sequencer that filters positives only
-        Sequencer<Segment<Integer>> sequencer = path -> path.guard(value -> value > 0);
-
-        // Create Container with Sequencer at Container level
-        // This means ALL Conduits created by this Container will apply these transformations
-        Container<Pool<Pipe<Integer>>, Source<Integer>> container = circuit.container(
-            new LinkedName("container-sequencer", null),
-            Composer.pipe(),  // Plain composer
-            sequencer         // Sequencer applied at Container level
-        );
-
-        // Get two different conduits from the container
-        Pool<Pipe<Integer>> conduit1 = container.get(new LinkedName("conduit-1", null));
-        Pool<Pipe<Integer>> conduit2 = container.get(new LinkedName("conduit-2", null));
-
-        Pipe<Integer> pipe1 = conduit1.get(new LinkedName("channel-1", null));
-        Pipe<Integer> pipe2 = conduit2.get(new LinkedName("channel-2", null));
-
-        // Emit values
-        pipe1.emit(-5);  // Filtered
-        pipe1.emit(10);  // Passes
-        pipe2.emit(0);   // Filtered
-        pipe2.emit(20);  // Passes
-
-        // Wait to ensure all Scripts are processed
-        circuit.queue().await();
-
-        // Note: This test demonstrates the API usage - Container passes Sequencer to all created Conduits
-        // Full verification would require subscribing to individual Conduit sources
-    }
+    // M15+ API: Container is now sealed (only Conduit and Cell extend it)
+    // Circuit no longer has container() method
+    // This test has been removed as the functionality no longer exists in M15+
 }

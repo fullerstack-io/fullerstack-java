@@ -3,10 +3,11 @@ package io.fullerstack.substrates.channel;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pipe.PipeImpl;
-import io.fullerstack.substrates.segment.SegmentImpl;
+import io.fullerstack.substrates.flow.FlowImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
+import io.fullerstack.substrates.circuit.Scheduler;
 
 import lombok.Getter;
 
@@ -33,19 +34,19 @@ import java.util.function.Consumer;
  * is NOT callback passing through layers - it's dependency injection at construction time
  * between siblings. Source's distribution logic remains private.
  *
- * <p><b>Sequencer Support:</b>
- * If a Sequencer is configured, this Channel creates Pipes with transformation pipelines
- * (Segments) applied. All Channels from the same Conduit share the same transformation
+ * <p><b>Flow Consumer Support:</b>
+ * If a Flow Consumer is configured, this Channel creates Pipes with transformation pipelines
+ * (Flows) applied. All Channels from the same Conduit share the same transformation
  * pipeline, as configured at the Conduit level.
  *
  * <p><b>Pipe Caching:</b>
  * The first call to {@code pipe()} creates and caches a Pipe instance. Subsequent calls
- * return the same cached Pipe. This ensures that Segment state (emission counters, limit
+ * return the same cached Pipe. This ensures that Flow state (emission counters, limit
  * tracking, reduce accumulators, diff last values) is shared across all emissions from
  * this Channel, preventing incorrect behavior where multiple Pipe instances would have
  * separate state.
  *
- * <p>Note: {@code pipe(Sequencer)} is NOT cached - each call creates a new Pipe with
+ * <p>Note: {@code pipe(Consumer<Flow>)} is NOT cached - each call creates a new Pipe with
  * fresh transformations, allowing different custom pipelines per call.
  *
  * @param <E> the emission type (e.g., MonitorSignal, ServiceSignal)
@@ -54,9 +55,9 @@ import java.util.function.Consumer;
 public class ChannelImpl<E> implements Channel<E> {
 
     private final Subject channelSubject;
-    private final Queue circuitQueue;
+    private final Scheduler scheduler;
     private final Source<E> source; // Direct Source reference for emission routing
-    private final Sequencer<Segment<E>> sequencer; // Optional transformation pipeline (nullable)
+    private final Consumer<Flow<E>> flowConfigurer; // Optional transformation pipeline (nullable)
 
     // Cached Pipe instance - ensures Segment state (limits, accumulators, etc.) is shared
     // across multiple calls to pipe()
@@ -66,11 +67,11 @@ public class ChannelImpl<E> implements Channel<E> {
      * Creates a Channel with Source reference for emission handler coordination.
      *
      * @param channelName hierarchical channel name (e.g., "circuit.conduit.channel")
-     * @param circuitQueue circuit's shared queue
+     * @param scheduler circuit's scheduler
      * @param source sibling Source (provides emission handler for Pipe creation)
-     * @param sequencer optional transformation pipeline (null if no transformations)
+     * @param flowConfigurer optional transformation pipeline (null if no transformations)
      */
-    public ChannelImpl(Name channelName, Queue circuitQueue, Source<E> source, Sequencer<Segment<E>> sequencer) {
+    public ChannelImpl(Name channelName, Scheduler scheduler, Source<E> source, Consumer<Flow<E>> flowConfigurer) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
         this.channelSubject = new SubjectImpl(
             IdImpl.generate(),
@@ -78,8 +79,8 @@ public class ChannelImpl<E> implements Channel<E> {
             StateImpl.empty(),
             Subject.Type.CHANNEL
         );
-        this.circuitQueue = Objects.requireNonNull(circuitQueue, "Circuit queue cannot be null");
-        this.sequencer = sequencer; // Can be null
+        this.scheduler = Objects.requireNonNull(scheduler, "Scheduler cannot be null");
+        this.flowConfigurer = flowConfigurer; // Can be null
     }
 
     @Override
@@ -89,18 +90,18 @@ public class ChannelImpl<E> implements Channel<E> {
 
     @Override
     public Pipe<E> pipe() {
-        // Return cached Pipe if it exists (ensures Segment state is shared)
+        // Return cached Pipe if it exists (ensures Flow state is shared)
         if (cachedPipe == null) {
             synchronized (this) {
                 if (cachedPipe == null) {
-                    // If Conduit has a Sequencer configured, apply it
-                    if (sequencer != null) {
-                        cachedPipe = pipe(sequencer);
+                    // If Conduit has a Flow Consumer configured, apply it
+                    if (flowConfigurer != null) {
+                        cachedPipe = pipe(flowConfigurer);
                     } else {
                         // Otherwise, create a plain Pipe with emission handler from Source
                         SourceImpl<E> sourceImpl = (SourceImpl<E>) source;
                         Consumer<Capture<E>> handler = sourceImpl.emissionHandler();
-                        cachedPipe = new PipeImpl<>(circuitQueue, channelSubject, handler, sourceImpl);
+                        cachedPipe = new PipeImpl<>(scheduler, channelSubject, handler, sourceImpl);
                     }
                 }
             }
@@ -109,18 +110,18 @@ public class ChannelImpl<E> implements Channel<E> {
     }
 
     @Override
-    public Pipe<E> pipe(Sequencer<? super Segment<E>> sequencer) {
-        Objects.requireNonNull(sequencer, "Sequencer cannot be null");
+    public Pipe<E> pipe(Consumer<? super Flow<E>> configurer) {
+        Objects.requireNonNull(configurer, "Flow configurer cannot be null");
 
-        // Create a Segment and apply the Sequencer transformations
-        SegmentImpl<E> segment = new SegmentImpl<>();
-        sequencer.apply(segment);
+        // Create a Flow and apply the Consumer transformations
+        FlowImpl<E> flow = new FlowImpl<>();
+        configurer.accept(flow);
 
         // Get emission handler from Source (sibling coordination)
         SourceImpl<E> sourceImpl = (SourceImpl<E>) source;
         Consumer<Capture<E>> handler = sourceImpl.emissionHandler();
 
-        // Return a Pipe with emission handler, Source reference, and Segment transformations
-        return new PipeImpl<>(circuitQueue, channelSubject, handler, sourceImpl, segment);
+        // Return a Pipe with emission handler, Source reference, and Flow transformations
+        return new PipeImpl<>(scheduler, channelSubject, handler, sourceImpl, flow);
     }
 }

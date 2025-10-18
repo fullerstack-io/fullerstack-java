@@ -285,22 +285,11 @@ class CortexRuntimeTest {
         assertThat(sink.drain()).isEmpty();
     }
 
-    // ========== Capture Creation (1 method) ==========
-
-    @Test
-    void shouldCreateCapture() {
-        Subject subject = cortex.scope().subject();
-        Capture<String> capture = cortex.capture(subject, "test-emission");
-
-        assertThat((Object) capture.subject()).isEqualTo(subject);
-        assertThat(capture.emission()).isEqualTo("test-emission");
-    }
-
     // ========== Integration Test ==========
 
     @Test
     void shouldImplementAllCortexMethods() {
-        // Verify all 38 methods are callable and return non-null
+        // Verify all Cortex methods are callable and return non-null
         assertThat((Object) cortex.circuit()).isNotNull();
         assertThat(cortex.circuit(new LinkedName("test", null))).isNotNull();
         assertThat((Object) cortex.name("test")).isNotNull();
@@ -322,6 +311,7 @@ class CortexRuntimeTest {
         assertThat((Object) cortex.slot(new LinkedName("n", null), 1.0f)).isNotNull();
         assertThat((Object) cortex.slot(new LinkedName("n", null), "s")).isNotNull();
         assertThat((Object) cortex.subscriber(new LinkedName("s", null), (sub, reg) -> {})).isNotNull();
-        assertThat((Object) cortex.capture(cortex.scope().subject(), "e")).isNotNull();
+        // Note: Capture is created internally by Pipe/Source, not by Cortex
+        // Sink.drain() returns Captures, so test via Sink instead
     }
 }

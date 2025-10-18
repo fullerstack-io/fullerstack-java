@@ -1,7 +1,5 @@
 package io.fullerstack.substrates.queue;
 
-import io.humainary.substrates.api.Substrates.Queue;
-
 /**
  * Factory interface for creating {@link Queue} implementations.
  *

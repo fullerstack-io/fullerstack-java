@@ -8,11 +8,13 @@ import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.registry.LazyTrieRegistry;
 import io.fullerstack.substrates.registry.RegistryFactory;
+import io.fullerstack.substrates.circuit.Scheduler;
 
 import lombok.Getter;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Generic implementation of Substrates.Conduit interface with Lombok for getters.
@@ -56,14 +58,14 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     private final Composer<? extends P, E> composer;
     private final Map<Name, P> percepts;
     private final Source<E> eventSource; // Observable stream - external code subscribes to this
-    private final Queue circuitQueue; // Shared Circuit Queue (single-threaded execution)
-    private final Sequencer<Segment<E>> sequencer; // Optional transformation pipeline (nullable)
+    private final Scheduler scheduler; // Circuit scheduler for serialized execution
+    private final Consumer<Flow<E>> flowConfigurer; // Optional transformation pipeline (nullable)
 
     /**
      * Creates a Conduit without transformations.
      */
-    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Queue circuitQueue, RegistryFactory registryFactory) {
-        this(conduitName, composer, circuitQueue, registryFactory, null);
+    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Scheduler scheduler, RegistryFactory registryFactory) {
+        this(conduitName, composer, scheduler, registryFactory, null);
     }
 
     /**
@@ -71,12 +73,12 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
      *
      * @param conduitName hierarchical conduit name (e.g., "circuit.conduit")
      * @param composer composer for creating percepts
-     * @param circuitQueue circuit's shared queue
+     * @param scheduler circuit's scheduler for work execution
      * @param registryFactory the factory to use for creating Registry instances
-     * @param sequencer optional transformation pipeline (null if no transformations)
+     * @param flowConfigurer optional transformation pipeline (null if no transformations)
      */
     @SuppressWarnings("unchecked")
-    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Queue circuitQueue, RegistryFactory registryFactory, Sequencer<Segment<E>> sequencer) {
+    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Scheduler scheduler, RegistryFactory registryFactory, Consumer<Flow<E>> flowConfigurer) {
         this.conduitSubject = new SubjectImpl(
             IdImpl.generate(),
             conduitName,
@@ -86,8 +88,8 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         this.composer = composer;
         this.percepts = (Map<Name, P>) registryFactory.create();
         this.eventSource = new SourceImpl<>(conduitName);
-        this.circuitQueue = java.util.Objects.requireNonNull(circuitQueue, "Circuit queue cannot be null");
-        this.sequencer = sequencer; // Can be null
+        this.scheduler = java.util.Objects.requireNonNull(scheduler, "Scheduler cannot be null");
+        this.flowConfigurer = flowConfigurer; // Can be null
     }
 
     @Override
@@ -105,14 +107,14 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         return percepts.computeIfAbsent(subject, s -> {
             // Build hierarchical channel name: circuit.conduit.channel
             Name hierarchicalChannelName = conduitSubject.name().name(s);
-            // Pass Source directly - eliminates callback passing through layers
-            Channel<E> channel = new ChannelImpl<>(hierarchicalChannelName, circuitQueue, eventSource, sequencer);
+            // Pass Source and Scheduler - Channel will use the Circuit
+            Channel<E> channel = new ChannelImpl<>(hierarchicalChannelName, scheduler, eventSource, flowConfigurer);
             return composer.compose(channel);
         });
     }
 
     @Override
-    public Conduit<P, E> tap(java.util.function.Consumer<? super Conduit<P, E>> consumer) {
+    public Conduit<P, E> tap(Consumer<? super Conduit<P, E>> consumer) {
         java.util.Objects.requireNonNull(consumer, "Consumer cannot be null");
         consumer.accept(this);
         return this;

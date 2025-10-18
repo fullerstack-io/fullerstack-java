@@ -189,17 +189,17 @@ public class SubstratesLoadBenchmark {
         bh.consume(counter.get());
     }
 
-    // ========== Benchmark 9: Container Operations ==========
+    // ========== Benchmark 9: Conduit.get() Operations ==========
 
     /**
-     * Measures container.get() overhead for dynamic entity management.
+     * Measures conduit.get() overhead for dynamic channel management.
      * Target: < 200ns
      */
     @Benchmark
-    public Pool<Pipe<Long>> benchmark09_containerGet() {
-        Container<Pool<Pipe<Long>>, Source<Long>> container =
-            cachedCircuit.container(cortex.name("container"), Composer.pipe());
-        return container.get(cortex.name("entity-" + (counter.incrementAndGet() % 100)));
+    public Pipe<Long> benchmark09_conduitGet() {
+        Conduit<Pipe<Long>, Long> conduit =
+            cachedCircuit.conduit(cortex.name("dynamic"), Composer.pipe());
+        return conduit.get(cortex.name("entity-" + (counter.incrementAndGet() % 100)));
     }
 
     // ========== Benchmark 10: Subscriber Callback Overhead ==========

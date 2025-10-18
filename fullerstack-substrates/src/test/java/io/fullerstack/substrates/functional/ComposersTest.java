@@ -169,8 +169,8 @@ class ComposersTest {
 
         Conduit<Pipe<String>, String> conduit = circuit.conduit(
             cortex.name("diff"),
-            Channel::pipe,
-            Segment::diff
+            Composer.pipe(),
+            flow -> flow.diff()
         );
 
         // When: Emitting duplicate values

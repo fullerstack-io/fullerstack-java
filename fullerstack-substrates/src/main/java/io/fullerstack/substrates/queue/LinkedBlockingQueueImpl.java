@@ -1,39 +1,22 @@
 package io.fullerstack.substrates.queue;
 
-import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.id.IdImpl;
-import io.fullerstack.substrates.state.StateImpl;
-import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameFactory;
-import io.fullerstack.substrates.name.InternedNameFactory;
-
-import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
- * LinkedBlockingQueue-based implementation of Substrates.Queue for backpressure management.
+ * LinkedBlockingQueue-based implementation of internal Queue for backpressure management.
  *
- * <p>Processes scripts asynchronously using a virtual thread with blocking FIFO semantics.
- * Scripts are executed in strict FIFO order using {@link java.util.concurrent.LinkedBlockingQueue}.
+ * <p>Processes runnables asynchronously using a virtual thread with blocking FIFO semantics.
+ * Runnables are executed in strict FIFO order using {@link java.util.concurrent.LinkedBlockingQueue}.
  *
  * <p><b>Characteristics:</b>
  * <ul>
- *   <li>Asynchronous script execution via virtual thread</li>
+ *   <li>Asynchronous execution via virtual thread</li>
  *   <li>Blocking FIFO ordering guarantee</li>
  *   <li>Unbounded capacity (linked-list backed)</li>
  *   <li>await() blocks until queue is empty</li>
- *   <li>Graceful error handling - continues processing after script errors</li>
+ *   <li>Graceful error handling - continues processing after errors</li>
  *   <li>Thread-safe concurrent post() operations</li>
- * </ul>
- *
- * <p><b>QoS/Priority Approach:</b>
- * Quality of Service is handled at the Circuit/Conduit level, not at the Script level.
- * If you need priority processing:
- * <ul>
- *   <li>Create separate Circuits (each has its own Queue) - circuit-level scaling</li>
- *   <li>Use separate Conduits with different processing characteristics</li>
- *   <li>Don't prioritize individual Scripts within a Queue - keep FIFO semantics</li>
  * </ul>
  *
  * <p><b>Alternative implementations:</b> Other Queue strategies could include:
@@ -49,7 +32,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  * @see java.util.concurrent.LinkedBlockingQueue
  */
 public class LinkedBlockingQueueImpl implements Queue {
-    private final BlockingQueue<Script> scripts = new LinkedBlockingQueue<>();
+    private final BlockingQueue<Runnable> runnables = new LinkedBlockingQueue<>();
     private final Thread processor;
     private volatile boolean running = true;
     private volatile boolean executing = false;
@@ -63,8 +46,8 @@ public class LinkedBlockingQueueImpl implements Queue {
 
     @Override
     public void await() {
-        // Block until queue is empty and no script is currently executing
-        while (running && (executing || !scripts.isEmpty())) {
+        // Block until queue is empty and nothing is currently executing
+        while (running && (executing || !runnables.isEmpty())) {
             try {
                 Thread.sleep(10);
             } catch (InterruptedException e) {
@@ -75,74 +58,14 @@ public class LinkedBlockingQueueImpl implements Queue {
     }
 
     @Override
-    public void post(Script script) {
-        if (script != null && running) {
-            scripts.offer(script);  // Add to queue (FIFO)
+    public void post(Runnable runnable) {
+        if (runnable != null && running) {
+            runnables.offer(runnable);  // Add to queue (FIFO)
         }
     }
 
     @Override
-    public void post(Name name, Script script) {
-        // Named script execution - allows tagging/tracking Scripts
-        // QoS/Priority is handled at Circuit/Conduit level, not Script level
-        if (script != null && running) {
-            scripts.offer(script);  // Add to queue (FIFO)
-        }
-    }
-
-    /**
-     * Background processor that executes scripts from the queue.
-     */
-    private void processQueue() {
-        // Create a Current instance for script execution with stable Subject
-        Id currentId = IdImpl.generate();
-        Current current = new Current() {
-            private final NameFactory nameFactory = InternedNameFactory.getInstance();
-            private final Subject currentSubject = new SubjectImpl(
-                currentId,
-                nameFactory.createRoot("queue-current").name(currentId.toString()),
-                StateImpl.empty(),
-                Subject.Type.SCRIPT
-            );
-
-            @Override
-            public Subject subject() {
-                return currentSubject;
-            }
-
-            @Override
-            public void post(Runnable runnable) {
-                // Post runnable as a script
-                LinkedBlockingQueueImpl.this.post(curr -> runnable.run());
-            }
-        };
-
-        while (running && !Thread.interrupted()) {
-            try {
-                Script script = scripts.take();  // Blocking take (FIFO)
-                executing = true;
-                try {
-                    script.exec(current);
-                } finally {
-                    executing = false;
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                // Log error but continue processing
-                // In production, would use proper logging
-                System.err.println("Error executing script: " + e.getMessage());
-                executing = false;
-            }
-        }
-    }
-
-    /**
-     * Shuts down the queue processor.
-     * This method is not part of the Queue interface but provided for cleanup.
-     */
-    public void shutdown() {
+    public void close() {
         running = false;
         processor.interrupt();
         try {
@@ -153,10 +76,34 @@ public class LinkedBlockingQueueImpl implements Queue {
     }
 
     /**
+     * Background processor that executes runnables from the queue.
+     */
+    private void processQueue() {
+        while (running && !Thread.interrupted()) {
+            try {
+                Runnable runnable = runnables.take();  // Blocking take (FIFO)
+                executing = true;
+                try {
+                    runnable.run();
+                } finally {
+                    executing = false;
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                // Log error but continue processing
+                System.err.println("Error executing runnable: " + e.getMessage());
+                executing = false;
+            }
+        }
+    }
+
+    /**
      * Checks if the queue is empty.
      * Useful for testing.
      */
     public boolean isEmpty() {
-        return scripts.isEmpty();
+        return runnables.isEmpty();
     }
 }

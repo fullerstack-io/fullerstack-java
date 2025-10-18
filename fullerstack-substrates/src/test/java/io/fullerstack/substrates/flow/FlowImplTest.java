@@ -1,4 +1,4 @@
-package io.fullerstack.substrates.segment;
+package io.fullerstack.substrates.flow;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.name.LinkedName;
@@ -11,13 +11,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Tests for SegmentImpl transformation pipeline.
+ * Tests for FlowImpl transformation pipeline.
  */
-class SegmentImplTest {
+class FlowImplTest {
 
     @Test
     void shouldPassAllEmissionsWithNoTransformations() {
-        SegmentImpl<Integer> segment = new SegmentImpl<>();
+        FlowImpl<Integer> segment = new FlowImpl<>();
 
         assertThat(segment.apply(1)).isEqualTo(1);
         assertThat(segment.apply(2)).isEqualTo(2);
@@ -26,10 +26,10 @@ class SegmentImplTest {
 
     @Test
     void shouldFilterWithGuard() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .guard(value -> value > 0);
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(-1)).isNull();
         assertThat(impl.apply(0)).isNull();
@@ -39,10 +39,10 @@ class SegmentImplTest {
 
     @Test
     void shouldLimitEmissions() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .limit(3);
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(1)).isEqualTo(1);
         assertThat(impl.apply(2)).isEqualTo(2);
@@ -53,10 +53,10 @@ class SegmentImplTest {
 
     @Test
     void shouldReplaceWithMapper() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .replace(value -> value * 2);
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(1)).isEqualTo(2);
         assertThat(impl.apply(5)).isEqualTo(10);
@@ -65,10 +65,10 @@ class SegmentImplTest {
 
     @Test
     void shouldReduceWithAccumulator() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .reduce(0, Integer::sum);
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(1)).isEqualTo(1);   // 0 + 1
         assertThat(impl.apply(2)).isEqualTo(3);   // 1 + 2
@@ -78,10 +78,10 @@ class SegmentImplTest {
 
     @Test
     void shouldFilterDuplicatesWithDiff() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .diff();
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(1)).isEqualTo(1);   // First value passes
         assertThat(impl.apply(1)).isNull();       // Duplicate filtered
@@ -92,10 +92,10 @@ class SegmentImplTest {
 
     @Test
     void shouldFilterDuplicatesWithDiffInitial() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .diff(1);
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(1)).isNull();       // Same as initial - filtered
         assertThat(impl.apply(2)).isEqualTo(2);   // Different - passes
@@ -104,10 +104,10 @@ class SegmentImplTest {
 
     @Test
     void shouldSampleEveryNthEmission() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .sample(3);
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(1)).isNull();       // 1st - filtered
         assertThat(impl.apply(2)).isNull();       // 2nd - filtered
@@ -120,11 +120,11 @@ class SegmentImplTest {
     @Test
     void shouldPeekWithoutModifying() {
         List<Integer> peeked = new ArrayList<>();
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .peek(peeked::add)
             .guard(value -> value > 0);
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         impl.apply(-1);
         impl.apply(5);
@@ -136,12 +136,12 @@ class SegmentImplTest {
     @Test
     void shouldChainMultipleTransformations() {
         // Guard > 0, multiply by 2, limit to 3
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .guard(value -> value > 0)
             .replace(value -> value * 2)
             .limit(3);
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(-1)).isNull();      // Filtered by guard
         assertThat(impl.apply(1)).isEqualTo(2);   // 1 * 2 = 2
@@ -152,10 +152,10 @@ class SegmentImplTest {
 
     @Test
     void shouldSiftAboveThreshold() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .sift(Integer::compareTo, sift -> sift.above(5));
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(3)).isNull();
         assertThat(impl.apply(5)).isNull();
@@ -165,10 +165,10 @@ class SegmentImplTest {
 
     @Test
     void shouldSiftBelowThreshold() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .sift(Integer::compareTo, sift -> sift.below(5));
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(3)).isEqualTo(3);
         assertThat(impl.apply(5)).isNull();
@@ -177,10 +177,10 @@ class SegmentImplTest {
 
     @Test
     void shouldSiftInRange() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .sift(Integer::compareTo, sift -> sift.range(5, 10));
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(3)).isNull();
         assertThat(impl.apply(5)).isEqualTo(5);
@@ -191,10 +191,10 @@ class SegmentImplTest {
 
     @Test
     void shouldSiftWithMin() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .sift(Integer::compareTo, sift -> sift.min(5));
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(3)).isNull();
         assertThat(impl.apply(5)).isEqualTo(5);
@@ -203,10 +203,10 @@ class SegmentImplTest {
 
     @Test
     void shouldSiftWithMax() {
-        Segment<Integer> segment = new SegmentImpl<Integer>()
+        Flow<Integer> segment = new FlowImpl<Integer>()
             .sift(Integer::compareTo, sift -> sift.max(10));
 
-        SegmentImpl<Integer> impl = (SegmentImpl<Integer>) segment;
+        FlowImpl<Integer> impl = (FlowImpl<Integer>) segment;
 
         assertThat(impl.apply(5)).isEqualTo(5);
         assertThat(impl.apply(10)).isEqualTo(10);
@@ -215,7 +215,7 @@ class SegmentImplTest {
 
     @Test
     void shouldRequireNonNullPredicate() {
-        SegmentImpl<Integer> segment = new SegmentImpl<>();
+        FlowImpl<Integer> segment = new FlowImpl<>();
 
         assertThatThrownBy(() -> segment.guard(null))
             .isInstanceOf(NullPointerException.class);
@@ -223,7 +223,7 @@ class SegmentImplTest {
 
     @Test
     void shouldRequireNonNullMapper() {
-        SegmentImpl<Integer> segment = new SegmentImpl<>();
+        FlowImpl<Integer> segment = new FlowImpl<>();
 
         assertThatThrownBy(() -> segment.replace(null))
             .isInstanceOf(NullPointerException.class);
@@ -231,7 +231,7 @@ class SegmentImplTest {
 
     @Test
     void shouldRequireNonNullAccumulator() {
-        SegmentImpl<Integer> segment = new SegmentImpl<>();
+        FlowImpl<Integer> segment = new FlowImpl<>();
 
         assertThatThrownBy(() -> segment.reduce(0, null))
             .isInstanceOf(NullPointerException.class);
@@ -239,7 +239,7 @@ class SegmentImplTest {
 
     @Test
     void shouldRequireNonNegativeLimit() {
-        SegmentImpl<Integer> segment = new SegmentImpl<>();
+        FlowImpl<Integer> segment = new FlowImpl<>();
 
         assertThatThrownBy(() -> segment.limit(-1))
             .isInstanceOf(IllegalArgumentException.class);
@@ -247,7 +247,7 @@ class SegmentImplTest {
 
     @Test
     void shouldRequirePositiveSampleRate() {
-        SegmentImpl<Integer> segment = new SegmentImpl<>();
+        FlowImpl<Integer> segment = new FlowImpl<>();
 
         assertThatThrownBy(() -> segment.sample(0))
             .isInstanceOf(IllegalArgumentException.class);

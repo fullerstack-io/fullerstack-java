@@ -20,14 +20,14 @@
     </modules>
 
     <properties>
-        <!-- Java 25 -->
+        <!-- Java 25 (required for Substrates API M15+) -->
         <java.version>25</java.version>
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Dependency Versions -->
-        <substrates-api.version>1.0.0-M13</substrates-api.version>
+        <substrates-api.version>1.0.0-M15</substrates-api.version>
         <serventis-api.version>1.0.0-M13</serventis-api.version>
         <junit.version>5.11.0</junit.version>
         <assertj.version>3.26.3</assertj.version>

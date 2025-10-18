@@ -1,6 +1,7 @@
-package io.fullerstack.substrates.segment;
+package io.fullerstack.substrates.flow;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.fullerstack.substrates.segment.SiftImpl;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -9,28 +10,28 @@ import java.util.Objects;
 import java.util.function.*;
 
 /**
- * Implementation of Substrates.Segment for emission transformation pipelines.
+ * Implementation of Substrates.Flow for emission transformation pipelines.
  *
- * <p><b>Note:</b> Segment is the current name for what was originally called "Path" in early
- * Humainary blog articles. The API evolved to use "Segment" to better align with the
- * "assembly line" metaphor where each segment performs specific operations on emissions.
+ * <p><b>Note:</b> Flow is the latest name in the API evolution: Path → Segment → Flow.
+ * The API evolved to use "Flow" to better represent the continuous data stream concept
+ * with Consumer<Flow> replacing the Sequencer pattern.
  *
- * <p>Segment provides a fluent API for building transformation pipelines that are applied
+ * <p>Flow provides a fluent API for building transformation pipelines that are applied
  * to emissions flowing through a Pipe. Transformations include filtering, mapping, reducing,
  * sampling, and comparison-based sifting.
  *
  * <p>Key characteristics:
  * <ul>
- *   <li>Immutable - each transformation returns a new Segment</li>
+ *   <li>Immutable - each transformation returns a new Flow</li>
  *   <li>Lazy - transformations are captured, not executed immediately</li>
- *   <li>Composable - transformations chain fluently</li>
+ *   <li>Composable - transformations chain fluently with @Fluent annotations</li>
  *   <li>Executed by Circuit - not by emitting thread (per Humainary design)</li>
  * </ul>
  *
- * <p>Usage (from blog examples):
+ * <p>Usage (M15+ with Consumer):
  * <pre>
  * channel.pipe(
- *   segment -> segment
+ *   flow -> flow
  *     .guard(value -> value > 0)
  *     .limit(10)
  *     .reduce(0, Integer::sum)
@@ -41,7 +42,7 @@ import java.util.function.*;
  * @see <a href="https://humainary.io/blog/observability-x-channels/">Observability X - Channels</a>
  * @see <a href="https://humainary.io/blog/observability-x-staging-state/">Observability X - Staging State</a>
  */
-public class SegmentImpl<E> implements Segment<E> {
+public class FlowImpl<E> implements Flow<E> {
 
     /**
      * Transformation operations that can be applied to emissions.
@@ -51,11 +52,11 @@ public class SegmentImpl<E> implements Segment<E> {
     private long limitCount = Long.MAX_VALUE;
     private long emissionCount = 0;
 
-    public SegmentImpl() {
+    public FlowImpl() {
     }
 
     @Override
-    public Segment<E> diff() {
+    public Flow<E> diff() {
         E[] lastValue = (E[]) new Object[1];
         return addTransformation(value -> {
             if (lastValue[0] == null) {
@@ -71,7 +72,7 @@ public class SegmentImpl<E> implements Segment<E> {
     }
 
     @Override
-    public Segment<E> diff(E initial) {
+    public Flow<E> diff(E initial) {
         E[] lastValue = (E[]) new Object[]{initial};
         return addTransformation(value -> {
             if (!Objects.equals(value, lastValue[0])) {
@@ -83,7 +84,7 @@ public class SegmentImpl<E> implements Segment<E> {
     }
 
     @Override
-    public Segment<E> forward(Pipe<E> pipe) {
+    public Flow<E> forward(Pipe<E> pipe) {
         Objects.requireNonNull(pipe, "Pipe cannot be null");
         return addTransformation(value -> {
             pipe.emit(value);
@@ -92,7 +93,7 @@ public class SegmentImpl<E> implements Segment<E> {
     }
 
     @Override
-    public Segment<E> guard(Predicate<? super E> predicate) {
+    public Flow<E> guard(Predicate<? super E> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
         return addTransformation(value ->
             predicate.test(value) ? TransformResult.pass(value) : TransformResult.filter()
@@ -100,7 +101,7 @@ public class SegmentImpl<E> implements Segment<E> {
     }
 
     @Override
-    public Segment<E> guard(E reference, BiPredicate<? super E, ? super E> predicate) {
+    public Flow<E> guard(E reference, BiPredicate<? super E, ? super E> predicate) {
         Objects.requireNonNull(predicate, "BiPredicate cannot be null");
         return addTransformation(value ->
             predicate.test(value, reference) ? TransformResult.pass(value) : TransformResult.filter()
@@ -108,7 +109,12 @@ public class SegmentImpl<E> implements Segment<E> {
     }
 
     @Override
-    public Segment<E> limit(long maxEmissions) {
+    public Flow<E> limit(int maxEmissions) {
+        return limit((long) maxEmissions);
+    }
+
+    @Override
+    public Flow<E> limit(long maxEmissions) {
         if (maxEmissions < 0) {
             throw new IllegalArgumentException("Limit must be non-negative");
         }
@@ -117,7 +123,7 @@ public class SegmentImpl<E> implements Segment<E> {
     }
 
     @Override
-    public Segment<E> peek(Consumer<E> consumer) {
+    public Flow<E> peek(Consumer<E> consumer) {
         Objects.requireNonNull(consumer, "Consumer cannot be null");
         return addTransformation(value -> {
             consumer.accept(value);
@@ -126,7 +132,7 @@ public class SegmentImpl<E> implements Segment<E> {
     }
 
     @Override
-    public Segment<E> reduce(E identity, BinaryOperator<E> accumulator) {
+    public Flow<E> reduce(E identity, BinaryOperator<E> accumulator) {
         Objects.requireNonNull(accumulator, "Accumulator cannot be null");
         E[] accumulated = (E[]) new Object[]{identity};
         return addTransformation(value -> {
@@ -136,13 +142,13 @@ public class SegmentImpl<E> implements Segment<E> {
     }
 
     @Override
-    public Segment<E> replace(UnaryOperator<E> mapper) {
+    public Flow<E> replace(UnaryOperator<E> mapper) {
         Objects.requireNonNull(mapper, "Mapper cannot be null");
         return addTransformation(value -> TransformResult.replace(mapper.apply(value)));
     }
 
     @Override
-    public Segment<E> sample(int n) {
+    public Flow<E> sample(int n) {
         if (n <= 0) {
             throw new IllegalArgumentException("Sample rate must be positive");
         }
@@ -154,7 +160,7 @@ public class SegmentImpl<E> implements Segment<E> {
     }
 
     @Override
-    public Segment<E> sample(double probability) {
+    public Flow<E> sample(double probability) {
         if (probability < 0.0 || probability > 1.0) {
             throw new IllegalArgumentException("Probability must be between 0.0 and 1.0");
         }
@@ -164,12 +170,12 @@ public class SegmentImpl<E> implements Segment<E> {
     }
 
     @Override
-    public Segment<E> sift(Comparator<E> comparator, Sequencer<? super Sift<E>> sequencer) {
+    public Flow<E> sift(Comparator<E> comparator, Consumer<? super Sift<E>> configurer) {
         Objects.requireNonNull(comparator, "Comparator cannot be null");
-        Objects.requireNonNull(sequencer, "Sequencer cannot be null");
+        Objects.requireNonNull(configurer, "Configurer cannot be null");
 
         SiftImpl<E> sift = new SiftImpl<>(comparator);
-        sequencer.apply(sift);
+        configurer.accept(sift);
 
         return addTransformation(value ->
             sift.test(value) ? TransformResult.pass(value) : TransformResult.filter()
@@ -207,7 +213,7 @@ public class SegmentImpl<E> implements Segment<E> {
         return emissionCount >= limitCount;
     }
 
-    private Segment<E> addTransformation(Function<E, TransformResult<E>> transformation) {
+    private Flow<E> addTransformation(Function<E, TransformResult<E>> transformation) {
         this.transformations.add(transformation);
         return this;
     }

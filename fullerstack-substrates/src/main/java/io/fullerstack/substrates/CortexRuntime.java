@@ -333,7 +333,6 @@ public class CortexRuntime implements Cortex {
 
     // ========== Capture Creation (1 method) ==========
 
-    @Override
     public <E> Capture<E> capture(Subject subject, E emission) {
         Objects.requireNonNull(subject, "Capture subject cannot be null");
         return new CaptureImpl<>(subject, emission);

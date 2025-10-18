@@ -16,17 +16,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class LinkedBlockingQueueImplTest {
     private LinkedBlockingQueueImpl queue;
 
-    /**
-     * Helper to create a Script from a Runnable.
-     */
-    private Script script(Runnable runnable) {
-        return current -> runnable.run();
-    }
-
     @AfterEach
     void cleanup() {
         if (queue != null) {
-            queue.shutdown();
+            queue.close();
         }
     }
 
@@ -35,9 +28,9 @@ class LinkedBlockingQueueImplTest {
         queue = new LinkedBlockingQueueImpl();
         CopyOnWriteArrayList<Integer> executionOrder = new CopyOnWriteArrayList<>();
 
-        queue.post(script(() -> executionOrder.add(1)));
-        queue.post(script(() -> executionOrder.add(2)));
-        queue.post(script(() -> executionOrder.add(3)));
+        queue.post(() -> executionOrder.add(1));
+        queue.post(() -> executionOrder.add(2));
+        queue.post(() -> executionOrder.add(3));
 
         queue.await();
 
@@ -50,7 +43,7 @@ class LinkedBlockingQueueImplTest {
         AtomicInteger counter = new AtomicInteger(0);
         CountDownLatch scriptStarted = new CountDownLatch(1);
 
-        queue.post(script(() -> {
+        queue.post(() -> {
             scriptStarted.countDown();
             try {
                 Thread.sleep(100);
@@ -58,7 +51,7 @@ class LinkedBlockingQueueImplTest {
                 Thread.currentThread().interrupt();
             }
             counter.incrementAndGet();
-        }));
+        });
 
         // Wait for script to start
         assertThat(scriptStarted.await(1, TimeUnit.SECONDS)).isTrue();
@@ -79,29 +72,20 @@ class LinkedBlockingQueueImplTest {
         assertThat(queue.isEmpty()).isTrue();
     }
 
-    @Test
-    void shouldHandleNamedScript() throws Exception {
-        queue = new LinkedBlockingQueueImpl();
-        AtomicInteger counter = new AtomicInteger(0);
-
-        queue.post(new LinkedName("test-script", null), script(() -> counter.incrementAndGet()));
-
-        queue.await();
-
-        assertThat(counter.get()).isEqualTo(1);
-    }
+    // Named scripts no longer supported in M15+ (Queue simplified to only Runnable post)
+    // Test removed
 
     @Test
     void shouldContinueProcessingAfterScriptError() throws Exception {
         queue = new LinkedBlockingQueueImpl();
         CopyOnWriteArrayList<Integer> executed = new CopyOnWriteArrayList<>();
 
-        queue.post(script(() -> executed.add(1)));
-        queue.post(script(() -> {
+        queue.post(() -> executed.add(1));
+        queue.post(() -> {
             executed.add(2);
             throw new RuntimeException("Script error");
-        }));
-        queue.post(script(() -> executed.add(3)));
+        });
+        queue.post(() -> executed.add(3));
 
         queue.await();
 
@@ -121,7 +105,7 @@ class LinkedBlockingQueueImplTest {
         for (int i = 0; i < threadCount; i++) {
             threads[i] = Thread.startVirtualThread(() -> {
                 for (int j = 0; j < postsPerThread; j++) {
-                    queue.post(script(() -> totalExecuted.incrementAndGet()));
+                    queue.post(() -> totalExecuted.incrementAndGet());
                 }
                 latch.countDown();
             });
@@ -141,13 +125,13 @@ class LinkedBlockingQueueImplTest {
         queue = new LinkedBlockingQueueImpl();
 
         // Post a long-running script
-        queue.post(script(() -> {
+        queue.post(() -> {
             try {
                 Thread.sleep(5000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-        }));
+        });
 
         Thread awaitThread = Thread.startVirtualThread(() -> {
             try {
@@ -172,7 +156,7 @@ class LinkedBlockingQueueImplTest {
         queue = new LinkedBlockingQueueImpl();
         CopyOnWriteArrayList<String> events = new CopyOnWriteArrayList<>();
 
-        queue.post(script(() -> {
+        queue.post(() -> {
             events.add("start-1");
             try {
                 Thread.sleep(50);
@@ -180,12 +164,12 @@ class LinkedBlockingQueueImplTest {
                 Thread.currentThread().interrupt();
             }
             events.add("end-1");
-        }));
+        });
 
-        queue.post(script(() -> {
+        queue.post(() -> {
             events.add("start-2");
             events.add("end-2");
-        }));
+        });
 
         queue.await();
 
@@ -197,15 +181,15 @@ class LinkedBlockingQueueImplTest {
         queue = new LinkedBlockingQueueImpl();
         AtomicInteger counter = new AtomicInteger(0);
 
-        queue.post(script(() -> counter.incrementAndGet()));
+        queue.post(() -> counter.incrementAndGet());
         queue.await();
 
         assertThat(counter.get()).isEqualTo(1);
 
-        queue.shutdown();
+        queue.close();
 
         // Posts after shutdown should be ignored
-        queue.post(script(() -> counter.incrementAndGet()));
+        queue.post(() -> counter.incrementAndGet());
 
         Thread.sleep(100);
 
@@ -229,7 +213,7 @@ class LinkedBlockingQueueImplTest {
         for (int i = 0; i < 10; i++) {
             AtomicInteger counter = new AtomicInteger(0);
 
-            queue.post(script(() -> counter.incrementAndGet()));
+            queue.post(() -> counter.incrementAndGet());
             queue.await();
 
             assertThat(counter.get()).isEqualTo(1);

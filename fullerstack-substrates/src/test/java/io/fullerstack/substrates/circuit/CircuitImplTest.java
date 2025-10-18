@@ -37,15 +37,6 @@ class CircuitImplTest {
     }
 
     @Test
-    void shouldProvideQueue() {
-        circuit = new CircuitImpl(new LinkedName("test", null));
-
-        Queue queue = circuit.queue();
-
-        assertThat((Object) queue).isNotNull();
-    }
-
-    @Test
     void shouldProvideDefaultClock() {
         circuit = new CircuitImpl(new LinkedName("test", null));
 
@@ -143,10 +134,6 @@ class CircuitImplTest {
         circuit = new CircuitImpl(new LinkedName("test", null));
         circuit.close();
 
-        assertThatThrownBy(() -> circuit.queue())
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Circuit is closed");
-
         assertThatThrownBy(() -> circuit.clock())
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("Circuit is closed");
@@ -191,7 +178,6 @@ class CircuitImplTest {
         // Verify all components are accessible
         assertThat((Object) circuit.subject()).isNotNull();
         assertThat((Object) circuit.source()).isNotNull();
-        assertThat((Object) circuit.queue()).isNotNull();
         assertThat((Object) circuit.clock()).isNotNull();
     }
 
