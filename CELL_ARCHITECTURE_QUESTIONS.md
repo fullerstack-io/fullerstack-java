@@ -1,7 +1,7 @@
 # Cell Architecture Questions for Substrates M15+
 
 ## Context
-I've successfully migrated fullerstack-substrates from API M13 to M15+ (all 269 tests passing). During this migration, I encountered architectural questions about the **Cell** component that I'd appreciate clarification on.
+I've successfully migrated fullerstack-substrates from API M13 to M15+ (all 269 tests passing). Through research into reactive programming patterns (RxJava), I now understand Cell's purpose and role - it maps to **BehaviorSubject** for stateful type transformation. However, I have remaining questions about the **implementation mechanics** of how Composer creates Cells.
 
 ## Cell Understanding So Far
 
@@ -65,37 +65,35 @@ Cell<SensorReading, Alert> cell = circuit.cell(
 );
 ```
 
-**What I understand:**
-- Cell's dual nature (Pipe + Container) matches reactive Subject pattern
-- The I → E transformation is analogous to RxJava's `.map()` operator
-- Composer provides the transformation logic
+**What I now understand:**
+- ✅ Cell's **purpose**: Stateful type transformation (like BehaviorSubject + map operator)
+- ✅ Cell's **dual nature**: Pipe<I> (receives) + Container (manages children that emit)
+- ✅ Cell's **use case**: Transform input streams (I) to output streams (E) with hierarchy
+- ✅ **Example**: Kafka metrics (I=KafkaMetric) → alerts (E=Alert) with child cells per metric type
 
 **What I'm uncertain about:**
-- How Composer creates objects that satisfy both Pipe<I> AND Cell<I,E> interfaces
-- Whether there's a Cell-specific Composer pattern I'm missing
+- ❓ **Implementation mechanics**: How does Composer create objects that satisfy both Pipe<I> AND Cell<I,E> interfaces?
+- ❓ **Creation pattern**: Is there a Composer.cell() method, or does Cell.get() create children differently?
 
-## Implementation Questions
+## Implementation Question: How does Composer create Cells?
 
-### Question 1: Is there a Composer.cell() method?
-
-I noticed the pattern:
+I observed the pattern:
 - `Composer.pipe()` creates `Composer<Pipe<E>, E>`
 - `Composer.channel()` creates `Composer<Channel<E>, E>`
 
 **Question:** Is there a `Composer.cell()` that creates `Composer<Cell<I,E>, E>`?
 
-If so, that would resolve my implementation questions!
+### Current Implementation Issue
 
-### Question 2: How should Cell.get() create child Cells?
+In `CellImpl.get()`, I'm casting `Pipe<I>` → `Cell<I, E>`:
 
-My current implementation:
 ```java
 public Cell<I, E> get(Name name) {
     return childCells.computeIfAbsent(name, n -> {
         Channel<E> channel = new ChannelImpl<>(name, scheduler, source, flowConfigurer);
         Pipe<I> pipe = composer.compose(channel);
 
-        // This cast assumes composer returns something that IS-A Cell<I,E>
+        // This cast works at runtime but seems architecturally incorrect
         @SuppressWarnings("unchecked")
         Cell<I, E> childCell = (Cell<I, E>) pipe;
 
@@ -104,22 +102,16 @@ public Cell<I, E> get(Name name) {
 }
 ```
 
-**The architectural question:**
+**The problem:** Since `Cell<I,E>` extends BOTH `Pipe<I>` AND `Container<Cell<I,E>, E>`, the `Composer<Pipe<I>, E>` must somehow create objects that implement both interfaces.
 
-Since Cell<I,E> extends BOTH Pipe<I> AND Container<Cell<I,E>, E>, the Composer<Pipe<I>, E> cannot just create a simple Pipe - it must create something that implements both interfaces.
+**Possible solutions:**
+1. There's a `Composer.cell()` method following the pipe()/channel() pattern
+2. The Composer is expected to return Cell instances (which ARE-A Pipe<I>)
+3. Cell.get() should create child Cells directly without using Composer
 
-**Possible interpretations:**
-1. The Composer is expected to return a **Cell<I,E>** (which IS-A Pipe<I>)
-2. There's a Cell-specific composer (Composer.cell()?) that explicitly creates Cells
-3. Cell.get() should create child Cells directly (like cell division) rather than via Composer
+### Example Use Case
 
-**Current uncertainty:** I'm casting `Pipe<I> → Cell<I, E>`, which works at runtime but suggests I don't understand the intended creation pattern.
-
-### Question 3: What is Cell's intended use case?
-
-I'm building a Kafka cluster observability framework. Based on the RxJava mapping, I see Cell as ideal for **stateful type transformation** scenarios.
-
-**My use case - Kafka metrics monitoring:**
+Kafka cluster observability - transforming metrics to alerts:
 
 ```java
 // Transform raw Kafka metrics into alerts
@@ -144,46 +136,20 @@ monitoringCell.source().subscribe(subscriber(
 ));
 ```
 
-**Pattern I see:**
-- **Input (I)**: Raw metrics from Kafka JMX
-- **Transformation**: Filter thresholds, enrich with context, categorize severity
-- **Output (E)**: Structured alerts with metadata
-- **Container role**: Each child Cell monitors a specific metric type
-
-**Is this the intended pattern?** Type transformation with hierarchical organization?
-
-### Question 4: How do Cells compose hierarchically?
-
-Given:
-```java
-Cell<KafkaMetric, Alert> cell = circuit.cell(composer);
-Cell<KafkaMetric, Alert> child = cell.get(name("cpu-monitor"));
-```
-
-When `cell.emit(metric)` is called:
-1. Does it propagate to ALL children? (my current impl)
-2. Should children be independent Cells or wrapped Pipes?
-3. How does the I → E transformation actually occur?
-
-## My Implementation
-
-**File:** `fullerstack-substrates/src/main/java/io/fullerstack/substrates/cell/CellImpl.java`
-
-**Current behavior:**
-- Cell.emit(I) → broadcasts to all child Cells
-- Each child Cell receives I
-- Children use Composer to transform I → E
-- Results emitted to shared Source<E>
-
-**Uncertainty:** The Composer creates Pipe<I>, which I cast to Cell<I, E>. This works at runtime but I know is incorrect but I just did it to migrate the rest of the API.
+This pattern makes sense conceptually - the question is just how to implement Cell.get() properly to create child Cells without unsafe casting.
 
 ## Request
 
 Could you provide:
-1. **Intended usage examples** for Cell
-2. **Clarification** on Cell.get() semantics
-3. **Guidance** on Composer's role with Cells
-4. Any **test examples** from Substrates codebase showing Cell usage
+1. **Confirmation**: Is there a `Composer.cell()` method?
+2. **Guidance**: How should `Cell.get()` create child Cell instances?
+3. **Examples**: Any test code from Substrates showing Cell usage patterns?
+
+## Current Implementation
+
+**File:** `fullerstack-substrates/src/main/java/io/fullerstack/substrates/cell/CellImpl.java`
+
+The implementation works functionally (269 tests passing), but uses unsafe casting that suggests I'm missing the proper creation pattern. Happy to share code if helpful.
 
 ## Migration Status
 
@@ -196,4 +162,4 @@ Could you provide:
 
 **Repository:** https://github.com/fullerstack-io/fullerstack-java
 **Branch:** main
-**Commit:** 8ec048b - "feat: Migrate fullerstack-substrates to Substrates API M15+"
+**Commit:** a8556a9
