@@ -77,11 +77,32 @@ Cell<SensorReading, Alert> cell = circuit.cell(
 
 ## Implementation Question: How does Composer create Cells?
 
-I observed the pattern:
-- `Composer.pipe()` creates `Composer<Pipe<E>, E>`
+I observed the pattern from the M15+ API:
+- `Composer.pipe()` creates `Composer<Pipe<E>, E>` (no transformation)
+- `Composer.pipe(Consumer<Flow<E>>)` creates `Composer<Pipe<E>, E>` (with transformations)
 - `Composer.channel()` creates `Composer<Channel<E>, E>`
 
 **Question:** Is there a `Composer.cell()` that creates `Composer<Cell<I,E>, E>`?
+
+### Expected Pattern (Based on API Consistency)
+
+If `Composer.cell()` exists, it should follow the same pattern:
+
+```java
+// Composer.pipe() pattern:
+Composer<Pipe<E>, E> pipeComposer = Composer.pipe();
+Composer<Pipe<E>, E> transformingComposer = Composer.pipe(
+    flow -> flow.filter(...).map(...)
+);
+
+// Expected Composer.cell() pattern:
+Composer<Cell<I,E>, E> cellComposer = Composer.cell();
+Composer<Cell<I,E>, E> transformingCellComposer = Composer.cell(
+    flow -> flow.filter(...).map(...)  // I → E transformation
+);
+```
+
+This would resolve the unsafe cast in `CellImpl.get()` by having Composer return the correct type.
 
 ### Current Implementation Issue
 
@@ -138,18 +159,59 @@ monitoringCell.source().subscribe(subscriber(
 
 This pattern makes sense conceptually - the question is just how to implement Cell.get() properly to create child Cells without unsafe casting.
 
-## Request
+## Proposed Solution: CellComposer Pattern
 
-Could you provide:
-1. **Confirmation**: Is there a `Composer.cell()` method?
-2. **Guidance**: How should `Cell.get()` create child Cell instances?
-3. **Examples**: Any test code from Substrates showing Cell usage patterns?
+While awaiting confirmation from the Substrates maintainer, I've implemented a **working solution** using a custom Composer factory.
 
-## Current Implementation
+### Implementation
+
+**File:** `fullerstack-substrates/src/main/java/io/fullerstack/substrates/functional/CellComposer.java`
+
+The `CellComposer` utility creates Composers that return `CellImpl` instances instead of generic Pipes:
+
+```java
+// Create a Cell Composer that transforms KafkaMetric → Alert
+Composer<Pipe<KafkaMetric>, Alert> composer = CellComposer.fromCircuit(
+    circuit,
+    LazyTrieRegistryFactory.getInstance(),
+    flow -> flow
+        .filter(m -> m.value() > threshold)
+        .map(m -> new Alert(m))
+);
+
+// Use with Circuit.cell()
+Cell<KafkaMetric, Alert> cell = circuit.cell(composer);
+
+// Now Cell.get() can safely cast because Composer returns Cells
+Cell<KafkaMetric, Alert> child = cell.get(name("cpu"));
+```
+
+**Key insight:** Since `Cell<I, E>` extends `Pipe<I>`, a Composer that creates `CellImpl` instances satisfies the `Composer<Pipe<I>, E>` interface while actually returning Cells.
+
+### Test Coverage
+
+**File:** `fullerstack-substrates/src/test/java/io/fullerstack/substrates/functional/CellComposerTest.java`
+
+Tests demonstrate:
+- Type transformation (Integer → String)
+- Hierarchical Cell structure
+- Kafka monitoring use case (metric → alert transformation)
+- Type-safe Cell retrieval
+
+## Request for Maintainer
+
+Could you confirm:
+1. **Is there a `Composer.cell()` method in the Substrates API?**
+2. **Is the `CellComposer` pattern the intended approach, or is there a built-in solution?**
+3. **Any test examples from Substrates showing Cell usage patterns?**
+
+## Current Implementation Status
 
 **File:** `fullerstack-substrates/src/main/java/io/fullerstack/substrates/cell/CellImpl.java`
 
-The implementation works functionally (269 tests passing), but uses unsafe casting that suggests I'm missing the proper creation pattern. Happy to share code if helpful.
+- ✅ Functionally correct (269 tests passing)
+- ✅ `CellComposer` provides type-safe alternative to unsafe casting
+- ⚠️ Would benefit from confirmation of intended pattern
 
 ## Migration Status
 
