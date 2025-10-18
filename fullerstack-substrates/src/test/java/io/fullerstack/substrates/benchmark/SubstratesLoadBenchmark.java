@@ -285,6 +285,112 @@ public class SubstratesLoadBenchmark {
         return cortex.name("broker." + counter.incrementAndGet() + ".partition.0");
     }
 
+    // ========== Benchmark 15: Cell Creation (Type-Transforming) ==========
+
+    /**
+     * Measures Cell creation overhead with type transformation.
+     * Target: < 15µs
+     */
+    @Benchmark
+    public Object benchmark15_cellCreation_typeTransforming() {
+        return cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.fromCircuit(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance(),
+                (Long i) -> "Value: " + i
+            )
+        );
+    }
+
+    // ========== Benchmark 16: Cell Child Lookup (Cached) ==========
+
+    /**
+     * Measures child Cell lookup from parent Cell.
+     * Target: < 200ns
+     */
+    @Benchmark
+    public Object benchmark16_cellChildLookup_cached() {
+        io.humainary.substrates.api.Substrates.Cell<Long, String> parent = cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.fromCircuit(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance(),
+                (Long i) -> "Value: " + i
+            )
+        );
+
+        return parent.get(cortex.name("child"));
+    }
+
+    // ========== Benchmark 17: Cell Hierarchical Creation (3 Levels) ==========
+
+    /**
+     * Measures overhead of creating 3-level Cell hierarchy (cluster → broker → partition).
+     * Target: < 50µs
+     */
+    @Benchmark
+    public Object benchmark17_cellHierarchy_threeLevels() {
+        io.humainary.substrates.api.Substrates.Cell<Long, String> cluster = cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.fromCircuit(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance(),
+                (Long i) -> "Metric: " + i
+            )
+        );
+
+        io.humainary.substrates.api.Substrates.Cell<Long, String> broker =
+            cluster.get(cortex.name("broker-1"));
+        io.humainary.substrates.api.Substrates.Cell<Long, String> partition =
+            broker.get(cortex.name("partition-0"));
+
+        return partition;
+    }
+
+    // ========== Benchmark 18: Cell Emission (Single Child) ==========
+
+    /**
+     * Measures emission latency through Cell with type transformation.
+     * Target: < 1µs
+     */
+    @Benchmark
+    public void benchmark18_cellEmission_singleChild(Blackhole bh) {
+        io.humainary.substrates.api.Substrates.Cell<Long, Long> cell = cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.sameType(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance()
+            )
+        );
+
+        io.humainary.substrates.api.Substrates.Cell<Long, Long> child =
+            cell.get(cortex.name("child"));
+        child.emit(counter.incrementAndGet());
+        bh.consume(counter.get());
+    }
+
+    // ========== Benchmark 19: Cell Broadcast to Multiple Children ==========
+
+    /**
+     * Measures parent Cell broadcast to multiple children.
+     * Target: < 5µs for 10 children
+     */
+    @Benchmark
+    public void benchmark19_cellBroadcast_multipleChildren(Blackhole bh) {
+        io.humainary.substrates.api.Substrates.Cell<Long, Long> parent = cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.sameType(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance()
+            )
+        );
+
+        // Create 10 children
+        for (int i = 0; i < 10; i++) {
+            parent.get(cortex.name("child-" + i));
+        }
+
+        // Emit to parent - broadcasts to all children
+        parent.emit(counter.incrementAndGet());
+        bh.consume(counter.get());
+    }
+
     // ========== Main Entry Point for Manual Execution ==========
 
     /**
