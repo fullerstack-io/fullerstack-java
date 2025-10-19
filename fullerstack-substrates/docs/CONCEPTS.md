@@ -6,6 +6,7 @@ This document explains the fundamental concepts in Substrates and how they work 
 
 - [What is Substrates?](#what-is-substrates)
 - [Core Abstractions](#core-abstractions)
+- [Async-First Architecture](#async-first-architecture)
 - [Producer-Consumer Model](#producer-consumer-model)
 - [Transformation Pipelines](#transformation-pipelines)
 - [Resource Management](#resource-management)
@@ -570,6 +571,116 @@ interface Substrate {
 **Implementations:**
 - Channel, Circuit, Clock, Conduit, Container
 - Scope, Sink, Source, Subscription, Subscriber
+
+## Async-First Architecture
+
+⚠️ **CRITICAL DESIGN PRINCIPLE**: Substrates is **async-first by default**. This is fundamentally different from reactive frameworks like RxJava which are synchronous by default.
+
+### Key Insight
+
+When you call `pipe.emit(value)`, the emission does **NOT** execute immediately. Instead:
+1. A Script is created wrapping the emission
+2. The Script is posted to the Circuit Queue
+3. `emit()` returns **immediately** (non-blocking)
+4. The Queue's single virtual thread processes the Script **asynchronously**
+5. Subscriber callbacks execute on the Queue thread, **not the calling thread**
+
+### Example: The Async Boundary
+
+```java
+Circuit circuit = cortex.circuit();
+Conduit<Pipe<String>, String> conduit = circuit.conduit(
+    cortex.name("test"),
+    Composer.pipe()
+);
+
+AtomicReference<String> received = new AtomicReference<>();
+conduit.source().subscribe(cortex.subscriber(
+    cortex.name("sub"),
+    (subject, registrar) -> registrar.register(received::set)
+));
+
+Pipe<String> pipe = conduit.get(cortex.name("channel"));
+
+// Emit value - returns IMMEDIATELY (async)
+pipe.emit("hello");
+
+// ❌ WRONG: received.get() is still NULL (async hasn't executed yet)
+// assertNull(received.get());
+
+// ✅ CORRECT: Wait for Circuit Queue to process
+circuit.await();  // Blocks until queue is empty
+
+// Now the value is available
+assertEquals("hello", received.get());  // ✅ Works
+```
+
+### Why Async-First?
+
+1. **Non-blocking producers** - Emitters never wait for consumers
+2. **Ordered execution** - FIFO queue guarantees event order
+3. **Backpressure control** - Single queue prevents saturation
+4. **Simplified threading** - Single virtual thread per Circuit (lock-free)
+5. **Predictable performance** - Consistent FIFO processing
+
+### Testing Pattern: circuit.await()
+
+**In tests, you MUST use `circuit.await()` to wait for async processing:**
+
+```java
+@Test
+void testEmission() throws Exception {
+    // Setup
+    Circuit circuit = cortex.circuit();
+    // ... create conduit, subscribe, get pipe ...
+
+    // Act
+    pipe.emit("value");
+
+    // ✅ CRITICAL: Wait for async queue processing
+    circuit.await();
+
+    // Assert - now safe to check results
+    assertEquals("value", received.get());
+}
+```
+
+### ❌ Don't Use Latches for Queue Synchronization
+
+**This pattern is INCORRECT**:
+
+```java
+// ❌ WRONG - Race condition with async queue
+CountDownLatch latch = new CountDownLatch(1);
+conduit.source().subscribe(cortex.subscriber(
+    cortex.name("sub"),
+    (subject, registrar) -> registrar.register(value -> {
+        received.set(value);
+        latch.countDown();  // May timeout
+    })
+));
+
+pipe.emit("value");
+assertTrue(latch.await(2, TimeUnit.SECONDS));  // ❌ May fail
+```
+
+**Latches are for thread coordination, not async queue synchronization. Use `circuit.await()` instead.**
+
+### Async vs RxJava Comparison
+
+| Aspect | RxJava (Sync Default) | Substrates (Async Default) |
+|--------|----------------------|---------------------------|
+| `emit()` behavior | Blocks until subscribers complete | Returns immediately |
+| Subscriber callbacks | Execute on calling thread | Execute on Queue virtual thread |
+| Testing | No special handling | Must use `circuit.await()` |
+| Ordering | Not guaranteed (multi-threaded) | FIFO guarantee (single queue) |
+
+### Further Reading
+
+For complete details on async architecture, Queue processing, and testing patterns, see:
+- **[ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md)** - Complete async design guide
+- **[Queue Architecture](archive/alignment/queues-scripts-currents.md)** - Queue implementation details
+- **[Circuit Architecture](archive/alignment/circuits.md)** - Virtual CPU Core pattern
 
 ## Producer-Consumer Model
 

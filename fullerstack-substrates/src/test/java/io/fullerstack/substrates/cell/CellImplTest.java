@@ -146,15 +146,11 @@ class CellImplTest {
             )
         );
 
-        CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> received = new AtomicReference<>();
 
         Subscriber<String> subscriber = cortex.subscriber(
             cortex.name("test-subscriber"),
-            (subject, registrar) -> registrar.register(value -> {
-                received.set(value);
-                latch.countDown();
-            })
+            (subject, registrar) -> registrar.register(received::set)
         );
 
         cell.source().subscribe(subscriber);
@@ -162,7 +158,8 @@ class CellImplTest {
         Cell<Integer, String> child = cell.get(cortex.name("child"));
         child.emit(42);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "Should receive transformed emission");
+        circuit.await();  // Wait for async queue processing
+
         assertEquals("Number: 42", received.get());
     }
 
@@ -176,15 +173,11 @@ class CellImplTest {
             )
         );
 
-        CountDownLatch latch = new CountDownLatch(3);
         CopyOnWriteArrayList<String> received = new CopyOnWriteArrayList<>();
 
         Subscriber<String> subscriber = cortex.subscriber(
             cortex.name("test-subscriber"),
-            (subject, registrar) -> registrar.register(value -> {
-                received.add(value);
-                latch.countDown();
-            })
+            (subject, registrar) -> registrar.register(received::add)
         );
 
         cell.source().subscribe(subscriber);
@@ -194,7 +187,9 @@ class CellImplTest {
         child.emit(2);
         child.emit(3);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "Should receive all emissions");
+        circuit.await();  // Wait for async queue processing
+
+        assertEquals(3, received.size());
         assertTrue(received.contains("Value: 2"));
         assertTrue(received.contains("Value: 4"));
         assertTrue(received.contains("Value: 6"));
@@ -212,15 +207,11 @@ class CellImplTest {
             )
         );
 
-        CountDownLatch latch = new CountDownLatch(3);
         CopyOnWriteArrayList<String> received = new CopyOnWriteArrayList<>();
 
         Subscriber<String> subscriber = cortex.subscriber(
             cortex.name("test-subscriber"),
-            (subject, registrar) -> registrar.register(value -> {
-                received.add(value);
-                latch.countDown();
-            })
+            (subject, registrar) -> registrar.register(received::add)
         );
 
         parent.source().subscribe(subscriber);
@@ -233,7 +224,8 @@ class CellImplTest {
         // Emit to parent - should broadcast to all children
         parent.emit(100);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "All children should receive broadcast");
+        circuit.await();  // Wait for async queue processing
+
         assertEquals(3, received.size());
         assertTrue(received.stream().allMatch(s -> s.equals("Broadcast: 100")));
     }
@@ -248,15 +240,11 @@ class CellImplTest {
             )
         );
 
-        CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> received = new AtomicReference<>();
 
         Subscriber<String> subscriber = cortex.subscriber(
             cortex.name("test-subscriber"),
-            (subject, registrar) -> registrar.register(value -> {
-                received.set(value);
-                latch.countDown();
-            })
+            (subject, registrar) -> registrar.register(received::set)
         );
 
         root.source().subscribe(subscriber);
@@ -268,7 +256,8 @@ class CellImplTest {
         // Emit at deepest level
         level2.emit(42);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "Should receive emission from deep child");
+        circuit.await();  // Wait for async queue processing
+
         assertEquals("Level: 42", received.get());
     }
 
@@ -283,15 +272,11 @@ class CellImplTest {
             )
         );
 
-        CountDownLatch latch = new CountDownLatch(4);
         CopyOnWriteArrayList<String> received = new CopyOnWriteArrayList<>();
 
         Subscriber<String> subscriber = cortex.subscriber(
             cortex.name("cluster-monitor"),
-            (subject, registrar) -> registrar.register(value -> {
-                received.add(value);
-                latch.countDown();
-            })
+            (subject, registrar) -> registrar.register(received::add)
         );
 
         cluster.source().subscribe(subscriber);
@@ -314,7 +299,8 @@ class CellImplTest {
         // Emit to cluster (broadcasts to all brokers)
         cluster.emit(999);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "Should receive all emissions");
+        circuit.await();  // Wait for async queue processing
+
         assertTrue(received.contains("Metric: 100"));
         assertTrue(received.contains("Metric: 200"));
         assertTrue(received.contains("Metric: 300"));
@@ -329,15 +315,11 @@ class CellImplTest {
             flow -> flow.guard(x -> x > 50)  // Only emit values > 50
         );
 
-        CountDownLatch latch = new CountDownLatch(2);
         CopyOnWriteArrayList<Integer> received = new CopyOnWriteArrayList<>();
 
         Subscriber<Integer> subscriber = cortex.subscriber(
             cortex.name("test-subscriber"),
-            (subject, registrar) -> registrar.register(value -> {
-                received.add(value);
-                latch.countDown();
-            })
+            (subject, registrar) -> registrar.register(received::add)
         );
 
         cell.source().subscribe(subscriber);
@@ -348,7 +330,8 @@ class CellImplTest {
         child.emit(30);  // Filtered out
         child.emit(100); // Passes
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "Should receive filtered values");
+        circuit.await();  // Wait for async queue processing
+
         assertEquals(2, received.size());
         assertTrue(received.contains(60));
         assertTrue(received.contains(100));
@@ -361,15 +344,11 @@ class CellImplTest {
             flow -> flow.replace(x -> x * 10)  // Multiply by 10
         );
 
-        CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<Integer> received = new AtomicReference<>();
 
         Subscriber<Integer> subscriber = cortex.subscriber(
             cortex.name("test-subscriber"),
-            (subject, registrar) -> registrar.register(value -> {
-                received.set(value);
-                latch.countDown();
-            })
+            (subject, registrar) -> registrar.register(received::set)
         );
 
         cell.source().subscribe(subscriber);
@@ -377,7 +356,8 @@ class CellImplTest {
         Cell<Integer, Integer> child = cell.get(cortex.name("child"));
         child.emit(5);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "Should receive transformed value");
+        circuit.await();  // Wait for async queue processing
+
         assertEquals(50, received.get());
     }
 
@@ -388,15 +368,11 @@ class CellImplTest {
             flow -> flow.limit(2)  // Only emit first 2 values
         );
 
-        CountDownLatch latch = new CountDownLatch(2);
         AtomicInteger count = new AtomicInteger(0);
 
         Subscriber<Integer> subscriber = cortex.subscriber(
             cortex.name("test-subscriber"),
-            (subject, registrar) -> registrar.register(value -> {
-                count.incrementAndGet();
-                latch.countDown();
-            })
+            (subject, registrar) -> registrar.register(value -> count.incrementAndGet())
         );
 
         cell.source().subscribe(subscriber);
@@ -407,8 +383,8 @@ class CellImplTest {
         child.emit(3);  // Should be limited
         child.emit(4);  // Should be limited
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "Should receive limited values");
-        Thread.sleep(100); // Give time for any extra emissions
+        circuit.await();  // Wait for async queue processing
+
         assertEquals(2, count.get(), "Should only receive first 2 emissions");
     }
 
@@ -439,15 +415,11 @@ class CellImplTest {
             )
         );
 
-        CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> received = new AtomicReference<>();
 
         Subscriber<String> subscriber = cortex.subscriber(
             cortex.name("test-subscriber"),
-            (subject, registrar) -> registrar.register(value -> {
-                received.set(value);
-                latch.countDown();
-            })
+            (subject, registrar) -> registrar.register(received::set)
         );
 
         cell.source().subscribe(subscriber);
@@ -456,7 +428,8 @@ class CellImplTest {
         child.emit(10);  // null transformation - filtered
         child.emit(100); // Valid transformation
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "Should receive non-null transformation");
+        circuit.await();  // Wait for async queue processing
+
         assertEquals("High: 100", received.get());
     }
 

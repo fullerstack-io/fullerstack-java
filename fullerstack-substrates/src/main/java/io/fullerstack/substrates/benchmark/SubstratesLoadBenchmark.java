@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * </pre>
  *
  * <p><b>JMH Configuration</b>:
- * - Warmup: 3 iterations × 2 seconds each
+ * - Warmup: 5 iterations × 2 seconds each
  * - Measurement: 5 iterations × 3 seconds each
  * - Fork: 2 JVM forks for statistical accuracy
  * - Threads: Varies by benchmark
@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @org.openjdk.jmh.annotations.State(org.openjdk.jmh.annotations.Scope.Benchmark)
-@Warmup(iterations = 3, time = 2)
+@Warmup(iterations = 5, time = 2)
 @Measurement(iterations = 5, time = 3)
 @Fork(value = 2, jvmArgs = {"-Xms2G", "-Xmx2G", "-XX:+UseG1GC"})
 public class SubstratesLoadBenchmark {
@@ -388,6 +388,161 @@ public class SubstratesLoadBenchmark {
 
         // Emit to parent - broadcasts to all children
         parent.emit(counter.incrementAndGet());
+        bh.consume(counter.get());
+    }
+
+    // ========== Benchmark 20: Cell Deep Hierarchy (5 Levels) ==========
+
+    /**
+     * Measures overhead of deep Cell hierarchy (simulating cluster → zone → broker → topic → partition).
+     * Target: < 100µs
+     */
+    @Benchmark
+    public Object benchmark20_cellDeepHierarchy_fiveLevels() {
+        io.humainary.substrates.api.Substrates.Cell<Long, String> cluster = cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.fromCircuit(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance(),
+                (Long i) -> "Metric: " + i
+            )
+        );
+
+        io.humainary.substrates.api.Substrates.Cell<Long, String> zone =
+            cluster.get(cortex.name("zone-us-east"));
+        io.humainary.substrates.api.Substrates.Cell<Long, String> broker =
+            zone.get(cortex.name("broker-1"));
+        io.humainary.substrates.api.Substrates.Cell<Long, String> topic =
+            broker.get(cortex.name("topic-orders"));
+        io.humainary.substrates.api.Substrates.Cell<Long, String> partition =
+            topic.get(cortex.name("partition-0"));
+
+        return partition;
+    }
+
+    // ========== Benchmark 21: Cell Emission Through Deep Hierarchy ==========
+
+    /**
+     * Measures emission latency through 5-level Cell hierarchy.
+     * This simulates real-world Kafka monitoring where metrics flow from
+     * partition → topic → broker → zone → cluster.
+     * Target: < 2µs
+     */
+    @Benchmark
+    public void benchmark21_cellEmission_deepHierarchy(Blackhole bh) {
+        io.humainary.substrates.api.Substrates.Cell<Long, String> cluster = cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.fromCircuit(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance(),
+                (Long i) -> "Metric: " + i
+            )
+        );
+
+        io.humainary.substrates.api.Substrates.Cell<Long, String> zone =
+            cluster.get(cortex.name("zone-us-east"));
+        io.humainary.substrates.api.Substrates.Cell<Long, String> broker =
+            zone.get(cortex.name("broker-1"));
+        io.humainary.substrates.api.Substrates.Cell<Long, String> topic =
+            broker.get(cortex.name("topic-orders"));
+        io.humainary.substrates.api.Substrates.Cell<Long, String> partition =
+            topic.get(cortex.name("partition-0"));
+
+        // Emit at leaf level - flows up through all levels
+        partition.emit(counter.incrementAndGet());
+        bh.consume(counter.get());
+    }
+
+    // ========== Benchmark 22: Cell with Flow Transformations ==========
+
+    /**
+     * Measures Cell emission with Flow transformations (guard, limit, replace).
+     * Target: < 1.5µs
+     */
+    @Benchmark
+    public void benchmark22_cellWithFlowTransformations(Blackhole bh) {
+        io.humainary.substrates.api.Substrates.Cell<Long, Long> cell = cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.sameType(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance()
+            ),
+            flow -> flow
+                .guard(x -> x > 10)       // Filter values
+                .replace(x -> x * 2)      // Double values
+                .limit(1000)              // Rate limit
+        );
+
+        io.humainary.substrates.api.Substrates.Cell<Long, Long> child =
+            cell.get(cortex.name("child"));
+        child.emit(counter.incrementAndGet());
+        bh.consume(counter.get());
+    }
+
+    // ========== Benchmark 23: Cell Child Caching Performance ==========
+
+    /**
+     * Measures performance of repeated child Cell lookups (should be cached).
+     * Target: < 50ns (cached lookup)
+     */
+    @Benchmark
+    public Object benchmark23_cellChildCaching() {
+        io.humainary.substrates.api.Substrates.Cell<Long, String> parent = cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.fromCircuit(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance(),
+                (Long i) -> "Value: " + i
+            )
+        );
+
+        // Repeated lookup of same child - should hit cache
+        Name childName = cortex.name("cached-child");
+        return parent.get(childName);
+    }
+
+    // ========== Benchmark 24: Cell Sibling Emissions (No Interference) ==========
+
+    /**
+     * Measures sibling Cell emissions to verify they don't interfere with each other.
+     * Target: < 1µs per emission
+     */
+    @Benchmark
+    public void benchmark24_cellSiblingEmissions(Blackhole bh) {
+        io.humainary.substrates.api.Substrates.Cell<Long, Long> parent = cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.sameType(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance()
+            )
+        );
+
+        io.humainary.substrates.api.Substrates.Cell<Long, Long> child1 =
+            parent.get(cortex.name("child-1"));
+        io.humainary.substrates.api.Substrates.Cell<Long, Long> child2 =
+            parent.get(cortex.name("child-2"));
+
+        // Emit to both siblings
+        child1.emit(counter.incrementAndGet());
+        child2.emit(counter.incrementAndGet());
+        bh.consume(counter.get());
+    }
+
+    // ========== Benchmark 25: Cell Type Transformation Overhead ==========
+
+    /**
+     * Measures overhead of type transformation (Long → String) in Cell.
+     * This isolates the transformation cost from emission overhead.
+     * Target: < 800ns
+     */
+    @Benchmark
+    public void benchmark25_cellTypeTransformation(Blackhole bh) {
+        io.humainary.substrates.api.Substrates.Cell<Long, String> cell = cachedCircuit.cell(
+            io.fullerstack.substrates.functional.CellComposer.fromCircuit(
+                cachedCircuit,
+                io.fullerstack.substrates.registry.LazyTrieRegistryFactory.getInstance(),
+                (Long i) -> "Transformed: " + i + " @ " + System.nanoTime()
+            )
+        );
+
+        io.humainary.substrates.api.Substrates.Cell<Long, String> child =
+            cell.get(cortex.name("child"));
+        child.emit(counter.incrementAndGet());
         bh.consume(counter.get());
     }
 

@@ -11,11 +11,12 @@ Substrates provides a flexible framework for building event-driven and observabi
 - **Circuit** - Central processing engine with precise ordering guarantees for events
 - **Conduit** - Context that creates Channels and provides Source for subscription
 - **Channel** - Named connector linking producers and consumers; provides access to Pipe
+- **Cell** - Hierarchical container with type transformation (I → E) for building observability trees
 - **Source** - Observable context for dynamic observation of Subjects/Channels
 - **Sequencer/Segment** - Transformation pipelines (filter, map, reduce, limit, sample, sift)
 - **Clock** - Timer utility for time-driven behaviors
 - **Scope** - Hierarchical resource lifecycle management
-- **Queue** - Coordinates execution and script scheduling
+- **Queue** - Async-first architecture with single virtual thread per Circuit (FIFO ordering)
 - **Factory Patterns** - Pluggable NameFactory, QueueFactory, RegistryFactory for customization
 - **Identity Map Fast Path** - InternedName + LazyTrieRegistry for 5× faster cached lookups
 
@@ -158,6 +159,7 @@ scope.close();
 ### Getting Started
 - **[Documentation Index](docs/DOCS-INDEX.md)** - Complete documentation map and navigation guide
 - **[Core Concepts](docs/CONCEPTS.md)** - Entities, relationships, and factory patterns
+- **[Async-First Architecture](docs/ASYNC-ARCHITECTURE.md)** ⚠️ **CRITICAL** - Understanding async queue processing
 - **[Examples](docs/examples/)** - Hands-on examples from simple to complex
 
 ### Architecture & Implementation

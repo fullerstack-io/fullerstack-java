@@ -16,8 +16,9 @@ This index provides a complete map of Substrates documentation, helping you find
 
 ### For Developers
 1. **[Architecture Guide](ARCHITECTURE.md)** - System design, data flow, and design principles
-2. **[Implementation Guide](IMPLEMENTATION-GUIDE.md)** - Recommended patterns and best practices
-3. **[Advanced Topics](ADVANCED.md)** - Performance tuning, custom implementations, extensions
+2. **[Async-First Architecture](ASYNC-ARCHITECTURE.md)** ⚠️ **CRITICAL** - Understanding async queue processing
+3. **[Implementation Guide](IMPLEMENTATION-GUIDE.md)** - Recommended patterns and best practices
+4. **[Advanced Topics](ADVANCED.md)** - Performance tuning, custom implementations, extensions
 
 ### For Performance Engineers
 1. **[Performance Guide](PERFORMANCE.md)** - Complete performance analysis and benchmarks
@@ -48,16 +49,37 @@ This index provides a complete map of Substrates documentation, helping you find
 **What's Inside:**
 - Entity definitions (Circuit, Conduit, Channel, Pipe, Source, etc.)
 - Entity relationships and lifecycle
+- **Async-First Architecture** ⚠️ **CRITICAL** - Understanding async queue processing
 - Hierarchical name system
 - Factory patterns (NameFactory, QueueFactory, RegistryFactory)
 - Subject temporal identity
 - Resource management patterns
 
 **Key Concepts:**
+- **Async-First Design** - All emissions are asynchronous via Circuit Queue
 - **Persistent Temporal Identity** - Every entity caches its Subject at construction
 - **Hierarchical Ownership** - Names build naturally via containment
 - **Identity Map Fast Path** - InternedName + LazyTrieRegistry for 5× performance
 - **Pool Singleton Pattern** - Same name → same instance throughout
+
+#### [ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md) ⚠️ **CRITICAL**
+**Purpose:** Complete guide to async-first design and queue processing
+**Audience:** ALL developers using Substrates
+**What's Inside:**
+- **Async vs Sync comparison** (Substrates vs RxJava)
+- **Circuit Queue Architecture** - Virtual CPU Core pattern
+- **Emission flow** - Complete path from emit() to subscriber
+- **circuit.await()** - The synchronization primitive for testing
+- **Testing patterns** - ✅ Correct vs ❌ Wrong patterns
+- **Performance characteristics** - Async queue overhead
+- **Cell hierarchical architecture** - Async in Cell emissions
+- **Debugging async issues** - Common mistakes and solutions
+
+**Critical Insight:**
+- `pipe.emit(value)` returns **immediately** (async boundary)
+- Subscriber callbacks execute **asynchronously** on Queue thread
+- **MUST use `circuit.await()` in tests** to wait for processing
+- **DON'T use latches** for queue synchronization (race condition)
 
 #### [ARCHITECTURE.md](ARCHITECTURE.md)
 **Purpose:** System architecture, design principles, and data flow
@@ -245,13 +267,21 @@ Each alignment doc covers a specific Substrates entity:
 - **Alignment:** [alignment/resources-scopes-closures.md](alignment/resources-scopes-closures.md)
 - **Example:** [examples/04-ResourceManagement.md](examples/04-ResourceManagement.md)
 
+### Async Architecture & Queue Processing ⚠️
+- **PRIMARY:** [ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md) - **MUST READ**
+- **Quick Reference:** [CONCEPTS.md](CONCEPTS.md) - Async-First Architecture section
+- **Implementation:** [ARCHITECTURE.md](ARCHITECTURE.md) - Queue architecture details
+- **Alignment:** [alignment/queues-scripts-currents.md](alignment/queues-scripts-currents.md)
+
 ### Threading & Concurrency
-- **Primary:** [ARCHITECTURE.md](ARCHITECTURE.md) - Queue architecture
+- **Primary:** [ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md) - Virtual CPU Core pattern
+- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) - Queue architecture
 - **Advanced:** [ADVANCED.md](ADVANCED.md) - Concurrency patterns
 - **Performance:** [PERFORMANCE.md](PERFORMANCE.md) - Multi-threading benchmarks
 
 ### Testing
-- **Primary:** [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md) - Testing patterns
+- **PRIMARY:** [ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md) - Testing async patterns ⚠️
+- **Implementation:** [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md) - Testing patterns
 - **Advanced:** [ADVANCED.md](ADVANCED.md) - Testing strategies
 
 ---
@@ -262,6 +292,7 @@ Each alignment doc covers a specific Substrates entity:
 |----------|--------|--------------|--------------|
 | README.md | ✅ Current | Oct 2025 | Complete |
 | CONCEPTS.md | ✅ Current | Oct 2025 | Complete |
+| ASYNC-ARCHITECTURE.md | ✅ Current | Oct 2025 | Complete ⚠️ **CRITICAL** |
 | ARCHITECTURE.md | ✅ Current | Oct 2025 | Complete |
 | ADVANCED.md | ✅ Current | Oct 2025 | Complete |
 | PERFORMANCE.md | ✅ Current | Oct 2025 | Complete |
