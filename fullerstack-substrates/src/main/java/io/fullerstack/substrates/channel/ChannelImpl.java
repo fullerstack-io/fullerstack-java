@@ -4,7 +4,6 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pipe.PipeImpl;
 import io.fullerstack.substrates.flow.FlowImpl;
-import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.circuit.Scheduler;
@@ -13,6 +12,7 @@ import lombok.Getter;
 
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 /**
  * Generic implementation of Substrates.Channel interface with Lombok for getters.
  *
@@ -54,8 +54,10 @@ public class ChannelImpl<E> implements Channel<E> {
 
     private final Subject<Channel<E>> channelSubject;
     private final Scheduler scheduler;
-    // M17: Source is sealed, using SourceImpl directly
-    private final SourceImpl<E> source; // Direct Source reference for emission routing
+    // Emission handler callback from Conduit (which IS-A Source)
+    private final Consumer<Capture<E, Channel<E>>> emissionHandler;
+    // Subscriber check from Conduit for early-exit optimization
+    private final BooleanSupplier hasSubscribers;
     private final Consumer<Flow<E>> flowConfigurer; // Optional transformation pipeline (nullable)
 
     // Cached Pipe instance - ensures Segment state (limits, accumulators, etc.) is shared
@@ -63,16 +65,30 @@ public class ChannelImpl<E> implements Channel<E> {
     private volatile Pipe<E> cachedPipe;
 
     /**
-     * Creates a Channel with Source reference for emission handler coordination.
+     * Creates a Channel with emission handler callback from Conduit.
      *
      * @param channelName hierarchical channel name (e.g., "circuit.conduit.channel")
      * @param scheduler circuit's scheduler
-     * @param source sibling Source (provides emission handler for Pipe creation)
+     * @param emissionHandler callback to notify Conduit of emissions (Conduit IS-A Source)
      * @param flowConfigurer optional transformation pipeline (null if no transformations)
      */
-    // M17: Source is sealed, constructor now takes SourceImpl
-    public ChannelImpl(Name channelName, Scheduler scheduler, SourceImpl<E> source, Consumer<Flow<E>> flowConfigurer) {
-        this.source = Objects.requireNonNull(source, "Source cannot be null");
+    public ChannelImpl(Name channelName, Scheduler scheduler, Consumer<Capture<E, Channel<E>>> emissionHandler, Consumer<Flow<E>> flowConfigurer) {
+        this(channelName, scheduler, emissionHandler, () -> true, flowConfigurer);
+    }
+
+    /**
+     * Creates a Channel with emission handler and subscriber check from Conduit.
+     *
+     * @param channelName hierarchical channel name (e.g., "circuit.conduit.channel")
+     * @param scheduler circuit's scheduler
+     * @param emissionHandler callback to notify Conduit of emissions
+     * @param hasSubscribers check if any subscribers exist (early-exit optimization)
+     * @param flowConfigurer optional transformation pipeline (null if no transformations)
+     */
+    public ChannelImpl(Name channelName, Scheduler scheduler, Consumer<Capture<E, Channel<E>>> emissionHandler,
+                      BooleanSupplier hasSubscribers, Consumer<Flow<E>> flowConfigurer) {
+        this.emissionHandler = Objects.requireNonNull(emissionHandler, "Emission handler cannot be null");
+        this.hasSubscribers = Objects.requireNonNull(hasSubscribers, "Subscriber check cannot be null");
         this.channelSubject = new SubjectImpl<>(
             IdImpl.generate(),
             channelName,  // Already hierarchical (circuit.conduit.channel)
@@ -98,10 +114,8 @@ public class ChannelImpl<E> implements Channel<E> {
                     if (flowConfigurer != null) {
                         cachedPipe = pipe(flowConfigurer);
                     } else {
-                        // Otherwise, create a plain Pipe with emission handler from Source
-                        SourceImpl<E> sourceImpl = (SourceImpl<E>) source;
-                        Consumer<Capture<E, Channel<E>>> handler = sourceImpl.emissionHandler();
-                        cachedPipe = new PipeImpl<>(scheduler, channelSubject, handler, sourceImpl);
+                        // Otherwise, create a plain Pipe with emission handler from Conduit
+                        cachedPipe = new PipeImpl<>(scheduler, channelSubject, emissionHandler, hasSubscribers);
                     }
                 }
             }
@@ -117,11 +131,7 @@ public class ChannelImpl<E> implements Channel<E> {
         FlowImpl<E> flow = new FlowImpl<>();
         configurer.accept(flow);
 
-        // Get emission handler from Source (sibling coordination)
-        SourceImpl<E> sourceImpl = (SourceImpl<E>) source;
-        Consumer<Capture<E, Channel<E>>> handler = sourceImpl.emissionHandler();
-
-        // Return a Pipe with emission handler, Source reference, and Flow transformations
-        return new PipeImpl<>(scheduler, channelSubject, handler, sourceImpl, flow);
+        // Return a Pipe with emission handler from Conduit and Flow transformations
+        return new PipeImpl<>(scheduler, channelSubject, emissionHandler, hasSubscribers, flow);
     }
 }

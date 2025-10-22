@@ -6,16 +6,18 @@ import io.fullerstack.substrates.clock.ClockImpl;
 import io.fullerstack.substrates.conduit.ConduitImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pool.PoolImpl;
-import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
+import io.fullerstack.substrates.subscription.SubscriptionImpl;
 import io.fullerstack.substrates.name.NameNode;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -40,8 +42,6 @@ import java.util.function.Consumer;
  */
 public class CircuitImpl implements Circuit, Scheduler {
     private final Subject circuitSubject;
-    // M17: Source is sealed, using SourceImpl directly for internal subscription management
-    private final SourceImpl<State> stateSource;
 
     // Internal queue processor (Virtual CPU Core pattern)
     private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
@@ -55,6 +55,9 @@ public class CircuitImpl implements Circuit, Scheduler {
     private final Map<Name, Clock> clocks;
     private final Map<Name, ConduitSlot> conduits;
     private volatile boolean closed = false;
+
+    // Direct subscriber management for State (Circuit IS-A Source<State>)
+    private final List<Subscriber<State>> stateSubscribers = new CopyOnWriteArrayList<>();
 
     /**
      * Optimized storage for Conduits with single-slot fast path + overflow map.
@@ -118,7 +121,6 @@ public class CircuitImpl implements Circuit, Scheduler {
             StateImpl.empty(),
             Circuit.class
         );
-        this.stateSource = new SourceImpl<>(name);
 
         // Shared scheduler for all Clocks in this Circuit
         this.clockScheduler = Executors.newScheduledThreadPool(1, r -> {
@@ -164,7 +166,9 @@ public class CircuitImpl implements Circuit, Scheduler {
 
     @Override
     public Subscription subscribe(Subscriber<State> subscriber) {
-        return stateSource.subscribe(subscriber);
+        Objects.requireNonNull(subscriber, "Subscriber cannot be null");
+        stateSubscribers.add(subscriber);
+        return new SubscriptionImpl(() -> stateSubscribers.remove(subscriber));
     }
 
     // Circuit.await() - public API
@@ -217,12 +221,11 @@ public class CircuitImpl implements Circuit, Scheduler {
         // Build hierarchical name: circuit.name
         Name hierarchicalName = circuitSubject.name().name(name);
 
-        // Create Source for this Cell
-        SourceImpl<E> source = new SourceImpl<>(hierarchicalName);
-
-        // Create Channel wrapping the Source
+        // Create Channel for Cell creation
+        // Note: The Cell (CellNode) will manage its own subscribers
+        // This Channel is just a temporary construct for the composer
         Channel<E> channel = new ChannelImpl<>(
-            hierarchicalName, this, source, configurer
+            hierarchicalName, this, capture -> {}, () -> false, configurer
         );
 
         // Invoke the Composer to create the Pipe<I> (which is actually a Cell<I,E>)

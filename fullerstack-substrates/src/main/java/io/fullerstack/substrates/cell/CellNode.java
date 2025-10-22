@@ -5,14 +5,18 @@ import io.fullerstack.substrates.channel.ChannelImpl;
 import io.fullerstack.substrates.circuit.Scheduler;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.name.NameNode;
-import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
+import io.fullerstack.substrates.subscription.SubscriptionImpl;
+import io.fullerstack.substrates.capture.CaptureImpl;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -42,12 +46,14 @@ public final class CellNode<I, E> implements Cell<I, E> {
     private final CellNode<I, E> parent;              // Parent Cell (null for root)
     private final String segment;                         // This Cell's name segment
     private final Function<I, E> transformer;             // I → E transformation
-    // M17: Source is sealed, using SourceImpl directly
-    private final SourceImpl<E> source;                   // For managing subscribers
     private final Pipe<E> pipe;                           // For emitting (connects to Source via Channel)
     private final Scheduler scheduler;                    // For async operations
     private final Subject subject;                        // For identity
     private final Map<Name, Cell<I, E>> children;         // Cache of children - simple ConcurrentHashMap
+
+    // Direct subscriber management (Cell IS-A Source via sealed hierarchy)
+    private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
+    private final Map<Name, Map<Subscriber<E>, List<Pipe<E>>>> pipeCache = new ConcurrentHashMap<>();
 
     /**
      * Constructor - minimal fields only.
@@ -70,10 +76,8 @@ public final class CellNode<I, E> implements Cell<I, E> {
             Cell.class
         );
 
-        this.source = new SourceImpl<>(name);
-
-        // Create Channel to connect Pipe to Source
-        Channel<E> channel = new ChannelImpl<>(name, scheduler, source, null);
+        // Create Channel with emission handler callback (Cell IS-A Source)
+        Channel<E> channel = new ChannelImpl<>(name, scheduler, this::notifySubscribers, this::hasSubscribers, null);
         this.pipe = channel.pipe();
 
         // Initialize empty children map (each Cell manages its own children)
@@ -124,11 +128,52 @@ public final class CellNode<I, E> implements Cell<I, E> {
         pipe.emit(output);
     }
 
-    // ============ REQUIRED: SourceImpl<E> implementation ============
+    // ============ REQUIRED: Source<E> implementation - Cell IS-A Source ============
 
     @Override
     public Subscription subscribe(Subscriber<E> subscriber) {
-        return source.subscribe(subscriber);
+        Objects.requireNonNull(subscriber, "Subscriber cannot be null");
+        subscribers.add(subscriber);
+        return new SubscriptionImpl(() -> subscribers.remove(subscriber));
+    }
+
+    public boolean hasSubscribers() {
+        return !subscribers.isEmpty();
+    }
+
+    private void notifySubscribers(Capture<E, Channel<E>> capture) {
+        Subject<Channel<E>> emittingSubject = capture.subject();
+        Name subjectName = emittingSubject.name();
+
+        Map<Subscriber<E>, List<Pipe<E>>> subscriberPipes = pipeCache.computeIfAbsent(
+            subjectName,
+            name -> new ConcurrentHashMap<>()
+        );
+
+        subscribers.stream()
+            .flatMap(subscriber ->
+                resolvePipes(subscriber, emittingSubject, subscriberPipes).stream()
+            )
+            .forEach(pipe -> pipe.emit(capture.emission()));
+    }
+
+    private List<Pipe<E>> resolvePipes(
+        Subscriber<E> subscriber,
+        Subject emittingSubject,
+        Map<Subscriber<E>, List<Pipe<E>>> subscriberPipes
+    ) {
+        return subscriberPipes.computeIfAbsent(subscriber, sub -> {
+            List<Pipe<E>> registeredPipes = new CopyOnWriteArrayList<>();
+
+            sub.accept(emittingSubject, new Registrar<E>() {
+                @Override
+                public void register(Pipe<E> pipe) {
+                    registeredPipes.add(pipe);
+                }
+            });
+
+            return registeredPipes;
+        });
     }
 
     // ============ REQUIRED: Subject (from Container) ============

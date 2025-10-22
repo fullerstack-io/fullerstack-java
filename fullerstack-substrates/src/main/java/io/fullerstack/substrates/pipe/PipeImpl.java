@@ -1,7 +1,6 @@
 package io.fullerstack.substrates.pipe;
 
 import io.fullerstack.substrates.capture.CaptureImpl;
-import io.fullerstack.substrates.source.SourceImpl;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.flow.FlowImpl;
 import io.fullerstack.substrates.circuit.Scheduler;
@@ -10,6 +9,7 @@ import lombok.Getter;
 
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 
 /**
  * Implementation of Substrates.Pipe interface with Lombok for getters.
@@ -44,8 +44,8 @@ public class PipeImpl<E> implements Pipe<E> {
 
     private final Scheduler scheduler; // Circuit's scheduler (retained for potential future use)
     private final Subject<Channel<E>> channelSubject; // WHO this pipe belongs to
-    private final Consumer<Capture<E, Channel<E>>> emissionHandler; // Callback to route emissions to Source
-    private final SourceImpl<E> source; // Source reference for early subscriber check optimization
+    private final Consumer<Capture<E, Channel<E>>> emissionHandler; // Callback to route emissions to Conduit (IS-A Source)
+    private final BooleanSupplier hasSubscribers; // Check for early subscriber optimization
     private final FlowImpl<E> flow; // FlowImpl for apply() and hasReachedLimit()
 
     /**
@@ -53,11 +53,11 @@ public class PipeImpl<E> implements Pipe<E> {
      *
      * @param scheduler the Circuit's scheduler
      * @param channelSubject the Subject of the Channel this Pipe belongs to
-     * @param emissionHandler callback to route emissions (provided by Source)
-     * @param source the Source instance for subscriber check optimization
+     * @param emissionHandler callback to route emissions (from Conduit which IS-A Source)
+     * @param hasSubscribers subscriber check for early-exit optimization
      */
-    public PipeImpl(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E, Channel<E>>> emissionHandler, SourceImpl<E> source) {
-        this(scheduler, channelSubject, emissionHandler, source, null);
+    public PipeImpl(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E, Channel<E>>> emissionHandler, BooleanSupplier hasSubscribers) {
+        this(scheduler, channelSubject, emissionHandler, hasSubscribers, null);
     }
 
     /**
@@ -65,15 +65,15 @@ public class PipeImpl<E> implements Pipe<E> {
      *
      * @param scheduler the Circuit's scheduler
      * @param channelSubject the Subject of the Channel this Pipe belongs to
-     * @param emissionHandler callback to route emissions (provided by Source)
-     * @param source the Source instance for subscriber check optimization
+     * @param emissionHandler callback to route emissions (from Conduit which IS-A Source)
+     * @param hasSubscribers subscriber check for early-exit optimization
      * @param flow the transformation pipeline (null for no transformations)
      */
-    public PipeImpl(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E, Channel<E>>> emissionHandler, SourceImpl<E> source, FlowImpl<E> flow) {
+    public PipeImpl(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E, Channel<E>>> emissionHandler, BooleanSupplier hasSubscribers, FlowImpl<E> flow) {
         this.scheduler = Objects.requireNonNull(scheduler, "Scheduler cannot be null");
         this.channelSubject = Objects.requireNonNull(channelSubject, "Channel subject cannot be null");
         this.emissionHandler = Objects.requireNonNull(emissionHandler, "Emission handler cannot be null");
-        this.source = Objects.requireNonNull(source, "Source cannot be null");
+        this.hasSubscribers = Objects.requireNonNull(hasSubscribers, "Subscriber check cannot be null");
         this.flow = flow;
     }
 
@@ -114,7 +114,7 @@ public class PipeImpl<E> implements Pipe<E> {
     private void postScript(E value) {
         // OPTIMIZATION: Early exit if no subscribers
         // Avoids: Capture allocation + queue posting when nothing is listening
-        if (!source.hasSubscribers()) {
+        if (!hasSubscribers.getAsBoolean()) {
             return;
         }
 

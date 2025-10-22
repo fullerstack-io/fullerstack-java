@@ -2,13 +2,15 @@ package io.fullerstack.substrates.clock;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
-import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
+import io.fullerstack.substrates.subscription.SubscriptionImpl;
 import io.fullerstack.substrates.name.NameNode;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -28,9 +30,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class ClockImpl implements Clock {
     private final Subject clockSubject;
-    private final SourceImpl<Instant> source;
     private final ScheduledExecutorService scheduler;
     private volatile boolean closed = false;
+
+    // Direct subscriber management for Instant (Clock IS-A Source<Instant>)
+    private final List<Subscriber<Instant>> subscribers = new CopyOnWriteArrayList<>();
 
     /**
      * Creates a clock with the specified name and shared scheduler.
@@ -48,7 +52,6 @@ public class ClockImpl implements Clock {
             StateImpl.empty(),
             Clock.class
         );
-        this.source = new SourceImpl<>(name);
         this.scheduler = scheduler;
     }
 
@@ -66,13 +69,11 @@ public class ClockImpl implements Clock {
         return clockSubject;
     }
 
-    public SourceImpl<Instant> source() {
-        return source;
-    }
-
     @Override
     public Subscription subscribe(Subscriber<Instant> subscriber) {
-        return source.subscribe(subscriber);
+        Objects.requireNonNull(subscriber, "Subscriber cannot be null");
+        subscribers.add(subscriber);
+        return new SubscriptionImpl(() -> subscribers.remove(subscriber));
     }
 
     @Override
