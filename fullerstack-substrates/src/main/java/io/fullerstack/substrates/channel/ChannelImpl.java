@@ -54,7 +54,8 @@ public class ChannelImpl<E> implements Channel<E> {
 
     private final Subject<Channel<E>> channelSubject;
     private final Scheduler scheduler;
-    private final Source<E> source; // Direct Source reference for emission routing
+    // M17: Source is sealed, using SourceImpl directly
+    private final SourceImpl<E> source; // Direct Source reference for emission routing
     private final Consumer<Flow<E>> flowConfigurer; // Optional transformation pipeline (nullable)
 
     // Cached Pipe instance - ensures Segment state (limits, accumulators, etc.) is shared
@@ -69,7 +70,8 @@ public class ChannelImpl<E> implements Channel<E> {
      * @param source sibling Source (provides emission handler for Pipe creation)
      * @param flowConfigurer optional transformation pipeline (null if no transformations)
      */
-    public ChannelImpl(Name channelName, Scheduler scheduler, Source<E> source, Consumer<Flow<E>> flowConfigurer) {
+    // M17: Source is sealed, constructor now takes SourceImpl
+    public ChannelImpl(Name channelName, Scheduler scheduler, SourceImpl<E> source, Consumer<Flow<E>> flowConfigurer) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
         this.channelSubject = new SubjectImpl<>(
             IdImpl.generate(),

@@ -40,7 +40,8 @@ import java.util.function.Consumer;
  */
 public class CircuitImpl implements Circuit, Scheduler {
     private final Subject circuitSubject;
-    private final Source<State> stateSource;
+    // M17: Source is sealed, using SourceImpl directly for internal subscription management
+    private final SourceImpl<State> stateSource;
 
     // Internal queue processor (Virtual CPU Core pattern)
     private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
@@ -217,7 +218,7 @@ public class CircuitImpl implements Circuit, Scheduler {
         Name hierarchicalName = circuitSubject.name().name(name);
 
         // Create Source for this Cell
-        Source<E> source = new SourceImpl<>(hierarchicalName);
+        SourceImpl<E> source = new SourceImpl<>(hierarchicalName);
 
         // Create Channel wrapping the Source
         Channel<E> channel = new ChannelImpl<>(

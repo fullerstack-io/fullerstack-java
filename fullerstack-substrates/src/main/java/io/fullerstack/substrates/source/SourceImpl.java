@@ -18,9 +18,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
- * Implementation of Substrates.Source for subscriber management with Lombok for getters.
+ * Internal subscriber management class (M17: Source is now sealed).
  *
- * <p>SourceImpl manages Subscribers and provides the observable stream interface.
+ * <p>SourceImpl manages Subscribers and provides subscription functionality.
+ * Note: In M17, Source interface became sealed, so this class no longer implements
+ * Source directly. Instead, it provides the same subscription functionality internally.
  *
  * <p>Manages subscribers with thread-safe CopyOnWriteArrayList, suitable for
  * read-heavy workloads (many emissions, fewer subscribe/unsubscribe operations).
@@ -36,11 +38,10 @@ import java.util.function.Consumer;
  * private while providing Channels with the callback they need for Pipe creation.
  *
  * @param <E> event emission type
- * @see Source
  * @see Subscriber
  */
 @Getter
-public class SourceImpl<E> implements Source<E> {
+public class SourceImpl<E> {
     private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
     private final Subject<?> sourceSubject;
 
@@ -76,7 +77,12 @@ public class SourceImpl<E> implements Source<E> {
         return sourceSubject;
     }
 
-    @Override
+    /**
+     * Subscribes a subscriber to receive events (M17: Source is sealed, so this is not @Override).
+     *
+     * @param subscriber the subscriber to register
+     * @return a Subscription to control the subscription lifecycle
+     */
     public Subscription subscribe(Subscriber<E> subscriber) {
         Objects.requireNonNull(subscriber, "Subscriber cannot be null");
         subscribers.add(subscriber);

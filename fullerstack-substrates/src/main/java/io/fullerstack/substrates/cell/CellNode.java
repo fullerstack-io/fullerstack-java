@@ -42,7 +42,8 @@ public final class CellNode<I, E> implements Cell<I, E> {
     private final CellNode<I, E> parent;              // Parent Cell (null for root)
     private final String segment;                         // This Cell's name segment
     private final Function<I, E> transformer;             // I → E transformation
-    private final Source<E> source;                       // For managing subscribers
+    // M17: Source is sealed, using SourceImpl directly
+    private final SourceImpl<E> source;                   // For managing subscribers
     private final Pipe<E> pipe;                           // For emitting (connects to Source via Channel)
     private final Scheduler scheduler;                    // For async operations
     private final Subject subject;                        // For identity
@@ -123,7 +124,7 @@ public final class CellNode<I, E> implements Cell<I, E> {
         pipe.emit(output);
     }
 
-    // ============ REQUIRED: Source<E> implementation ============
+    // ============ REQUIRED: SourceImpl<E> implementation ============
 
     @Override
     public Subscription subscribe(Subscriber<E> subscriber) {

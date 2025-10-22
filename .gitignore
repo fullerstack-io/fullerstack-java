@@ -24,3 +24,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Accidentally extracted dependency files
+**/META-INF/
+**/io/humainary/

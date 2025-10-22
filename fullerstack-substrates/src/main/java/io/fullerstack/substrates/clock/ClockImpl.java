@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class ClockImpl implements Clock {
     private final Subject clockSubject;
-    private final Source<Instant> source;
+    private final SourceImpl<Instant> source;
     private final ScheduledExecutorService scheduler;
     private volatile boolean closed = false;
 
@@ -66,7 +66,7 @@ public class ClockImpl implements Clock {
         return clockSubject;
     }
 
-    public Source<Instant> source() {
+    public SourceImpl<Instant> source() {
         return source;
     }
 

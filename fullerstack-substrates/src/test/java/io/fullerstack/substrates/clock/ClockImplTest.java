@@ -2,6 +2,7 @@ package io.fullerstack.substrates.clock;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.name.NameNode;
+import io.fullerstack.substrates.source.SourceImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +54,7 @@ class ClockImplTest {
     void shouldProvideSource() {
         clock = new ClockImpl(scheduler);
 
-        Source<Instant> source = clock.source();
+        SourceImpl<Instant> source = clock.source();
 
         assertThat((Object) source).isNotNull();
     }

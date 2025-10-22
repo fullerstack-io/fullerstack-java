@@ -56,7 +56,7 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     private final Subject conduitSubject;
     private final Composer<? extends P, E> composer;
     private final Map<Name, P> percepts;
-    private final Source<E> eventSource; // Observable stream - external code subscribes to this
+    private final SourceImpl<E> eventSource; // Observable stream - external code subscribes to this
     private final Scheduler scheduler; // Circuit scheduler for serialized execution
     private final Consumer<Flow<E>> flowConfigurer; // Optional transformation pipeline (nullable)
 
@@ -94,7 +94,7 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         return conduitSubject;
     }
 
-    public Source<E> source() {
+    public SourceImpl<E> source() {
         return eventSource;
     }
 
