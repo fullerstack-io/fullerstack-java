@@ -257,8 +257,8 @@ MonitorSignal signal = MonitorSignal.degraded(
 );
 heapPipe.emit(signal);
 
-// 5. Subscribe to Signals
-monitors.source().subscribe(
+// 5. Subscribe to Signals (Conduit extends Source in M17 sealed hierarchy)
+monitors.subscribe(
     cortex.subscriber(
         cortex.name("cluster-health-aggregator"),
         (subject, registrar) -> {  // subject parameter = Name from Conduit.get()
@@ -316,42 +316,42 @@ Raw     Context    Meaning
     <dependency>
         <groupId>io.humainary.modules.serventis.monitors</groupId>
         <artifactId>humainary-modules-serventis-monitors-api</artifactId>
-        <version>1.0.0-M13</version>
+        <version>1.0.0-M17</version>
     </dependency>
 
     <!-- Services API -->
     <dependency>
         <groupId>io.humainary.modules.serventis.services</groupId>
         <artifactId>humainary-modules-serventis-services-api</artifactId>
-        <version>1.0.0-M13</version>
+        <version>1.0.0-M17</version>
     </dependency>
 
     <!-- Queues API -->
     <dependency>
         <groupId>io.humainary.modules.serventis.queues</groupId>
         <artifactId>humainary-modules-serventis-queues-api</artifactId>
-        <version>1.0.0-M13</version>
+        <version>1.0.0-M17</version>
     </dependency>
 
     <!-- Reporters API -->
     <dependency>
         <groupId>io.humainary.modules.serventis.reporters</groupId>
         <artifactId>humainary-modules-serventis-reporters-api</artifactId>
-        <version>1.0.0-M13</version>
+        <version>1.0.0-M17</version>
     </dependency>
 
     <!-- Probes API -->
     <dependency>
         <groupId>io.humainary.modules.serventis.probes</groupId>
         <artifactId>humainary-modules-serventis-probes-api</artifactId>
-        <version>1.0.0-M13</version>
+        <version>1.0.0-M17</version>
     </dependency>
 
     <!-- Resources API -->
     <dependency>
         <groupId>io.humainary.modules.serventis.resources</groupId>
         <artifactId>humainary-modules-serventis-resources-api</artifactId>
-        <version>1.0.0-M13</version>
+        <version>1.0.0-M17</version>
     </dependency>
 </dependencies>
 ```
@@ -374,8 +374,8 @@ Add to your `pom.xml`:
 
 ## Requirements
 
-- **Java 24** (with preview features enabled)
-- **Humainary Serventis APIs** (1.0.0-M13)
+- **Java 25** or higher (LTS)
+- **Humainary Serventis APIs** (1.0.0-M17)
 
 ---
 
