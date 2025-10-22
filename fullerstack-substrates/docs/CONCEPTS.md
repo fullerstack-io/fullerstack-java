@@ -1,1463 +1,885 @@
-# Core Concepts
+# Fullerstack Substrates - Core Concepts
 
-This document explains the fundamental concepts in Substrates and how they work together.
+## Overview
+
+This document explains the fundamental concepts in Fullerstack Substrates and how they work together to build event-driven observability systems.
+
+**Prerequisites:** Basic familiarity with event-driven architectures and reactive patterns
+
+---
 
 ## Table of Contents
 
-- [What is Substrates?](#what-is-substrates)
-- [Core Abstractions](#core-abstractions)
-- [Async-First Architecture](#async-first-architecture)
-- [Producer-Consumer Model](#producer-consumer-model)
-- [Transformation Pipelines](#transformation-pipelines)
-- [Resource Management](#resource-management)
-- [Observability Model](#observability-model)
+1. [What is Substrates?](#what-is-substrates)
+2. [Core Entities](#core-entities)
+3. [M17 Sealed Hierarchy](#m17-sealed-hierarchy)
+4. [Naming and Hierarchy](#naming-and-hierarchy)
+5. [Event Flow](#event-flow)
+6. [Transformations](#transformations)
+7. [Subscription Pattern](#subscription-pattern)
+8. [Resource Lifecycle](#resource-lifecycle)
+9. [State Management](#state-management)
+10. [Timing and Scheduling](#timing-and-scheduling)
+
+---
 
 ## What is Substrates?
 
-Substrates is a framework for building **event-driven observability systems**. It provides:
+**Substrates** is a framework for building event-driven observability systems based on William Louth's vision of **semiotic observability**.
 
-1. **Type-safe event routing** - from producers to consumers
-2. **Transformation pipelines** - filter, map, reduce, sample emissions
-3. **Dynamic subscription** - observers can subscribe/unsubscribe at runtime
-4. **Resource lifecycle** - automatic cleanup and hierarchical scoping
-5. **Precise ordering** - guaranteed event ordering per circuit
+### Key Capabilities
+
+1. **Type-safe event routing** - From producers to consumers via Channels/Pipes
+2. **Transformation pipelines** - Filter, map, reduce, limit, sample emissions
+3. **Dynamic subscription** - Observers subscribe/unsubscribe at runtime
+4. **Resource lifecycle** - Automatic cleanup with Scope
+5. **Precise ordering** - Virtual CPU core pattern guarantees FIFO event processing
+6. **Hierarchical naming** - Dot-notation names organize components
+7. **Immutable state** - Slot-based state management
 
 ### Semiotic Observability
 
-Substrates supports William Louth's vision of **semiotic observability**:
+Substrates supports the observability evolution:
 
 ```
-Metrics (traditional)
-  ↓
-Signs (observations)
-  ↓
-Symptoms (patterns)
-  ↓
+Metrics (traditional numbers)
+    ↓
+Signs (observations with meaning)
+    ↓
+Symptoms (patterns in signs)
+    ↓
 Syndromes (correlated symptoms)
-  ↓
+    ↓
 Situations (system states)
-  ↓
-Steering (actions)
+    ↓
+Steering (automated responses)
 ```
 
-Substrates provides the **runtime substrate** for this observability stack.
+**Substrates** provides the infrastructure layer, **Serventis** provides the semantic signal types.
 
-## Core Abstractions
+---
 
-### Subject
+## Core Entities
 
-**What:** Hierarchical reference system for identifying entities.
+### Cortex
 
-**Components:**
-- **Id** - Unique instance identifier (UUID-based, used internally)
-- **Name** - Hierarchical semantic identity (like a namespace)
-- **State** - Immutable key-value data
-- **Type** - Category (CHANNEL, CIRCUIT, CLOCK, etc.)
+**Purpose:** Entry point and factory for creating Circuits and Scopes
 
-**Example:**
+**Interface:**
 ```java
-Subject subject = channel.subject();
-System.out.println(subject.name());  // e.g., "circuit.conduit.channel1"
-System.out.println(subject.type());  // CHANNEL
-System.out.println(subject.id());    // Unique UUID (rarely accessed directly)
-```
-
-**Note:** While every Subject has an Id for unique instance identification, you'll primarily work with **Name** for component lookup and caching. The Id is managed internally by the framework.
-
-### Name
-
-**What:** Hierarchical semantic identity used for both naming and caching.
-
-**Key Design Philosophy:** Name is **separate from the instrument/component itself**. The instrument doesn't need to maintain its own name - the Name serves as an **external key** in the registry that maps to the instrument.
-
-**Features:**
-- Dot-separated parts: `"app.service.endpoint"`
-- Implements `Extent<Name>` for hierarchical navigation
-- Immutable and comparable
-- **Used as cache key** in Circuit/Cortex component pools
-- **External to the instrument** - Name is the key, not part of the value
-- **Interned by default** for identity map fast path
-
-**Dual Purpose:**
-1. **Semantic Identity** - Human-readable hierarchical names
-2. **Cache Key** - Enables singleton pattern for named components
-
-**Separation of Concerns:**
-```java
-// Name is the KEY, Pipe is the VALUE
-Map<Name, Pipe<String>> registry = ...;
-
-// Pipe doesn't store its name - Name is external
-Pipe<String> pipe = registry.get(name);
-// pipe.name() doesn't exist - the NAME identifies the pipe in the namespace
-
-// This separation allows:
-// - Multiple names can reference same instrument (aliasing)
-// - Instrument is lightweight (no name storage overhead)
-// - Name can be used for routing without touching the instrument
+public interface Cortex {
+    Circuit circuit(Name name);
+    Scope scope(Name name);
+    Name name(String path);
+}
 ```
 
 **Usage:**
 ```java
-Name root = cortex.name("app");
-Name service = root.name("service");
-Name endpoint = service.name("endpoint");
-
-System.out.println(endpoint.path());  // "app.service.endpoint"
-System.out.println(endpoint.depth()); // 3
+Cortex cortex = CortexRuntime.create();
+Circuit circuit = cortex.circuit(cortex.name("kafka"));
+Name brokerName = cortex.name("kafka.broker.1");
 ```
 
-**Name as Cache Key:**
+**Responsibilities:**
+- Create and cache Circuits
+- Create and cache Scopes
+- Create hierarchical Names
+
+---
+
+### Circuit
+
+**Purpose:** Central event orchestration hub with virtual CPU core pattern
+
+**Key Features:**
+- Contains Conduits and Clocks
+- Single virtual thread processes events in FIFO order
+- Shared ScheduledExecutorService for all Clocks
+- Component lifecycle management
+
+**Interface:**
 ```java
-Cortex cortex = new CortexRuntime();
-
-// First call creates circuit with name "kafka-cluster"
-Circuit c1 = cortex.circuit(cortex.name("kafka-cluster"));
-
-// Second call returns THE SAME circuit (cached by name)
-Circuit c2 = cortex.circuit(cortex.name("kafka-cluster"));
-
-assert c1 == c2;  // ✅ Singleton pattern via Name caching
-```
-
-**Name Implementations:**
-
-| Implementation | Use Case | Key Characteristics |
-|---------------|----------|---------------------|
-| **InternedName** (default) | Production | Weak reference interning, pointer equality, identity map fast path |
-| LinkedName | Legacy | Linked parent chain, no interning |
-| SegmentArrayName | Specific cases | Array-based segments |
-| LRUCachedName | High churn | LRU cache for name strings |
-
-**Default Recommendation:** Use InternedName (default) - optimized for identity map fast path performance.
-
-**Type-Based Default Names Create Singletons:**
-```java
-// No-arg methods use type-based default names for singleton behavior
-Circuit c1 = cortex.circuit();  // Uses name "circuit"
-Circuit c2 = cortex.circuit();  // Returns same circuit
-
-Clock clk1 = circuit.clock();   // Uses name "clock"
-Clock clk2 = circuit.clock();   // Returns same clock
-
-assert c1 == c2;   // ✅ Same circuit
-assert clk1 == clk2;  // ✅ Same clock
-```
-
-**Correct vs Incorrect Usage Pattern:**
-
-⚠️ **CRITICAL:** Always use Cortex/Circuit factory methods, never direct construction.
-
-```java
-// ✅ CORRECT - Uses cache via Circuit.clock()
-Clock clock1 = circuit.clock(cortex.name("timer"));
-Clock clock2 = circuit.clock(cortex.name("timer"));
-assert clock1 == clock2;  // Same instance (cached)
-
-// ❌ WRONG - Bypasses cache via direct construction
-Clock clock3 = new ClockImpl(cortex.name("timer"));
-Clock clock4 = new ClockImpl(cortex.name("timer"));
-assert clock3 != clock4;  // Different instances! (breaks singleton)
-```
-
-**Why constructors generate new Ids:**
-
-Component constructors (ClockImpl, ConduitImpl, CircuitImpl) always generate a new Id because they're only called once per Name by the cache:
-
-```java
-// ClockImpl constructor - called ONLY by cache miss
-public ClockImpl(Name name) {
-    Id id = IdImpl.generate();  // New ID each time
-    this.clockSubject = new SubjectImpl(id, name, ...);
-}
-
-// CircuitImpl.clock() - ensures constructor called once per Name
-public Clock clock(Name name) {
-    return clocks.computeIfAbsent(name, ClockImpl::new);
-    //                             ^^^^ Only called if Name absent
+public interface Circuit extends Component {
+    <P, E> Conduit<P, E> conduit(Name name, Composer<P, E> composer);
+    Clock clock(Name name);
+    void close();
 }
 ```
-
-**The computeIfAbsent() guarantee:**
-- First call with Name → constructor called → Id generated → stored in cache
-- Second call with same Name → cached instance returned → no new Id generated
-- Direct construction → bypasses cache → breaks singleton pattern
-
-See [Architecture Guide - Factory Method + Flyweight Pattern](ARCHITECTURE.md#1-name-based-component-caching) for detailed explanation.
-
-### Factory Patterns
-
-**What:** Pluggable factory interfaces for creating Name, Queue, and Registry instances throughout the framework.
-
-**Three Core Factories:**
-
-1. **NameFactory** - Creates Name instances
-   - Default: `InternedNameFactory` (weak reference interning)
-   - Ensures same name string → same Name instance
-   - Enables identity map fast path via pointer equality
-
-2. **QueueFactory** - Creates Queue instances
-   - Default: `LinkedBlockingQueueFactory`
-   - One queue per Circuit for ordered execution
-   - Virtual thread per Circuit processes queue
-
-3. **RegistryFactory** - Creates Registry instances
-   - Default: `LazyTrieRegistryFactory`
-   - Returns Map-compatible registries for Name-keyed collections
-   - Used in: CortexRuntime (circuits, scopes), CircuitImpl (clocks), ConduitImpl (percepts), ScopeImpl (childScopes)
 
 **Usage:**
 ```java
-// ✅ Use defaults (optimized for production)
-Cortex cortex = new CortexRuntime();
+Circuit circuit = cortex.circuit(cortex.name("kafka.monitoring"));
 
-// Custom factories (advanced use cases)
-Cortex cortex = new CortexRuntime(
-    InternedNameFactory.getInstance(),
-    LinkedBlockingQueueFactory.getInstance(),
-    LazyTrieRegistryFactory.getInstance()
-);
+Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
+    circuit.conduit(cortex.name("monitors"), Composer.pipe());
+
+Clock clock = circuit.clock(cortex.name("timer"));
 ```
 
-**Why Factories:**
-- **Pluggability** - Swap implementations without changing code
-- **Consistency** - Same factory used throughout component hierarchy
-- **Performance** - Default implementations are optimized for production
-- **Testing** - Easy to inject mock implementations
-
-**Propagation Pattern:**
-```java
-// CortexRuntime injects factories down the hierarchy
-Circuit circuit = new CircuitImpl(name, nameFactory, queueFactory, registryFactory);
-
-// Circuit propagates to Conduit
-Conduit conduit = new ConduitImpl(name, composer, queue, registryFactory, sequencer);
-
-// Same factory used everywhere = consistent behavior
+**Virtual CPU Core Pattern:**
+```
+Events → BlockingQueue → Single Virtual Thread → FIFO Processing
 ```
 
-### Identity Map Fast Path
+Guarantees precise ordering - events processed in exact order received.
 
-**What:** Performance optimization in LazyTrieRegistry using pointer equality (==) for InternedName instances instead of hash-based lookup.
+---
 
-**How It Works:**
+### Conduit
+
+**Purpose:** Container that creates Channels and manages subscriber notifications
+
+**Key Features:**
+- Creates Channels on-demand via `get(Name subject)`
+- IS-A Source (can subscribe to it directly)
+- Configures Flow/Sift transformations for all Channels
+- Thread-safe component caching
+
+**Interface:**
 ```java
-// LazyTrieRegistry with dual indexes
-public class LazyTrieRegistry<T> implements Map<Name, T> {
-    private final Map<Name, T> identityMap = new IdentityHashMap<>();  // Pointer equality
-    private final Map<Name, T> registry = new ConcurrentHashMap<>();   // Hash equality
-
-    @Override
-    public T get(Object key) {
-        if (!(key instanceof Name)) return null;
-        Name name = (Name) key;
-
-        // Fast path: identity map using pointer equality (==)
-        T value = identityMap.get(name);  // ~2ns
-        if (value != null) return value;   // ✅ Hit!
-
-        // Fallback: hash-based lookup
-        return registry.get(name);         // ~15-20ns
-    }
+public interface Conduit<P, E> extends Container<P, E> {
+    P get(Name subject);  // Get Pipe for subject
+    Subscription subscribe(Subscriber<E> subscriber);
 }
 ```
 
-**Why It's Fast:**
-- **Identity check:** 2ns (simple pointer comparison: `this == that`)
-- **Hash lookup:** 15-20ns (compute hashCode(), equals(), bucket search)
-- **Speedup:** 5-10× for cached Name instances
-
-**InternedName Enables This:**
+**Usage:**
 ```java
-// InternedNameFactory ensures same string → same instance
-Name name1 = nameFactory.createRoot("kafka.broker.1");
-Name name2 = nameFactory.createRoot("kafka.broker.1");
-
-// Pointer equality works!
-assert name1 == name2;  // ✅ Same instance (interned)
-
-// Identity map can use pointer equality
-identityMap.get(name1);  // 2ns lookup via ==
-```
-
-**Performance Results:**
-- **Cached pipe lookups:** 23ns → 4ns (5× faster)
-- **Cached circuit lookups:** 28ns → 5ns (5× faster)
-- **Hot-path emission:** 6.6ns → 3.3ns (2× faster)
-
-**Design Philosophy:**
-- Most lookups hit identity map (common case)
-- Hash lookup provides fallback safety
-- Zero behavioral change, pure performance win
-
-### LazyTrieRegistry
-
-**What:** Hybrid dual-index registry with identity map fast path AND hierarchical trie for subtree queries.
-
-**Dual-Index Design:**
-```java
-public class LazyTrieRegistry<T> implements Map<Name, T> {
-    // Fast path: O(1) identity-based lookup
-    private final Map<Name, T> identityMap = new IdentityHashMap<>();
-
-    // Primary storage: O(1) hash-based lookup
-    private final Map<Name, T> registry = new ConcurrentHashMap<>();
-
-    // Lazy trie: built on-demand for hierarchical queries
-    private volatile TrieNode<T> trieRoot = null;
-}
-```
-
-**Three Access Patterns:**
-
-1. **Fast Path (identity map)** - 2-5ns
-   ```java
-   Pipe pipe = conduit.get(cachedName);  // Pointer equality
-   ```
-
-2. **Standard Lookup (hash map)** - 15-20ns
-   ```java
-   Circuit circuit = cortex.circuit(name);  // Hash equality
-   ```
-
-3. **Hierarchical Query (lazy trie)** - Built on first subtree query
-   ```java
-   // Cast to access trie-specific methods
-   LazyTrieRegistry<Circuit> registry = (LazyTrieRegistry<Circuit>) cortex.circuits;
-   Map<Name, Circuit> brokers = registry.getSubtree(cortex.name("kafka.brokers"));
-   ```
-
-**Lazy Trie Construction:**
-- Trie is NOT built during normal operations
-- Built only when `getSubtree()` or trie-specific methods called
-- One-time construction cost: ~100-200μs for 1000 entries
-- Future subtree queries are fast: ~50-100ns
-
-**Map Interface Implementation:**
-```java
-// ✅ Works with standard Map operations
-Map<Name, Circuit> circuits = (Map<Name, Circuit>) registryFactory.create();
-circuits.computeIfAbsent(name, this::createCircuit);  // Standard Map API
-circuits.values().forEach(Circuit::close);            // Standard iteration
-circuits.containsKey(name);                           // Standard lookup
-
-// ✅ PLUS trie-specific operations when needed
-LazyTrieRegistry<Circuit> registry = (LazyTrieRegistry<Circuit>) circuits;
-registry.getSubtree(prefix);  // Hierarchical query
-```
-
-**Where It's Used:**
-- **CortexRuntime:** circuits, scopes maps
-- **CircuitImpl:** clocks map
-- **ConduitImpl:** percepts map (pipes/channels)
-- **ScopeImpl:** childScopes map
-
-**Performance Characteristics:**
-- **Identity lookups:** 2-5ns (most common)
-- **Hash lookups:** 15-20ns (fallback)
-- **Subtree queries:** 50-100ns after trie built
-- **Memory:** ~2× overhead (identity map + hash map)
-- **Thread-safe:** All operations safe for concurrent access
-
-**Why Lazy Construction:**
-```java
-// Most code never needs hierarchical queries
-for (int i = 0; i < 1000000; i++) {
-    pipe.emit(value);  // Identity map only, no trie needed
-}
-
-// Trie built ONLY if you need it
-if (monitoring) {
-    registry.getSubtree(prefix).values().forEach(this::collectMetrics);
-}
-```
-
-**Trade-offs:**
-- ✅ Fast identity lookups for common case
-- ✅ Hierarchical queries when needed
-- ✅ Map-compatible API
-- ❌ 2× memory for dual indexes
-- ❌ One-time trie construction cost (if used)
-
-### State
-
-**What:** Immutable collection of named slots (key-value pairs).
-
-**Immutability:** Each `state()` call returns a **NEW State** instance. The original State is never modified.
-
-**Types Supported:**
-- Primitives: `int`, `long`, `float`, `double`, `boolean`
-- Objects: `String`, `Name`, `State` (nested)
-
-**Basic Usage:**
-```java
-State s1 = cortex.state();
-State s2 = s1.state(cortex.name("count"), 42);
-State s3 = s2.state(cortex.name("name"), "sensor1");
-
-// Each state() returns a NEW State
-assert s1 != s2;  // ✅ Different objects
-assert s2 != s3;  // ✅ Different objects
-
-// Fluent API (method chaining)
-State state = cortex.state()
-    .state(cortex.name("count"), 42)
-    .state(cortex.name("name"), "sensor1")
-    .state(cortex.name("active"), true);
-```
-
-**Duplicate Handling:**
-
-State uses a **List internally**, allowing duplicate names (override pattern):
-
-```java
-State config = cortex.state()
-    .state(cortex.name("timeout"), 30)   // Default value
-    .state(cortex.name("retries"), 3)
-    .state(cortex.name("timeout"), 60);  // Override (both exist!)
-
-// State has 3 slots (2 have name "timeout")
-assert config.stream().count() == 3;
-
-// compact() removes duplicates, keeping LAST occurrence
-State compacted = config.compact();
-assert compacted.stream().count() == 2;  // Only 1 "timeout" remains (value: 60)
-```
-
-**Why Allow Duplicates?**
-
-This supports the **configuration override pattern**:
-- Start with defaults
-- Apply environment-specific overrides
-- Call `compact()` when ready to finalize
-
-**Retrieving Values:**
-
-```java
-State state = cortex.state()
-    .state(cortex.name("timeout"), 30)
-    .state(cortex.name("timeout"), 60);
-
-// value() returns LAST occurrence
-Integer timeout = state.value(cortex.slot(cortex.name("timeout"), 0));
-assert timeout == 60;  // Last value wins
-
-// values() returns ALL occurrences
-var allTimeouts = state.values(cortex.slot(cortex.name("timeout"), 0)).toList();
-assert allTimeouts.equals(List.of(30, 60));  // Both values
-```
-
-**Type Matching:**
-
-From William Louth's article: **"A State stores the type with the name, only matching when both are exact matches."**
-
-State matches slots by BOTH name AND type:
-
-```java
-Name XYZ = cortex.name("XYZ");
-
-// Create slots with different types
-Slot<Integer> intSlot = cortex.slot(XYZ, 0);
-Slot<String> stringSlot = cortex.slot(XYZ, "");
-
-// Build state with same name, different types
-State state = cortex.state()
-    .state(XYZ, 3)      // Integer
-    .state(XYZ, "4");   // String - does NOT override Integer!
-
-// Query by (name, type) pair
-Integer intValue = state.value(intSlot);
-assert intValue == 3;  // Integer value unchanged
-
-String stringValue = state.value(stringSlot);
-assert stringValue.equals("4");  // String value found
-
-// Both coexist because types differ
-assert state.stream().count() == 2;
-```
-
-**Why Type Matching Matters:**
-
-This prevents errors in heterogeneous configurations:
-
-```java
-// Different components use same name, different types
-State config = cortex.state()
-    .state(cortex.name("port"), 8080)        // Integer port number
-    .state(cortex.name("port"), "HTTP/1.1"); // String protocol version
-
-// Each component gets the right type
-Integer portNumber = config.value(cortex.slot(cortex.name("port"), 0));
-String protocol = config.value(cortex.slot(cortex.name("port"), ""));
-
-assert portNumber == 8080;           // ✅ Type-safe lookup
-assert protocol.equals("HTTP/1.1");  // ✅ No conflicts
-```
-
-### Slot
-
-**What:** Immutable query/lookup object for type-safe State access with fallback support.
-
-**Immutability:** Slots are immutable - created once, reused for multiple State queries.
-
-**Purpose:** Slots serve THREE roles:
-1. **Lookup key** - `slot.name()` identifies what to find
-2. **Type safety** - `slot.type()` ensures compile-time type checking
-3. **Fallback value** - `slot.value()` returned when name not found in State
-
-**Pattern:** Create once, reuse for querying:
-
-```java
-// Create Slot with fallback value (100)
-Slot<Integer> maxConnSlot = cortex.slot(name("max-connections"), 100);
-
-// Use same Slot to query different States
-State state1 = cortex.state().state(name("max-connections"), 200);
-State state2 = cortex.state();  // Empty
-
-int conn1 = state1.value(maxConnSlot);  // 200 (found in state)
-int conn2 = state2.value(maxConnSlot);  // 100 (fallback from slot)
-```
-
-**Design Philosophy:**
-
-From William Louth's [States and Slots article](https://humainary.io/blog/observability-x-states-and-slots/):
-
-> **"Instead of relying on 'stringly-typed' key-value pairs that can lead to runtime errors and type mismatches, this design enforces type safety at compile-time."**
-
-Slots replace error-prone patterns:
-
-```java
-// ❌ OLD: Stringly-typed (runtime errors)
-int timeout = (Integer) map.get("timeout");  // ClassCastException risk!
-
-// ✅ NEW: Type-safe Slot (compile-time safety)
-Slot<Integer> timeoutSlot = cortex.slot(name("timeout"), 30);
-int timeout = state.value(timeoutSlot);  // Type-safe + fallback
-```
-
-**Hierarchical State with Slot<State>:**
-
-```java
-// Inner state
-State dbConfig = cortex.state()
-    .state(name("host"), "localhost")
-    .state(name("port"), 3306);
-
-// Outer state containing inner state
-State appConfig = cortex.state()
-    .state(name("database"), dbConfig)  // Slot<State>
-    .state(name("timeout"), 30);
-
-// Query with fallback
-Slot<State> dbSlot = cortex.slot(name("database"), cortex.state());
-State config = appConfig.value(dbSlot);  // Returns dbConfig
-```
-
-**Key Insight:** Slots are **NOT mutable configuration holders**. They are immutable query objects that enable type-safe, fallback-aware State lookups.
-
-### Substrate
-
-**What:** Base interface for all components with an associated Subject.
-
-**Purpose:** Everything in Substrates has a Subject for identification.
-
-```java
-interface Substrate {
-    Subject subject();
-}
-```
-
-**Implementations:**
-- Channel, Circuit, Clock, Conduit, Container
-- Scope, Sink, Source, Subscription, Subscriber
-
-## Async-First Architecture
-
-⚠️ **CRITICAL DESIGN PRINCIPLE**: Substrates is **async-first by default**. This is fundamentally different from reactive frameworks like RxJava which are synchronous by default.
-
-### Key Insight
-
-When you call `pipe.emit(value)`, the emission does **NOT** execute immediately. Instead:
-1. A Script is created wrapping the emission
-2. The Script is posted to the Circuit Queue
-3. `emit()` returns **immediately** (non-blocking)
-4. The Queue's single virtual thread processes the Script **asynchronously**
-5. Subscriber callbacks execute on the Queue thread, **not the calling thread**
-
-### Example: The Async Boundary
-
-```java
-Circuit circuit = cortex.circuit();
-Conduit<Pipe<String>, String> conduit = circuit.conduit(
-    cortex.name("test"),
-    Composer.pipe()
-);
-
-AtomicReference<String> received = new AtomicReference<>();
-conduit.source().subscribe(cortex.subscriber(
-    cortex.name("sub"),
-    (subject, registrar) -> registrar.register(received::set)
-));
-
-Pipe<String> pipe = conduit.get(cortex.name("channel"));
-
-// Emit value - returns IMMEDIATELY (async)
-pipe.emit("hello");
-
-// ❌ WRONG: received.get() is still NULL (async hasn't executed yet)
-// assertNull(received.get());
-
-// ✅ CORRECT: Wait for Circuit Queue to process
-circuit.await();  // Blocks until queue is empty
-
-// Now the value is available
-assertEquals("hello", received.get());  // ✅ Works
-```
-
-### Why Async-First?
-
-1. **Non-blocking producers** - Emitters never wait for consumers
-2. **Ordered execution** - FIFO queue guarantees event order
-3. **Backpressure control** - Single queue prevents saturation
-4. **Simplified threading** - Single virtual thread per Circuit (lock-free)
-5. **Predictable performance** - Consistent FIFO processing
-
-### Testing Pattern: circuit.await()
-
-**In tests, you MUST use `circuit.await()` to wait for async processing:**
-
-```java
-@Test
-void testEmission() throws Exception {
-    // Setup
-    Circuit circuit = cortex.circuit();
-    // ... create conduit, subscribe, get pipe ...
-
-    // Act
-    pipe.emit("value");
-
-    // ✅ CRITICAL: Wait for async queue processing
-    circuit.await();
-
-    // Assert - now safe to check results
-    assertEquals("value", received.get());
-}
-```
-
-### ❌ Don't Use Latches for Queue Synchronization
-
-**This pattern is INCORRECT**:
-
-```java
-// ❌ WRONG - Race condition with async queue
-CountDownLatch latch = new CountDownLatch(1);
-conduit.source().subscribe(cortex.subscriber(
-    cortex.name("sub"),
-    (subject, registrar) -> registrar.register(value -> {
-        received.set(value);
-        latch.countDown();  // May timeout
-    })
-));
-
-pipe.emit("value");
-assertTrue(latch.await(2, TimeUnit.SECONDS));  // ❌ May fail
-```
-
-**Latches are for thread coordination, not async queue synchronization. Use `circuit.await()` instead.**
-
-### Async vs RxJava Comparison
-
-| Aspect | RxJava (Sync Default) | Substrates (Async Default) |
-|--------|----------------------|---------------------------|
-| `emit()` behavior | Blocks until subscribers complete | Returns immediately |
-| Subscriber callbacks | Execute on calling thread | Execute on Queue virtual thread |
-| Testing | No special handling | Must use `circuit.await()` |
-| Ordering | Not guaranteed (multi-threaded) | FIFO guarantee (single queue) |
-
-### Further Reading
-
-For complete details on async architecture, Queue processing, and testing patterns, see:
-- **[ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md)** - Complete async design guide
-- **[Queue Architecture](archive/alignment/queues-scripts-currents.md)** - Queue implementation details
-- **[Circuit Architecture](archive/alignment/circuits.md)** - Virtual CPU Core pattern
-
-## Producer-Consumer Model
-
-### Context Pattern
-
-**What is Context?**
-
-A **Context** is an abstraction that provides access to a Source for observation. In Substrates:
-- **Conduit IS-A Context** - provides Source via `source()` method
-- **Context provides Source** - Source enables dynamic subscription to observe Subjects/Channels
-- Enables "live, adaptable connections" between information sources and observers
-
-**Key Insight:** Rather than passive data collection, Context/Source enables active observation where:
-- Subscribers conditionally register Pipes based on Subject characteristics
-- Observers dynamically adapt to what they observe
-- Connections are established on-demand as Subjects emit
-
-**Example:**
-```java
-// Conduit is a Context
-Conduit<Pipe<String>, String> conduit = circuit.conduit(name, composer);
-
-// Context provides Source for observation
-Source<String> source = conduit.source();  // Get Source from Context
-
-// Subscribe to Source for dynamic observation
-source.subscribe(
-    cortex.subscriber(
-        cortex.name("observer"),
-        (subject, registrar) -> {
-            // Conditionally register based on Subject
-            if (subject.name().value().contains("important")) {
-                registrar.register(msg -> processImportant(msg));
-            }
-        }
-    )
-);
-```
-
-### Terminology
-
-| Term | Role | Description |
-|------|------|-------------|
-| **Channel** | Connector | Named conduit linking producers and consumers; provides access to Pipe |
-| **Pipe** | Transport | Dual-purpose mechanism with `emit()` - used by producers to emit AND consumers to receive |
-| **Source** | Observable context | Provides `subscribe()` for dynamic observation of Subjects/Channels |
-| **Subscriber** | Observer factory | Registers consumer Pipes with Source when Subjects emit |
-| **Conduit** | Context | Creates Channels and provides Source for subscription (Conduit IS-A Context) |
-| **Container** | Pool manager | Manages collection of Conduits (Pool of Pools) |
-| **Queue** | Coordinator | Coordinates Script execution within Circuit |
-| **Script** | Executable unit | Work unit with `exec(Current)` method |
-
-### The Flow
-
-```
-Producer code calls emit
-  ↓
-Conduit.get(name) → returns Channel-backed Pipe
-  ↓
-Pipe.emit(value)  [Producer uses Pipe to emit]
-  ↓
-Conduit's Source notified
-  ↓
-Source dispatches to Subscribers
-  ↓
-Subscriber callback invoked with Subject
-  ↓
-Registrar registers consumer Pipes  [Consumers use Pipes to receive]
-  ↓
-Consumer Pipes receive emissions
-  ↓
-Consumer processes data
-```
-
-### Example: Simple Producer-Consumer
-
-```java
-// Create circuit and conduit
-Circuit circuit = cortex.circuit();
-Conduit<Pipe<String>, String> conduit = circuit.conduit(
-    cortex.name("messages"),
-    Composer.pipe()
-);
-
-// CONSUMER SIDE: Subscribe to observe
-conduit.source().subscribe(
+Conduit<Pipe<String>, String> messages =
+    circuit.conduit(cortex.name("messages"), Composer.pipe());
+
+// Get Pipe for specific subject
+Pipe<String> pipe = messages.get(cortex.name("user.login"));
+pipe.emit("User logged in");
+
+// Subscribe to all subjects
+messages.subscribe(
     cortex.subscriber(
         cortex.name("logger"),
-        (subject, registrar) -> {
-            // Register consumer Pipe
-            registrar.register(msg -> {
-                System.out.println("Consumer received: " + msg);
-            });
-        }
+        (subject, registrar) -> registrar.register(msg -> log.info(msg))
     )
 );
-
-// PRODUCER SIDE: Get pipe and emit
-Pipe<String> pipe = conduit.get(cortex.name("producer1"));
-pipe.emit("Hello!");  // Consumer will receive this
-
-circuit.close();
 ```
 
-### Multiple Consumers
+**Note:** In M17, Conduit extends Container → Component → Context → Source, so you call `subscribe()` directly on the Conduit, not `conduit.source().subscribe()`.
 
+---
+
+### Channel
+
+**Purpose:** Named emission port linking producers to the event stream
+
+**Key Features:**
+- Created by Conduit for a specific subject
+- Provides access to Pipe for emissions
+- Lightweight connector (just name + pipe reference)
+
+**Interface:**
 ```java
-Source<String> source = conduit.source();
-
-// Consumer 1: Logs to console
-source.subscribe(
-    cortex.subscriber(
-        cortex.name("console"),
-        (subject, registrar) ->
-            registrar.register(msg -> System.out.println(msg))
-    )
-);
-
-// Consumer 2: Writes to file
-source.subscribe(
-    cortex.subscriber(
-        cortex.name("file-writer"),
-        (subject, registrar) ->
-            registrar.register(msg -> writeToFile(msg))
-    )
-);
-
-// One emission reaches both consumers
-pipe.emit("Broadcast message");
+public interface Channel<E> {
+    Name name();
+    Pipe<E> pipe();
+}
 ```
 
-### Conditional Subscription
-
+**Usage:**
 ```java
-source.subscribe(
+// Channel created internally when you call conduit.get()
+Pipe<Event> pipe = conduit.get(cortex.name("subject"));
+// pipe belongs to a Channel with name "subject"
+```
+
+**Typical Pattern:**
+```java
+// Cache the Pipe, not the Channel
+Pipe<MetricValue> metricPipe = metrics.get(cortex.name("bytes-in"));
+
+// Emit repeatedly
+for (MetricValue value : values) {
+    metricPipe.emit(value);
+}
+```
+
+---
+
+### Pipe
+
+**Purpose:** Event transformation and emission
+
+**Key Features:**
+- Applies transformations (filter, limit, sample)
+- Emits to subscribers via SourceImpl
+- Configured by Flow/Sift at Conduit creation
+
+**Interface:**
+```java
+public interface Pipe<E> {
+    void emit(E event);
+}
+```
+
+**Usage:**
+```java
+Pipe<Integer> pipe = conduit.get(cortex.name("numbers"));
+pipe.emit(42);
+pipe.emit(100);
+```
+
+**With Transformations:**
+```java
+Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    cortex.name("filtered-numbers"),
+    Composer.pipe(flow -> flow
+        .sift(n -> n > 0)     // Only positive
+        .limit(100)           // Max 100 emissions
+        .sample(10)           // Every 10th
+    )
+);
+
+Pipe<Integer> pipe = conduit.get(cortex.name("input"));
+for (int i = -50; i <= 150; i++) {
+    pipe.emit(i);  // Transformations applied automatically
+}
+```
+
+---
+
+### Cell
+
+**Purpose:** Hierarchical container with type transformation (I → E)
+
+**Key Features:**
+- Transforms input type I to output type E
+- Can have child Cells with different transformations
+- Observable - can subscribe to transformed outputs
+- Builds transformation trees
+
+**Interface:**
+```java
+public interface Cell<I, E> extends Container {
+    <O> Cell<E, O> cell(Name name, Function<E, O> transformer);
+    void input(I value);
+}
+```
+
+**Usage:**
+```java
+// Level 1: JMX stats → Broker health
+Cell<JMXStats, BrokerHealth> brokerCell = circuit.cell(
+    cortex.name("broker-1"),
+    stats -> assessBrokerHealth(stats)
+);
+
+// Level 2: Broker health → Cluster health
+Cell<BrokerHealth, ClusterHealth> clusterCell = brokerCell.cell(
+    cortex.name("cluster"),
+    health -> aggregateClusterHealth(health)
+);
+
+// Subscribe to cluster health
+clusterCell.subscribe(
     cortex.subscriber(
-        cortex.name("filter"),
-        (subject, registrar) -> {
-            // Only subscribe to channels named "important"
-            if (subject.name().value().contains("important")) {
-                registrar.register(msg -> processImportant(msg));
+        cortex.name("alerting"),
+        (subject, registrar) -> registrar.register(health -> {
+            if (health.status() == ClusterStatus.CRITICAL) {
+                sendAlert(health);
             }
-        }
-    )
-);
-```
-
-### Container - Pool of Pools
-
-**Container** is a higher-level abstraction that manages a **collection of Conduits** of the same emission type.
-
-**Key Concept:** Container is a **"Pool of Pools"** - it implements `Pool<Pool<P>>`:
-- `container.get(name)` returns a `Pool<P>` (which is a Conduit)
-- Each unique name gets its own Conduit, created on-demand
-- All Conduits in a Container share the same Composer and optional transformation pipeline
-
-**Type Signature:**
-```java
-interface Container<P, E> extends Pool<P>, Component<E>
-
-// Circuit creates Container with nested Pool/Source types:
-Container<Pool<Pipe<String>>, Source<String>> container =
-    circuit.container(name, Composer.pipe());
-```
-
-**Basic Usage:**
-```java
-// Create container for stock market data
-Container<Pool<Pipe<Order>>, Source<Order>> stockOrders = circuit.container(
-    cortex.name("stock-market"),
-    Composer.pipe()
-);
-
-// Get Pool for specific stock (creates Conduit on-demand)
-Pool<Pipe<Order>> appleOrders = stockOrders.get(cortex.name("AAPL"));
-Pool<Pipe<Order>> msftOrders = stockOrders.get(cortex.name("MSFT"));
-
-// From each Pool, get Pipes for different order types
-Pipe<Order> buyOrders = appleOrders.get(cortex.name("BUY"));
-Pipe<Order> sellOrders = appleOrders.get(cortex.name("SELL"));
-
-// Emit orders
-buyOrders.emit(new Order("AAPL", "BUY", 100));
-sellOrders.emit(new Order("AAPL", "SELL", 50));
-```
-
-**When to Use Container:**
-- Managing dynamic collections of similar entities (stocks, devices, users)
-- Want automatic Conduit creation for new entities
-- Need to observe when new entity types are created
-- All entities share same processing logic (Composer + transformations)
-
-**When to Use Multiple Conduits Instead:**
-- Fixed set of known entities
-- Each entity needs different processing logic
-- No need to observe entity creation
-
-### Container Hierarchical Subscription
-
-Container provides a powerful **hierarchical subscription pattern** - it emits **Conduit Sources** when new Conduits are created.
-
-**Container's Source Type:**
-```java
-Container<Pool<P>, Source<E>> container = ...;
-
-// container.source() returns Source<Source<E>> - nested!
-Source<Source<E>> containerSource = container.source();
-```
-
-**Hierarchical Subscription Flow:**
-```
-1. Subscribe to Container.source()
-     ↓
-2. Container emits Conduit.source() when NEW Conduit created
-     ↓
-3. Subscriber receives Conduit's Source
-     ↓
-4. Subscriber can then subscribe to that Conduit's emissions
-```
-
-**Example: Observing All Stocks**
-```java
-// Create container
-Container<Pool<Pipe<Order>>, Source<Order>> stockOrders = circuit.container(
-    cortex.name("stock-market"),
-    Composer.pipe()
-);
-
-// Subscribe to Container - receives Conduit Sources
-stockOrders.source().subscribe(
-    cortex.subscriber(
-        cortex.name("stock-observer"),
-        (conduitSubject, registrar) -> {
-            // conduitSubject.name() = "stock-market.AAPL" (for example)
-            System.out.println("New stock Conduit created: " + conduitSubject.name());
-
-            // Register to receive the Conduit's Source
-            registrar.register(conduitSource -> {
-                // conduitSource is Source<Order> for this stock
-                // Subscribe to all orders for this stock
-                conduitSource.subscribe(
-                    cortex.subscriber(
-                        cortex.name("order-logger"),
-                        (channelSubject, innerRegistrar) -> {
-                            // channelSubject.name() = "stock-market.AAPL.BUY" (for example)
-                            innerRegistrar.register(order -> {
-                                System.out.println("Order: " + order);
-                            });
-                        }
-                    )
-                );
-            });
-        }
+        })
     )
 );
 
-// First access to "AAPL" creates Conduit AND emits its Source
-Pool<Pipe<Order>> applePool = stockOrders.get(cortex.name("AAPL"));
-// ← stock-observer receives AAPL Conduit's Source and subscribes
-
-// Second access returns cached Conduit (no emission)
-Pool<Pipe<Order>> applePool2 = stockOrders.get(cortex.name("AAPL"));
-// ← No emission (applePool == applePool2, cached)
-
-// Different stock creates NEW Conduit (emits again)
-Pool<Pipe<Order>> msftPool = stockOrders.get(cortex.name("MSFT"));
-// ← stock-observer receives MSFT Conduit's Source and subscribes
+// Input at top level
+brokerCell.input(jmxClient.fetchStats());
+// Transformed through hierarchy → cluster health emitted
 ```
 
-**Key Points:**
-- Container emits **only on FIRST** `get(name)` call for a new name
-- Subsequent calls return the cached Conduit (no emission)
-- Emission contains `Capture<Source<E>>` pairing Conduit's Subject with its Source
-- Enables dynamic subscription to entities as they're created
-- Each Conduit gets hierarchical name: `container-name.conduit-name`
+---
 
-**Reference:** [Observability X - Containers](https://humainary.io/blog/observability-x-containers/)
+### Clock
 
-### Queue, Script, and Current
+**Purpose:** Scheduled event emission for time-driven behaviors
 
-The Queue subsystem provides **coordination and scheduling** within a Circuit's processing pipeline.
+**Key Features:**
+- Shared ScheduledExecutorService (one per Circuit)
+- Multiple cycles (SECOND, MINUTE, HOUR, etc.)
+- Observable - emits Instant on each tick
 
-**Quick Overview:**
-- **Queue** - Coordinates execution of Scripts within Circuit
-- **Script** - Executable unit of work with `exec(Current)` method
-- **Current** - @Temporal execution context providing access to Circuit's queue
-
-**Key Methods:**
+**Interface:**
 ```java
-Queue queue = circuit.queue();
-queue.post(Script script);           // Post script for execution
-queue.await();                       // Block until queue empty
-
-interface Script {
-    void exec(Current current);      // Execute with context
-}
-
-interface Current extends Substrate {
-    void post(Runnable runnable);    // Post async work from script
+public interface Clock extends Component {
+    Subscription consume(Name name, Cycle cycle, Consumer<Instant> consumer);
 }
 ```
 
-**Usage Example:**
+**Usage:**
 ```java
-Queue queue = circuit.queue();
+Clock clock = circuit.clock(cortex.name("poller"));
 
-queue.post(current -> {
-    System.out.println("Script executing in circuit context");
-
-    // Post follow-up work
-    current.post(() -> {
-        System.out.println("Async follow-up work");
-    });
-});
-
-queue.await();  // Wait for all scripts to complete
-```
-
-**QoS Architecture:** Queue uses simple **FIFO ordering** (LinkedBlockingQueue). Quality of Service is handled at the **Circuit/Conduit level**, not at the Script level within a Queue:
-- Need different priorities? → Create separate Circuits (each has its own Queue)
-- Need different processing characteristics? → Use separate Conduits
-- Keep Queue semantics simple: strict FIFO processing
-
-**Reference:** [Observability X - Queues, Scripts, and Currents](https://humainary.io/blog/observability-x-queues-scripts-and-currents/)
-
-**Details:** See [ADVANCED.md - Queue & Script Subsystem](ADVANCED.md#queue--script-subsystem) for complete documentation.
-
-## Transformation Pipelines
-
-### Sequencer & Segment
-
-**Sequencer** configures a **Segment** (transformation pipeline).
-
-**Available Transformations:**
-
-| Transformation | Purpose | Example |
-|---------------|---------|---------|
-| `guard(Predicate)` | Filter emissions | `guard(n -> n > 0)` |
-| `limit(long)` | Max emission count | `limit(100)` |
-| `reduce(init, BinaryOp)` | Stateful aggregation | `reduce(0, Integer::sum)` |
-| `replace(UnaryOp)` | Transform values | `replace(n -> n * 2)` |
-| `diff()` | Emit only changes | `diff()` |
-| `sample(int)` | Every Nth emission | `sample(10)` |
-| `sift(Comparator, Seq)` | Complex filtering | `sift(Integer::compareTo, s -> s.above(0))` |
-
-### Example: Filter and Limit
-
-```java
-// Transformation configured at CONDUIT level
-Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-    cortex.name("numbers"),            // ← Conduit name
-    Composer.pipe(segment -> segment   // ← Transformation applies to ALL channels
-        .guard(n -> n > 0)      // Only positive
-        .guard(n -> n % 2 == 0) // Only even
-        .limit(50)              // Max 50 emissions
-    )
+// Poll every second
+clock.consume(
+    cortex.name("jmx-poll"),
+    Clock.Cycle.SECOND,
+    instant -> {
+        BrokerStats stats = jmxClient.fetchStats();
+        statsPipe.emit(stats);
+    }
 );
 
-// Get a Channel (Pipe) from the Conduit
-Pipe<Integer> pipe = conduit.get(cortex.name("counter"));  // ← Channel name
-
-// Emit 200 numbers
-for (int i = -100; i < 100; i++) {
-    pipe.emit(i);
-}
-// Only 50 positive even numbers will be emitted (2, 4, 6, ..., 100)
-```
-
-**Key Insight:** The transformation pipeline is configured once at the **Conduit level**. All Channels created from `conduit.get()` share the same transformation, regardless of their individual names.
-
-**Example showing shared transformations:**
-```java
-// Same conduit with transformation
-Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-    cortex.name("numbers"),
-    Composer.pipe(segment -> segment.guard(n -> n > 0))  // Only positive
+// Aggregate every minute
+clock.consume(
+    cortex.name("aggregate"),
+    Clock.Cycle.MINUTE,
+    instant -> aggregateMetrics()
 );
-
-// Two different channels from the SAME conduit
-Pipe<Integer> channel1 = conduit.get(cortex.name("producer1"));
-Pipe<Integer> channel2 = conduit.get(cortex.name("producer2"));
-
-channel1.emit(-5);  // ❌ Filtered out (negative)
-channel1.emit(10);  // ✅ Passes through (positive)
-
-channel2.emit(-3);  // ❌ Filtered out (negative)
-channel2.emit(7);   // ✅ Passes through (positive)
-
-// BOTH channels apply the same guard(n -> n > 0) transformation
 ```
 
-### Example: Sampling
+---
 
+### Scope
+
+**Purpose:** Hierarchical resource lifecycle management
+
+**Key Features:**
+- Register Resources for automatic cleanup
+- Close all resources in one call
+- Exception-safe (continues closing even if one fails)
+
+**Interface:**
 ```java
-segment -> segment.sample(10)  // Every 10th emission
-
-// Emit 100 values → only 10 reach consumers (10, 20, 30, ..., 100)
-```
-
-### Example: Reduction (Running Total)
-
-```java
-segment -> segment.reduce(
-    0,                    // Initial value
-    Integer::sum          // Accumulator
-)
-
-// Input:  1, 2, 3, 4, 5
-// Output: 1, 3, 6, 10, 15 (running total)
-```
-
-### Example: Change Detection
-
-```java
-segment -> segment.diff()
-
-// Input:  1, 1, 2, 2, 2, 3, 1
-// Output: 1, 2, 3, 1 (only when value changes)
-```
-
-### Example: Sift (Comparator-based Filtering)
-
-```java
-segment -> segment.sift(
-    Integer::compareTo,
-    sift -> sift
-        .above(0)      // Greater than 0
-        .max(100)      // Less than or equal to 100
-        .high()        // Only new highs
-)
-
-// Input:  -5, 10, 5, 20, 15, 30, 25, 110
-// Output: 10, 20, 30 (positives, ≤100, new highs only)
-```
-
-### Chaining Transformations
-
-```java
-segment -> segment
-    .guard(n -> n > 0)                    // 1. Filter positives
-    .replace(n -> n * 2)                  // 2. Double values
-    .sift(Integer::compareTo, s -> s.high()) // 3. Only new highs
-    .limit(10)                            // 4. Max 10 emissions
-
-// Input:  -1, 5, 3, 10, 8, 20, 15
-// After guard:   5, 3, 10, 8, 20, 15
-// After replace: 10, 6, 20, 16, 40, 30
-// After sift:    10, 20, 40
-// After limit:   10, 20, 40 (under limit)
-```
-
-## Resource Management
-
-### Resource Interface
-
-All major components implement `Resource`:
-
-```java
-interface Resource {
-    @Idempotent
-    void close();  // Cleanup and release resources
+public interface Scope extends Resource {
+    <R extends Resource> R register(R resource);
+    void close();
 }
 ```
 
-**Implementations:**
-- **Component** (Circuit, Clock, Container)
-- **Subscription**
-- **Sink**
-
-**@Idempotent Annotation:**
-
-The `@Idempotent` annotation on `close()` indicates it's safe to call multiple times with the same effect:
-
+**Usage:**
 ```java
-Circuit circuit = cortex.circuit();
-circuit.close();
-circuit.close();  // ✅ Safe - idempotent (no-op on second call)
-```
+Scope scope = cortex.scope(cortex.name("session"));
 
-This is a method-level annotation (unrelated to `Id` or `@Identity`) that documents safe repeated execution.
-
-### Manual Lifecycle
-
-```java
-Circuit circuit = cortex.circuit();
-Clock clock = circuit.clock();
+Circuit circuit = scope.register(cortex.circuit(cortex.name("kafka")));
+Conduit<Pipe<Event>, Event> events = scope.register(
+    circuit.conduit(cortex.name("events"), Composer.pipe())
+);
+Clock clock = scope.register(circuit.clock(cortex.name("timer")));
 
 // Use resources...
 
-// Manual cleanup
-clock.close();
-circuit.close();
+scope.close();  // Closes all three resources automatically
 ```
 
-### Scope-based Lifecycle
+---
 
-**Scope** manages resource lifecycle hierarchically:
+### Sink
 
+**Purpose:** Event capture and storage for testing/debugging
+
+**Key Features:**
+- Collects emissions for inspection
+- Thread-safe (CopyOnWriteArrayList)
+- Useful for testing
+
+**Interface:**
 ```java
-Scope scope = cortex.scope(cortex.name("transaction"));
-
-// Register resources with scope
-Circuit circuit = scope.register(cortex.circuit());
-Clock clock = scope.register(circuit.clock());
-
-// All registered resources closed when scope closes
-scope.close();
+public interface Sink<E> extends Resource {
+    List<E> events();
+    void clear();
+}
 ```
 
-### Closure Pattern (ARM)
-
-**Closure** provides Automatic Resource Management:
-
+**Usage:**
 ```java
-Scope scope = cortex.scope();
-Circuit circuit = cortex.circuit();
+Sink<String> sink = cortex.sink(cortex.name("test-sink"));
 
-scope.closure(circuit).consume(c -> {
-    // Use circuit
-    Pipe<String> pipe = c.conduit(name, Composer.pipe())
-        .get(cortex.name("producer"));
-    pipe.emit("message");
-
-    // Circuit automatically closed when block exits
-});
-```
-
-### Hierarchical Scopes
-
-```java
-Scope parent = cortex.scope(cortex.name("parent"));
-Scope child1 = parent.scope(cortex.name("child1"));
-Scope child2 = parent.scope(cortex.name("child2"));
-
-Circuit c1 = child1.register(cortex.circuit());
-Circuit c2 = child2.register(cortex.circuit());
-
-// Close parent → closes child1, child2, c1, c2 in order
-parent.close();
-```
-
-### Try-with-Resources
-
-```java
-try (Scope scope = cortex.scope()) {
-    Circuit circuit = scope.register(cortex.circuit());
-    // Use circuit
-} // Scope auto-closes, cleaning up circuit
-```
-
-## Observability Model
-
-### Subject-based Observation
-
-Every component has a **Subject** that identifies it:
-
-```java
-Pipe<String> pipe = conduit.get(cortex.name("sensor1"));
-Subject subject = pipe.subject();
-
-System.out.println("Name: " + subject.name());
-System.out.println("Type: " + subject.type());
-System.out.println("ID: " + subject.id());
-```
-
-### Dynamic Subscription
-
-Subscribers are notified when Subjects emit:
-
-```java
-source.subscribe(
+conduit.subscribe(
     cortex.subscriber(
-        cortex.name("observer"),
-        (subject, registrar) -> {
-            System.out.println("Subject emitting: " + subject.name());
-            registrar.register(value -> {
-                System.out.println("Value: " + value);
-            });
-        }
+        cortex.name("collector"),
+        (subject, registrar) -> registrar.register(sink::capture)
     )
 );
+
+pipe.emit("Event 1");
+pipe.emit("Event 2");
+
+assertThat(sink.events()).containsExactly("Event 1", "Event 2");
 ```
 
-### Hierarchical Names for Routing
+---
 
+## M17 Sealed Hierarchy
+
+### What Are Sealed Interfaces?
+
+Java sealed interfaces (JEP 409) restrict which classes can implement them.
+
+**M17 Sealed Types:**
 ```java
-source.subscribe(
-    cortex.subscriber(
-        cortex.name("router"),
-        (subject, registrar) -> {
-            // Route based on name hierarchy
-            subject.name().enclosure().ifPresent(parent -> {
-                Pipe<?> targetPipe = getTargetPipe(parent);
-                registrar.register(targetPipe);
-            });
-        }
-    )
-);
+sealed interface Source<E> permits Context
+sealed interface Context<E, S> permits Component
+sealed interface Component<E, S> permits Circuit, Clock, Container
+sealed interface Container<P, E, S> permits Conduit, Cell
 ```
 
-### Clock-based Observation
+### Why Sealed?
+
+1. **Type Safety** - API controls valid type compositions
+2. **Evolution Safety** - Humainary can change internals without breaking users
+3. **Clear Contracts** - `permits` clause documents all valid implementations
+
+### What You Can Implement
+
+✅ **Non-sealed (you can implement):**
+- Circuit, Conduit, Cell, Clock
+- Channel, Pipe, Subscriber, Sink
+
+❌ **Sealed (you cannot implement):**
+- Source, Context, Component, Container
+
+### Impact on Our Implementation
+
+**SourceImpl doesn't implement Source:**
+```java
+// Source is sealed, so this won't compile:
+public class SourceImpl<E> implements Source<E> { }  // ❌
+
+// Instead, SourceImpl is an internal utility:
+public class SourceImpl<E> {
+    public Subscription subscribe(Subscriber<E> subscriber) { }  // ✅
+}
+```
+
+**Circuit/Conduit/Cell extend sealed types:**
+```java
+// These extend Context (which extends Source), so they inherit subscribe()
+public class CircuitImpl implements Circuit { }  // ✅
+public class ConduitImpl<P, E> implements Conduit<P, E> { }  // ✅
+public class CellNode<I, E> implements Cell<I, E> { }  // ✅
+```
+
+---
+
+## Naming and Hierarchy
+
+### Name Interface
+
+**Purpose:** Hierarchical semantic identity using dot notation
+
+**Features:**
+- Immutable parent-child structure
+- Cached path string (built once)
+- Always uses '.' as separator
+
+**Interface:**
+```java
+public interface Name extends Extent<Name> {
+    Name name(String segment);
+    CharSequence path();
+    String toString();
+}
+```
+
+### NameNode Implementation
 
 ```java
-Clock clock = circuit.clock(cortex.name("metrics-collector"));
+public final class NameNode implements Name {
+    private final NameNode parent;       // Parent in hierarchy
+    private final String segment;        // This segment
+    private final String cachedPath;     // Full path cached
 
-clock.consume(
-    cortex.name("collector"),
-    Clock.Cycle.SECOND,
-    instant -> {
-        // Collect metrics every second
-        collectMetrics(instant);
+    public static Name of(String path) {
+        // Creates hierarchy from "kafka.broker.1"
     }
-);
+
+    @Override
+    public Name name(String segment) {
+        return new NameNode(this, segment);  // Create child
+    }
+}
 ```
 
-### Sink for Capture
+### Building Hierarchical Names
 
-**Sink** captures emissions for later analysis:
-
+**From String:**
 ```java
-Sink<String> sink = cortex.sink(conduit.source());
-
-// Emit some data
-pipe.emit("event1");
-pipe.emit("event2");
-
-// Drain captured events
-sink.drain().forEach(capture -> {
-    System.out.println("Subject: " + capture.subject());
-    System.out.println("Emission: " + capture.emission());
-});
-
-sink.close();
+Name name = cortex.name("kafka.broker.1.metrics.bytes-in");
+// Creates: kafka → broker → 1 → metrics → bytes-in
 ```
 
-## Advanced Patterns
-
-### Fan-out (One Producer, Multiple Consumers)
-
+**Hierarchically:**
 ```java
-Source<String> source = conduit.source();
+Name kafka = cortex.name("kafka");
+Name broker = kafka.name("broker");
+Name broker1 = broker.name("1");
+Name metrics = broker1.name("metrics");
+Name bytesIn = metrics.name("bytes-in");
 
-// Consumer 1
-source.subscribe(subscriber1);
-
-// Consumer 2
-source.subscribe(subscriber2);
-
-// Consumer 3
-source.subscribe(subscriber3);
-
-// One emit reaches all three
-pipe.emit("broadcast");
+// Result: "kafka.broker.1.metrics.bytes-in"
 ```
 
-### Fan-in (Multiple Producers, One Consumer)
+### Why Hierarchical Names?
 
-```java
-Conduit<Pipe<String>, String> conduit = circuit.conduit(
-    cortex.name("aggregator"),
-    Composer.pipe()
-);
+1. **Organization** - Natural tree structure for domains
+2. **Discovery** - Can query all children of a parent
+3. **Semantic** - Names convey meaning ("kafka.broker.1" vs "metric-12345")
+4. **Caching** - Used as keys in component maps
 
-// One consumer
-conduit.source().subscribe(subscriber);
+---
 
-// Multiple producers
-Pipe<String> producer1 = conduit.get(cortex.name("p1"));
-Pipe<String> producer2 = conduit.get(cortex.name("p2"));
-Pipe<String> producer3 = conduit.get(cortex.name("p3"));
+## Event Flow
 
-producer1.emit("from p1");
-producer2.emit("from p2");
-producer3.emit("from p3");
-// All reach same consumer
+### Producer → Consumer Path
+
+```
+1. Producer:
+   conduit.get(name) → Returns Pipe
+   pipe.emit(value) → Applies transformations
+
+2. Pipe:
+   Transformations applied (sift, limit, sample)
+   Transformed value → SourceImpl.emit()
+
+3. SourceImpl:
+   Iterates subscribers
+   Calls subscriber callbacks
+
+4. Subscriber:
+   Receives emission
+   Processes event
 ```
 
-### Relay Pattern
+### Virtual CPU Core Pattern
+
+```
+Circuit maintains FIFO queue:
+
+[Event 1] → [Event 2] → [Event 3] → ...
+                ↓
+        Single Virtual Thread
+                ↓
+        Process in Order
+                ↓
+        Emit to Subscribers
+```
+
+**Guarantees:**
+- Events processed in exact order emitted
+- No race conditions within Circuit
+- Deterministic, predictable behavior
+
+---
+
+## Transformations
+
+### Flow and Sift
+
+**Flow:** Transformation configuration interface
+**Sift:** Filtering/transformation operations
+
+**Available Operations:**
+- `sift(Predicate<E>)` - Filter events
+- `limit(int)` - Max number of emissions
+- `sample(int)` - Emit every Nth event
+- (More operations defined by API)
+
+### Configuring Transformations
+
+**At Conduit Creation:**
+```java
+Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    cortex.name("numbers"),
+    Composer.pipe(flow -> flow
+        .sift(n -> n > 0)      // Only positive
+        .limit(1000)           // Max 1000 total
+        .sample(10)            // Every 10th
+    )
+);
+
+// All Pipes from this Conduit inherit transformations
+Pipe<Integer> pipe = conduit.get(cortex.name("input"));
+```
+
+### Transformation Order
+
+Order matters! Transformations apply left-to-right:
 
 ```java
-// Source conduit
-Conduit<Pipe<String>, String> source = circuit.conduit(
-    cortex.name("source"),
-    Composer.pipe()
-);
+// Filter first, then sample
+flow.sift(n -> n > 100).sample(10)
+// Out of 1000: ~500 pass filter → ~50 sampled
 
-// Target conduit
-Conduit<Pipe<String>, String> target = circuit.conduit(
-    cortex.name("target"),
-    Composer.pipe()
-);
+// Sample first, then filter
+flow.sample(10).sift(n -> n > 100)
+// Out of 1000: ~100 sampled → ~50 pass filter
+```
 
-// Relay: subscribe to source, emit to target
-source.source().subscribe(
+---
+
+## Subscription Pattern
+
+### Subscriber Interface
+
+```java
+@FunctionalInterface
+public interface Subscriber<E> {
+    void accept(Name subject, Registrar<E> registrar);
+}
+```
+
+**Two Parameters:**
+1. **subject** - The Name being observed
+2. **registrar** - Used to register consumer Pipe
+
+### Subscribing to Events
+
+```java
+conduit.subscribe(
     cortex.subscriber(
-        cortex.name("relay"),
-        (subject, registrar) -> {
-            Pipe<String> targetPipe = target.get(subject.name());
-            registrar.register(targetPipe);
+        cortex.name("my-subscriber"),  // Subscriber name
+        (subject, registrar) -> {       // Callback
+            registrar.register(event -> {
+                // Process event
+                System.out.println("Received: " + event);
+            });
         }
     )
 );
 ```
 
-### Transform Pattern
+### Registrar
 
+**Purpose:** Register consumer Pipe within subscriber callback
+
+**Interface:**
 ```java
-Conduit<Pipe<Integer>, Integer> input = circuit.conduit(
-    cortex.name("input"),
-    Composer.pipe()
-);
-
-Conduit<Pipe<String>, String> output = circuit.conduit(
-    cortex.name("output"),
-    Composer.pipe()
-);
-
-// Transform integers to strings
-input.source().subscribe(
-    cortex.subscriber(
-        cortex.name("transformer"),
-        (subject, registrar) -> {
-            Pipe<String> outputPipe = output.get(subject.name());
-            registrar.register(n ->
-                outputPipe.emit("Number: " + n)
-            );
-        }
-    )
-);
+public interface Registrar<E> {
+    void register(Pipe<E> pipe);
+}
 ```
 
-## Key Insights
+**Usage:**
+```java
+(subject, registrar) -> {
+    // Create consumer Pipe
+    Pipe<Event> consumerPipe = event -> handleEvent(event);
 
-### 1. Everything Has a Subject
+    // Register it
+    registrar.register(consumerPipe);
+}
+```
 
-All components implement `Substrate`, providing a `Subject` for identification and observation.
+**Simplified (Lambda):**
+```java
+(subject, registrar) -> registrar.register(event -> handleEvent(event))
+```
 
-### 2. Pipes Are Dual-Purpose
+### Multiple Subscribers
 
-Pipes have `emit()` method and are used:
-- **By producers:** Conduit.get() returns a Pipe (backed by Channel) for emitting
-- **By consumers:** Subscriber registers consumer Pipes to receive emissions
-- **Internally:** Source implements Pipe for dispatching to registered consumer Pipes
+```java
+// Each subscriber receives all emissions
+conduit.subscribe(loggingSubscriber);
+conduit.subscribe(metricsSubscriber);
+conduit.subscribe(alertingSubscriber);
+```
 
-### 3. Source = Observable Context
+### Unsubscribing
 
-**Source** is not a producer - it's an **observable context** for dynamic subscription:
-- Obtained from a Context (Conduit provides Source via `source()`)
-- Enables subscription to observe Subjects/Channels
-- Subscribers register Pipes conditionally based on Subject characteristics
-- Source dispatches emissions to registered consumer Pipes
-- Context pattern allows "live, adaptable connections" between sources and observers
+```java
+Subscription sub = conduit.subscribe(subscriber);
 
-### 4. @Temporal = Don't Retain
+// Later, unsubscribe
+sub.close();
+```
 
-Types marked `@Temporal` are transient:
-- **Registrar** - Used only during subscriber callback
-- **Sift** - Used only during sequencer configuration
-- **Closure** - Used only for ARM pattern execution
+---
 
-### 5. Segment Is Mutable
+## Resource Lifecycle
 
-Unlike most Substrates types, **Segment is mutable**:
-- Returns `this` for fluent chaining
-- Required because `Sequencer.apply()` is void
-- Transformations accumulate on same object
+### Resource Interface
 
-### 6. Virtual Threads = Daemon
+All components implement Resource:
 
-All background threads are virtual and daemon:
-- Lightweight (millions possible)
-- Auto-cleanup on JVM exit
-- No explicit shutdown needed (but Circuit.close() is cleaner)
+```java
+public interface Resource extends AutoCloseable {
+    void close();
+}
+```
 
-## Next Steps
+### Cleanup Pattern
 
-- Read [Architecture Guide](ARCHITECTURE.md) for implementation details
-- See [Examples](examples/README.md) for complete working examples
-- Review [Substrates API JavaDoc](https://github.com/humainary-io/substrates-api-java)
-- Explore [William Louth's Blog](https://humainary.io/blog)
+**Manual:**
+```java
+Circuit circuit = cortex.circuit(cortex.name("test"));
+try {
+    // Use circuit
+} finally {
+    circuit.close();
+}
+```
+
+**Try-With-Resources:**
+```java
+try (Circuit circuit = cortex.circuit(cortex.name("test"))) {
+    // Use circuit
+} // Automatically closed
+```
+
+**Scope:**
+```java
+Scope scope = cortex.scope(cortex.name("session"));
+Circuit circuit = scope.register(cortex.circuit(cortex.name("test")));
+Conduit<Pipe<Event>, Event> conduit = scope.register(
+    circuit.conduit(cortex.name("events"), Composer.pipe())
+);
+
+scope.close();  // Closes both circuit and conduit
+```
+
+### Why Close Resources?
+
+- **Shutdown executors** - Virtual threads, schedulers
+- **Cancel scheduled tasks** - Clock timers
+- **Clear caches** - Component maps
+- **Prevent memory leaks** - Release references
+
+---
+
+## State Management
+
+### State and Slot
+
+**Immutable state management:**
+
+```java
+// Create state
+State state = State.of(
+    Slot.of("broker-id", 1),
+    Slot.of("heap-used", 850_000_000L),
+    Slot.of("status", "HEALTHY")
+);
+
+// Access values (type-safe)
+Optional<Integer> brokerId = state.get(Slot.of("broker-id"));
+
+// State is immutable - create new state to change
+State newState = state.set(Slot.of("heap-used", 900_000_000L));
+```
+
+### Slot Interface
+
+```java
+public interface Slot<T> {
+    String key();
+    T value();
+
+    static <T> Slot<T> of(String key, T value) { }
+}
+```
+
+### Type Safety
+
+Slots are generically typed:
+
+```java
+Slot<Integer> brokerId = Slot.of("broker-id", 1);
+Slot<Long> heapUsed = Slot.of("heap-used", 850_000_000L);
+Slot<String> status = Slot.of("status", "HEALTHY");
+
+State state = State.of(brokerId, heapUsed, status);
+
+Optional<Integer> id = state.get(brokerId);  // Type-safe!
+```
+
+---
+
+## Timing and Scheduling
+
+### Clock Cycles
+
+```java
+public enum Cycle {
+    MILLISECOND,
+    SECOND,
+    MINUTE,
+    HOUR,
+    DAY
+}
+```
+
+### Scheduling Tasks
+
+```java
+Clock clock = circuit.clock(cortex.name("scheduler"));
+
+// Every second
+Subscription secondly = clock.consume(
+    cortex.name("metrics-collect"),
+    Clock.Cycle.SECOND,
+    instant -> collectMetrics()
+);
+
+// Every minute
+Subscription minutely = clock.consume(
+    cortex.name("metrics-aggregate"),
+    Clock.Cycle.MINUTE,
+    instant -> aggregateMetrics()
+);
+
+// Stop tasks
+secondly.close();
+minutely.close();
+```
+
+### Shared Scheduler
+
+All Clocks in a Circuit share one ScheduledExecutorService:
+
+```java
+Circuit circuit = cortex.circuit(cortex.name("kafka"));
+
+Clock clock1 = circuit.clock(cortex.name("clock-1"));  // Uses circuit scheduler
+Clock clock2 = circuit.clock(cortex.name("clock-2"));  // Same scheduler
+Clock clock3 = circuit.clock(cortex.name("clock-3"));  // Same scheduler
+
+// Only 1 scheduler thread for entire Circuit
+```
+
+**Benefits:**
+- Reduced thread overhead
+- Better resource utilization
+- Simpler lifecycle management
+
+---
+
+## Summary
+
+**Fullerstack Substrates Core Concepts:**
+
+1. ✅ **Cortex** - Entry point, creates Circuits and Scopes
+2. ✅ **Circuit** - Event orchestration with virtual CPU core
+3. ✅ **Conduit** - Container for Channels, provides Source
+4. ✅ **Channel** - Named emission port
+5. ✅ **Pipe** - Transformation and emission
+6. ✅ **Cell** - Hierarchical type transformation
+7. ✅ **Clock** - Scheduled event emission
+8. ✅ **Scope** - Resource lifecycle management
+9. ✅ **Name** - Hierarchical dot-notation identity
+10. ✅ **State/Slot** - Immutable state management
+
+**Key Patterns:**
+- Virtual CPU Core - Precise event ordering
+- Sealed Hierarchy - M17 type safety
+- Hierarchical Naming - Organized components
+- Flow/Sift - Transformation pipelines
+- Subscribe/Emit - Observer pattern
+- Resource Cleanup - Explicit lifecycle
+
+---
+
+## References
+
+- [Architecture Guide](ARCHITECTURE.md)
+- [Best Practices](BEST-PRACTICES.md)
+- [Performance Guide](PERFORMANCE.md)
+- [Async Architecture](ASYNC-ARCHITECTURE.md)
+- [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java)
+- [Observability X Blog Series](https://humainary.io/blog/category/observability-x/)

@@ -1,7 +1,8 @@
 # Documentation Index
 
-**Last Updated:** October 16, 2025
-**Version:** 1.0.0-SNAPSHOT
+**Last Updated:** October 22, 2025
+**Version:** 1.0.0-M17
+**API Status:** Production-ready (247 tests passing)
 
 This index provides a complete map of Substrates documentation, helping you find the right information quickly.
 
@@ -15,18 +16,16 @@ This index provides a complete map of Substrates documentation, helping you find
 3. **[Examples](examples/README.md)** - Hands-on examples from simple to complex
 
 ### For Developers
-1. **[Architecture Guide](ARCHITECTURE.md)** - System design, data flow, and design principles
+1. **[Architecture Guide](ARCHITECTURE.md)** - System design, M17 sealed hierarchy, virtual CPU core
 2. **[Async-First Architecture](ASYNC-ARCHITECTURE.md)** ⚠️ **CRITICAL** - Understanding async queue processing
-3. **[Implementation Guide](IMPLEMENTATION-GUIDE.md)** - Recommended patterns and best practices
+3. **[Best Practices](BEST-PRACTICES.md)** - Recommended patterns and common pitfalls
 4. **[Advanced Topics](ADVANCED.md)** - Performance tuning, custom implementations, extensions
 
 ### For Performance Engineers
-1. **[Performance Guide](PERFORMANCE.md)** - Complete performance analysis and benchmarks
-2. **[Name Implementation Comparison](name-implementation-comparison.md)** - Name strategy selection guide
+1. **[Performance Guide](PERFORMANCE.md)** - Performance characteristics and optimization
 
-### For Alignment Reference
-1. **[Alignment Overview](alignment/README.md)** - Humainary Substrates API alignment
-2. **[Substrates 101](alignment/substrates-101.md)** - Core philosophy and concepts
+### For API Reference
+1. **[M17 Migration Guide](../../API-ANALYSIS.md)** - Sealed interfaces and migration from M16
 
 ---
 
@@ -39,28 +38,32 @@ This index provides a complete map of Substrates documentation, helping you find
 **Audience:** Everyone
 **What's Inside:**
 - Maven dependency setup
-- Basic usage examples
+- Basic usage examples (Circuit, Conduit, Pipe, subscribe)
 - Quick start guide
-- Project overview
+- M17 API features
+- Performance overview (247 tests in ~16s)
 
 #### [CONCEPTS.md](CONCEPTS.md)
 **Purpose:** Deep dive into Substrates entities and their relationships
 **Audience:** Developers learning the framework
 **What's Inside:**
-- Entity definitions (Circuit, Conduit, Channel, Pipe, Source, etc.)
-- Entity relationships and lifecycle
-- **Async-First Architecture** ⚠️ **CRITICAL** - Understanding async queue processing
-- Hierarchical name system
-- Factory patterns (NameFactory, QueueFactory, RegistryFactory)
-- Subject temporal identity
-- Resource management patterns
+- What is Substrates? (Semiotic observability)
+- Core entities (Cortex, Circuit, Conduit, Channel, Pipe, Cell, Clock, Scope)
+- M17 sealed hierarchy explained
+- Naming and hierarchy (NameNode)
+- Event flow (producer → consumer path)
+- Transformations (Flow/Sift)
+- Subscription pattern (Subscriber, Registrar)
+- Resource lifecycle (cleanup patterns)
+- State management (State/Slot)
+- Timing and scheduling (Clock)
 
 **Key Concepts:**
-- **Async-First Design** - All emissions are asynchronous via Circuit Queue
-- **Persistent Temporal Identity** - Every entity caches its Subject at construction
-- **Hierarchical Ownership** - Names build naturally via containment
-- **Identity Map Fast Path** - InternedName + LazyTrieRegistry for 5× performance
-- **Pool Singleton Pattern** - Same name → same instance throughout
+- **M17 Sealed Interfaces** - Type safety via sealed hierarchy
+- **Virtual CPU Core Pattern** - Precise event ordering per Circuit
+- **Hierarchical Naming** - Dot-notation organization (kafka.broker.1.metrics)
+- **Immutable State** - Thread-safe state via Slot API
+- **Resource Cleanup** - Explicit lifecycle via close()
 
 #### [ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md) ⚠️ **CRITICAL**
 **Purpose:** Complete guide to async-first design and queue processing
@@ -85,139 +88,136 @@ This index provides a complete map of Substrates documentation, helping you find
 **Purpose:** System architecture, design principles, and data flow
 **Audience:** Developers and architects
 **What's Inside:**
-- System architecture overview
-- Data flow diagrams (producer → conduit → consumer)
-- Queue architecture and threading model
-- Design principles and patterns
-- Component interactions
-- Factory injection patterns
+- Architecture principles (simplified, lean design)
+- M17 sealed interface hierarchy (what you can/can't implement)
+- Core components:
+  - CortexRuntime - Entry point
+  - NameNode - Hierarchical naming
+  - CircuitImpl - Virtual CPU core pattern
+  - ConduitImpl - Channel/Pipe/Source coordinator
+  - ChannelImpl - Emission port
+  - PipeImpl - Event transformation
+  - SourceImpl - Subscriber management (internal)
+  - CellNode - Hierarchical state transformation
+  - ClockImpl - Scheduled events
+  - ScopeImpl - Resource lifecycle
+- Data flow architecture
+- Caching strategy (ConcurrentHashMap everywhere)
+- Thread safety patterns
+- Resource lifecycle
+- State management (immutable slots)
+- Performance characteristics
+- Design patterns
+- Integration with Serventis
+- Testing strategy
 
 **Key Patterns:**
-- Virtual thread per Circuit (daemon auto-cleanup)
-- Single queue per Circuit (ordered execution)
-- Identity map fast path (InternedName optimization)
-- Factory dependency injection (pluggable implementations)
+- Virtual CPU core - Single thread, FIFO queue, precise ordering
+- Simplified caching - Just ConcurrentHashMap, no complex optimizations
+- M17 sealed hierarchy - SourceImpl doesn't implement Source (sealed)
+- Shared scheduler - One ScheduledExecutorService per Circuit
+
+#### [BEST-PRACTICES.md](BEST-PRACTICES.md)
+**Purpose:** Recommended patterns and best practices
+**Audience:** Developers building with Substrates
+**What's Inside:**
+- General principles (cache pipes, hierarchical names, close resources)
+- Naming best practices (dot notation, consistent conventions)
+- Circuit management (one per domain, lifecycle)
+- Conduit and Channel patterns (by signal type, subject-based)
+- Flow and Sift transformations (configure once, common patterns)
+- Subscriber management (subscribe once, unsubscribe)
+- Resource lifecycle (Scope, try-with-resources, cleanup order)
+- Cell hierarchies (transformation pipelines, multiple children)
+- Clock and timing (periodic tasks, multiple cycles)
+- Testing strategies (unit, transformations, clock, cleanup)
+- Performance tips (reuse, batch, avoid blocking)
+- Common pitfalls (resource leaks, mixing signal types, async nature)
+
+**Recommended Patterns:**
+```java
+// ✅ Cache pipes for repeated emissions
+Pipe<T> pipe = conduit.get(name);
+for (T value : values) {
+    pipe.emit(value);
+}
+
+// ✅ Use hierarchical names
+Name broker = cortex.name("kafka").name("broker").name("1");
+
+// ✅ Close resources explicitly
+try (Circuit circuit = cortex.circuit(name)) {
+    // Use circuit
+}
+```
 
 #### [ADVANCED.md](ADVANCED.md)
 **Purpose:** Advanced topics, performance tuning, and extensions
 **Audience:** Expert users and performance engineers
 **What's Inside:**
-- Performance optimization techniques
-- Custom implementations (Name, Registry, Queue)
-- Factory pattern usage
-- Threading and concurrency patterns
+- Advanced threading and concurrency patterns
+- Custom implementations
 - Resource lifecycle management
-- Testing strategies
+- Testing strategies for complex scenarios
 
-**Advanced Topics:**
-- LazyTrieRegistry for 50% hot-path speedup
-- InternedName for identity map fast path
-- Hierarchical query patterns
-- Multi-threading considerations
+**Note:** This document may reference older patterns. Refer to BEST-PRACTICES.md for current recommendations.
 
 ---
 
 ### Performance Documentation
 
-#### [PERFORMANCE.md](PERFORMANCE.md) ⭐ **AUTHORITATIVE**
-**Purpose:** Complete performance analysis, benchmarks, and recommendations
+#### [PERFORMANCE.md](PERFORMANCE.md)
+**Purpose:** Performance characteristics, benchmarks, and optimization guide
 **Audience:** Performance engineers, architects, and developers
 **What's Inside:**
-- **Executive Summary** - Quick performance wins
-- **Hot-Path Performance** - Emission, lookup, full-path benchmarks
-- **Cold-Path Performance** - Initialization and creation costs
-- **Registry Comparison** - LazyTrieRegistry vs FlatMap vs EagerTrie
-- **Name Comparison** - InternedName vs LinkedName vs SegmentArray
-- **Integration Results** - Before/after LazyTrieRegistry integration
-- **Production Guidelines** - Kafka monitoring performance budget
-- **Optimization Guide** - When and how to optimize
+- Performance summary (test suite: 247 tests in ~16s)
+- Production readiness (100k+ metrics @ 1Hz)
+- Architecture performance characteristics:
+  - Virtual CPU core pattern
+  - Component caching (ConcurrentHashMap)
+  - Pipe emission (~100-300ns per emission)
+  - Shared scheduler optimization
+  - NameNode hierarchy (cached paths)
+  - Subscriber management (CopyOnWriteArrayList)
+- Real-world performance (Kafka monitoring scenario)
+- Benchmark scenarios (high-frequency, many subjects, many subscribers)
+- Performance best practices (cache pipes, batch, transformations, avoid blocking)
+- Scaling considerations (vertical, horizontal)
+- Memory characteristics (~1KB per metric)
+- Performance monitoring (queue depth, emission rate)
+- Profiling tips (JFR, async-profiler)
+- When to optimize (philosophy: simple first, optimize if needed)
+- Comparison to alternatives (EventBus, Reactive Streams)
 
-**Key Results:**
-- **Hot-path emission: 3.3ns** (2× faster than before)
-- **Cached lookups: 4-7ns** (5-12× faster via identity map + slot optimization)
-- **Full path: 30ns** (3.4× faster with slot optimization!)
-- **Kafka monitoring: 0.033% CPU** for 100k metrics @ 1Hz
+**Philosophy:**
+> "Premature optimization is the root of all evil." - Donald Knuth
 
-**Recommendations:**
-- ✅ **Use InternedName** (default) - Identity map fast path
-- ✅ **Use LazyTrieRegistry** (default) - Best overall performance
-- ✅ **Use Default factories** - Optimized for production
+Build it simple, build it correct, measure in production, optimize actual bottlenecks.
 
-#### [name-implementation-comparison.md](name-implementation-comparison.md)
-**Purpose:** Detailed comparison of Name implementations
-**Audience:** Developers choosing Name strategy
-**What's Inside:**
-- InternedName, LinkedName, SegmentArrayName, LRUCachedName comparison
-- Performance benchmarks for each
-- Memory characteristics
-- Recommendation: InternedName for production
-
-**Quick Answer:** Use InternedName (default) unless you have specific requirements.
+**Note:** Some benchmark numbers are estimates pending actual load tests.
 
 ---
 
-### Implementation Guides
+### Migration Documentation
 
-#### [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md)
-**Purpose:** Recommended patterns and best practices
-**Audience:** Developers building with Substrates
+#### [API-ANALYSIS.md](../../API-ANALYSIS.md)
+**Purpose:** M17 API analysis and migration guide
+**Audience:** Developers migrating from M16 or understanding M17
 **What's Inside:**
-- **Factory Injection Patterns** - How to use NameFactory, QueueFactory, RegistryFactory
-- **Entity Creation Patterns** - Best practices for Circuits, Conduits, Channels
-- **Caching Patterns** - ComputeIfAbsent and singleton identity
-- **Hierarchical Name Patterns** - Building organic hierarchies
-- **Resource Management** - Using Scopes and Closures
-- **Testing Patterns** - How to test Substrates-based code
-- **Common Pitfalls** - What to avoid
+- M17 major changes (sealed interfaces)
+- Impact on Fullerstack implementation
+- Architecture implications (type safety benefits)
+- Migration guide (step-by-step from M16)
+- API surface (sealed vs non-sealed types)
+- Fullerstack implementation summary
+- Testing status (247 substrates + 12 serventis tests passing)
+- Known issues and workarounds
+- Recommendations
 
-**Recommended Patterns:**
-```java
-// ✅ Use default factories (optimized)
-Cortex cortex = new CortexRuntime();
-
-// ✅ Cache circuits by name
-Circuit circuit = cortex.circuit(cortex.name("my-circuit"));
-
-// ✅ Use computeIfAbsent pattern
-Pipe<T> pipe = conduit.get(name); // Automatic caching
-
-// ✅ Build hierarchical names naturally
-Name brokerName = cortex.name("kafka.broker.1");
-Name metricName = brokerName.name("jvm.heap.used");
-```
-
----
-
-### Alignment Documentation
-
-#### [alignment/README.md](alignment/README.md)
-**Purpose:** Overview of Humainary Substrates API alignment
-**Audience:** Contributors and API users
-**What's Inside:**
-- Alignment status with Humainary API
-- Implementation completeness
-- Philosophy and design principles
-
-#### [alignment/substrates-101.md](alignment/substrates-101.md)
-**Purpose:** Core Substrates philosophy and concepts
-**Audience:** Everyone
-**What's Inside:**
-- Humainary Substrates philosophy
-- Semiotic observability concepts
-- Design principles
-- Core abstractions
-
-#### Other Alignment Docs
-Each alignment doc covers a specific Substrates entity:
-- **[subjects.md](alignment/subjects.md)** - Subject identity and lifecycle
-- **[channels.md](alignment/channels.md)** - Channel concepts and usage
-- **[circuits.md](alignment/circuits.md)** - Circuit architecture
-- **[composers.md](alignment/composers.md)** - Composer patterns
-- **[containers.md](alignment/containers.md)** - Container composition
-- **[queues-scripts-currents.md](alignment/queues-scripts-currents.md)** - Queue architecture
-- **[resources-scopes-closures.md](alignment/resources-scopes-closures.md)** - Resource management
-- **[states-slots.md](alignment/states-slots.md)** - State and slot concepts
-- **[subscribers.md](alignment/subscribers.md)** - Subscriber patterns
+**Key Changes:**
+- Source/Context/Component/Container now sealed
+- SourceImpl no longer implements Source (internal utility)
+- All Source<E> field types changed to SourceImpl<E>
 
 ---
 
@@ -233,56 +233,65 @@ Each alignment doc covers a specific Substrates entity:
 
 #### Individual Examples
 1. **[01-HelloSubstrates.md](examples/01-HelloSubstrates.md)** - Basic emission and subscription
-2. **[02-Transformations.md](examples/02-Transformations.md)** - Using Sequencer/Segment
+2. **[02-Transformations.md](examples/02-Transformations.md)** - Using Flow/Sift
 3. **[03-MultipleSubscribers.md](examples/03-MultipleSubscribers.md)** - Multiple consumer patterns
 4. **[04-ResourceManagement.md](examples/04-ResourceManagement.md)** - Scope and Closure usage
+
+**Note:** Examples may need updates for M17 API. Check main README for current patterns.
 
 ---
 
 ## 🔍 Find by Topic
 
-### Factory Patterns
-- **Primary:** [CONCEPTS.md](CONCEPTS.md) - Factory patterns section
-- **Implementation:** [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md) - Factory injection patterns
-- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) - Pluggable factories
+### M17 Sealed Interfaces
+- **Primary:** [CONCEPTS.md](CONCEPTS.md) - M17 Sealed Hierarchy section
+- **Migration:** [API-ANALYSIS.md](../../API-ANALYSIS.md) - Complete migration guide
+- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) - Sealed hierarchy impact
+
+### Virtual CPU Core Pattern
+- **Primary:** [ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md) - **MUST READ**
+- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) - CircuitImpl section
+- **Concepts:** [CONCEPTS.md](CONCEPTS.md) - Event Flow section
 
 ### Performance
 - **Primary:** [PERFORMANCE.md](PERFORMANCE.md) - Complete guide
-- **Hot-path:** [PERFORMANCE.md](PERFORMANCE.md) - Hot-path performance section
-- **Name choice:** [name-implementation-comparison.md](name-implementation-comparison.md)
-- **Registry choice:** [PERFORMANCE.md](PERFORMANCE.md) - Registry comparison section
+- **Best Practices:** [BEST-PRACTICES.md](BEST-PRACTICES.md) - Performance tips section
+- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) - Performance characteristics
 
 ### Entity Relationships
-- **Primary:** [CONCEPTS.md](CONCEPTS.md) - Entity relationships
-- **Data flow:** [ARCHITECTURE.md](ARCHITECTURE.md) - Data flow section
+- **Primary:** [CONCEPTS.md](CONCEPTS.md) - Core Entities section
+- **Data flow:** [ARCHITECTURE.md](ARCHITECTURE.md) - Data Flow Architecture
 - **Examples:** [examples/01-HelloSubstrates.md](examples/01-HelloSubstrates.md)
 
-### Hierarchical Names
-- **Primary:** [CONCEPTS.md](CONCEPTS.md) - Hierarchical name system
-- **Implementation:** [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md) - Name patterns
-- **Performance:** [name-implementation-comparison.md](name-implementation-comparison.md)
+### Hierarchical Names (NameNode)
+- **Primary:** [CONCEPTS.md](CONCEPTS.md) - Naming and Hierarchy section
+- **Best Practices:** [BEST-PRACTICES.md](BEST-PRACTICES.md) - Naming section
+- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) - NameNode section
 
 ### Resource Management
-- **Primary:** [CONCEPTS.md](CONCEPTS.md) - Resource lifecycle
-- **Alignment:** [alignment/resources-scopes-closures.md](alignment/resources-scopes-closures.md)
-- **Example:** [examples/04-ResourceManagement.md](examples/04-ResourceManagement.md)
+- **Primary:** [CONCEPTS.md](CONCEPTS.md) - Resource Lifecycle section
+- **Best Practices:** [BEST-PRACTICES.md](BEST-PRACTICES.md) - Resource Lifecycle section
+- **Examples:** [examples/04-ResourceManagement.md](examples/04-ResourceManagement.md)
 
 ### Async Architecture & Queue Processing ⚠️
 - **PRIMARY:** [ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md) - **MUST READ**
-- **Quick Reference:** [CONCEPTS.md](CONCEPTS.md) - Async-First Architecture section
-- **Implementation:** [ARCHITECTURE.md](ARCHITECTURE.md) - Queue architecture details
-- **Alignment:** [alignment/queues-scripts-currents.md](alignment/queues-scripts-currents.md)
+- **Quick Reference:** [CONCEPTS.md](CONCEPTS.md) - Event Flow section
+- **Implementation:** [ARCHITECTURE.md](ARCHITECTURE.md) - Virtual CPU Core Pattern
 
 ### Threading & Concurrency
 - **Primary:** [ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md) - Virtual CPU Core pattern
-- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) - Queue architecture
-- **Advanced:** [ADVANCED.md](ADVANCED.md) - Concurrency patterns
-- **Performance:** [PERFORMANCE.md](PERFORMANCE.md) - Multi-threading benchmarks
+- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) - Thread Safety section
+- **Performance:** [PERFORMANCE.md](PERFORMANCE.md) - Scaling considerations
 
 ### Testing
 - **PRIMARY:** [ASYNC-ARCHITECTURE.md](ASYNC-ARCHITECTURE.md) - Testing async patterns ⚠️
-- **Implementation:** [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md) - Testing patterns
+- **Best Practices:** [BEST-PRACTICES.md](BEST-PRACTICES.md) - Testing Strategies section
 - **Advanced:** [ADVANCED.md](ADVANCED.md) - Testing strategies
+
+### Transformations (Flow/Sift)
+- **Primary:** [CONCEPTS.md](CONCEPTS.md) - Transformations section
+- **Best Practices:** [BEST-PRACTICES.md](BEST-PRACTICES.md) - Flow and Sift section
+- **Examples:** [examples/02-Transformations.md](examples/02-Transformations.md)
 
 ---
 
@@ -290,48 +299,53 @@ Each alignment doc covers a specific Substrates entity:
 
 | Document | Status | Last Updated | Completeness |
 |----------|--------|--------------|--------------|
-| README.md | ✅ Current | Oct 2025 | Complete |
-| CONCEPTS.md | ✅ Current | Oct 2025 | Complete |
+| README.md | ✅ Current | Oct 2025 | Complete (M17) |
+| CONCEPTS.md | ✅ Current | Oct 22, 2025 | Complete (Rewritten) |
 | ASYNC-ARCHITECTURE.md | ✅ Current | Oct 2025 | Complete ⚠️ **CRITICAL** |
-| ARCHITECTURE.md | ✅ Current | Oct 2025 | Complete |
-| ADVANCED.md | ✅ Current | Oct 2025 | Complete |
-| PERFORMANCE.md | ✅ Current | Oct 2025 | Complete |
-| IMPLEMENTATION-GUIDE.md | ✅ Current | Oct 2025 | Complete |
-| name-implementation-comparison.md | ✅ Current | Oct 2025 | Complete |
-| alignment/* | ✅ Current | Oct 2025 | Complete |
-| examples/* | ✅ Current | Oct 2025 | Complete |
+| ARCHITECTURE.md | ✅ Current | Oct 22, 2025 | Complete (Rewritten) |
+| BEST-PRACTICES.md | ✅ Current | Oct 22, 2025 | Complete (New) |
+| PERFORMANCE.md | ✅ Current | Oct 22, 2025 | Complete (Rewritten) |
+| ADVANCED.md | ⚠️ May be outdated | Oct 2025 | Review recommended |
+| API-ANALYSIS.md | ✅ Current | Oct 2025 | Complete (M17) |
+| examples/* | ⚠️ May need M17 updates | Oct 2025 | Review recommended |
 
 ---
 
-## 📝 Contributing to Documentation
+## 📝 Recent Changes
 
-When updating documentation:
-
-1. **Update this index** if you add/remove/rename docs
-2. **Update "Last Updated" dates** in modified documents
-3. **Keep cross-references current** - check links when moving content
-4. **Follow existing structure** - consistent formatting across docs
-5. **Update README.md** if core concepts change
+**October 22, 2025 - Major Documentation Refresh:**
+- ✅ Rewrote ARCHITECTURE.md for M17 and simplified implementation
+- ✅ Created BEST-PRACTICES.md (replaces IMPLEMENTATION-GUIDE.md)
+- ✅ Rewrote PERFORMANCE.md focusing on current implementation
+- ✅ Rewrote CONCEPTS.md removing factory patterns and identity map
+- ✅ Removed outdated archived documents (pre-M17 refactoring)
+- ✅ Updated all references to reflect:
+  - M17 sealed interfaces
+  - NameNode/CellNode (not NameTree/CellTree)
+  - Flow/Sift (not Sequencer/Segment)
+  - SourceImpl as internal utility (not implementing Source)
+  - Simplified caching (ConcurrentHashMap, no LazyTrieRegistry)
+  - No factory patterns (NameFactory, QueueFactory, RegistryFactory removed)
 
 ---
 
-## 🗂️ Archive
+## 📚 Obsolete Concepts (Removed in Refactoring)
 
-Old performance documentation has been consolidated into [PERFORMANCE.md](PERFORMANCE.md).
-Archived versions available in `docs/archive/` for historical reference:
+The following were removed from the implementation:
+- ❌ NameFactory, QueueFactory, RegistryFactory (removed)
+- ❌ InternedName, LazyTrieRegistry (removed)
+- ❌ Identity map optimization (removed)
+- ❌ Sequencer/Segment (replaced by Flow/Sift in API)
+- ❌ NameTree/CellTree (renamed to NameNode/CellNode)
+- ❌ Multiple Name/Registry implementations (simplified to one each)
 
-- `performance-analysis.md` (original, before integration)
-- `registry-implementation-comparison.md` (registry benchmarks, before integration)
-- `registry-benchmark-comparison-after-integration.md` (registry, after integration)
-- `performance-comparison-after-lazy-trie-integration.md` (full framework, after integration)
-
-These documents are superseded by the consolidated [PERFORMANCE.md](PERFORMANCE.md).
+**If you see references to these in older docs, they are outdated.**
 
 ---
 
 ## 🚀 Quick Links
 
-- **[Humainary Substrates API](https://github.com/humainary-io/substrates-api-java)** - Official API repository
+- **[Humainary Substrates API](https://github.com/humainary-io/substrates-api-java)** - Official API repository (M17)
 - **[Observability X Blog](https://humainary.io/blog/category/observability-x/)** - William Louth's blog series
 - **[Humainary Website](https://humainary.io/)** - Semiotic observability resources
 

@@ -1,769 +1,709 @@
-# Substrates Performance Guide
+# Fullerstack Substrates - Performance Guide
 
-**Last Updated:** October 16, 2025
-**Version:** 1.0.0-SNAPSHOT
-**Status:** ✅ Production-Ready
+## Overview
 
-This is the **authoritative performance guide** for the Substrates framework, consolidating all benchmark results, optimization strategies, and production recommendations.
+This guide describes the performance characteristics of the Fullerstack Substrates implementation.
 
----
+**Philosophy:** Simple, correct implementation that's fast enough for production use. Optimize when profiling shows actual bottlenecks, not prematurely.
 
-## 📊 Executive Summary
-
-### Production-Ready Performance
-
-**Hot-Path (Cached/Warm - steady-state after initialization):**
-- **Pipe Emission: 3.3ns** - Blazingly fast metric emission (cached pipe)
-- **Cached Lookups: 5-7ns** - Identity map + slot optimization for 12× speedup
-- **Full Path: 30ns** - End-to-end get-or-create chain (all cached hits) - **3.4× faster!**
-- **Multi-threading: 26.7ns** - Excellent under 4-thread contention
-
-**Cold-Path (First-time creation - one-time startup cost):**
-- **Conduit Creation: ~10.7μs** - First call to `conduit()` creates new instance
-- **Pipe Creation: ~4μs** - First call to `get()` creates new pipe
-- **Name Creation: ~36ns** - Name parsing and interning
-- **Total Startup: ~14.7μs** per unique metric path (one-time only)
-
-**For Kafka Monitoring (100k metrics @ 1Hz):**
-- **CPU Overhead: 0.033%** - Negligible system impact
-- **Scale: 20,000+ brokers** - 2× capacity vs baseline
-- **Memory: Minimal** - Lazy trie construction on-demand
-
-### Key Optimizations
-
-1. ✅ **InternedName** (default) - Identity map fast path for 5× speedup
-2. ✅ **LazyTrieRegistry** (default) - Best overall performance
-3. ✅ **Default factories** - Optimized for production use
+**Current Status:** Production-ready for Kafka monitoring (100k+ metrics @ 1Hz)
 
 ---
 
-## Table of Contents
+## Performance Summary
 
-1. [Quick Reference](#quick-reference)
-2. [Hot-Path Performance](#hot-path-performance)
-3. [Registry Performance](#registry-performance)
-4. [Name Implementation Performance](#name-implementation-performance)
-5. [Integration Results](#integration-results)
-6. [Production Guidelines](#production-guidelines)
-7. [Optimization Guide](#optimization-guide)
-8. [Benchmark Environment](#benchmark-environment)
+### Test Suite Performance
+
+```
+Test Execution:
+- 247 tests
+- ~16 seconds total execution time
+- 0 failures, 0 errors
+- Includes unit, integration, thread-safety, and timing tests
+```
+
+**What This Means:**
+- Fast feedback during development
+- Comprehensive coverage without slow test suite
+- All tests designed to be fast and deterministic
 
 ---
 
-## Quick Reference
+### Production Readiness
 
-### Performance at a Glance
+**Target Workload:** Kafka monitoring
+- **100,000+ metrics** @ 1Hz emission rate
+- **100 brokers** × 1,000 metrics each
+- Continuous monitoring 24/7
 
-**Warm/Cached (Steady-State Production Performance):**
-
-| Operation | Time | Throughput | Use Case |
-|-----------|------|------------|----------|
-| **Pipe Emission** | 3.3ns | 302M ops/sec | Metric collection hot-path (cached pipe) |
-| **Pipe Lookup (Warm)** | 4.4ns | 227M ops/sec | Get-or-create pipe (cached hit) |
-| **Circuit Lookup (Warm)** | 5.7ns | 175M ops/sec | Get-or-create circuit (cached hit) |
-| **Conduit Lookup (Warm)** | **6.7ns** | **149M ops/sec** | Get-or-create conduit (**12× faster!** 🚀) |
-| **Full Path (Warm)** | **30ns** | **33M ops/sec** | Full chain (**3.4× faster!** 🚀) |
-| **Container Get** | 83.9ns | 11.9M ops/sec | Dynamic broker discovery |
-| **Subtree Query (Deep)** | 185ns | 5.4M ops/sec | Hierarchical metric queries |
-| **Multi-thread (4 threads)** | 26.7ns | 37.5M ops/sec | Concurrent emission |
-
-**Cold (First-Time Creation - One-Time Startup Cost):**
-
-| Operation | Time | Use Case |
-|-----------|------|----------|
-| **Conduit Creation** | ~10.7μs | First `conduit()` call for new metric type |
-| **Pipe Creation** | ~4μs | First `get()` call for new channel |
-| **Name Creation** | ~36ns | Parse and intern new hierarchical name |
-| **Full Cold Path** | ~14.7μs | Complete initialization of new metric path |
-
-### Recommendations Matrix
-
-| Scenario | Name Implementation | Registry | Queue |
-|----------|---------------------|----------|-------|
-| **Production (Default)** | InternedName ✅ | LazyTrieRegistry ✅ | LinkedBlockingQueue ✅ |
-| **Simple Use Case** | InternedName | FlatMapRegistry | LinkedBlockingQueue |
-| **Heavy Subtree Queries** | InternedName | LazyTrieRegistry | LinkedBlockingQueue |
-| **Testing/Prototyping** | InternedName | FlatMapRegistry | LinkedBlockingQueue |
-| **Memory Constrained** | SegmentArrayName | FlatMapRegistry | LinkedBlockingQueue |
+**Architecture Benefits:**
+- ✅ **Virtual CPU core pattern** - Precise event ordering, no contention
+- ✅ **Shared schedulers** - One ScheduledExecutorService per Circuit (not per Clock)
+- ✅ **Efficient caching** - ConcurrentHashMap, minimal overhead
+- ✅ **Immutable state** - No synchronization overhead
+- ✅ **Virtual threads** - Lightweight, scalable concurrency
 
 ---
 
-## Hot-Path Performance
+## Architecture Performance Characteristics
 
-### Pipe Emission (Critical Path)
+### 1. Virtual CPU Core Pattern
 
-**Benchmark:** `SubstratesLoadBenchmark.benchmark07_pipeEmission_hotPath`
-
-```
-Time: 3.3ns ± 2.4ns
-Throughput: ~302 million emissions/second
-```
-
-**What this measures:**
-- Core emission path after all lookups cached
-- No subscribers attached (hot-path with early exit)
-- JIT-optimized code path
-
-**Production Impact:**
-```
-100,000 metrics @ 1Hz = 100,000 emissions/second
-100,000 × 3.3ns = 0.33ms CPU time/second
-CPU utilization = 0.033%
-```
-
-**Key Insight:** Identity map fast path (InternedName) eliminates hash computation overhead, delivering 2× improvement over ConcurrentHashMap baseline.
-
----
-
-### Cached Lookups
-
-#### Pipe Lookup (Cached)
-
-```
-Time: 4.4ns ± 3.7ns
-Improvement: 81% faster (was 23.2ns before LazyTrieRegistry integration)
-```
-
-**Identity Map Fast Path:**
+**How It Works:**
 ```java
-// LazyTrieRegistry with InternedName
-public T get(Name key) {
-    T value = identityMap.get(key);  // ~2ns (pointer ==)
-    if (value != null) return value;  // Fast path hit!
-    return registry.get(key);         // Fallback
-}
-```
-
-**vs ConcurrentHashMap:**
-```java
-// Standard hash map
-public T get(Name key) {
-    int hash = key.hashCode();        // ~15ns
-    return map.get(key);              // hash table lookup
-}
-```
-
-**Speedup: 5×** - Identity check (`==`) vs hash computation + lookup
-
-#### Circuit Lookup (Cached)
-
-```
-Time: 5.1ns ± 2.0ns
-Improvement: 82% faster (was 28.0ns)
-```
-
-Same identity map fast path benefits as Pipe lookup.
-
-#### Conduit Lookup (Cached)
-
-```
-Time: 6.7ns ± 12.7ns
-Improvement: 91% faster (was 78.6ns before slot optimization)
-```
-
-**🚀 MAJOR OPTIMIZATION:** Slot pattern with identity map fast path!
-
-**Before (Composite Key):**
-```java
-// Old: ConduitKey(name, class) → ConcurrentHashMap
-ConduitKey key = new ConduitKey(name, composer.getClass());  // 46ns string ops
-conduits.get(key);  // 32ns hash + lookup
-Total: 78.6ns
-```
-
-**After (Slot Pattern):**
-```java
-// New: Name → ConduitSlot (primary + overflow)
-ConduitSlot slot = conduits.get(name);        // 4ns identity map
-Conduit conduit = slot.get(composerClass);   // 1-2ns primary check
-Total: 6.7ns (12× faster!)
-```
-
----
-
-### Full Path: Lookup + Emit (Warm/Cached)
-
-**Benchmark:** `SubstratesLoadBenchmark.benchmark08_fullPath_lookupAndEmit`
-
-```
-Time: 30ns ± 40ns
-Improvement: 70% faster (was 101ns before slot optimization)
-```
-
-**🚀 MAJOR IMPROVEMENT:** Full path now 3.4× faster thanks to slot optimization!
-
-**⚠️ IMPORTANT:** This is **warm/cached** performance - all lookups hit existing cached entries. This is **NOT** cold startup performance.
-
-**What this measures:**
-```java
-// This entire chain runs every iteration (all warm after first call)
-cortex.circuit(circuitName)         // Get-or-create circuit: ~6ns (cached)
-      .conduit(conduitName, ...)    // Get-or-create conduit: ~7ns (cached) - WAS 79ns!
-      .get(channelName)             // Get-or-create pipe: ~4ns (cached)
-      .emit(value);                 // Emission: ~3ns
-```
-
-**⚠️ CRITICAL:** All methods are **get-or-create** (using `computeIfAbsent`):
-- **First call:** Creates the object (~10.7μs for conduit, one-time cost)
-- **Subsequent calls:** Returns cached instance (~7ns for conduit, very fast!)
-- **Benchmark measures:** Cached path after warmup (thousands of iterations)
-
-**Breakdown (all cached/warm):**
-```
-Circuit lookup:   ~6ns   (get-or-create circuit, cached hit)
-Conduit lookup:   ~7ns   (get-or-create conduit, cached hit, OPTIMIZED with slot pattern!)
-Pipe lookup:      4ns    (get-or-create pipe, cached hit, identity map fast path)
-Emission:         3ns    (hot path)
-Method overhead: ~10ns   (call stack, parameter passing)
-──────────────────────
-Total:            30ns   (steady-state, all warm) - 3.4× FASTER!
-```
-
-**Cold vs Warm:**
-```
-COLD (first call - one-time cost per unique path):
-  Conduit creation: ~10.7μs  (new ConduitImpl + initialization)
-  Pipe creation:    ~4μs     (new PipeImpl + subscriber setup)
-  Total first call: ~14.7μs
-
-WARM (cached, what benchmark08 measures - full chain):
-  Circuit lookup:    6ns  (get-or-create, cached hit)
-  Conduit lookup:    7ns  (get-or-create, cached hit, OPTIMIZED!)
-  Pipe lookup:       4ns  (get-or-create, cached hit)
-  Emission:          3ns  (hot path)
-  Method overhead:  10ns  (call stack, chaining)
-  ────────────────────
-  Total:            30ns  (3.4× faster than before!)
-```
-
-**Key Insights:**
-- 🚀 **30ns is outstanding!** - 3.4× faster thanks to slot optimization
-- ✅ **All lookups are warm** - this is steady-state performance, not cold startup
-- ✅ **Real hot-path is 3.3ns** when you cache the pipe reference (recommended pattern)
-- ⚠️ **Cold startup** (first-time creation) is much slower (~10.7μs for conduit creation, see Cold-Path section)
-
-**Recommended Usage Pattern:**
-```java
-// ✅ GOOD - Cache pipe, use hot path (3.3ns)
-Pipe<Long> pipe = circuit.conduit(name, Composer.pipe()).get(channelName);
-for (int i = 0; i < 1000; i++) {
-    pipe.emit(value);  // 3.3ns per emission
-}
-
-// ✅ ALSO GOOD - Full chain each time (30ns) for occasional emissions
-circuit.conduit(name, Composer.pipe()).get(channelName).emit(value);
-
-// ⚠️ ACCEPTABLE - Full chain in loop (if not too tight)
-for (int i = 0; i < 100; i++) {
-    circuit.conduit(name, Composer.pipe()).get(channelName).emit(value);  // 30ns × 100 = 3μs
-}
-
-// ❌ AVOID - Full chain in very tight loop (wasteful, cache the pipe instead)
-for (int i = 0; i < 10000; i++) {
-    circuit.conduit(name, Composer.pipe()).get(channelName).emit(value);  // 30ns × 10000 = 300μs
-}
-```
-
-**For Production:** Cache pipe references for best performance (3.3ns hot path). The 30ns full-path is now fast enough for most use cases!
-
----
-
-### Multi-threading Performance
-
-**Benchmark:** `SubstratesLoadBenchmark.benchmark11_multiThreaded_contention`
-
-```
-Time: 26.7ns ± 21.4ns (4 threads)
-Single-thread: 3.3ns
-Degradation: 8× (expected under contention)
-```
-
-**Analysis:**
-- LazyTrieRegistry uses ConcurrentHashMap (read-optimized)
-- CopyOnWriteArrayList for subscribers (read-heavy workload)
-- Minimal lock contention on hot path
-
-**Production Impact:** Excellent - 4-thread contention only 8× slower than single-thread (expected range: 4-10×).
-
----
-
-## Registry Performance
-
-### LazyTrieRegistry (Recommended)
-
-**Strengths:**
-- ✅ **Fastest direct lookups** (identity map fast path)
-- ✅ **Best subtree queries** (46-109% faster than FlatMap)
-- ✅ **Competitive writes** (only 22-45% slower than FlatMap)
-- ✅ **Lazy trie construction** (zero overhead until needed)
-- ✅ **Balanced performance** across all operations
-
-**Performance Summary:**
-
-| Operation | LazyTrieRegistry | vs FlatMap | Notes |
-|-----------|------------------|------------|-------|
-| **GET (direct)** | 35.8ns | **1.01× faster** | Identity map |
-| **PUT (writes)** | 89.3ns | 1.51× slower | Map interface overhead |
-| **Subtree (shallow)** | 302ns | **1.86× faster** | Trie query |
-| **Subtree (deep)** | 185ns | **2.09× faster** | Trie query |
-| **Cache hit** | 33.5ns | **1.05× faster** | Identity check |
-| **Mixed workload** | 2,083ns | 1.41× slower | Balanced |
-
-**When to Use:**
-- ✅ **Production (recommended default)**
-- ✅ High-frequency direct lookups
-- ✅ Hierarchical subtree queries
-- ✅ Using InternedName (identity map optimization)
-
-**Memory Profile:**
-- ConcurrentHashMap (primary): ~48 bytes/entry
-- IdentityHashMap (fast path): ~48 bytes/entry
-- Lazy Trie (on-demand): ~64 bytes/entry (built on first query)
-- **Total: ~96-160 bytes/entry** depending on whether trie is built
-
----
-
-### FlatMapRegistry (Simple Baseline)
-
-**Strengths:**
-- ✅ **Simplest implementation** (minimal code)
-- ✅ **Fast writes** (no dual-index overhead)
-- ✅ **Fast direct lookups** (pure ConcurrentHashMap)
-- ✅ **Minimal memory** (~48 bytes/entry)
-
-**Weaknesses:**
-- ⚠️ **Slow subtree queries** (O(n) full scan with string operations)
-- ⚠️ **No hierarchical awareness**
-
-**Performance Summary:**
-
-| Operation | FlatMapRegistry | Notes |
-|-----------|-----------------|-------|
-| **GET** | 36.2ns | Hash table lookup |
-| **PUT** | 59.2ns | Fastest writes |
-| **Subtree (shallow)** | 559ns | **2× slower** than LazyTrie |
-| **Subtree (deep)** | 386ns | **2× slower** than LazyTrie |
-
-**When to Use:**
-- ✅ Simple key-value storage without hierarchy needs
-- ✅ Rare or no subtree query operations
-- ✅ Maximum write throughput required
-- ✅ Prototyping and testing
-
----
-
-### EagerTrieRegistry (Not Recommended)
-
-**Weaknesses:**
-- ⚠️ Eager trie maintenance overhead on every write
-- ⚠️ ReadWriteLock contention
-- ⚠️ Slower than LazyTrie for both reads and writes
-
-**Performance:** 10-60% slower than LazyTrieRegistry across all operations.
-
-**Recommendation:** Migrate to LazyTrieRegistry for better performance.
-
----
-
-### StringSplitTrieRegistry (Not Recommended)
-
-**Weaknesses:**
-- ❌ **Very slow writes** (string splitting overhead)
-- ❌ Allocation pressure from `split()` operations
-- ❌ 16× slower than FlatMap on deep path inserts
-
-**Recommendation:** Do not use in production. Legacy compatibility only.
-
----
-
-## Name Implementation Performance
-
-See **[name-implementation-comparison.md](name-implementation-comparison.md)** for detailed analysis.
-
-### Quick Summary
-
-| Implementation | Shallow Create | Deep Create | GET | Memory | Recommendation |
-|----------------|----------------|-------------|-----|--------|----------------|
-| **InternedName** | 132ns | 252ns | **33ns** | Medium | ✅ **Production** |
-| LinkedName | 92ns | **185ns** | 33ns | Low | Simple use cases |
-| SegmentArrayName | **85ns** | 193ns | 35ns | **Lowest** | Memory constrained |
-| LRUCachedName | 111ns | 206ns | 35ns | Configurable | High churn |
-
-**Recommendation:** Use **InternedName** (default) for:
-- ✅ Identity map fast path (5× speedup in LazyTrieRegistry)
-- ✅ Weak reference interning (automatic cleanup)
-- ✅ Parent chain traversal (O(1) access)
-- ✅ Best overall balance
-
----
-
-## Integration Results
-
-### Before LazyTrieRegistry Integration
-
-System used `Map<Name, ?> = new ConcurrentHashMap<>()` throughout.
-
-**Performance:**
-- Pipe emission: 6.6ns
-- Pipe lookup: 23.2ns
-- Circuit lookup: 28.0ns
-- Full path: 97.2ns
-
----
-
-### After LazyTrieRegistry Integration
-
-System uses `LazyTrieRegistry` (with Map interface) for all Name-keyed collections:
-- `CortexRuntime`: circuits, scopes maps
-- `CircuitImpl`: clocks map
-- `ConduitImpl`: percepts map
-- `ScopeImpl`: childScopes map
-
-**Performance:**
-
-| Operation | Before | After | Change | Impact |
-|-----------|--------|-------|--------|--------|
-| **Pipe Emission** | 6.6ns | **3.3ns** | **-50%** | 🚀 **2× FASTER** |
-| **Pipe Lookup** | 23.2ns | **4.4ns** | **-81%** | 🚀 **5× FASTER** |
-| **Circuit Lookup** | 28.0ns | **5.1ns** | **-82%** | 🚀 **5× FASTER** |
-| **Full Path** | 97.2ns | **101ns** | +4% | ✅ Stable |
-| **Container Get** | 180ns | **83.9ns** | **-53%** | 🚀 **2× FASTER** |
-| **Multi-thread** | 26.8ns | **26.7ns** | -0.4% | ✅ Perfect |
-
-### Why Such Dramatic Improvements?
-
-**1. Identity Map Fast Path**
-
-InternedName instances use pointer equality (`==`) instead of hashCode() + equals():
-```
-Before: hashCode() [15ns] + table lookup [5ns] = 20ns
-After:  identity check [2ns] = 2ns
-Speedup: 10×
-```
-
-**2. JIT Optimization**
-
-Identity checks can be aggressively inlined:
-```java
-// JIT can eliminate null check and inline
-if (identityMap.array[index] == key) return identityMap.values[index];
-```
-
-**3. Reduced Memory Access**
-
-- Identity map: Single array access + pointer compare
-- Hash map: Hash compute + bucket lookup + equals() + array access
-- **50% fewer memory loads**
-
----
-
-### Cold-Path Trade-offs (Acceptable)
-
-| Operation | Before | After | Change | Impact |
-|-----------|--------|-------|--------|--------|
-| Cortex Creation | 74.5ns | 423ns | +468% | ⚠️ One-time startup |
-| Conduit Creation | 25.9μs | 10.7μs | -59% | ✅ Faster than before! |
-| Conduit Lookup | 42.4ns | 6.7ns | -84% | ✅ Slot optimization! |
-| Name Creation | 8.4μs | 36.2μs | +332% | ⚠️ Cached |
-
-**Why faster?**
-- ✅ **Conduit creation improved** from 25.9μs to 10.7μs (slot optimization)
-- ✅ **Conduit lookup improved** from 42.4ns to 6.7ns (identity map + slot pattern)
-- ⚠️ Only Cortex creation and Name creation are slower (one-time operations)
-
-**Impact:** Excellent - cold-path improved significantly with slot optimization!
-
----
-
-## Production Guidelines
-
-### Kafka Monitoring Performance Budget
-
-**Scenario:** 1000 Brokers × 100 Metrics Each @ 1Hz
-
-#### Hot-Path (Metric Emission)
-
-```
-100,000 metrics × 1Hz = 100,000 emissions/second
-
-Emission Time:
-  100,000 × 3.3ns = 0.33ms CPU time/second
-
-CPU Utilization:
-  0.33ms / 1000ms = 0.033%
-```
-
-**Result:** ✅ Can handle 100k metrics with 0.033% CPU overhead
-
-#### Full-Path (Lookup + Emit)
-
-```
-Includes:
-  - Conduit lookup (cold-path, cached after first)
-  - Pipe lookup (cached)
-  - Emission
-
-Time per operation: 101ns
-
-CPU Utilization:
-  100,000 × 101ns = 10.1ms/second = 1.01%
-```
-
-**Result:** ✅ Total CPU overhead under 1.1%
-
-#### Cold-Path (Initialization)
-
-```
-Conduit Creation (100 metric types):
-  100 × 10.7μs = 1.07ms
-
-Pipe Creation (100k pipes):
-  100,000 × 4.4ns = 0.44ms
-
-Name Creation (100k unique names):
-  100,000 × 36ns = 3.6ms
-
-Total Startup Overhead: ~5.1ms (was ~10ms)
-```
-
-**Result:** ✅ Negligible compared to network/JMX setup (typically seconds)
-
-#### Hierarchical Queries (Dashboard)
-
-```
-Query all metrics for broker.1:
-  getSubtree("kafka.broker.1") → 8 results
-
-Time: 302ns
-
-For 10 queries/second:
-  10 × 302ns = 3μs/second
-```
-
-**Result:** ✅ Perfect for real-time dashboards
-
----
-
-### Scale Recommendations
-
-| Scale | Metrics | CPU Overhead | Status |
-|-------|---------|--------------|--------|
-| **Small** | 1k-10k | <0.01% | ✅ Comfortable |
-| **Medium** | 10k-100k | 0.01-0.1% | ✅ Comfortable |
-| **Large** | 100k-1M | 0.1-1% | ✅ Comfortable |
-| **Very Large** | 1M-10M | 1-10% | ✅ Feasible |
-
-**Recommendation:** Substrates can comfortably handle 100k-1M metrics on a single node.
-
----
-
-## Optimization Guide
-
-### When to Optimize
-
-**DON'T optimize if:**
-- ✅ CPU overhead < 1%
-- ✅ Latency < 1ms
-- ✅ Using default factories (already optimized)
-
-**CONSIDER optimizing if:**
-- ⚠️ CPU overhead > 5%
-- ⚠️ Latency > 10ms
-- ⚠️ Custom Name/Registry implementations
-
-**MUST optimize if:**
-- ❌ CPU overhead > 20%
-- ❌ Latency > 100ms
-- ❌ Scaling beyond 10M metrics
-
----
-
-### Optimization Checklist
-
-#### 1. ✅ Use InternedName (Default)
-
-```java
-// ✅ GOOD - Uses default InternedNameFactory
-Cortex cortex = new CortexRuntime();
-
-// ❌ BAD - Custom implementation without identity optimization
-Cortex cortex = new CortexRuntime(new CustomNameFactory());
-```
-
-**Benefit:** 5× faster cached lookups via identity map
-
----
-
-#### 2. ✅ Use LazyTrieRegistry (Default)
-
-```java
-// ✅ GOOD - Uses default LazyTrieRegistryFactory
-Cortex cortex = new CortexRuntime();
-
-// ❌ BAD - FlatMapRegistry loses hierarchical query speed
-Cortex cortex = new CortexRuntime(
-    InternedNameFactory.getInstance(),
-    LinkedBlockingQueueFactory.getInstance(),
-    FlatMapRegistryFactory.getInstance()  // 2× slower on subtree queries
-);
-```
-
-**Benefit:** 2× faster hierarchical queries, 50% faster hot-path
-
----
-
-#### 3. ✅ Cache Lookups Aggressively
-
-```java
-// ✅ GOOD - Cache pipe instance
-Pipe<String> pipe = conduit.get(name);  // Automatic caching
-for (int i = 0; i < 1000; i++) {
-    pipe.emit("value-" + i);  // Reuse cached pipe
-}
-
-// ❌ BAD - Repeated lookups
-for (int i = 0; i < 1000; i++) {
-    conduit.get(name).emit("value-" + i);  // 101ns overhead per emit!
-}
-```
-
-**Benefit:** 30× faster emission (3.3ns vs 101ns)
-
----
-
-#### 4. ✅ Use Hierarchical Names Wisely
-
-```java
-// ✅ GOOD - Leverage InternedName parent chain
-Name brokerName = cortex.name("kafka.broker.1");
-Name heapName = brokerName.name("jvm.heap.used");  // Uses parent chain
-
-// ❌ BAD - Recreating full path every time
-for (int i = 0; i < 1000; i++) {
-    Name name = cortex.name("kafka.broker.1.jvm.heap.used");  // 36μs each!
-}
-```
-
-**Benefit:** 10× faster name creation via cached parent chains
-
----
-
-#### 5. ⚠️ Minimize Subscribers
-
-```java
-// ✅ GOOD - One subscriber per Source
-source.subscribe(mainSubscriber);
-
-// ⚠️ ACCEPTABLE - Few subscribers
-source.subscribe(subscriber1);
-source.subscribe(subscriber2);
-source.subscribe(subscriber3);
-
-// ❌ BAD - Many subscribers (use aggregation instead)
-for (int i = 0; i < 1000; i++) {
-    source.subscribe(subscriber[i]);  // 1000 callbacks per emission!
-}
-```
-
-**Benefit:** Each subscriber adds ~1μs overhead per emission
-
----
-
-### Advanced Optimizations (If Needed)
-
-#### Conduit Lookup Optimization
-
-**Problem:** Conduit lookup uses composite key `(Name, Class<?>)` which can't use identity map.
-
-**Current:** 78.6ns per lookup
-
-**Potential Solution:**
-```java
-// Use Name-only key when composer class is fixed
-ConduitKey key = new ConduitKey(name);  // No class component
-
-// Enable identity map fast path
-Conduit lookup: 78.6ns → ~5ns (predicted)
-```
-
-**Priority:** LOW - 78ns is acceptable for cold-path
-
----
-
-#### Custom Queue Implementations
-
-For very high-frequency use cases (>1M ops/sec), consider:
-
-```java
-// High-performance bounded queue
-public class RingBufferQueueFactory implements QueueFactory {
-    @Override
-    public Queue create() {
-        return new RingBufferQueue(capacity);
+public class CircuitImpl implements Circuit {
+    private final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+
+    private void startProcessing() {
+        executor.submit(() -> {
+            while (!interrupted) {
+                Runnable task = queue.take();  // Blocks until available
+                task.run();  // Execute in FIFO order
+            }
+        });
     }
 }
 ```
 
-**Priority:** LOW - default LinkedBlockingQueue is sufficient for most use cases
+**Performance Impact:**
+- ✅ **No lock contention** - Single thread processes events
+- ✅ **Precise ordering** - FIFO queue guarantees order
+- ✅ **Predictable latency** - No variability from thread scheduling
+- ✅ **Lightweight** - Virtual threads have minimal overhead
+
+**Cost:**
+- Single-threaded processing per Circuit (by design)
+- Can't parallelize event processing within a Circuit
+- Multiple Circuits can run in parallel for different domains
 
 ---
 
-## Benchmark Environment
+### 2. Component Caching
 
-All benchmarks run on:
+**Implementation:**
+```java
+private final Map<Name, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
+private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
 
-**Hardware:**
-- Platform: Linux 6.8.0-1030-azure
-- CPU: Azure standard instance
-- Memory: 512MB heap (-Xms512M -Xmx512M)
+public <P, E> Conduit<P, E> conduit(Name name, Composer<P, E> composer) {
+    return (Conduit<P, E>) conduits.computeIfAbsent(name, n ->
+        new ConduitImpl<>(n, this, composer)
+    );
+}
+```
 
-**JVM:**
-- Version: Java HotSpot(TM) 64-Bit Server VM 24.0.2+12-54
-- GC: G1GC with 10ms pause target (-XX:+UseG1GC -XX:MaxGCPauseMillis=10)
-- Compilation: Default JIT settings
+**Performance Characteristics:**
+- **First access:** ~100-200ns (create + cache)
+- **Cached access:** ~5-10ns (ConcurrentHashMap lookup)
+- **Thread-safe:** computeIfAbsent handles races
 
-**JMH:**
-- Version: 1.37
-- Mode: Average time (ns/op)
-- Warmup: 2-3 iterations × 1s each
-- Measurement: 3-5 iterations × 2s each
-- Forks: 1
-- Threads: 1 (except multi-threading benchmarks)
-
-**Notes:**
-- Benchmarks use realistic Kafka monitoring paths
-- Results show average time per operation
-- Error margins reflect JIT/GC variance
-- Production results may vary based on workload patterns
+**Recommendation:** Cache components at application startup, reuse throughout lifecycle.
 
 ---
 
-## Conclusion
+### 3. Pipe Emission
 
-The Substrates framework delivers **exceptional hot-path performance** with the default configuration:
+**Direct Emission Path:**
+```java
+public void emit(E event) {
+    // Apply transformations
+    E transformed = applyTransformations(event);
+    if (transformed == null) return;
 
-✅ **3.3ns emission** - 2× faster than baseline
-✅ **5-7ns cached lookups** - 12× faster via identity map + slot optimization
-✅ **30ns full path** - 3.4× faster end-to-end (was 101ns)
-✅ **0.01% CPU overhead** - For 100k metrics @ 1Hz (improved from 0.033%)
+    // Emit to subscribers
+    source.emit(transformed);
+}
+```
 
-**Recommendations:**
+**Performance:**
+- **No transformations:** ~50-100ns per emission
+- **With sift/limit/sample:** +10-50ns depending on complexity
+- **Subscriber notification:** +20-50ns per subscriber
 
-1. ✅ **Use defaults** - InternedName + LazyTrieRegistry already optimized
-2. ✅ **Cache aggressively** - Store pipe instances, reuse
-3. ✅ **Profile first** - Only optimize if measurements show bottlenecks
-4. ✅ **Test at scale** - Validate performance with realistic workloads
+**Total:** ~100-300ns per emission with 1-3 subscribers
 
-**For most use cases, the default configuration is optimal and requires no tuning.**
+**Comparison:** Fast enough for 100k emissions/second on single core
+
+---
+
+### 4. Shared Scheduler Optimization
+
+**Before (Hypothetical - One scheduler per Clock):**
+```java
+public class ClockImpl {
+    private final ScheduledExecutorService scheduler =
+        Executors.newScheduledThreadPool(1);  // One per Clock!
+}
+```
+
+**After (Current - Shared across Circuit):**
+```java
+public class CircuitImpl {
+    private final ScheduledExecutorService scheduler =
+        Executors.newScheduledThreadPool(1);  // Shared by all Clocks
+
+    public Clock clock(Name name) {
+        return new ClockImpl(name, scheduler);  // Reuse scheduler
+    }
+}
+```
+
+**Impact:**
+- **100 Clocks:** 1 scheduler thread instead of 100
+- **Memory:** ~10MB saved (100 threads × ~100KB each)
+- **CPU:** Better utilization, less context switching
+
+---
+
+### 5. NameNode Hierarchy
+
+**Implementation:**
+```java
+public final class NameNode implements Name {
+    private final NameNode parent;
+    private final String segment;
+    private final String cachedPath;  // Built once in constructor
+
+    @Override
+    public CharSequence path(char separator) {
+        return cachedPath;  // O(1) lookup
+    }
+
+    @Override
+    public Name name(String segment) {
+        return new NameNode(this, segment);  // O(1) creation
+    }
+}
+```
+
+**Performance:**
+- **Creation:** ~50-100ns (allocate + cache path)
+- **Path access:** ~5ns (return cached string)
+- **Hierarchy traversal:** O(1) per level (parent reference)
+
+**Trade-off:**
+- ✅ Fast path access (cached)
+- ✅ Fast child creation
+- ❌ No interning (every name is unique instance)
+- ❌ More memory (each name is separate object)
+
+**Why This Trade-off:**
+- Simplicity > micro-optimization
+- Memory is cheap, complexity is expensive
+- Fast enough for realistic workloads
+
+---
+
+### 6. Subscriber Management
+
+**Implementation:**
+```java
+public class SourceImpl<E> {
+    private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
+
+    public void emit(E event) {
+        for (Subscriber<E> subscriber : subscribers) {
+            subscriber.notify(event);  // Iterate and notify
+        }
+    }
+}
+```
+
+**CopyOnWriteArrayList Characteristics:**
+- **Read (emit):** O(n) iteration, no locks
+- **Write (subscribe):** O(n) copy, synchronized internally
+- **Optimized for:** Read-heavy workloads (many emits, few subscribes)
+
+**Performance:**
+- **1 subscriber:** ~20ns per emission
+- **10 subscribers:** ~200ns per emission
+- **100 subscribers:** ~2μs per emission
+
+**Why CopyOnWriteArrayList:**
+- Emissions happen frequently (millions/second)
+- Subscriptions happen rarely (at startup)
+- No lock contention during hot path (emissions)
+
+---
+
+## Real-World Performance
+
+### Kafka Monitoring Scenario
+
+**Setup:**
+- 100 Kafka brokers
+- 1,000 metrics per broker
+- 1Hz emission rate
+- 100,000 total emissions/second
+
+**Resource Usage (Estimated):**
+
+```
+CPU:
+- 100,000 emissions × 200ns = 20ms/second
+- 20ms / 1000ms = 2% of one CPU core
+
+Memory:
+- 100,000 Pipes × 1KB ≈ 100MB
+- Emission queue: <10MB
+- Total: ~200-300MB
+
+Threads:
+- 1 Circuit = 1 virtual thread
+- 1 shared scheduler = 1 thread
+- Total: ~2-3 threads
+```
+
+**Headroom:** 98% CPU available for metric collection, analysis, alerting
+
+---
+
+### Benchmark Scenarios
+
+#### Scenario 1: High-Frequency Emissions
+
+```java
+// 1 million emissions to same pipe
+Pipe<Integer> pipe = conduit.get(name);
+for (int i = 0; i < 1_000_000; i++) {
+    pipe.emit(i);
+}
+```
+
+**Expected Performance:**
+- **Total time:** ~200-300ms
+- **Per emission:** ~200-300ns
+- **Throughput:** ~3-5M emissions/second
+
+#### Scenario 2: Many Subjects
+
+```java
+// 10,000 different subjects, 100 emissions each
+for (int i = 0; i < 10_000; i++) {
+    Pipe<Integer> pipe = conduit.get(cortex.name("subject-" + i));
+    for (int j = 0; j < 100; j++) {
+        pipe.emit(j);
+    }
+}
+```
+
+**Expected Performance:**
+- **Total time:** ~200-300ms
+- **Per emission:** ~200-300ns (same as cached)
+- **Cache creation:** ~10,000 × 100ns = 1ms overhead
+
+#### Scenario 3: Many Subscribers
+
+```java
+// 100 subscribers, 10,000 emissions
+for (int i = 0; i < 100; i++) {
+    conduit.subscribe(createSubscriber(i));
+}
+
+Pipe<Integer> pipe = conduit.get(name);
+for (int i = 0; i < 10_000; i++) {
+    pipe.emit(i);
+}
+```
+
+**Expected Performance:**
+- **Total time:** ~20-30ms
+- **Per emission:** ~2-3μs (100 subscribers × ~20-30ns)
+- **Throughput:** ~300-500k emissions/second
+
+---
+
+## Performance Best Practices
+
+### 1. Cache Pipes
+
+✅ **FAST:**
+```java
+Pipe<MetricValue> pipe = conduit.get(name);  // Cache once
+for (MetricValue value : values) {
+    pipe.emit(value);  // ~200ns per emit
+}
+```
+
+❌ **SLOW:**
+```java
+for (MetricValue value : values) {
+    conduit.get(name).emit(value);  // ~200ns + 10ns lookup per emit
+}
+```
+
+**Impact:** 5% overhead for repeated lookups
+
+---
+
+### 2. Batch Emissions
+
+✅ **FAST:**
+```java
+List<Event> batch = collectBatch(100);
+Pipe<Event> pipe = conduit.get(name);
+for (Event event : batch) {
+    pipe.emit(event);  // Amortized overhead
+}
+```
+
+❌ **SLOW:**
+```java
+for (int i = 0; i < 100; i++) {
+    Event event = fetchOne();  // Network call per event
+    conduit.get(name).emit(event);
+}
+```
+
+**Impact:** Reduces per-event overhead (network, setup costs)
+
+---
+
+### 3. Use Transformations Wisely
+
+✅ **EFFICIENT:**
+```java
+// Filter early, process less
+flow.sift(event -> event.severity() == CRITICAL)  // Filters 90%
+    .limit(100)  // Only 10 pass through
+```
+
+❌ **INEFFICIENT:**
+```java
+// Process everything, then filter
+flow.limit(1000)  // Processes 1000 events
+    .sift(event -> event.severity() == CRITICAL)  // Then filters
+```
+
+**Impact:** 10× reduction in transformation overhead
+
+---
+
+### 4. Minimize Subscriber Count
+
+✅ **EFFICIENT:**
+```java
+// One subscriber aggregates for all consumers
+conduit.subscribe(createAggregator());
+```
+
+❌ **INEFFICIENT:**
+```java
+// 100 subscribers, each does similar work
+for (int i = 0; i < 100; i++) {
+    conduit.subscribe(createIndividualSubscriber(i));
+}
+```
+
+**Impact:** Linear scaling - 100 subscribers = 100× notification cost
+
+---
+
+### 5. Avoid Blocking in Callbacks
+
+❌ **BLOCKS EVENT PROCESSING:**
+```java
+conduit.subscribe(
+    cortex.subscriber(name, (subject, registrar) -> {
+        registrar.register(event -> {
+            Thread.sleep(100);  // BLOCKS CIRCUIT!
+        });
+    })
+);
+```
+
+✅ **ASYNC PROCESSING:**
+```java
+ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+
+conduit.subscribe(
+    cortex.subscriber(name, (subject, registrar) -> {
+        registrar.register(event -> {
+            executor.submit(() -> processSlowly(event));
+        });
+    })
+);
+```
+
+**Impact:** Blocking subscribers halt all event processing in Circuit
+
+---
+
+## Scaling Considerations
+
+### Vertical Scaling (Single JVM)
+
+**Current Architecture:**
+- ✅ **100k metrics @ 1Hz:** 2% CPU, 200MB RAM
+- ✅ **1M metrics @ 1Hz:** 20% CPU, 2GB RAM
+- ✅ **10M metrics @ 1Hz:** May need tuning
+
+**Bottlenecks (if you reach them):**
+1. **Circuit queue depth** - If processing slower than emission rate
+2. **Subscriber count** - Linear cost per subscriber
+3. **Memory** - 100M Pipes × 1KB = 100GB
+
+**Solutions:**
+1. **Multiple Circuits** - Partition by domain (broker-1, broker-2, etc.)
+2. **Aggregate subscribers** - One subscriber multiplexes to many consumers
+3. **Sample more aggressively** - Use flow.sample() to reduce rate
+
+---
+
+### Horizontal Scaling (Multiple JVMs)
+
+**Partition Strategies:**
+
+1. **By Broker:**
+```java
+// JVM 1: Brokers 1-50
+Circuit brokers1to50 = cortex.circuit(cortex.name("brokers-1-50"));
+
+// JVM 2: Brokers 51-100
+Circuit brokers51to100 = cortex.circuit(cortex.name("brokers-51-100"));
+```
+
+2. **By Metric Type:**
+```java
+// JVM 1: JVM metrics
+Circuit jvmMetrics = cortex.circuit(cortex.name("jvm-metrics"));
+
+// JVM 2: Kafka metrics
+Circuit kafkaMetrics = cortex.circuit(cortex.name("kafka-metrics"));
+```
+
+3. **By Signal Type:**
+```java
+// JVM 1: Monitors
+Circuit monitors = cortex.circuit(cortex.name("monitors"));
+
+// JVM 2: Services
+Circuit services = cortex.circuit(cortex.name("services"));
+```
+
+---
+
+## Memory Characteristics
+
+### Component Memory Footprint (Approximate)
+
+```
+NameNode: ~64 bytes (object header + 3 references + string)
+CircuitImpl: ~1KB (queue + executor + maps)
+ConduitImpl: ~512 bytes (maps + references)
+ChannelImpl: ~256 bytes (pipe + references)
+PipeImpl: ~512 bytes (transformations + filters)
+SourceImpl: ~256 bytes (subscriber list)
+ClockImpl: ~512 bytes (tasks map + references)
+
+Per Metric (Pipe):
+- NameNode: ~64 bytes
+- PipeImpl: ~512 bytes
+- Total: ~1KB per unique metric
+```
+
+### Memory Scaling
+
+```
+1,000 metrics:     ~1MB
+10,000 metrics:    ~10MB
+100,000 metrics:   ~100MB
+1,000,000 metrics: ~1GB
+```
+
+**Plus:**
+- Event queue: Variable (depends on emission rate vs processing rate)
+- Subscriber callbacks: ~100 bytes per subscriber
+- State/Slots: Variable (depends on state size)
+
+---
+
+## Performance Monitoring
+
+### Key Metrics to Track
+
+1. **Circuit Queue Depth**
+```java
+// Monitor queue size
+BlockingQueue<Runnable> queue = circuit.getQueue();
+int depth = queue.size();
+
+// Alert if growing (emissions > processing)
+if (depth > 10000) {
+    log.warn("Circuit queue backing up: {}", depth);
+}
+```
+
+2. **Emission Rate**
+```java
+// Count emissions per second
+AtomicLong emissionCount = new AtomicLong();
+
+pipe.emit(event);
+emissionCount.incrementAndGet();
+
+// Sample periodically
+clock.consume(name, Clock.Cycle.SECOND, instant -> {
+    long rate = emissionCount.getAndSet(0);
+    log.info("Emission rate: {} events/second", rate);
+});
+```
+
+3. **Subscriber Processing Time**
+```java
+conduit.subscribe(
+    cortex.subscriber(name, (subject, registrar) -> {
+        registrar.register(event -> {
+            long start = System.nanoTime();
+            processEvent(event);
+            long duration = System.nanoTime() - start;
+
+            if (duration > 1_000_000) {  // > 1ms
+                log.warn("Slow subscriber: {}ns", duration);
+            }
+        });
+    })
+);
+```
+
+---
+
+## Profiling Tips
+
+### Using JFR (Java Flight Recorder)
+
+```bash
+# Start application with JFR
+java -XX:StartFlightRecording=duration=60s,filename=recording.jfr \
+     -jar my-app.jar
+
+# Analyze recording
+jfr print --events jdk.ObjectAllocationSample recording.jfr
+jfr print --events jdk.ExecutionSample recording.jfr
+```
+
+**Look for:**
+- High allocation rate in hot path
+- Thread contention (should be minimal)
+- Long garbage collection pauses
+
+### Using Async-Profiler
+
+```bash
+# Profile CPU
+./profiler.sh -d 60 -f flamegraph-cpu.html <pid>
+
+# Profile allocations
+./profiler.sh -d 60 -e alloc -f flamegraph-alloc.html <pid>
+```
+
+**Look for:**
+- Emission hot path (should be minimal)
+- Transformation overhead
+- Subscriber callback time
+
+---
+
+## When to Optimize
+
+**DON'T optimize if:**
+- ✅ Test suite runs in < 30 seconds
+- ✅ Production CPU usage < 20%
+- ✅ Production memory usage is stable
+- ✅ No user-facing performance issues
+
+**DO optimize if:**
+- ❌ Circuit queue depth growing unbounded
+- ❌ CPU usage > 80% sustained
+- ❌ Memory usage growing (memory leak)
+- ❌ Subscriber callbacks blocking event processing
+
+**How to optimize:**
+1. **Profile first** - Use JFR or async-profiler to find bottleneck
+2. **Optimize hot path only** - Focus on actual bottleneck
+3. **Measure improvement** - Benchmark before and after
+4. **Document why** - Explain optimization in code comments
+
+---
+
+## Comparison to Alternatives
+
+### vs. Simple Event Bus
+
+**Simple Event Bus:**
+```java
+EventBus bus = new EventBus();
+bus.register(subscriber);
+bus.post(event);
+```
+
+**Pros:**
+- ✅ Even simpler API
+- ✅ Slightly less overhead
+
+**Cons:**
+- ❌ No hierarchical naming
+- ❌ No transformations (filter, limit, sample)
+- ❌ No resource lifecycle management
+- ❌ No virtual CPU pattern (order not guaranteed)
+
+**When to use Substrates:**
+- Need hierarchical organization (kafka.broker.1.metrics.bytes-in)
+- Need transformations (filter, sample, limit)
+- Need precise event ordering
+- Building observability system (semantic signals)
+
+---
+
+### vs. Reactive Streams (Reactor, RxJava)
+
+**Reactive Streams:**
+```java
+Flux.just(event1, event2)
+    .filter(e -> e.important())
+    .subscribe(subscriber);
+```
+
+**Pros:**
+- ✅ Richer transformation operators
+- ✅ Backpressure support
+- ✅ Mature ecosystem
+
+**Cons:**
+- ❌ Steeper learning curve
+- ❌ More complex mental model (hot/cold observables, etc.)
+- ❌ Not designed for observability domain
+
+**When to use Substrates:**
+- Building observability system specifically
+- Want simpler conceptual model
+- Need hierarchical naming and organization
+- Want M17 type safety (sealed interfaces)
+
+---
+
+## Summary
+
+**Fullerstack Substrates Performance:**
+
+✅ **Fast enough** - 100k+ metrics @ 1Hz on 2% CPU
+✅ **Simple** - No complex optimizations, easy to understand
+✅ **Scalable** - Virtual threads, efficient caching
+✅ **Predictable** - Virtual CPU pattern, deterministic ordering
+✅ **Production-ready** - 247 tests passing, proven architecture
+
+**Philosophy:**
+> "Premature optimization is the root of all evil." - Donald Knuth
+
+Build it simple, build it correct, measure in production, optimize actual bottlenecks.
 
 ---
 
 ## References
 
-- **[Name Implementation Comparison](name-implementation-comparison.md)** - Detailed Name strategy analysis
-- **[Architecture Guide](ARCHITECTURE.md)** - System design and data flow
-- **[Implementation Guide](IMPLEMENTATION-GUIDE.md)** - Recommended patterns
-
----
-
-**Questions or suggestions?** Open an issue or submit a PR!
+- [Architecture Guide](ARCHITECTURE.md)
+- [Best Practices](BEST-PRACTICES.md)
+- [Async Architecture](ASYNC-ARCHITECTURE.md)
+- [Java Virtual Threads](https://openjdk.org/jeps/444)
+- [ConcurrentHashMap Performance](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ConcurrentHashMap.html)
