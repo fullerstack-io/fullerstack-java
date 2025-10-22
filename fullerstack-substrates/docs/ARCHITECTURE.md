@@ -491,18 +491,23 @@ public class SourceImpl<E> {
 
 ```java
 // Create state
-State state = State.of(
-    Slot.of("broker-id", 1),
-    Slot.of("heap-used", 850_000_000L),
-    Slot.of("status", "HEALTHY")
-);
+State state = cortex.state()
+    .state(cortex.name("broker-id"), 1)
+    .state(cortex.name("heap-used"), 850_000_000L)
+    .state(cortex.name("status"), "HEALTHY");
 
 // Access values (type-safe)
-Optional<Integer> brokerId = state.get(Slot.of("broker-id"));
+Integer brokerId = state.value(slot(cortex.name("broker-id"), 0));
+Long heapUsed = state.value(slot(cortex.name("heap-used"), 0L));
 
 // State is immutable - create new state to change
-State newState = state.set(Slot.of("heap-used", 900_000_000L));
+State newState = state.state(cortex.name("heap-used"), 900_000_000L);
 ```
+
+**Key Features:**
+- Immutable - each `state()` call returns new State
+- Type-safe - matches by name AND type
+- Allows duplicate names with different types
 
 ---
 
