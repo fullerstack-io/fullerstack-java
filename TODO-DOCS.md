@@ -39,18 +39,67 @@ Update for M17:
 2. Note sealed interface changes in Serventis API
 3. Update Monitor/Service subject() signature changes
 
-## Documentation Files to Review:
+## Documentation Files Status:
 
--  docs/ARCHITECTURE.md - May reference old registry/queue implementations
-- docs/ASYNC-ARCHITECTURE.md - Should be current
-- docs/IMPLEMENTATION-GUIDE.md - May reference old factory patterns
-- docs/PERFORMANCE.md - Needs benchmark updates
-- docs/CONCEPTS.md - May reference removed concepts
-- docs/examples/*.md - All examples may need M17 updates
+### ✅ COMPLETED
+1. fullerstack-substrates/README.md - Updated for M17 and simplified architecture
+2. fullerstack-serventis/README.md - Updated for M17
+3. Root README.md - Updated for M17
+4. API-ANALYSIS.md - Complete rewrite for M17
 
-## Priority:
+### ⚠️ NEEDS EXTENSIVE UPDATES
 
-1. High: fullerstack-substrates README features and quick start
-2. High: fullerstack-serventis README
-3. Medium: Architecture docs
-4. Low: Example docs (can be updated incrementally)
+#### docs/ARCHITECTURE.md - CRITICAL
+Found 45+ references to removed implementations:
+- LazyTrieRegistry, RegistryFactory, NameFactory, QueueFactory
+- InternedName, identity map optimization
+- Sequencer/Segment (now Flow/Sift)
+
+**Recommendation:** Archive and rewrite from scratch focusing on:
+- NameNode implementation
+- CellNode hierarchies
+- Virtual CPU core pattern
+- M17 sealed interfaces
+- Simplified caching (just ConcurrentHashMap)
+
+#### docs/IMPLEMENTATION-GUIDE.md - CRITICAL
+30+ references to removed optimizations.
+This guide is almost entirely about things we removed!
+
+**Recommendation:** Archive and rewrite as "Best Practices" guide:
+- NameNode usage patterns
+- Flow/Sift transformations
+- Resource lifecycle management
+- Testing strategies
+
+#### docs/PERFORMANCE.md - CRITICAL
+40+ references to identity map benchmarks we no longer have.
+
+**Recommendation:** Rewrite focusing on:
+- Test suite performance (247 tests in ~16s)
+- Production readiness claims
+- Virtual CPU core benefits
+- Shared scheduler optimization
+
+#### docs/CONCEPTS.md - MAJOR UPDATES
+25+ references to removed implementations.
+
+**Recommendation:** Update to remove:
+- Factory pattern sections
+- Identity map sections
+- Name implementation comparisons
+Update transformation sections (Sequencer → Flow/Sift)
+
+### ✓ SHOULD BE CURRENT
+- docs/ASYNC-ARCHITECTURE.md - Verify no outdated references
+
+### 📝 CHECK LATER
+- docs/examples/*.md - May have outdated API usage patterns
+
+## Recommended Approach:
+
+Given the extensive outdated content, I recommend:
+
+1. **Archive outdated docs** to docs/archive/pre-m17-refactoring/
+2. **Rewrite critical docs** from scratch rather than trying to edit
+3. **Focus on current implementation** not removed optimizations
