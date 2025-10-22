@@ -1,18 +1,63 @@
-# Fullerstack Substrates Architecture
-
-## Overview
-
-This document describes the architecture of the Fullerstack Substrates implementation for the [Humainary Substrates API M17](https://github.com/humainary-io/substrates-api-java).
-
-**Design Philosophy:** Simplified, lean implementation focused on correctness, clarity, and production readiness rather than premature optimization.
+# Fullerstack Substrates - Architecture & Core Concepts
 
 **API Version:** M17 (Sealed Interfaces)
 **Java Version:** 25 (LTS with Virtual Threads)
-**Implementation Status:** Production-ready (247 tests passing)
+**Status:** Production-ready (247 tests passing)
 
 ---
 
-## Architecture Principles
+## Table of Contents
+
+1. [What is Substrates?](#what-is-substrates)
+2. [Design Philosophy](#design-philosophy)
+3. [M17 Sealed Hierarchy](#m17-sealed-hierarchy)
+4. [Core Entities](#core-entities)
+5. [Data Flow](#data-flow)
+6. [Implementation Details](#implementation-details)
+7. [Thread Safety](#thread-safety)
+8. [Resource Lifecycle](#resource-lifecycle)
+
+---
+
+## What is Substrates?
+
+**Substrates** is a framework for building event-driven observability systems based on William Louth's **semiotic observability** vision.
+
+### The Observability Evolution
+
+```
+Metrics (traditional numbers)
+    ↓
+Signs (observations with meaning)
+    ↓
+Symptoms (patterns in signs)
+    ↓
+Syndromes (correlated symptoms)
+    ↓
+Situations (system states)
+    ↓
+Steering (automated responses)
+```
+
+**Substrates** provides the infrastructure layer, **Serventis** provides the semantic signal types.
+
+### Key Capabilities
+
+- ✅ **Type-safe event routing** - From producers to consumers via Channels/Pipes
+- ✅ **Transformation pipelines** - Filter, map, reduce, limit, sample emissions
+- ✅ **Dynamic subscription** - Observers subscribe/unsubscribe at runtime
+- ✅ **Precise ordering** - Virtual CPU core pattern guarantees FIFO processing
+- ✅ **Hierarchical naming** - Dot-notation organization (kafka.broker.1.metrics)
+- ✅ **Resource lifecycle** - Automatic cleanup with Scope
+- ✅ **Immutable state** - Thread-safe state via Slot API
+
+---
+
+## Design Philosophy
+
+**Core Principle:** Simplified, lean implementation focused on correctness, clarity, and production readiness.
+
+### Architecture Principles
 
 1. **Simplified Design** - Single implementations, no factory abstractions
 2. **M17 Sealed Hierarchy** - Type-safe API contracts enforced by sealed interfaces
@@ -22,13 +67,24 @@ This document describes the architecture of the Fullerstack Substrates implement
 6. **Thread Safety** - Concurrent collections where needed, immutability elsewhere
 7. **Clear Separation** - Public API (interfaces) vs internal implementation (concrete classes)
 
+### What We DON'T Do
+
+❌ **No premature optimization** - Keep it simple
+❌ **No factory abstractions** - Direct component creation
+❌ **No complex caching** - Just ConcurrentHashMap
+❌ **No identity maps** - Standard Java equality
+
+**Philosophy:** Build it simple, build it correct, optimize when profiling shows actual bottlenecks.
+
 ---
 
-## M17 Sealed Interface Hierarchy
+## M17 Sealed Hierarchy
 
-The Substrates API M17 uses sealed interfaces to enforce correct type composition:
+### Sealed Interfaces (Java JEP 409)
 
-```
+M17 uses sealed interfaces to restrict which classes can implement them:
+
+```java
 sealed interface Source<E> permits Context
 sealed interface Context<E, S> permits Component
 sealed interface Component<E, S> permits Circuit, Clock, Container
@@ -44,25 +100,51 @@ non-sealed interface Pipe<E>
 non-sealed interface Sink<E>
 ```
 
-**What This Means:**
-- ✅ We **can** implement: Circuit, Conduit, Cell, Clock, Channel, Pipe, Sink
-- ❌ We **cannot** implement: Source, Context, Component, Container (sealed)
-- The API controls the type hierarchy to prevent incorrect compositions
+### What This Means
 
-**Impact on Our Implementation:**
-- `SourceImpl` does not implement `Source` interface (it's sealed)
-- `SourceImpl` is an internal utility for subscriber management
-- Circuit/Conduit/Cell extend sealed types and inherit `subscribe()` from Source
+✅ **You CAN implement:** Circuit, Conduit, Cell, Clock, Channel, Pipe, Sink
+❌ **You CANNOT implement:** Source, Context, Component, Container (sealed)
+
+The API controls the type hierarchy to prevent incorrect compositions.
+
+### Impact on Implementation
+
+**SourceImpl doesn't implement Source:**
+
+```java
+// Source is sealed, so this won't compile:
+public class SourceImpl<E> implements Source<E> { }  // ❌
+
+// Instead, SourceImpl is an internal utility:
+public class SourceImpl<E> {
+    public Subscription subscribe(Subscriber<E> subscriber) { }  // ✅
+}
+```
+
+**Circuit/Conduit/Cell extend sealed types:**
+
+```java
+// These extend Context (which extends Source), so they inherit subscribe()
+public class CircuitImpl implements Circuit { }  // ✅
+public class ConduitImpl<P, E> implements Conduit<P, E> { }  // ✅
+public class CellNode<I, E> implements Cell<I, E> { }  // ✅
+```
 
 ---
 
-## Core Components
+## Core Entities
 
-### 1. CortexRuntime (Entry Point)
+### 1. Cortex (Entry Point)
 
 **Purpose:** Factory for creating Circuits and Scopes
 
-**Implementation:** `io.fullerstack.substrates.CortexRuntime`
+```java
+Cortex cortex = CortexRuntime.create();
+Circuit circuit = cortex.circuit(cortex.name("kafka"));
+Name brokerName = cortex.name("kafka.broker.1");
+```
+
+**Implementation:**
 
 ```java
 public class CortexRuntime implements Cortex {
@@ -73,129 +155,128 @@ public class CortexRuntime implements Cortex {
     public Circuit circuit(Name name) {
         return circuits.computeIfAbsent(name, CircuitImpl::new);
     }
-
-    @Override
-    public Name name(String path) {
-        return NameNode.of(path);  // Creates hierarchical dot-notation name
-    }
 }
 ```
 
-**Key Features:**
-- Simple ConcurrentHashMap for component caching
-- Thread-safe `computeIfAbsent()` for lazy creation
-- NameNode handles hierarchical name creation
-
 ---
 
-### 2. NameNode (Hierarchical Naming)
+### 2. Circuit (Event Orchestration Hub)
 
-**Purpose:** Hierarchical dot-notation names (e.g., "kafka.broker.1")
+**Purpose:** Central processing engine with virtual CPU core pattern
 
-**Implementation:** `io.fullerstack.substrates.name.NameNode`
+**Key Features:**
+- Single virtual thread processes events in FIFO order
+- Contains Conduits and Clocks
+- Shared ScheduledExecutorService for all Clocks
+- Component lifecycle management
 
 ```java
-public final class NameNode implements Name {
-    private final NameNode parent;
-    private final String segment;
-    private final String cachedPath;  // Cached for performance
+Circuit circuit = cortex.circuit(cortex.name("kafka.monitoring"));
 
-    public static Name of(String path) {
-        String[] segments = path.split("\\.");
-        Name current = new NameNode(null, segments[0]);
-        for (int i = 1; i < segments.length; i++) {
-            current = current.name(segments[i]);
-        }
-        return current;
-    }
+Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
+    circuit.conduit(cortex.name("monitors"), Composer.pipe());
 
-    @Override
-    public Name name(String segment) {
-        return new NameNode(this, segment);
-    }
-
-    @Override
-    public CharSequence path(char separator) {
-        return cachedPath;  // Always uses '.' separator
-    }
-}
+Clock clock = circuit.clock(cortex.name("timer"));
 ```
 
-**Key Features:**
-- Immutable parent-child structure
-- Cached path string (built once in constructor)
-- Always uses '.' as separator (Name.SEPARATOR = '.')
-- Hierarchical: `broker.name("metrics").name("bytes-in")` → "broker.metrics.bytes-in"
+**Virtual CPU Core Pattern:**
 
----
+```
+Events → BlockingQueue → Single Virtual Thread → FIFO Processing → Subscribers
+```
 
-### 3. CircuitImpl (Event Orchestration Hub)
+**Guarantees:** Events processed in exact order received, no race conditions.
 
-**Purpose:** Central processing engine with virtual CPU core pattern for precise event ordering
-
-**Implementation:** `io.fullerstack.substrates.circuit.CircuitImpl`
+**Implementation:**
 
 ```java
-public final class CircuitImpl implements Circuit {
-    private final Name name;
-    private final ExecutorService executor;  // Single virtual thread
-    private final BlockingQueue<Runnable> queue;
+public class CircuitImpl implements Circuit {
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+    private final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final Map<Name, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
     private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService scheduler;  // Shared by all Clocks
-    private final SourceImpl<State> stateSource;
-
-    public CircuitImpl(Name name) {
-        this.name = name;
-        this.queue = new LinkedBlockingQueue<>();
-        this.executor = Executors.newVirtualThreadPerTaskExecutor();
-        this.scheduler = Executors.newScheduledThreadPool(1);
-        this.stateSource = new SourceImpl<>();
-        startProcessing();
-    }
 
     private void startProcessing() {
         executor.submit(() -> {
             while (!Thread.currentThread().isInterrupted()) {
-                try {
-                    Runnable task = queue.take();
-                    task.run();  // Execute in FIFO order
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
+                Runnable task = queue.take();  // Blocks until available
+                task.run();  // Execute in FIFO order
             }
         });
     }
 }
 ```
 
-**Key Features:**
-- **Virtual CPU Core Pattern**: Single virtual thread processes events from FIFO queue
-- **Precise Ordering**: Events processed in exact order received
-- **Shared Scheduler**: All Clocks in this Circuit share one ScheduledExecutorService
-- **Component Caching**: ConcurrentHashMap for Conduits and Clocks
+---
 
-**Virtual Thread Benefits:**
-- Lightweight (thousands of virtual threads possible)
-- Automatically managed by JVM
-- Clean daemon thread cleanup on JVM shutdown
+### 3. Name (Hierarchical Identity)
+
+**Purpose:** Dot-notation hierarchical names (e.g., "kafka.broker.1")
+
+**NameNode Implementation:**
+
+```java
+public final class NameNode implements Name {
+    private final NameNode parent;       // Parent in hierarchy
+    private final String segment;        // This segment
+    private final String cachedPath;     // Full path cached
+
+    public static Name of(String path) {
+        // Creates hierarchy from "kafka.broker.1"
+    }
+
+    @Override
+    public Name name(String segment) {
+        return new NameNode(this, segment);  // Create child
+    }
+}
+```
+
+**Building Hierarchical Names:**
+
+```java
+// From string
+Name name = cortex.name("kafka.broker.1.metrics.bytes-in");
+
+// Hierarchically
+Name kafka = cortex.name("kafka");
+Name broker = kafka.name("broker").name("1");
+Name metrics = broker.name("metrics");
+Name bytesIn = metrics.name("bytes-in");
+// Result: "kafka.broker.1.metrics.bytes-in"
+```
 
 ---
 
-### 4. ConduitImpl (Channel/Pipe/Source Coordinator)
+### 4. Conduit (Container)
 
-**Purpose:** Container that creates Channels, manages Pipes, and provides Source for subscriptions
-
-**Implementation:** `io.fullerstack.substrates.conduit.ConduitImpl`
+**Purpose:** Creates Channels and manages subscriber notifications
 
 ```java
-public final class ConduitImpl<P, E> implements Conduit<P, E> {
-    private final Name name;
-    private final Circuit circuit;
+Conduit<Pipe<String>, String> messages =
+    circuit.conduit(cortex.name("messages"), Composer.pipe());
+
+// Get Pipe for specific subject
+Pipe<String> pipe = messages.get(cortex.name("user.login"));
+pipe.emit("User logged in");
+
+// Subscribe to all subjects (Conduit IS-A Source in M17)
+messages.subscribe(
+    cortex.subscriber(
+        cortex.name("logger"),
+        (subject, registrar) -> registrar.register(msg -> log.info(msg))
+    )
+);
+```
+
+**Implementation:**
+
+```java
+public class ConduitImpl<P, E> implements Conduit<P, E> {
     private final SourceImpl<E> source;  // Internal subscriber management
     private final Map<Name, ChannelImpl<E>> channels = new ConcurrentHashMap<>();
-    private final Consumer<Flow<E>> flowConfigurer;  // Flow/Sift transformations
+    private final Consumer<Flow<E>> flowConfigurer;  // Transformations
 
     @Override
     public P get(Name subject) {
@@ -203,7 +284,7 @@ public final class ConduitImpl<P, E> implements Conduit<P, E> {
             subject,
             s -> new ChannelImpl<>(s, circuit.scheduler(), source, flowConfigurer)
         );
-        return (P) channel.pipe();  // Return Pipe for this subject
+        return (P) channel.pipe();
     }
 
     @Override
@@ -213,39 +294,15 @@ public final class ConduitImpl<P, E> implements Conduit<P, E> {
 }
 ```
 
-**Key Features:**
-- **Conduit IS-A Source**: Implements subscribe() by delegating to SourceImpl
-- **Channel Factory**: Creates Channels on-demand via `get(Name subject)`
-- **Flow Configuration**: Passes Flow/Sift transformations to all Channels
-- **Thread-Safe**: ConcurrentHashMap for concurrent channel access
-
-**Conduit in M17:**
-- Extends Container which extends Component which extends Context which extends Source
-- Inherits `subscribe()` from Source interface
-- SourceImpl provides the actual implementation
-
 ---
 
-### 5. ChannelImpl (Emission Port)
+### 5. Channel & Pipe (Emission)
 
-**Purpose:** Named emission port linking producers to the event stream
-
-**Implementation:** `io.fullerstack.substrates.channel.ChannelImpl`
+**Channel:** Named emission port
 
 ```java
-public final class ChannelImpl<E> implements Channel<E> {
-    private final Name name;
-    private final Scheduler scheduler;
-    private final SourceImpl<E> source;  // Reference to Conduit's source
+public class ChannelImpl<E> implements Channel<E> {
     private final PipeImpl<E> pipe;
-
-    public ChannelImpl(Name name, Scheduler scheduler, SourceImpl<E> source,
-                       Consumer<Flow<E>> flowConfigurer) {
-        this.name = name;
-        this.scheduler = scheduler;
-        this.source = source;
-        this.pipe = new PipeImpl<>(source, flowConfigurer);
-    }
 
     @Override
     public Pipe<E> pipe() {
@@ -254,126 +311,79 @@ public final class ChannelImpl<E> implements Channel<E> {
 }
 ```
 
-**Key Features:**
-- Creates PipeImpl with transformation configuration
-- Passes SourceImpl reference to Pipe for emissions
-- Lightweight - just connects producer to infrastructure
-
----
-
-### 6. PipeImpl (Event Transformation)
-
-**Purpose:** Event transformation pipeline with Flow/Sift operations
-
-**Implementation:** `io.fullerstack.substrates.pipe.PipeImpl`
+**Pipe:** Event transformation and emission
 
 ```java
-public final class PipeImpl<E> implements Pipe<E> {
+public class PipeImpl<E> implements Pipe<E> {
     private final SourceImpl<E> source;
     private final List<Function<E, E>> transformations = new ArrayList<>();
     private final List<Predicate<E>> filters = new ArrayList<>();
-    private int limit = Integer.MAX_VALUE;
-    private int sampleRate = 1;
-    private int emissionCount = 0;
-
-    public PipeImpl(SourceImpl<E> source, Consumer<Flow<E>> flowConfigurer) {
-        this.source = source;
-        if (flowConfigurer != null) {
-            flowConfigurer.accept(new FlowImpl<>(this));
-        }
-    }
 
     @Override
     public void emit(E event) {
-        if (emissionCount >= limit) return;
-        if (++emissionCount % sampleRate != 0) return;
+        // Apply transformations
+        E transformed = applyTransformations(event);
+        if (transformed == null) return;
 
-        E transformed = event;
-        for (Function<E, E> transform : transformations) {
-            transformed = transform.apply(transformed);
-            if (transformed == null) return;
-        }
-
-        for (Predicate<E> filter : filters) {
-            if (!filter.test(transformed)) return;
-        }
-
-        source.emit(transformed);  // Send to subscribers
+        // Emit to subscribers
+        source.emit(transformed);
     }
 }
 ```
 
-**Key Features:**
-- **Transformations**: map, filter, limit, sample
-- **Flow/Sift API**: Fluent configuration via Consumer<Flow<E>>
-- **Direct Emission**: After transformations, emits directly to SourceImpl
+**With Transformations (Flow/Sift):**
 
-**Flow/Sift Example:**
 ```java
 Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-    name,
+    cortex.name("filtered-numbers"),
     Composer.pipe(flow -> flow
-        .sift(n -> n > 0)      // Filter: only positive
-        .limit(100)            // Max 100 emissions
-        .sample(10)            // Every 10th emission
+        .sift(n -> n > 0)     // Only positive
+        .limit(100)           // Max 100 emissions
+        .sample(10)           // Every 10th
     )
 );
 ```
 
 ---
 
-### 7. SourceImpl (Subscriber Management)
+### 6. Cell (Hierarchical Transformation)
 
-**Purpose:** Internal utility for managing subscribers (does NOT implement Source interface)
-
-**Implementation:** `io.fullerstack.substrates.source.SourceImpl`
+**Purpose:** Type transformation with parent-child hierarchy (I → E)
 
 ```java
-public class SourceImpl<E> {
-    private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
+// Level 1: JMX stats → Broker health
+Cell<JMXStats, BrokerHealth> brokerCell = circuit.cell(
+    cortex.name("broker-1"),
+    stats -> assessBrokerHealth(stats)
+);
 
-    public Subscription subscribe(Subscriber<E> subscriber) {
-        subscribers.add(subscriber);
+// Level 2: Broker health → Cluster health
+Cell<BrokerHealth, ClusterHealth> clusterCell = brokerCell.cell(
+    cortex.name("cluster"),
+    health -> aggregateClusterHealth(health)
+);
 
-        // Trigger subscriber callback with registrar
-        subscriber.accept(name, registrar -> {
-            // Registrar allows subscriber to register consumer Pipes
-        });
+// Subscribe to cluster health
+clusterCell.subscribe(
+    cortex.subscriber(
+        cortex.name("alerting"),
+        (subject, registrar) -> registrar.register(health -> {
+            if (health.status() == ClusterStatus.CRITICAL) {
+                sendAlert(health);
+            }
+        })
+    )
+);
 
-        return () -> subscribers.remove(subscriber);
-    }
-
-    public void emit(E event) {
-        for (Subscriber<E> subscriber : subscribers) {
-            // Notify all subscribers of emission
-        }
-    }
-}
+// Input at top level
+brokerCell.input(jmxClient.fetchStats());
+// Transformed through hierarchy → cluster health emitted
 ```
 
-**Key Features:**
-- **CopyOnWriteArrayList**: Read-optimized for subscriber iteration
-- **Thread-Safe**: Multiple threads can subscribe/emit concurrently
-- **Does NOT implement Source**: Source is sealed in M17
-- **Internal Use Only**: Used by Circuit, Conduit, Cell, Clock, Channel
-
-**Why SourceImpl Doesn't Implement Source:**
-- M17 made `Source` sealed, only permitting `Context`
-- Only Circuit/Conduit/Cell/Clock (which extend Context) can implement Source
-- SourceImpl is an internal implementation detail, not part of public API
-
----
-
-### 8. CellNode (Hierarchical State Transformation)
-
-**Purpose:** Hierarchical container with type transformation (I → E)
-
-**Implementation:** `io.fullerstack.substrates.cell.CellNode`
+**Implementation:**
 
 ```java
-public final class CellNode<I, E> implements Cell<I, E> {
-    private final Name name;
-    private final CellNode<?, I> parent;  // Parent in hierarchy
+public class CellNode<I, E> implements Cell<I, E> {
     private final Function<I, E> transformer;  // I → E transformation
     private final SourceImpl<E> source;
     private final Map<Name, CellNode<E, ?>> children = new ConcurrentHashMap<>();
@@ -388,131 +398,134 @@ public final class CellNode<I, E> implements Cell<I, E> {
     public void input(I value) {
         E transformed = transformer.apply(value);
         source.emit(transformed);  // Emit to subscribers
-        // Children can subscribe and transform further
     }
 }
 ```
 
-**Key Features:**
-- **Type Transformation**: Each level transforms input type to output type
-- **Parent-Child Hierarchy**: Build trees of transforming cells
-- **Observable**: Each Cell is a Source, can subscribe to transformations
-
-**Example Use Case:**
-```java
-// Broker stats (JMX) → Health assessment → Cluster health
-Cell<JMXStats, BrokerHealth> brokerCell = circuit.cell(
-    name("broker-1"),
-    stats -> assessBrokerHealth(stats)
-);
-
-Cell<BrokerHealth, ClusterHealth> clusterCell = brokerCell.cell(
-    name("cluster"),
-    health -> aggregateClusterHealth(health)
-);
-```
-
 ---
 
-### 9. ClockImpl (Scheduled Events)
+### 7. Clock (Scheduled Events)
 
 **Purpose:** Timer utility for time-driven behaviors
 
-**Implementation:** `io.fullerstack.substrates.clock.ClockImpl`
-
 ```java
-public final class ClockImpl implements Clock {
-    private final Name name;
-    private final ScheduledExecutorService scheduler;  // Shared across Circuit
-    private final SourceImpl<Instant> source;
-    private final Map<Cycle, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
+Clock clock = circuit.clock(cortex.name("poller"));
 
-    @Override
-    public Subscription consume(Name name, Cycle cycle, Consumer<Instant> consumer) {
-        ScheduledFuture<?> task = scheduler.scheduleAtFixedRate(
-            () -> consumer.accept(Instant.now()),
-            0,
-            cycle.duration().toMillis(),
-            TimeUnit.MILLISECONDS
-        );
-
-        tasks.put(cycle, task);
-        return () -> {
-            task.cancel(false);
-            tasks.remove(cycle);
-        };
+// Poll every second
+clock.consume(
+    cortex.name("jmx-poll"),
+    Clock.Cycle.SECOND,
+    instant -> {
+        BrokerStats stats = jmxClient.fetchStats();
+        statsPipe.emit(stats);
     }
-}
+);
 ```
 
-**Key Features:**
-- **Shared Scheduler**: All Clocks in a Circuit share one ScheduledExecutorService
-- **Multiple Cycles**: Can have different consumers for SECOND, MINUTE, HOUR, etc.
-- **Observable**: Emits Instant on each tick, subscribers can observe
+**Shared Scheduler Optimization:**
 
-**Shared Scheduler Benefits:**
-- Reduced thread overhead (one scheduler for entire Circuit)
-- Better resource utilization
-- Simpler lifecycle management
+All Clocks in a Circuit share one ScheduledExecutorService:
+
+```java
+Circuit circuit = cortex.circuit(cortex.name("kafka"));
+Clock clock1 = circuit.clock(cortex.name("clock-1"));  // Uses circuit scheduler
+Clock clock2 = circuit.clock(cortex.name("clock-2"));  // Same scheduler
+Clock clock3 = circuit.clock(cortex.name("clock-3"));  // Same scheduler
+```
+
+**Benefits:** Reduced thread overhead, better resource utilization.
 
 ---
 
-### 10. ScopeImpl (Resource Lifecycle)
+### 8. Scope (Resource Lifecycle)
 
-**Purpose:** Hierarchical resource lifecycle management
-
-**Implementation:** `io.fullerstack.substrates.scope.ScopeImpl`
+**Purpose:** Automatic resource cleanup
 
 ```java
-public final class ScopeImpl implements Scope {
-    private final Name name;
-    private final List<Resource> resources = new CopyOnWriteArrayList<>();
+Scope scope = cortex.scope(cortex.name("session"));
 
-    @Override
-    public <R extends Resource> R register(R resource) {
-        resources.add(resource);
-        return resource;
+Circuit circuit = scope.register(cortex.circuit(cortex.name("kafka")));
+Conduit<Pipe<Event>, Event> events = scope.register(
+    circuit.conduit(cortex.name("events"), Composer.pipe())
+);
+
+// Use resources...
+
+scope.close();  // Closes all registered resources automatically
+```
+
+---
+
+### 9. SourceImpl (Internal Subscriber Management)
+
+**Purpose:** Internal utility for managing subscribers (does NOT implement Source)
+
+```java
+public class SourceImpl<E> {
+    private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
+
+    public Subscription subscribe(Subscriber<E> subscriber) {
+        subscribers.add(subscriber);
+        return () -> subscribers.remove(subscriber);
     }
 
-    @Override
-    public void close() {
-        for (Resource resource : resources) {
-            try {
-                resource.close();
-            } catch (Exception e) {
-                // Log but continue closing other resources
-            }
+    public void emit(E event) {
+        for (Subscriber<E> subscriber : subscribers) {
+            // Notify all subscribers
         }
-        resources.clear();
     }
 }
 ```
 
-**Key Features:**
-- **Automatic Cleanup**: Close all registered resources in one call
-- **Exception Safety**: Continues closing even if one resource fails
-- **Hierarchical**: Scopes can contain other scopes
+**Why CopyOnWriteArrayList?**
+- Read-heavy workload (many emits, few subscribes)
+- Emissions happen millions/second
+- Subscriptions happen rarely (at startup)
+- No lock contention during hot path
 
 ---
 
-## Data Flow Architecture
+### 10. State & Slot (Immutable State)
 
-### Producer → Consumer Flow
+**Purpose:** Thread-safe state management
+
+```java
+// Create state
+State state = State.of(
+    Slot.of("broker-id", 1),
+    Slot.of("heap-used", 850_000_000L),
+    Slot.of("status", "HEALTHY")
+);
+
+// Access values (type-safe)
+Optional<Integer> brokerId = state.get(Slot.of("broker-id"));
+
+// State is immutable - create new state to change
+State newState = state.set(Slot.of("heap-used", 900_000_000L));
+```
+
+---
+
+## Data Flow
+
+### Producer → Consumer Path
 
 ```
-1. Producer Side:
-   conduit.get(name)           → Returns Pipe for subject
-   pipe.emit(value)            → Applies transformations
-                               → Emits to SourceImpl
+1. Producer:
+   conduit.get(name) → Returns Pipe
+   pipe.emit(value) → Applies transformations
 
-2. SourceImpl Processing:
-   source.emit(value)          → Iterates subscribers
-                               → Calls subscriber callbacks
+2. Pipe:
+   Transformations applied (sift, limit, sample)
+   Transformed value → SourceImpl.emit()
 
-3. Consumer Side:
-   conduit.subscribe(sub)      → Registers subscriber
-   subscriber.accept(registrar) → Sets up consumer Pipe
-   registrar.register(pipe)    → Consumer receives emissions
+3. SourceImpl:
+   Iterates subscribers (CopyOnWriteArrayList)
+   Calls subscriber callbacks
+
+4. Subscriber:
+   Receives emission via registered Pipe
+   Processes event
 ```
 
 ### Virtual CPU Core Pattern
@@ -521,23 +534,25 @@ public final class ScopeImpl implements Scope {
 Circuit Queue (FIFO):
   [Event 1] → [Event 2] → [Event 3] → ...
       ↓
-  Single Virtual Thread
+  Single Virtual Thread (daemon)
       ↓
-  Process in Order
+  Process in Order (no race conditions)
       ↓
   Emit to Subscribers
 ```
 
-**Guarantees:**
-- Events processed in exact order received
-- No race conditions within Circuit
-- Predictable, deterministic behavior
+**Critical Insight:**
+- `pipe.emit(value)` returns **immediately** (async boundary)
+- Subscriber callbacks execute **asynchronously** on Queue thread
+- **MUST use `circuit.await()` in tests** to wait for processing
 
 ---
 
-## Caching Strategy
+## Implementation Details
 
-**Simple and Effective:**
+### Caching Strategy
+
+Simple and effective - ConcurrentHashMap everywhere:
 
 ```
 CortexRuntime
@@ -556,29 +571,49 @@ CellNode
 ```
 
 **Key Points:**
-- ConcurrentHashMap for all component caching
 - `computeIfAbsent()` for thread-safe lazy creation
-- No complex optimizations - just standard Java collections
+- No complex optimizations - standard Java collections
 - Fast enough for production (100k+ metrics @ 1Hz)
+
+---
+
+### Performance Characteristics
+
+**Test Suite:**
+- 247 tests in ~16 seconds
+- 0 failures, 0 errors
+
+**Production Target:**
+- 100k+ metrics @ 1Hz
+- ~2% CPU usage (estimated)
+- ~200-300MB memory
+
+**Per-Operation Costs:**
+- Component lookup: ~5-10ns (ConcurrentHashMap)
+- Pipe emission: ~100-300ns (with transformations)
+- Subscriber notification: ~20-50ns per subscriber
 
 ---
 
 ## Thread Safety
 
 ### Concurrent Components
-- **ConcurrentHashMap**: All component caches
-- **CopyOnWriteArrayList**: Subscriber lists (read-heavy workload)
-- **BlockingQueue**: Circuit event queue
+
+- **ConcurrentHashMap** - All component caches
+- **CopyOnWriteArrayList** - Subscriber lists (read-heavy)
+- **BlockingQueue** - Circuit event queue
 
 ### Immutable Components
-- **NameNode**: Immutable parent-child structure
-- **State/Slot**: Immutable state management
-- **Signal Types**: Immutable records (in serventis module)
+
+- **NameNode** - Immutable parent-child structure
+- **State/Slot** - Immutable state management
+- **Signal Types** - Immutable records (Serventis)
 
 ### Synchronization Points
-- **Circuit Queue**: Single thread processes, FIFO ordering
-- **Component Creation**: `computeIfAbsent()` handles races
-- **Subscriber Registration**: CopyOnWriteArrayList handles concurrent adds
+
+- **Circuit Queue** - Single thread, FIFO ordering
+- **Component Creation** - `computeIfAbsent()` handles races
+- **Subscriber Registration** - CopyOnWriteArrayList handles concurrent adds
 
 ---
 
@@ -591,7 +626,6 @@ Scope.close()
   → Circuit.close()
     → Conduit.close()
       → Channel.close()
-        → Pipe.close()
     → Clock.close()
       → Cancel scheduled tasks
     → Shutdown executor
@@ -599,98 +633,32 @@ Scope.close()
 ```
 
 **Best Practices:**
-1. Always close Circuits when done
-2. Use Scope for automatic cleanup
-3. Use try-with-resources where possible
-4. Virtual threads auto-cleanup on JVM shutdown (daemon threads)
-
----
-
-## State Management
-
-**Immutable Slot-Based State:**
 
 ```java
-State state = State.of(
-    Slot.of("key1", "value1"),
-    Slot.of("key2", 42),
-    Slot.of("key3", Instant.now())
-);
+// 1. Try-with-resources
+try (Circuit circuit = cortex.circuit(cortex.name("test"))) {
+    // Use circuit
+}
 
-// State is immutable - create new state to change
-State newState = state.set(Slot.of("key1", "updated"));
+// 2. Scope for grouped cleanup
+Scope scope = cortex.scope(cortex.name("session"));
+Circuit circuit = scope.register(cortex.circuit(cortex.name("kafka")));
+scope.close();  // Closes all registered resources
+
+// 3. Manual cleanup
+Circuit circuit = cortex.circuit(cortex.name("kafka"));
+try {
+    // Use circuit
+} finally {
+    circuit.close();
+}
 ```
-
-**Key Features:**
-- Type-safe slots with generics
-- Immutable - no shared mutable state
-- Value semantics - equality by content
-- Thread-safe by design (no synchronization needed)
-
----
-
-## Performance Characteristics
-
-### Test Suite Performance
-- **247 tests** complete in ~16 seconds
-- **0 failures, 0 errors**
-- Integration tests include multi-threading and timing scenarios
-
-### Production Readiness
-- Designed for Kafka monitoring: **100k+ metrics @ 1Hz**
-- Virtual CPU core pattern ensures ordered processing
-- Resource cleanup via Scope prevents memory leaks
-- ConcurrentHashMap fast enough for all realistic workloads
-
-### Optimization Approach
-**Philosophy:** Optimize when needed, not prematurely
-
-- ✅ **Simple design** - Easy to understand and maintain
-- ✅ **Standard collections** - ConcurrentHashMap, CopyOnWriteArrayList
-- ✅ **Virtual threads** - Lightweight, scalable
-- ✅ **Immutable state** - No synchronization overhead
-- ❌ **No premature optimization** - Keep it simple
-
-**If performance becomes an issue:**
-1. Profile first - find the actual bottleneck
-2. Optimize hot path only
-3. Keep optimizations localized
-4. Document why optimization was needed
-
----
-
-## Design Patterns
-
-### 1. Factory Pattern (Simplified)
-- Cortex creates Circuits and Scopes
-- Circuit creates Conduits and Clocks
-- Conduit creates Channels
-- No factory abstractions - just direct creation
-
-### 2. Observer Pattern
-- Source provides subscribe()
-- Subscribers register to receive events
-- SourceImpl manages subscriber list
-
-### 3. Composite Pattern
-- NameNode parent-child hierarchy
-- CellNode parent-child hierarchy
-- Scope contains Resources
-
-### 4. Builder Pattern
-- State built via Slot.of()
-- Flow built via fluent API (sift, limit, sample)
-
-### 5. Virtual CPU Pattern
-- Single virtual thread per Circuit
-- FIFO queue for events
-- Precise ordering guarantees
 
 ---
 
 ## Integration with Serventis
 
-**Serventis** provides semantic signal types, **Substrates** provides infrastructure:
+**Example: Kafka Broker Monitoring**
 
 ```java
 // Create Circuit
@@ -722,7 +690,6 @@ monitors.subscribe(
         cortex.name("health-aggregator"),
         (subject, registrar) -> {
             registrar.register(s -> {
-                // Process signal
                 if (s.status() == MonitorStatus.DEGRADED) {
                     // Take action
                 }
@@ -734,35 +701,9 @@ monitors.subscribe(
 
 ---
 
-## Testing Strategy
-
-### Unit Tests
-- Individual component behavior
-- NameNode hierarchy
-- State/Slot immutability
-- Flow/Sift transformations
-
-### Integration Tests
-- Circuit event processing
-- Conduit/Channel/Pipe flow
-- Subscriber notifications
-- Clock timing behavior
-
-### Thread Safety Tests
-- Concurrent emissions
-- Concurrent subscriptions
-- Concurrent component creation
-
-### Resource Cleanup Tests
-- Circuit close
-- Scope close
-- Clock task cancellation
-
----
-
 ## Summary
 
-**Fullerstack Substrates** is a simplified, production-ready implementation of the Humainary Substrates API M17:
+**Fullerstack Substrates:**
 
 ✅ **Simple** - No complex optimizations, easy to understand
 ✅ **Correct** - 247 tests passing, proper M17 sealed interface usage
@@ -780,6 +721,5 @@ monitors.subscribe(
 - [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java)
 - [Observability X Blog Series](https://humainary.io/blog/category/observability-x/)
 - [M17 Migration Guide](../../API-ANALYSIS.md)
-- [Performance Guide](PERFORMANCE.md)
-- [Best Practices](BEST-PRACTICES.md)
+- [Developer Guide](DEVELOPER-GUIDE.md)
 - [Async Architecture](ASYNC-ARCHITECTURE.md)

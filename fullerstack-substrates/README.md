@@ -41,7 +41,7 @@ Substrates is optimized for high-throughput, low-latency observability with a si
 - Virtual CPU core pattern ensures ordered event processing
 - Resource cleanup via Scope ensures no memory leaks
 
-See [Performance Guide](docs/PERFORMANCE.md) for detailed analysis.
+See [Developer Guide](docs/DEVELOPER-GUIDE.md) for performance details and best practices.
 
 ## Quick Start
 
@@ -161,24 +161,16 @@ scope.close();
 
 ## Documentation
 
-### Getting Started
-- **[Documentation Index](docs/DOCS-INDEX.md)** - Complete documentation map and navigation guide
-- **[Core Concepts](docs/CONCEPTS.md)** - Entities, relationships, and factory patterns
-- **[Async-First Architecture](docs/ASYNC-ARCHITECTURE.md)** ⚠️ **CRITICAL** - Understanding async queue processing
+**Core Documentation:**
+
+1. **[Architecture & Core Concepts](docs/ARCHITECTURE.md)** - System design, M17 sealed hierarchy, all core entities
+2. **[Developer Guide](docs/DEVELOPER-GUIDE.md)** - Best practices, performance tips, testing strategies
+3. **[Async-First Architecture](docs/ASYNC-ARCHITECTURE.md)** ⚠️ **CRITICAL** - Understanding async queue processing
+
+**Additional Resources:**
+
 - **[Examples](docs/examples/)** - Hands-on examples from simple to complex
-
-### Architecture & Implementation
-- **[Architecture Guide](docs/ARCHITECTURE.md)** - System design, data flow, and factory injection
-- **[Implementation Guide](docs/IMPLEMENTATION-GUIDE.md)** - Best practices and recommended patterns
-- **[Advanced Topics](docs/ADVANCED.md)** - Performance optimization, custom implementations, extensions
-
-### Performance
-- **[Performance Guide](docs/PERFORMANCE.md)** - ⭐ Authoritative performance analysis and benchmarks
-- **[Name Implementation Comparison](docs/name-implementation-comparison.md)** - Name strategy selection guide
-
-### Alignment
-- **[Substrates 101](docs/archive/alignment/substrates-101.md)** - Core philosophy and concepts (archived)
-- **[Alignment Overview](docs/archive/alignment/README.md)** - Humainary Substrates API alignment (archived)
+- **[M17 Migration Guide](../API-ANALYSIS.md)** - Sealed interfaces and migration from M16
 
 ## Key Concepts
 
