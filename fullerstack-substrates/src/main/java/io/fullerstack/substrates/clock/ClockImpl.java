@@ -5,13 +5,10 @@ import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameFactory;
-import io.fullerstack.substrates.name.InternedNameFactory;
+import io.fullerstack.substrates.name.NameTree;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -24,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  * <ul>
  *   <li>Event source for Instant emissions</li>
  *   <li>Periodic emission via consume() with Clock.Cycle</li>
- *   <li>Resource lifecycle management</li>
+ *   <li>Shared scheduler from Circuit (no per-clock thread pools)</li>
  * </ul>
  *
  * @see Clock
@@ -36,33 +33,32 @@ public class ClockImpl implements Clock {
     private volatile boolean closed = false;
 
     /**
-     * Creates a clock with the specified name.
+     * Creates a clock with the specified name and shared scheduler.
      *
      * @param name clock name
+     * @param scheduler shared ScheduledExecutorService from Circuit
      */
-    public ClockImpl(Name name) {
+    public ClockImpl(Name name, ScheduledExecutorService scheduler) {
         Objects.requireNonNull(name, "Clock name cannot be null");
+        Objects.requireNonNull(scheduler, "Scheduler cannot be null");
         Id id = IdImpl.generate();
-        this.clockSubject = new SubjectImpl(
+        this.clockSubject = new SubjectImpl<>(
             id,
             name,
             StateImpl.empty(),
-            Subject.Type.CLOCK
+            Clock.class
         );
         this.source = new SourceImpl<>(name);
-        this.scheduler = Executors.newScheduledThreadPool(1, r -> {
-            Thread thread = new Thread(r);
-            thread.setDaemon(true);
-            thread.setName("clock-" + name.part());
-            return thread;
-        });
+        this.scheduler = scheduler;
     }
 
     /**
-     * Creates a clock with default name using {@link InternedNameFactory}.
+     * Creates a clock with default name and shared scheduler.
+     *
+     * @param scheduler shared ScheduledExecutorService from Circuit
      */
-    public ClockImpl() {
-        this(InternedNameFactory.getInstance().createRoot("clock"));
+    public ClockImpl(ScheduledExecutorService scheduler) {
+        this(NameTree.of("clock"), scheduler);
     }
 
     @Override
@@ -70,9 +66,13 @@ public class ClockImpl implements Clock {
         return clockSubject;
     }
 
-    @Override
     public Source<Instant> source() {
         return source;
+    }
+
+    @Override
+    public Subscription subscribe(Subscriber<Instant> subscriber) {
+        return source.subscribe(subscriber);
     }
 
     @Override
@@ -103,11 +103,11 @@ public class ClockImpl implements Clock {
         return new Subscription() {
             private volatile boolean subscriptionClosed = false;
             private final Id subscriptionId = IdImpl.generate();
-            private final Subject subscriptionSubject = new SubjectImpl(
+            private final Subject subscriptionSubject = new SubjectImpl<>(
                 subscriptionId,
                 name.name(subscriptionId.toString()),
                 StateImpl.empty(),
-                Subject.Type.SUBSCRIPTION
+                Subscription.class
             );
 
             @Override
@@ -129,15 +129,8 @@ public class ClockImpl implements Clock {
     public void close() {
         if (!closed) {
             closed = true;
-            scheduler.shutdown();
-            try {
-                if (!scheduler.awaitTermination(1, TimeUnit.SECONDS)) {
-                    scheduler.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                scheduler.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
+            // Note: Clock no longer owns the scheduler - Circuit manages its lifecycle
+            // Just mark closed so consume() stops scheduling new tasks
         }
     }
 }

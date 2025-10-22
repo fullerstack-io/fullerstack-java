@@ -2,7 +2,7 @@ package io.fullerstack.substrates.integration;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.circuit.CircuitImpl;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameTree;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -35,10 +35,11 @@ class PipeCachingTest {
     /**
      * Helper to create a simple subscriber that collects emissions.
      */
-    private <E> Subscriber<E> subscriber(Subject subject, List<E> collector, CountDownLatch latch) {
+    @SuppressWarnings("unchecked")
+    private <E> Subscriber<E> subscriber(Subject<Subscriber<E>> subject, List<E> collector, CountDownLatch latch) {
         return new Subscriber<E>() {
             @Override
-            public void accept(Subject s, Registrar<E> registrar) {
+            public void accept(Subject<Channel<E>> s, Registrar<E> registrar) {
                 registrar.register(emission -> {
                     collector.add(emission);
                     latch.countDown();
@@ -46,7 +47,7 @@ class PipeCachingTest {
             }
 
             @Override
-            public Subject subject() {
+            public Subject<Subscriber<E>> subject() {
                 return subject;
             }
         };
@@ -54,17 +55,17 @@ class PipeCachingTest {
 
     @Test
     void shouldReturnSamePipeInstanceOnMultipleCalls() {
-        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
+        circuit = new CircuitImpl(NameTree.of("test-circuit"));
 
         // Create conduit with limit transformation
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new LinkedName("test-conduit", null),
+            NameTree.of("test-conduit"),
             Composer.pipe(path -> path.limit(3))
         );
 
         // Get the same channel twice - should be same instance (cached by Conduit)
-        Pipe<Integer> pipe1 = conduit.get(new LinkedName("channel-1", null));
-        Pipe<Integer> pipe2 = conduit.get(new LinkedName("channel-1", null));
+        Pipe<Integer> pipe1 = conduit.get(NameTree.of("channel-1"));
+        Pipe<Integer> pipe2 = conduit.get(NameTree.of("channel-1"));
 
         // Should return the SAME Pipe instance (cached by Conduit)
         assertThat(pipe1).isSameAs(pipe2);
@@ -72,22 +73,24 @@ class PipeCachingTest {
 
     @Test
     void shouldShareSegmentStateAcrossMultiplePipeCalls() throws InterruptedException {
-        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
+        circuit = new CircuitImpl(NameTree.of("test-circuit"));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(3);
 
         // Create conduit with limit(3)
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new LinkedName("test-conduit", null),
+            NameTree.of("test-conduit"),
             Composer.pipe(path -> path.limit(3))
         );
 
-        conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
+        @SuppressWarnings("unchecked")
+        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
+        conduit.subscribe(subscriber(subscriberSubject, received, latch));
 
         // Get pipe and verify it's the same instance on multiple calls
-        Pipe<Integer> pipe1 = conduit.get(new LinkedName("channel-1", null));
-        Pipe<Integer> pipe2 = conduit.get(new LinkedName("channel-1", null));
+        Pipe<Integer> pipe1 = conduit.get(NameTree.of("channel-1"));
+        Pipe<Integer> pipe2 = conduit.get(NameTree.of("channel-1"));
 
         assertThat(pipe1).isSameAs(pipe2);
 
@@ -104,22 +107,24 @@ class PipeCachingTest {
 
     @Test
     void shouldShareReduceAccumulatorState() throws InterruptedException {
-        circuit = new CircuitImpl(new LinkedName("test-circuit", null));
+        circuit = new CircuitImpl(NameTree.of("test-circuit"));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(4);
 
         // Create conduit with reduce (accumulating sum)
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            new LinkedName("test-conduit", null),
+            NameTree.of("test-conduit"),
             Composer.pipe(path -> path.reduce(0, Integer::sum))
         );
 
-        conduit.source().subscribe(subscriber(conduit.subject(), received, latch));
+        @SuppressWarnings("unchecked")
+        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
+        conduit.subscribe(subscriber(subscriberSubject, received, latch));
 
         // Get pipe twice - should be same instance
-        Pipe<Integer> pipe1 = conduit.get(new LinkedName("accumulator", null));
-        Pipe<Integer> pipe2 = conduit.get(new LinkedName("accumulator", null));
+        Pipe<Integer> pipe1 = conduit.get(NameTree.of("accumulator"));
+        Pipe<Integer> pipe2 = conduit.get(NameTree.of("accumulator"));
 
         assertThat(pipe1).isSameAs(pipe2);
 

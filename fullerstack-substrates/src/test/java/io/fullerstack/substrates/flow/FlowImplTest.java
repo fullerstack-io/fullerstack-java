@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.flow;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameTree;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

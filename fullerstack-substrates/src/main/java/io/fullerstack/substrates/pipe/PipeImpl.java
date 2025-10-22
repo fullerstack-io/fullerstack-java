@@ -40,12 +40,11 @@ import java.util.function.Consumer;
  *
  * @param <E> the emission type (e.g., MonitorSignal, ServiceSignal)
  */
-@Getter
 public class PipeImpl<E> implements Pipe<E> {
 
     private final Scheduler scheduler; // Circuit's scheduler (retained for potential future use)
-    private final Subject channelSubject; // WHO this pipe belongs to
-    private final Consumer<Capture<E>> emissionHandler; // Callback to route emissions to Source
+    private final Subject<Channel<E>> channelSubject; // WHO this pipe belongs to
+    private final Consumer<Capture<E, Channel<E>>> emissionHandler; // Callback to route emissions to Source
     private final SourceImpl<E> source; // Source reference for early subscriber check optimization
     private final FlowImpl<E> flow; // FlowImpl for apply() and hasReachedLimit()
 
@@ -57,7 +56,7 @@ public class PipeImpl<E> implements Pipe<E> {
      * @param emissionHandler callback to route emissions (provided by Source)
      * @param source the Source instance for subscriber check optimization
      */
-    public PipeImpl(Scheduler scheduler, Subject channelSubject, Consumer<Capture<E>> emissionHandler, SourceImpl<E> source) {
+    public PipeImpl(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E, Channel<E>>> emissionHandler, SourceImpl<E> source) {
         this(scheduler, channelSubject, emissionHandler, source, null);
     }
 
@@ -70,7 +69,7 @@ public class PipeImpl<E> implements Pipe<E> {
      * @param source the Source instance for subscriber check optimization
      * @param flow the transformation pipeline (null for no transformations)
      */
-    public PipeImpl(Scheduler scheduler, Subject channelSubject, Consumer<Capture<E>> emissionHandler, SourceImpl<E> source, FlowImpl<E> flow) {
+    public PipeImpl(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E, Channel<E>>> emissionHandler, SourceImpl<E> source, FlowImpl<E> flow) {
         this.scheduler = Objects.requireNonNull(scheduler, "Scheduler cannot be null");
         this.channelSubject = Objects.requireNonNull(channelSubject, "Channel subject cannot be null");
         this.emissionHandler = Objects.requireNonNull(emissionHandler, "Emission handler cannot be null");
@@ -121,8 +120,9 @@ public class PipeImpl<E> implements Pipe<E> {
 
         // Post to Circuit's queue - ensures ordering guarantees
         scheduler.schedule(() -> {
-            Capture<E> capture = new CaptureImpl<>(channelSubject, value);
+            Capture<E, Channel<E>> capture = new CaptureImpl<>(channelSubject, value);
             emissionHandler.accept(capture);
         });
     }
+
 }

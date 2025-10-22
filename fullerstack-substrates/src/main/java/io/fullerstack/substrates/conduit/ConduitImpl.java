@@ -6,14 +6,13 @@ import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.registry.LazyTrieRegistry;
-import io.fullerstack.substrates.registry.RegistryFactory;
 import io.fullerstack.substrates.circuit.Scheduler;
 
 import lombok.Getter;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
@@ -64,8 +63,8 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
     /**
      * Creates a Conduit without transformations.
      */
-    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Scheduler scheduler, RegistryFactory registryFactory) {
-        this(conduitName, composer, scheduler, registryFactory, null);
+    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Scheduler scheduler) {
+        this(conduitName, composer, scheduler, null);
     }
 
     /**
@@ -74,19 +73,17 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
      * @param conduitName hierarchical conduit name (e.g., "circuit.conduit")
      * @param composer composer for creating percepts
      * @param scheduler circuit's scheduler for work execution
-     * @param registryFactory the factory to use for creating Registry instances
      * @param flowConfigurer optional transformation pipeline (null if no transformations)
      */
-    @SuppressWarnings("unchecked")
-    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Scheduler scheduler, RegistryFactory registryFactory, Consumer<Flow<E>> flowConfigurer) {
-        this.conduitSubject = new SubjectImpl(
+    public ConduitImpl(Name conduitName, Composer<? extends P, E> composer, Scheduler scheduler, Consumer<Flow<E>> flowConfigurer) {
+        this.conduitSubject = new SubjectImpl<>(
             IdImpl.generate(),
             conduitName,
             StateImpl.empty(),
-            Subject.Type.CONDUIT
+            Conduit.class
         );
         this.composer = composer;
-        this.percepts = (Map<Name, P>) registryFactory.create();
+        this.percepts = new ConcurrentHashMap<>();
         this.eventSource = new SourceImpl<>(conduitName);
         this.scheduler = java.util.Objects.requireNonNull(scheduler, "Scheduler cannot be null");
         this.flowConfigurer = flowConfigurer; // Can be null
@@ -97,9 +94,13 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         return conduitSubject;
     }
 
-    @Override
     public Source<E> source() {
         return eventSource;
+    }
+
+    @Override
+    public Subscription subscribe(Subscriber<E> subscriber) {
+        return eventSource.subscribe(subscriber);
     }
 
     @Override

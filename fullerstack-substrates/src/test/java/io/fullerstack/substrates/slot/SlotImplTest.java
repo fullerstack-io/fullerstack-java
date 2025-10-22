@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Slot;
 import io.humainary.substrates.api.Substrates.State;
 import io.fullerstack.substrates.state.StateImpl;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameTree;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -13,7 +13,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateBooleanSlot() {
-        Name name = new LinkedName("enabled", null);
+        Name name = NameTree.of("enabled");
         Slot<Boolean> slot = SlotImpl.of(name, true);
 
         assertThat((Object) slot.name()).isEqualTo(name);
@@ -23,7 +23,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateIntegerSlot() {
-        Name name = new LinkedName("count", null);
+        Name name = NameTree.of("count");
         Slot<Integer> slot = SlotImpl.of(name, 42);
 
         assertThat(slot.type()).isEqualTo(Integer.class);
@@ -32,7 +32,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateLongSlot() {
-        Name name = new LinkedName("timestamp", null);
+        Name name = NameTree.of("timestamp");
         Slot<Long> slot = SlotImpl.of(name, 123456L);
 
         assertThat(slot.type()).isEqualTo(Long.class);
@@ -41,7 +41,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateDoubleSlot() {
-        Name name = new LinkedName("percentage", null);
+        Name name = NameTree.of("percentage");
         Slot<Double> slot = SlotImpl.of(name, 75.5);
 
         assertThat(slot.type()).isEqualTo(Double.class);
@@ -50,7 +50,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateFloatSlot() {
-        Name name = new LinkedName("ratio", null);
+        Name name = NameTree.of("ratio");
         Slot<Float> slot = SlotImpl.of(name, 0.5f);
 
         assertThat(slot.type()).isEqualTo(Float.class);
@@ -59,7 +59,7 @@ class SlotImplTest {
 
     @Test
     void shouldCreateStringSlot() {
-        Name name = new LinkedName("message", null);
+        Name name = NameTree.of("message");
         Slot<String> slot = SlotImpl.of(name, "hello");
 
         assertThat(slot.type()).isEqualTo(String.class);
@@ -68,8 +68,8 @@ class SlotImplTest {
 
     @Test
     void shouldCreateNameSlot() {
-        Name name = new LinkedName("key", null);
-        Name value = new LinkedName("value", null);
+        Name name = NameTree.of("key");
+        Name value = NameTree.of("value");
         Slot<Name> slot = SlotImpl.of(name, value, Name.class);
 
         assertThat(slot.type()).isEqualTo(Name.class);
@@ -78,8 +78,8 @@ class SlotImplTest {
 
     @Test
     void shouldCreateStateSlot() {
-        Name name = new LinkedName("nested", null);
-        State value = StateImpl.of(new LinkedName("inner", null), 42);
+        Name name = NameTree.of("nested");
+        State value = StateImpl.of(NameTree.of("inner"), 42);
         Slot<State> slot = SlotImpl.of(name, value, State.class);
 
         assertThat(slot.type()).isEqualTo(State.class);
@@ -89,7 +89,7 @@ class SlotImplTest {
     @Test
     void shouldBeImmutable() {
         // Slots are immutable - value cannot change after creation
-        Name name = new LinkedName("count", null);
+        Name name = NameTree.of("count");
         Slot<Integer> slot = SlotImpl.of(name, 42);
 
         assertThat(slot.value()).isEqualTo(42);
@@ -104,7 +104,7 @@ class SlotImplTest {
 
     @Test
     void shouldReturnNamePart() {
-        Name name = new LinkedName("count", new LinkedName("broker", new LinkedName("kafka", null)));
+        Name name = NameTree.of("kafka.broker.count");
         Slot<Integer> slot = SlotImpl.of(name, 42);
 
         assertThat(name.part()).isEqualTo("count");
@@ -112,8 +112,8 @@ class SlotImplTest {
 
     @Test
     void shouldSupportEquality() {
-        Name name1 = new LinkedName("test", null);
-        Name name2 = new LinkedName("test", null);
+        Name name1 = NameTree.of("test");
+        Name name2 = NameTree.of("test");
 
         Slot<Integer> slot1 = SlotImpl.of(name1, 42);
         Slot<Integer> slot2 = SlotImpl.of(name2, 42);

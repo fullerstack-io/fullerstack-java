@@ -5,8 +5,7 @@ import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameFactory;
-import io.fullerstack.substrates.name.InternedNameFactory;
+import io.fullerstack.substrates.name.NameTree;
 import io.fullerstack.substrates.subscription.SubscriptionImpl;
 
 import lombok.Getter;
@@ -43,17 +42,17 @@ import java.util.function.Consumer;
 @Getter
 public class SourceImpl<E> implements Source<E> {
     private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
-    private final Subject sourceSubject;
+    private final Subject<?> sourceSubject;
 
     // Cache: Subject Name -> Subscriber -> List of registered Pipes
     // Pipes are registered only once per Subject per Subscriber (on first emission)
     private final Map<Name, Map<Subscriber<E>, List<Pipe<E>>>> pipeCache = new ConcurrentHashMap<>();
 
     /**
-     * Creates a source with default name using {@link InternedNameFactory}.
+     * Creates a source with default name using NameTree.of().
      */
     public SourceImpl() {
-        this(InternedNameFactory.getInstance().createRoot("source"));
+        this(NameTree.of("source"));
     }
 
     /**
@@ -61,17 +60,18 @@ public class SourceImpl<E> implements Source<E> {
      *
      * @param name source name
      */
+    @SuppressWarnings("unchecked")
     public SourceImpl(Name name) {
         Objects.requireNonNull(name, "Source name cannot be null");
+        // Source doesn't extend Substrate, so we use wildcard Subject
         this.sourceSubject = new SubjectImpl(
             IdImpl.generate(),
             name,
             StateImpl.empty(),
-            Subject.Type.SOURCE
+            Source.class
         );
     }
 
-    @Override
     public Subject subject() {
         return sourceSubject;
     }
@@ -110,7 +110,7 @@ public class SourceImpl<E> implements Source<E> {
      *
      * @return callback that routes emissions to subscribers
      */
-    public Consumer<Capture<E>> emissionHandler() {
+    public Consumer<Capture<E, Channel<E>>> emissionHandler() {
         return this::notifySubscribers;
     }
 
@@ -133,8 +133,8 @@ public class SourceImpl<E> implements Source<E> {
      *
      * @param capture the emission capture (Subject + value)
      */
-    private void notifySubscribers(Capture<E> capture) {
-        Subject emittingSubject = capture.subject();
+    private void notifySubscribers(Capture<E, Channel<E>> capture) {
+        Subject<Channel<E>> emittingSubject = capture.subject();
         Name subjectName = emittingSubject.name();
 
         // Get or create the subscriber->pipes map for this Subject

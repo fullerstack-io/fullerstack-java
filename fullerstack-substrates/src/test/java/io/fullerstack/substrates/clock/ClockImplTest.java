@@ -1,14 +1,13 @@
 package io.fullerstack.substrates.clock;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameTree;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,34 +15,43 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ClockImplTest {
     private ClockImpl clock;
+    private ScheduledExecutorService scheduler;
+
+    @BeforeEach
+    void setup() {
+        scheduler = Executors.newScheduledThreadPool(1);
+    }
 
     @AfterEach
     void cleanup() {
         if (clock != null) {
             clock.close();
         }
+        if (scheduler != null) {
+            scheduler.shutdown();
+        }
     }
 
     @Test
     void shouldCreateClockWithDefaultName() {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
 
         assertThat((Object) clock).isNotNull();
         assertThat((Object) clock.subject()).isNotNull();
-        assertThat(clock.subject().type()).isEqualTo(Subject.Type.CLOCK);
+        assertThat(clock.subject().type()).isEqualTo(Clock.class);
     }
 
     @Test
     void shouldCreateClockWithCustomName() {
-        Name name = new LinkedName("custom-clock", null);
-        clock = new ClockImpl(name);
+        Name name = NameTree.of("custom-clock");
+        clock = new ClockImpl(name, scheduler);
 
         assertThat((Object) clock.subject().name()).isEqualTo(name);
     }
 
     @Test
     void shouldProvideSource() {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
 
         Source<Instant> source = clock.source();
 
@@ -52,12 +60,12 @@ class ClockImplTest {
 
     @Test
     void shouldEmitPeriodicEventsOnMillisecondCycle() throws Exception {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
         CopyOnWriteArrayList<Instant> emissions = new CopyOnWriteArrayList<>();
         CountDownLatch latch = new CountDownLatch(3);
 
         Subscription subscription = clock.consume(
-            new LinkedName("test", null),
+            NameTree.of("test"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 emissions.add(instant);
@@ -75,11 +83,11 @@ class ClockImplTest {
 
     @Test
     void shouldStopEmissionsWhenSubscriptionClosed() throws Exception {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
         AtomicInteger count = new AtomicInteger(0);
 
         Subscription subscription = clock.consume(
-            new LinkedName("test", null),
+            NameTree.of("test"),
             Clock.Cycle.MILLISECOND,
             instant -> count.incrementAndGet()
         );
@@ -96,13 +104,13 @@ class ClockImplTest {
 
     @Test
     void shouldHandleMultipleSubscriptions() throws Exception {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
         AtomicInteger count1 = new AtomicInteger(0);
         AtomicInteger count2 = new AtomicInteger(0);
         CountDownLatch latch = new CountDownLatch(6);
 
         Subscription sub1 = clock.consume(
-            new LinkedName("sub1", null),
+            NameTree.of("sub1"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 count1.incrementAndGet();
@@ -111,7 +119,7 @@ class ClockImplTest {
         );
 
         Subscription sub2 = clock.consume(
-            new LinkedName("sub2", null),
+            NameTree.of("sub2"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 count2.incrementAndGet();
@@ -130,32 +138,39 @@ class ClockImplTest {
 
     @Test
     void shouldRequireNonNullName() {
-        assertThatThrownBy(() -> new ClockImpl(null))
+        assertThatThrownBy(() -> new ClockImpl(null, scheduler))
             .isInstanceOf(NullPointerException.class)
             .hasMessageContaining("Clock name cannot be null");
     }
 
     @Test
+    void shouldRequireNonNullScheduler() {
+        assertThatThrownBy(() -> new ClockImpl(NameTree.of("test"), null))
+            .isInstanceOf(NullPointerException.class)
+            .hasMessageContaining("Scheduler cannot be null");
+    }
+
+    @Test
     void shouldRequireNonNullParameters() {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
 
         assertThatThrownBy(() -> clock.consume(null, Clock.Cycle.SECOND, instant -> {}))
             .isInstanceOf(NullPointerException.class);
 
-        assertThatThrownBy(() -> clock.consume(new LinkedName("test", null), null, instant -> {}))
+        assertThatThrownBy(() -> clock.consume(NameTree.of("test"), null, instant -> {}))
             .isInstanceOf(NullPointerException.class);
 
-        assertThatThrownBy(() -> clock.consume(new LinkedName("test", null), Clock.Cycle.SECOND, null))
+        assertThatThrownBy(() -> clock.consume(NameTree.of("test"), Clock.Cycle.SECOND, null))
             .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     void shouldPreventConsumeAfterClose() {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
         clock.close();
 
         assertThatThrownBy(() -> clock.consume(
-            new LinkedName("test", null),
+            NameTree.of("test"),
             Clock.Cycle.SECOND,
             instant -> {}
         ))
@@ -165,7 +180,7 @@ class ClockImplTest {
 
     @Test
     void shouldAllowMultipleCloses() {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
 
         clock.close();
         clock.close(); // Should not throw
@@ -175,28 +190,28 @@ class ClockImplTest {
 
     @Test
     void shouldProvideSubscriptionWithSubject() {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
 
         Subscription subscription = clock.consume(
-            new LinkedName("test", null),
+            NameTree.of("test"),
             Clock.Cycle.SECOND,
             instant -> {}
         );
 
         assertThat((Object) subscription.subject()).isNotNull();
-        assertThat(subscription.subject().type()).isEqualTo(Subject.Type.SUBSCRIPTION);
+        assertThat(subscription.subject().type()).isEqualTo(Subscription.class);
 
         subscription.close();
     }
 
     @Test
     void shouldHandleSecondCycle() throws Exception {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
         AtomicInteger count = new AtomicInteger(0);
         CountDownLatch latch = new CountDownLatch(2);
 
         Subscription subscription = clock.consume(
-            new LinkedName("test", null),
+            NameTree.of("test"),
             Clock.Cycle.SECOND,
             instant -> {
                 count.incrementAndGet();
@@ -214,11 +229,11 @@ class ClockImplTest {
 
     @Test
     void shouldCleanupSchedulerOnClose() throws Exception {
-        clock = new ClockImpl();
+        clock = new ClockImpl(scheduler);
         AtomicInteger count = new AtomicInteger(0);
 
         clock.consume(
-            new LinkedName("test", null),
+            NameTree.of("test"),
             Clock.Cycle.MILLISECOND,
             instant -> count.incrementAndGet()
         );

@@ -5,7 +5,7 @@ import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameTree;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -22,20 +22,21 @@ class SourceImplTest {
      * Helper to create a test subscriber from a lambda.
      * Since Subscriber extends Substrate, it's not a functional interface.
      */
-    private <E> Subscriber<E> subscriber(java.util.function.BiConsumer<Subject, Registrar<E>> handler) {
+    private <E> Subscriber<E> subscriber(java.util.function.BiConsumer<Subject<Channel<E>>, Registrar<E>> handler) {
         return new Subscriber<E>() {
             @Override
-            public Subject subject() {
-                return new SubjectImpl(
+            @SuppressWarnings("unchecked")
+            public Subject<Subscriber<E>> subject() {
+                return new SubjectImpl<>(
                     IdImpl.of(java.util.UUID.randomUUID()),
-                    new LinkedName("test-subscriber", null),
+                    NameTree.of("test-subscriber"),
                     StateImpl.empty(),
-                    Subject.Type.SUBSCRIBER
+                    (Class<Subscriber<E>>) (Class<?>) Subscriber.class
                 );
             }
 
             @Override
-            public void accept(Subject subject, Registrar<E> registrar) {
+            public void accept(Subject<Channel<E>> subject, Registrar<E> registrar) {
                 handler.accept(subject, registrar);
             }
         };
@@ -44,12 +45,13 @@ class SourceImplTest {
     /**
      * Helper to create a test Subject (simulating a Channel).
      */
-    private Subject testSubject(String name) {
-        return new SubjectImpl(
+    @SuppressWarnings("unchecked")
+    private <E> Subject<Channel<E>> testSubject(String name) {
+        return new SubjectImpl<>(
             IdImpl.generate(),
-            new LinkedName(name, null),
+            NameTree.of(name),
             StateImpl.empty(),
-            Subject.Type.CHANNEL
+            (Class<Channel<E>>) (Class<?>) Channel.class
         );
     }
 
@@ -58,8 +60,8 @@ class SourceImplTest {
      * Uses SourceImpl.emissionHandler() like inlet Pipes do.
      */
     private <E> void notifySource(SourceImpl<E> source, String channelName, E emission) {
-        Subject subject = testSubject(channelName);
-        Capture<E> capture = new CaptureImpl<>(subject, emission);
+        Subject<Channel<E>> subject = testSubject(channelName);
+        Capture<E, Channel<E>> capture = new CaptureImpl<>(subject, emission);
 
         // Use SourceImpl's emission handler (like inlet Pipes do)
         source.emissionHandler().accept(capture);
@@ -76,7 +78,7 @@ class SourceImplTest {
 
     @Test
     void shouldCreateSourceWithCustomName() {
-        Name name = new LinkedName("custom-source", null);
+        Name name = NameTree.of("custom-source");
         SourceImpl<String> source = new SourceImpl<>(name);
 
         assertThat((Object) source.subject().name()).isEqualTo(name);
@@ -234,6 +236,6 @@ class SourceImplTest {
         Subscription subscription = source.subscribe(subscriber((subject, registrar) -> {}));
 
         assertThat((Object) subscription.subject()).isNotNull();
-        assertThat(subscription.subject().type()).isEqualTo(Subject.Type.SUBSCRIPTION);
+        assertThat(subscription.subject().type()).isEqualTo(Subscription.class);
     }
 }

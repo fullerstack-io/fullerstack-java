@@ -13,7 +13,6 @@ import lombok.Getter;
 
 import java.util.Objects;
 import java.util.function.Consumer;
-
 /**
  * Generic implementation of Substrates.Channel interface with Lombok for getters.
  *
@@ -51,10 +50,9 @@ import java.util.function.Consumer;
  *
  * @param <E> the emission type (e.g., MonitorSignal, ServiceSignal)
  */
-@Getter
 public class ChannelImpl<E> implements Channel<E> {
 
-    private final Subject channelSubject;
+    private final Subject<Channel<E>> channelSubject;
     private final Scheduler scheduler;
     private final Source<E> source; // Direct Source reference for emission routing
     private final Consumer<Flow<E>> flowConfigurer; // Optional transformation pipeline (nullable)
@@ -73,11 +71,11 @@ public class ChannelImpl<E> implements Channel<E> {
      */
     public ChannelImpl(Name channelName, Scheduler scheduler, Source<E> source, Consumer<Flow<E>> flowConfigurer) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
-        this.channelSubject = new SubjectImpl(
+        this.channelSubject = new SubjectImpl<>(
             IdImpl.generate(),
             channelName,  // Already hierarchical (circuit.conduit.channel)
             StateImpl.empty(),
-            Subject.Type.CHANNEL
+            Channel.class
         );
         this.scheduler = Objects.requireNonNull(scheduler, "Scheduler cannot be null");
         this.flowConfigurer = flowConfigurer; // Can be null
@@ -100,7 +98,7 @@ public class ChannelImpl<E> implements Channel<E> {
                     } else {
                         // Otherwise, create a plain Pipe with emission handler from Source
                         SourceImpl<E> sourceImpl = (SourceImpl<E>) source;
-                        Consumer<Capture<E>> handler = sourceImpl.emissionHandler();
+                        Consumer<Capture<E, Channel<E>>> handler = sourceImpl.emissionHandler();
                         cachedPipe = new PipeImpl<>(scheduler, channelSubject, handler, sourceImpl);
                     }
                 }
@@ -119,7 +117,7 @@ public class ChannelImpl<E> implements Channel<E> {
 
         // Get emission handler from Source (sibling coordination)
         SourceImpl<E> sourceImpl = (SourceImpl<E>) source;
-        Consumer<Capture<E>> handler = sourceImpl.emissionHandler();
+        Consumer<Capture<E, Channel<E>>> handler = sourceImpl.emissionHandler();
 
         // Return a Pipe with emission handler, Source reference, and Flow transformations
         return new PipeImpl<>(scheduler, channelSubject, handler, sourceImpl, flow);

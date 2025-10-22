@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.conduit;
 
 import io.fullerstack.substrates.CortexRuntime;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameTree;
 import io.humainary.substrates.api.Substrates.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -161,7 +161,7 @@ class ConduitImplTest {
         Subject subject = conduit.subject();
 
         assertThat((Object) subject).isNotNull();
-        assertThat(subject.type()).isEqualTo(Subject.Type.CONDUIT);
+        assertThat(subject.type()).isEqualTo(Conduit.class);
     }
 
     @Test
@@ -183,15 +183,15 @@ class ConduitImplTest {
     // ========== Source Access ==========
 
     @Test
-    void shouldProvideSource() {
+    void shouldImplementSource() {
         Conduit<Pipe<String>, String> conduit = circuit.conduit(
             cortex.name("test"),
             Composer.pipe()
         );
 
-        Source<String> source = conduit.source();
-
-        assertThat((Object) source).isNotNull();
+        // Conduit implements Source directly in M16
+        assertThat((Object) conduit).isNotNull();
+        assertThat(conduit).isInstanceOf(Source.class);
     }
 
     @Test
@@ -203,7 +203,7 @@ class ConduitImplTest {
 
         // Subscribe to the conduit's source
         final String[] received = {null};
-        Subscription subscription = conduit.source().subscribe(
+        Subscription subscription = conduit.subscribe(
             cortex.subscriber(
                 cortex.name("listener"),
                 (subject, registrar) -> {
@@ -235,7 +235,7 @@ class ConduitImplTest {
         // Tap returns the same conduit for fluent chaining
         Conduit<Pipe<Long>, Long> tapped = conduit.tap(c -> {
             // Configure via tap
-            c.source().subscribe(cortex.subscriber(
+            c.subscribe(cortex.subscriber(
                 cortex.name("logger"),
                 (subject, registrar) -> {
                     registrar.register(value -> {
@@ -301,7 +301,7 @@ class ConduitImplTest {
 
         // And subscribe to the metrics source
         final long[] counts = {0, 0};
-        metrics.source().subscribe(
+        metrics.subscribe(
             cortex.subscriber(
                 cortex.name("aggregator"),
                 (subject, registrar) -> {

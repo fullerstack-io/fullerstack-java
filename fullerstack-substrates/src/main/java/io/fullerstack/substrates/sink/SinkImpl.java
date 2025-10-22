@@ -5,8 +5,7 @@ import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameFactory;
-import io.fullerstack.substrates.name.InternedNameFactory;
+import io.fullerstack.substrates.name.NameTree;
 
 import java.util.List;
 import java.util.Objects;
@@ -29,14 +28,14 @@ import java.util.stream.Stream;
  */
 public class SinkImpl<E> implements Sink<E> {
 
-    private final Subject sinkSubject;
+    private final Subject<Sink<E>> sinkSubject;
     private final Source<E> source;
-    private final List<Capture<E>> buffer = new CopyOnWriteArrayList<>();
+    private final List<Capture<E, Channel<E>>> buffer = new CopyOnWriteArrayList<>();
     private final Subscription subscription;
     private volatile boolean closed = false;
 
     // Cache the internal subscriber's Subject - represents persistent identity
-    private final Subject internalSubscriberSubject;
+    private final Subject<Subscriber<E>> internalSubscriberSubject;
 
     /**
      * Creates a Sink that subscribes to the given Source.
@@ -44,25 +43,26 @@ public class SinkImpl<E> implements Sink<E> {
      * @param source the source to subscribe to
      * @throws NullPointerException if source is null
      */
+    @SuppressWarnings("unchecked")
     public SinkImpl(Source<E> source) {
         Objects.requireNonNull(source, "Source cannot be null");
 
-        NameFactory nameFactory = InternedNameFactory.getInstance();
+        // Using NameTree.of() static factory
         this.source = source;
         Id sinkId = IdImpl.generate();
-        this.sinkSubject = new SubjectImpl(
+        this.sinkSubject = new SubjectImpl<>(
             sinkId,
-            nameFactory.createRoot("sink").name(sinkId.toString()),
+            NameTree.of("sink").name(sinkId.toString()),
             StateImpl.empty(),
-            Subject.Type.SINK
+            (Class<Sink<E>>) (Class<?>) Sink.class
         );
 
         // Create internal subscriber's Subject once
-        this.internalSubscriberSubject = new SubjectImpl(
+        this.internalSubscriberSubject = new SubjectImpl<>(
             IdImpl.generate(),
-            nameFactory.createRoot("sink-subscriber"),
+            NameTree.of("sink-subscriber"),
             StateImpl.empty(),
-            Subject.Type.SUBSCRIBER
+            (Class<Subscriber<E>>) (Class<?>) Subscriber.class
         );
 
         // Subscribe to source and buffer all emissions
@@ -73,7 +73,7 @@ public class SinkImpl<E> implements Sink<E> {
             }
 
             @Override
-            public void accept(Subject subject, Registrar<E> registrar) {
+            public void accept(Subject<Channel<E>> subject, Registrar<E> registrar) {
                 // Register a pipe that captures emissions into the buffer
                 registrar.register(emission -> {
                     if (!closed) {
@@ -90,9 +90,9 @@ public class SinkImpl<E> implements Sink<E> {
     }
 
     @Override
-    public Stream<Capture<E>> drain() {
+    public Stream<Capture<E, Channel<E>>> drain() {
         // Get all accumulated captures and clear the buffer
-        List<Capture<E>> captured = List.copyOf(buffer);
+        List<Capture<E, Channel<E>>> captured = List.copyOf(buffer);
         buffer.clear();
         return captured.stream();
     }

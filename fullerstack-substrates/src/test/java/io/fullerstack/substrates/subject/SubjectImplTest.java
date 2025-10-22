@@ -4,9 +4,15 @@ import io.humainary.substrates.api.Substrates.Id;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.State;
 import io.humainary.substrates.api.Substrates.Subject;
+import io.humainary.substrates.api.Substrates.Scope;
+import io.humainary.substrates.api.Substrates.Conduit;
+import io.humainary.substrates.api.Substrates.Pipe;
+import io.humainary.substrates.api.Substrates.Circuit;
+import io.humainary.substrates.api.Substrates.Slot;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.slot.SlotImpl;
+import io.fullerstack.substrates.name.NameTree;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,11 +22,12 @@ class SubjectImplTest {
     @Test
     void shouldCreateSubjectWithAllComponents() {
         Id id = IdImpl.generate();
-        Name name = new LinkedName("test-subject", null);
+        Name name = NameTree.of("test-subject");
         State state = StateImpl.empty();
-        Subject.Type type = Subject.Type.SCOPE;
+        Class<Scope> type = Scope.class;
 
-        Subject subject = new SubjectImpl(id, name, state, type);
+        @SuppressWarnings("unchecked")
+        Subject<Scope> subject = new SubjectImpl<>(id, name, state, type);
 
         assertThat(subject.id()).isEqualTo(id);
         assertThat((Object) subject.name()).isEqualTo(name);
@@ -30,42 +37,33 @@ class SubjectImplTest {
 
     @Test
     void shouldReturnPartFromName() {
-        Name name = new LinkedName("1", new LinkedName("broker", new LinkedName("kafka", null)));
-        Subject subject = new SubjectImpl(
+        Name name = NameTree.of("kafka.broker.1");
+        @SuppressWarnings("unchecked")
+        Subject<Conduit<Pipe<String>, String>> subject = new SubjectImpl<>(
             IdImpl.generate(),
             name,
             StateImpl.empty(),
-            Subject.Type.SOURCE
+            (Class<Conduit<Pipe<String>, String>>) (Class<?>) Conduit.class
         );
 
         assertThat(subject.part()).isEqualTo("1");
     }
 
     @Test
-    void shouldSupportAllSubjectTypes() {
-        for (Subject.Type type : Subject.Type.values()) {
-            Subject subject = new SubjectImpl(
-                IdImpl.generate(),
-                new LinkedName("test", null),
-                StateImpl.empty(),
-                type
-            );
-
-            assertThat(subject.type()).isEqualTo(type);
-        }
-    }
-
-    @Test
     void shouldIncludeStateInSubject() {
-        State state = new StateImpl()
-            .state(new LinkedName("count", null), 42)
-            .state(new LinkedName("active", null), true);
+        Slot<Integer> countSlot = SlotImpl.of(NameTree.of("count"), 42);
+        Slot<Boolean> activeSlot = SlotImpl.of(NameTree.of("active"), true);
 
-        Subject subject = new SubjectImpl(
+        State state = StateImpl.empty()
+            .state(countSlot)
+            .state(activeSlot);
+
+        @SuppressWarnings("unchecked")
+        Subject<Circuit> subject = new SubjectImpl<>(
             IdImpl.generate(),
-            new LinkedName("test", null),
+            NameTree.of("test"),
             state,
-            Subject.Type.CIRCUIT
+            Circuit.class
         );
 
         assertThat(subject.state().stream().count()).isEqualTo(2);

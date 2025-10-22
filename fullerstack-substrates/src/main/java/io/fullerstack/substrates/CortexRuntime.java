@@ -10,14 +10,10 @@ import io.fullerstack.substrates.slot.SlotImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.subscriber.SubscriberImpl;
-import io.fullerstack.substrates.name.NameFactory;
-import io.fullerstack.substrates.name.InternedNameFactory;
-import io.fullerstack.substrates.queue.QueueFactory;
-import io.fullerstack.substrates.queue.LinkedBlockingQueueFactory;
+import io.fullerstack.substrates.name.NameTree;
 import io.fullerstack.substrates.sink.SinkImpl;
-import io.fullerstack.substrates.registry.LazyTrieRegistry;
-import io.fullerstack.substrates.registry.RegistryFactory;
-import io.fullerstack.substrates.registry.LazyTrieRegistryFactory;
+
+import java.util.concurrent.ConcurrentHashMap;
 
 import java.lang.reflect.Member;
 import java.util.Iterator;
@@ -46,91 +42,22 @@ import java.util.stream.Stream;
  *   <li>Capture creation (1 method)</li>
  * </ul>
  *
- * <p><b>Factory Injection:</b>
- * CortexRuntime uses constructor injection for pluggable implementations:
- * <ul>
- *   <li>{@link NameFactory} - Pluggable Name implementations (default: {@link InternedNameFactory})</li>
- *   <li>{@link QueueFactory} - Pluggable Queue implementations (default: {@link LinkedBlockingQueueFactory})</li>
- *   <li>{@link RegistryFactory} - Pluggable Registry implementations (default: {@link LazyTrieRegistryFactory})</li>
- * </ul>
- *
  * @see Cortex
- * @see NameFactory
- * @see QueueFactory
- * @see RegistryFactory
  */
 public class CortexRuntime implements Cortex {
 
-    private final NameFactory nameFactory;
-    private final QueueFactory queueFactory;
-    private final RegistryFactory registryFactory;
     private final Map<Name, Circuit> circuits;
     private final Map<Name, Scope> scopes;
     private final Scope defaultScope;
 
     /**
-     * Creates a new Cortex runtime with defaults:
-     * {@link InternedNameFactory}, {@link LinkedBlockingQueueFactory}, and {@link LazyTrieRegistryFactory}.
-     *
-     * <p>This is the recommended default constructor.
+     * Creates a new Cortex runtime.
      */
     public CortexRuntime() {
-        this(InternedNameFactory.getInstance(), LinkedBlockingQueueFactory.getInstance(), LazyTrieRegistryFactory.getInstance());
-    }
-
-    /**
-     * Creates a new Cortex runtime with a custom {@link NameFactory},
-     * using default {@link LinkedBlockingQueueFactory} and {@link LazyTrieRegistryFactory}.
-     *
-     * <p>This constructor allows you to inject a different Name implementation,
-     * useful for testing or when you need specific Name characteristics.
-     *
-     * <p><b>Available Name factories:</b>
-     * <ul>
-     *   <li>{@link InternedNameFactory} - Recommended default (weak interning)</li>
-     *   <li>{@link io.fullerstack.substrates.name.LinkedNameFactory} - Simple baseline</li>
-     *   <li>{@link io.fullerstack.substrates.name.SegmentArrayNameFactory} - Array-backed</li>
-     *   <li>{@link io.fullerstack.substrates.name.LRUCachedNameFactory} - LRU cache</li>
-     * </ul>
-     *
-     * @param nameFactory the factory to use for creating Name instances
-     * @throws NullPointerException if nameFactory is null
-     */
-    public CortexRuntime(NameFactory nameFactory) {
-        this(nameFactory, LinkedBlockingQueueFactory.getInstance(), LazyTrieRegistryFactory.getInstance());
-    }
-
-    /**
-     * Creates a new Cortex runtime with custom factories.
-     *
-     * <p>This constructor provides full control over pluggable implementations.
-     *
-     * <p><b>Available Queue factories:</b>
-     * <ul>
-     *   <li>{@link LinkedBlockingQueueFactory} - Unbounded FIFO (recommended)</li>
-     * </ul>
-     *
-     * <p><b>Available Registry factories:</b>
-     * <ul>
-     *   <li>{@link LazyTrieRegistryFactory} - Lazy trie construction (recommended)</li>
-     *   <li>{@link io.fullerstack.substrates.registry.EagerTrieRegistryFactory} - Eager trie</li>
-     *   <li>{@link io.fullerstack.substrates.registry.FlatMapRegistryFactory} - Simple HashMap</li>
-     * </ul>
-     *
-     * @param nameFactory the factory to use for creating Name instances
-     * @param queueFactory the factory to use for creating Queue instances
-     * @param registryFactory the factory to use for creating Registry instances
-     * @throws NullPointerException if any factory is null
-     */
-    @SuppressWarnings("unchecked")
-    public CortexRuntime(NameFactory nameFactory, QueueFactory queueFactory, RegistryFactory registryFactory) {
-        this.nameFactory = Objects.requireNonNull(nameFactory, "NameFactory cannot be null");
-        this.queueFactory = Objects.requireNonNull(queueFactory, "QueueFactory cannot be null");
-        this.registryFactory = Objects.requireNonNull(registryFactory, "RegistryFactory cannot be null");
-        this.circuits = (Map<Name, Circuit>) registryFactory.create();
-        this.scopes = (Map<Name, Scope>) registryFactory.create();
-        Name cortexName = nameFactory.createRoot("cortex");
-        this.defaultScope = new ScopeImpl(cortexName, registryFactory);
+        this.circuits = new ConcurrentHashMap<>();
+        this.scopes = new ConcurrentHashMap<>();
+        Name cortexName = NameTree.of("cortex");
+        this.defaultScope = new ScopeImpl(cortexName);
         // Cache default scope by its name
         this.scopes.put(cortexName, defaultScope);
     }
@@ -139,7 +66,7 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public Circuit circuit() {
-        return circuit(nameFactory.createRoot("circuit"));
+        return circuit(NameTree.of("circuit"));
     }
 
     @Override
@@ -149,49 +76,71 @@ public class CortexRuntime implements Cortex {
     }
 
     private Circuit createCircuit(Name name) {
-        return new CircuitImpl(name, nameFactory, queueFactory, registryFactory);
+        return new CircuitImpl(name);
     }
 
     // ========== Name Factory (8 methods) ==========
+    // All delegate directly to NameTree.of() overloaded methods
 
     @Override
     public Name name(String s) {
-        return nameFactory.create(s);
+        // Create root name - no path parsing
+        return NameTree.of(s);
     }
 
     @Override
     public Name name(Enum<?> e) {
-        return nameFactory.create(e);
+        // Create root, let Name handle the hierarchy building
+        return NameTree.of(e.getDeclaringClass().getName()).name(e);
     }
 
     @Override
     public Name name(Iterable<String> parts) {
-        return nameFactory.create(parts);
+        // Get first element as root, let Name.name() build the rest
+        Iterator<String> it = parts.iterator();
+        if (!it.hasNext()) {
+            throw new IllegalArgumentException("parts cannot be empty");
+        }
+        return NameTree.of(it.next()).name(it);
     }
 
     @Override
     public <T> Name name(Iterable<? extends T> items, Function<T, String> mapper) {
-        return nameFactory.create(items, mapper);
+        // Get first element as root, let Name.name() build the rest
+        Iterator<? extends T> it = items.iterator();
+        if (!it.hasNext()) {
+            throw new IllegalArgumentException("items cannot be empty");
+        }
+        return NameTree.of(mapper.apply(it.next())).name(it, mapper);
     }
 
     @Override
     public Name name(Iterator<String> parts) {
-        return nameFactory.create(parts);
+        // Get first element as root, let Name.name() build the rest
+        if (!parts.hasNext()) {
+            throw new IllegalArgumentException("parts cannot be empty");
+        }
+        return NameTree.of(parts.next()).name(parts);
     }
 
     @Override
     public <T> Name name(Iterator<? extends T> items, Function<T, String> mapper) {
-        return nameFactory.create(items, mapper);
+        // Get first element as root, let Name.name() build the rest
+        if (!items.hasNext()) {
+            throw new IllegalArgumentException("items cannot be empty");
+        }
+        return NameTree.of(mapper.apply(items.next())).name(items, mapper);
     }
 
     @Override
     public Name name(Class<?> clazz) {
-        return nameFactory.create(clazz);
+        return NameTree.of(clazz.getName());
     }
 
     @Override
     public Name name(Member member) {
-        return nameFactory.create(member);
+        // Create root, let Name.name() handle the hierarchy
+        return NameTree.of(member.getDeclaringClass().getName()).name(member);
     }
 
     // ========== Pool Management (1 method) ==========
@@ -213,68 +162,23 @@ public class CortexRuntime implements Cortex {
     @Override
     public Scope scope(Name name) {
         Objects.requireNonNull(name, "Scope name cannot be null");
-        return scopes.computeIfAbsent(name, n -> new ScopeImpl(n, registryFactory));
+        return scopes.computeIfAbsent(name, n -> new ScopeImpl(n));
     }
 
-    // ========== State Factory (9 methods) ==========
+    // ========== State Factory (1 method) ==========
 
     @Override
     public State state() {
         return StateImpl.empty();
     }
 
-    @Override
-    public State state(Name name, int value) {
-        return StateImpl.of(name, value);
-    }
+    // ========== Sink Creation (1 method) ==========
 
     @Override
-    public State state(Name name, long value) {
-        return StateImpl.of(name, value);
-    }
-
-    @Override
-    public State state(Name name, float value) {
-        return StateImpl.of(name, value);
-    }
-
-    @Override
-    public State state(Name name, double value) {
-        return StateImpl.of(name, value);
-    }
-
-    @Override
-    public State state(Name name, boolean value) {
-        return StateImpl.of(name, value);
-    }
-
-    @Override
-    public State state(Name name, String value) {
-        return StateImpl.of(name, value);
-    }
-
-    @Override
-    public State state(Name name, Name value) {
-        return StateImpl.of(name, value);
-    }
-
-    @Override
-    public State state(Name name, State value) {
-        return StateImpl.of(name, value);
-    }
-
-    // ========== Sink Creation (2 methods) ==========
-
-    @Override
-    public <E> Sink<E> sink(Source<E> source) {
-        Objects.requireNonNull(source, "Source cannot be null");
-        return new SinkImpl<>(source);
-    }
-
-    @Override
-    public <E> Sink<E> sink(Context<E> context) {
+    public <E, S extends Context<E, S>> Sink<E> sink(Context<E, S> context) {
         Objects.requireNonNull(context, "Context cannot be null");
-        return sink(context.source());
+        // Context extends Source, so we can create SinkImpl directly
+        return new SinkImpl<>(context);
     }
 
     // ========== Slot Management (8 methods) ==========
@@ -319,22 +223,26 @@ public class CortexRuntime implements Cortex {
         return SlotImpl.of(name, value, State.class);
     }
 
+    @Override
+    public Slot<Name> slot(Enum<?> value) {
+        Objects.requireNonNull(value, "Enum value cannot be null");
+        Name enumName = name(value.getClass().getSimpleName()).name(value.name());
+        return SlotImpl.of(
+            name(value.getClass().getSimpleName()),
+            enumName,
+            Name.class
+        );
+    }
+
     // ========== Subscriber Management (2 methods) ==========
 
     @Override
-    public <E> Subscriber<E> subscriber(Name name, BiConsumer<Subject, Registrar<E>> fn) {
+    public <E> Subscriber<E> subscriber(Name name, BiConsumer<Subject<Channel<E>>, Registrar<E>> fn) {
         return new SubscriberImpl<>(name, fn);
     }
 
     @Override
     public <E> Subscriber<E> subscriber(Name name, Pool<? extends Pipe<E>> pool) {
         return new SubscriberImpl<>(name, pool);
-    }
-
-    // ========== Capture Creation (1 method) ==========
-
-    public <E> Capture<E> capture(Subject subject, E emission) {
-        Objects.requireNonNull(subject, "Capture subject cannot be null");
-        return new CaptureImpl<>(subject, emission);
     }
 }

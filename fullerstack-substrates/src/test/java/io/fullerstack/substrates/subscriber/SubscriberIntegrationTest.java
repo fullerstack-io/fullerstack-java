@@ -2,7 +2,7 @@ package io.fullerstack.substrates.subscriber;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.CortexRuntime;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameTree;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -27,13 +27,13 @@ class SubscriberIntegrationTest {
             cortex.name("test-conduit"),
             Composer.pipe()
         );
-        Source<Long> source = conduit.source();
+        Source<Long> source = conduit;  // Conduit implements Source
 
         assertThat((Object) cortex).isNotNull();
         assertThat((Object) circuit).isNotNull();
         assertThat((Object) conduit).isNotNull();
         assertThat((Object) source).isNotNull();
-        assertThat((Object) source.subject()).isNotNull();
+        assertThat((Object) conduit.subject()).isNotNull();
     }
 
     @Test
@@ -45,7 +45,7 @@ class SubscriberIntegrationTest {
             cortex.name("metrics"),
             Composer.pipe()
         );
-        Source<Long> source = conduit.source();
+        Source<Long> source = conduit;  // Conduit implements Source
 
         CopyOnWriteArrayList<Long> receivedValues = new CopyOnWriteArrayList<>();
         CountDownLatch latch = new CountDownLatch(1);
@@ -84,7 +84,7 @@ class SubscriberIntegrationTest {
             cortex.name("sensors"),
             Composer.pipe()
         );
-        Source<Long> source = conduit.source();
+        Source<Long> source = conduit;  // Conduit implements Source
 
         CopyOnWriteArrayList<Long> receivedValues = new CopyOnWriteArrayList<>();
         CountDownLatch latch = new CountDownLatch(1);
@@ -123,7 +123,7 @@ class SubscriberIntegrationTest {
             cortex.name("counters"),
             Composer.pipe()
         );
-        Source<Long> source = conduit.source();
+        Source<Long> source = conduit;  // Conduit implements Source
 
         CopyOnWriteArrayList<Long> values = new CopyOnWriteArrayList<>();
         CountDownLatch latch = new CountDownLatch(2);
@@ -181,7 +181,7 @@ class SubscriberIntegrationTest {
             cortex.name("events"),
             Composer.pipe()
         );
-        Source<Long> source = conduit.source();
+        Source<Long> source = conduit;  // Conduit implements Source
 
         AtomicInteger subscriber1Count = new AtomicInteger(0);
         AtomicInteger subscriber2Count = new AtomicInteger(0);

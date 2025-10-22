@@ -1,9 +1,7 @@
 package io.fullerstack.substrates.functional;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.cell.CellImpl;
-import io.fullerstack.substrates.pipe.TransformingPipe;
-import io.fullerstack.substrates.registry.RegistryFactory;
+import io.fullerstack.substrates.cell.CellTree;
 import io.fullerstack.substrates.circuit.Scheduler;
 
 import java.util.function.Function;
@@ -24,7 +22,6 @@ import java.util.function.Function;
  * // Create a type-transforming Composer
  * Composer<Pipe<KafkaMetric>, Alert> composer = CellComposer.typeTransforming(
  *     circuit,
- *     LazyTrieRegistryFactory.getInstance(),
  *     metric -> new Alert(metric)  // Transform: KafkaMetric → Alert
  * );
  *
@@ -56,7 +53,6 @@ public class CellComposer {
      * input type I to emission type E using the provided transformer function.
      *
      * @param scheduler the Circuit's scheduler (for async emission processing)
-     * @param registryFactory factory for creating child cell registries
      * @param transformer function to transform I → E
      * @param <I> input type (what Cell receives via emit())
      * @param <E> emission type (what gets emitted to Source)
@@ -64,24 +60,41 @@ public class CellComposer {
      */
     public static <I, E> Composer<Pipe<I>, E> typeTransforming(
         Scheduler scheduler,
-        RegistryFactory registryFactory,
+        Function<I, E> transformer
+    ) {
+        // Create root Composer (no parent)
+        return typeTransformingWithParent(null, scheduler, transformer);
+    }
+
+    /**
+     * Creates a Composer that captures parent Cell for creating children.
+     *
+     * <p>This is used internally by Cell.get() to create child Cells.
+     * The parent reference is captured in the closure.
+     *
+     * @param parent the parent Cell (null for root Cells)
+     * @param scheduler the scheduler
+     * @param transformer the transformation function
+     * @param <I> input type
+     * @param <E> emission type
+     * @return Composer that creates Cells with parent reference
+     */
+    public static <I, E> Composer<Pipe<I>, E> typeTransformingWithParent(
+        Cell<I, E> parent,
+        Scheduler scheduler,
         Function<I, E> transformer
     ) {
         return channel -> {
-            // Create TransformingPipe that converts I → E
-            Pipe<I> transformingPipe = new TransformingPipe<>(
-                channel.pipe(),  // Target Pipe<E>
-                transformer      // I → E transformation
-            );
+            // Create Cell with parent reference
+            // CellTree manages its own children via get()
+            @SuppressWarnings("unchecked")
+            CellTree<I, E> cellParent = (CellTree<I, E>) parent;
 
-            // Wrap in CellImpl (which IS-A Pipe<I>)
-            return new CellImpl<>(
+            return new CellTree<>(
+                cellParent,      // Captured from closure (null for root)
                 channel.subject().name(),
-                // Recursive: child Cells use same transformer
-                typeTransforming(scheduler, registryFactory, transformer),
-                scheduler,
-                registryFactory,
-                null  // Flow transformations happen on the E type in Channel
+                transformer,
+                scheduler
             );
         };
     }
@@ -92,7 +105,6 @@ public class CellComposer {
      * <p>Convenience method that extracts the Scheduler from the Circuit.
      *
      * @param circuit the circuit (provides Scheduler via cast to Scheduler interface)
-     * @param registryFactory factory for creating child cell registries
      * @param transformer function to transform I → E
      * @param <I> input type
      * @param <E> emission type
@@ -100,13 +112,12 @@ public class CellComposer {
      */
     public static <I, E> Composer<Pipe<I>, E> fromCircuit(
         Circuit circuit,
-        RegistryFactory registryFactory,
         Function<I, E> transformer
     ) {
         if (!(circuit instanceof Scheduler)) {
             throw new IllegalArgumentException("Circuit must implement Scheduler interface");
         }
-        return typeTransforming((Scheduler) circuit, registryFactory, transformer);
+        return typeTransforming((Scheduler) circuit, transformer);
     }
 
     /**
@@ -115,15 +126,13 @@ public class CellComposer {
      * <p>For Cell<E, E> where no type transformation is needed.
      *
      * @param circuit the circuit
-     * @param registryFactory factory for creating child cell registries
      * @param <E> emission type (same for input and output)
      * @return Composer that creates same-type Cells
      */
     public static <E> Composer<Pipe<E>, E> sameType(
-        Circuit circuit,
-        RegistryFactory registryFactory
+        Circuit circuit
     ) {
-        return fromCircuit(circuit, registryFactory, Function.identity());
+        return fromCircuit(circuit, Function.identity());
     }
 
     private CellComposer() {

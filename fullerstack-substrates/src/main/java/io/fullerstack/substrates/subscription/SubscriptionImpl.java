@@ -2,8 +2,7 @@ package io.fullerstack.substrates.subscription;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
-import io.fullerstack.substrates.name.NameFactory;
-import io.fullerstack.substrates.name.InternedNameFactory;
+import io.fullerstack.substrates.name.NameTree;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 
@@ -22,7 +21,7 @@ import java.util.Objects;
 public class SubscriptionImpl implements Subscription {
 
     private final Id subscriptionId;
-    private final Subject subscriptionSubject;
+    private final Subject<Subscription> subscriptionSubject;
     private final Runnable onClose;
     private volatile boolean closed = false;
 
@@ -35,12 +34,11 @@ public class SubscriptionImpl implements Subscription {
     public SubscriptionImpl(Runnable onClose) {
         this.onClose = Objects.requireNonNull(onClose, "onClose cannot be null");
         this.subscriptionId = IdImpl.generate();
-        NameFactory nameFactory = InternedNameFactory.getInstance();
-        this.subscriptionSubject = new SubjectImpl(
+        this.subscriptionSubject = new SubjectImpl<>(
             subscriptionId,
-            nameFactory.createRoot("subscription").name(subscriptionId.toString()),
+            NameTree.of("subscription").name(subscriptionId.toString()),
             StateImpl.empty(),
-            Subject.Type.SUBSCRIPTION
+            Subscription.class
         );
     }
 

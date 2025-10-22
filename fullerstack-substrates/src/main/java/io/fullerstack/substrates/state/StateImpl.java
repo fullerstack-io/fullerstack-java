@@ -1,5 +1,6 @@
 package io.fullerstack.substrates.state;
 
+import io.fullerstack.substrates.name.NameTree;
 import io.fullerstack.substrates.slot.SlotImpl;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Slot;
@@ -134,6 +135,40 @@ public class StateImpl implements State {
         StateImpl newState = new StateImpl(this.slots);
         newState.slots.add(SlotImpl.of(name, value));
         return newState;
+    }
+
+    @Override
+    public State state(Enum<?> value) {
+        // Store enum by its class name and the enum constant name
+        // This allows for type-safe enum retrieval
+        StateImpl newState = new StateImpl(this.slots);
+        // Use the enum's declaring class simple name as the slot name
+        Name enumName = NameTree.of(value.getClass().getSimpleName());
+        newState.slots.add(SlotImpl.of(enumName, value.name()));
+        return newState;
+    }
+
+    @Override
+    public State state(Slot<?> slot) {
+        // Returns a state that includes the Slot specified.
+        // The slot is inserted before existing entries; if an equal slot
+        // (same name and value) already exists this state instance is returned.
+
+        // Check if equal slot already exists
+        for (Slot<?> existing : slots) {
+            if (existing.name().equals(slot.name()) &&
+                existing.type().equals(slot.type()) &&
+                java.util.Objects.equals(existing.value(), slot.value())) {
+                // Equal slot exists, return this instance
+                return this;
+            }
+        }
+
+        // Insert slot before existing entries (new state with slot prepended)
+        List<Slot<?>> newSlots = new ArrayList<>();
+        newSlots.add(slot);
+        newSlots.addAll(this.slots);
+        return new StateImpl(newSlots);
     }
 
     @Override

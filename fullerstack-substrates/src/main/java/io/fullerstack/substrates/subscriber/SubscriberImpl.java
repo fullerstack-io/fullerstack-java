@@ -44,8 +44,8 @@ import java.util.function.BiConsumer;
  */
 public class SubscriberImpl<E> implements Subscriber<E> {
 
-    private final Subject subscriberSubject;
-    private final BiConsumer<Subject, Registrar<E>> handler;
+    private final Subject<Subscriber<E>> subscriberSubject;
+    private final BiConsumer<Subject<Channel<E>>, Registrar<E>> handler;
     private final Pool<? extends Pipe<E>> pool;
 
     /**
@@ -55,15 +55,16 @@ public class SubscriberImpl<E> implements Subscriber<E> {
      * @param handler the callback function that receives (Subject, Registrar)
      * @throws NullPointerException if name or handler is null
      */
-    public SubscriberImpl(Name name, BiConsumer<Subject, Registrar<E>> handler) {
+    @SuppressWarnings("unchecked")
+    public SubscriberImpl(Name name, BiConsumer<Subject<Channel<E>>, Registrar<E>> handler) {
         Objects.requireNonNull(name, "Subscriber name cannot be null");
         Objects.requireNonNull(handler, "Subscriber handler cannot be null");
 
-        this.subscriberSubject = new SubjectImpl(
+        this.subscriberSubject = new SubjectImpl<>(
             IdImpl.generate(),
             name,
             StateImpl.empty(),
-            Subject.Type.SUBSCRIBER
+            (Class<Subscriber<E>>) (Class<?>) Subscriber.class
         );
         this.handler = handler;
         this.pool = null;
@@ -79,15 +80,16 @@ public class SubscriberImpl<E> implements Subscriber<E> {
      * @param pool the pool of Pipes keyed by Subject name
      * @throws NullPointerException if name or pool is null
      */
+    @SuppressWarnings("unchecked")
     public SubscriberImpl(Name name, Pool<? extends Pipe<E>> pool) {
         Objects.requireNonNull(name, "Subscriber name cannot be null");
         Objects.requireNonNull(pool, "Pipe pool cannot be null");
 
-        this.subscriberSubject = new SubjectImpl(
+        this.subscriberSubject = new SubjectImpl<>(
             IdImpl.generate(),
             name,
             StateImpl.empty(),
-            Subject.Type.SUBSCRIBER
+            (Class<Subscriber<E>>) (Class<?>) Subscriber.class
         );
         this.pool = pool;
         this.handler = null;
@@ -99,7 +101,7 @@ public class SubscriberImpl<E> implements Subscriber<E> {
     }
 
     @Override
-    public void accept(Subject subject, Registrar<E> registrar) {
+    public void accept(Subject<Channel<E>> subject, Registrar<E> registrar) {
         if (handler != null) {
             // Function-based: delegate to user-provided handler
             handler.accept(subject, registrar);

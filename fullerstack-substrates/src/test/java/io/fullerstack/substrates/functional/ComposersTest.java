@@ -14,68 +14,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Unit tests for {@link Composers}.
  *
  * <p>These tests demonstrate the CORRECT way to use Substrates via the Cortex API.
+ *
+ * <p>Note: Hierarchical routing tests removed as that functionality is now built
+ * into the Cell implementation via auto-subscription pattern.
  */
 class ComposersTest {
-
-    // ========== Hierarchical Routing Tests ==========
-
-    @Test
-    void hierarchicalPipes_createsAllLevels() {
-        // Given: A circuit created via Cortex API
-        Cortex cortex = new CortexRuntime();
-        Circuit circuit = cortex.circuit(cortex.name("root"));
-
-        Composer<Pipe<String>, String> composer = Channel::pipe;
-
-        // Create conduit to get a properly structured subject with hierarchical name
-        Name hierarchicalName = cortex.name(List.of("broker", "1", "heap"));
-        Conduit<Pipe<String>, String> testConduit = circuit.conduit(hierarchicalName, composer);
-        Subject subject = testConduit.subject();
-
-        // When: Creating hierarchical pipes
-        List<Pipe<String>> pipes = Composers.<String>hierarchicalPipes(circuit, subject, composer)
-            .collect(Collectors.toList());
-
-        // Then: Pipes created for all hierarchical levels (root + broker + broker.1 + broker.1.heap = 4)
-        assertThat(pipes).hasSize(4);
-        assertThat(pipes).allMatch(pipe -> pipe != null);
-    }
-
-    @Test
-    void hierarchicalConduits_returnsAllLevels() {
-        // Given: Cortex and circuit
-        Cortex cortex = new CortexRuntime();
-        Circuit circuit = cortex.circuit(cortex.name("root"));
-        Name name = cortex.name(List.of("broker", "1", "heap"));
-        Composer<Pipe<String>, String> composer = Channel::pipe;
-
-        // When: Getting hierarchical conduits
-        List<Conduit<Pipe<String>, String>> conduits = Composers.hierarchicalConduits(circuit, name, composer)
-            .collect(Collectors.toList());
-
-        // Then: Conduits returned for all levels (scoped under circuit)
-        assertThat(conduits).hasSize(3);
-        assertThat(conduits.get(0).subject().name().path().toString()).isEqualTo("root.broker");
-        assertThat(conduits.get(1).subject().name().path().toString()).isEqualTo("root.broker.1");
-        assertThat(conduits.get(2).subject().name().path().toString()).isEqualTo("root.broker.1.heap");
-    }
-
-    @Test
-    void hierarchicalConduits_withSingleLevel_returnsOne() {
-        // Given: Single-level name
-        Cortex cortex = new CortexRuntime();
-        Circuit circuit = cortex.circuit(cortex.name("root"));
-        Name name = cortex.name("broker");
-        Composer<Pipe<String>, String> composer = Channel::pipe;
-
-        // When: Getting hierarchical conduits
-        List<Conduit<Pipe<String>, String>> conduits = Composers.hierarchicalConduits(circuit, name, composer)
-            .collect(Collectors.toList());
-
-        // Then: Only one conduit (scoped under circuit)
-        assertThat(conduits).hasSize(1);
-        assertThat(conduits.get(0).subject().name().path().toString()).isEqualTo("root.broker");
-    }
 
     // ========== Filter/Transform Tests ==========
 
@@ -94,17 +37,10 @@ class ComposersTest {
         // When: Emitting positive and negative values
         List<Integer> received = new CopyOnWriteArrayList<>();
 
-        conduit.source().subscribe(new Subscriber<Integer>() {
-            @Override
-            public void accept(Subject subject, Registrar<Integer> registrar) {
-                registrar.register(emission -> received.add(emission));
-            }
-
-            @Override
-            public Subject subject() {
-                return conduit.subject();
-            }
-        });
+        conduit.subscribe(cortex.subscriber(
+            cortex.name("test-subscriber"),
+            (subject, registrar) -> registrar.register(emission -> received.add(emission))
+        ));
 
         Pipe<Integer> pipe = conduit.get(cortex.name("test"));
         pipe.emit(-5);
@@ -134,17 +70,10 @@ class ComposersTest {
         // When: Emitting more than the limit
         List<String> received = new CopyOnWriteArrayList<>();
 
-        conduit.source().subscribe(new Subscriber<String>() {
-            @Override
-            public void accept(Subject subject, Registrar<String> registrar) {
-                registrar.register(emission -> received.add(emission));
-            }
-
-            @Override
-            public Subject subject() {
-                return conduit.subject();
-            }
-        });
+        conduit.subscribe(cortex.subscriber(
+            cortex.name("test-subscriber"),
+            (subject, registrar) -> registrar.register(emission -> received.add(emission))
+        ));
 
         Pipe<String> pipe = conduit.get(cortex.name("test"));
         pipe.emit("1");
@@ -176,17 +105,10 @@ class ComposersTest {
         // When: Emitting duplicate values
         List<String> received = new CopyOnWriteArrayList<>();
 
-        conduit.source().subscribe(new Subscriber<String>() {
-            @Override
-            public void accept(Subject subject, Registrar<String> registrar) {
-                registrar.register(emission -> received.add(emission));
-            }
-
-            @Override
-            public Subject subject() {
-                return conduit.subject();
-            }
-        });
+        conduit.subscribe(cortex.subscriber(
+            cortex.name("test-subscriber"),
+            (subject, registrar) -> registrar.register(emission -> received.add(emission))
+        ));
 
         Pipe<String> pipe = conduit.get(cortex.name("test"));
         pipe.emit("A");
@@ -217,17 +139,10 @@ class ComposersTest {
         // When: Emitting many values
         List<Integer> received = new CopyOnWriteArrayList<>();
 
-        conduit.source().subscribe(new Subscriber<Integer>() {
-            @Override
-            public void accept(Subject subject, Registrar<Integer> registrar) {
-                registrar.register(emission -> received.add(emission));
-            }
-
-            @Override
-            public Subject subject() {
-                return conduit.subject();
-            }
-        });
+        conduit.subscribe(cortex.subscriber(
+            cortex.name("test-subscriber"),
+            (subject, registrar) -> registrar.register(emission -> received.add(emission))
+        ));
 
         Pipe<Integer> pipe = conduit.get(cortex.name("test"));
         for (int i = 1; i <= 10; i++) {
@@ -259,17 +174,10 @@ class ComposersTest {
         // When: Emitting values
         List<Integer> received = new CopyOnWriteArrayList<>();
 
-        conduit.source().subscribe(new Subscriber<Integer>() {
-            @Override
-            public void accept(Subject subject, Registrar<Integer> registrar) {
-                registrar.register(emission -> received.add(emission));
-            }
-
-            @Override
-            public Subject subject() {
-                return conduit.subject();
-            }
-        });
+        conduit.subscribe(cortex.subscriber(
+            cortex.name("test-subscriber"),
+            (subject, registrar) -> registrar.register(emission -> received.add(emission))
+        ));
 
         Pipe<Integer> pipe = conduit.get(cortex.name("test"));
         pipe.emit(-1);  // Filtered (negative)

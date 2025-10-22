@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.sink;
 
 import io.fullerstack.substrates.CortexRuntime;
-import io.fullerstack.substrates.name.LinkedName;
+import io.fullerstack.substrates.name.NameTree;
 import io.humainary.substrates.api.Substrates.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,11 +44,11 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
 
         assertThat(sink).isNotNull();
         assertThat((Object) sink.subject()).isNotNull();
-        assertThat(sink.subject().type()).isEqualTo(Subject.Type.SINK);
+        assertThat(sink.subject().type()).isEqualTo(Sink.class);
         assertThat(sink.subject().name().value()).contains("sink");
     }
 
@@ -59,7 +59,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
 
         assertThat(sink.drain().toList()).isEmpty();
     }
@@ -73,7 +73,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
         Pipe<String> pipe = conduit.get(cortex.name("producer"));
 
         pipe.emit("message1");
@@ -81,7 +81,7 @@ class SinkImplTest {
         // Give async processing time to complete
         Thread.sleep(50);
 
-        List<Capture<String>> captures = sink.drain().toList();
+        List<Capture<String, Channel<String>>> captures = sink.drain().toList();
 
         assertThat(captures).hasSize(1);
         assertThat(captures.get(0).emission()).isEqualTo("message1");
@@ -95,7 +95,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
         Pipe<String> pipe = conduit.get(cortex.name("producer"));
 
         pipe.emit("msg1");
@@ -105,7 +105,7 @@ class SinkImplTest {
         // Give async processing time to complete
         Thread.sleep(50);
 
-        List<Capture<String>> captures = sink.drain().toList();
+        List<Capture<String, Channel<String>>> captures = sink.drain().toList();
 
         assertThat(captures).hasSize(3);
         assertThat(captures.get(0).emission()).isEqualTo("msg1");
@@ -120,18 +120,18 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
         Pipe<String> pipe = conduit.get(cortex.name("producer"));
 
         pipe.emit("message");
         Thread.sleep(50);
 
         // First drain returns emission
-        List<Capture<String>> firstDrain = sink.drain().toList();
+        List<Capture<String, Channel<String>>> firstDrain = sink.drain().toList();
         assertThat(firstDrain).hasSize(1);
 
         // Second drain should be empty
-        List<Capture<String>> secondDrain = sink.drain().toList();
+        List<Capture<String, Channel<String>>> secondDrain = sink.drain().toList();
         assertThat(secondDrain).isEmpty();
     }
 
@@ -142,7 +142,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
 
         // Multiple producers
         Pipe<String> pipe1 = conduit.get(cortex.name("producer1"));
@@ -153,7 +153,7 @@ class SinkImplTest {
 
         Thread.sleep(50);
 
-        List<Capture<String>> captures = sink.drain().toList();
+        List<Capture<String, Channel<String>>> captures = sink.drain().toList();
 
         assertThat(captures).hasSize(2);
         assertThat(captures)
@@ -168,7 +168,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
         Pipe<String> pipe = conduit.get(cortex.name("producer"));
 
         // First batch
@@ -176,7 +176,7 @@ class SinkImplTest {
         pipe.emit("batch1-msg2");
         Thread.sleep(50);
 
-        List<Capture<String>> firstBatch = sink.drain().toList();
+        List<Capture<String, Channel<String>>> firstBatch = sink.drain().toList();
         assertThat(firstBatch).hasSize(2);
 
         // Second batch
@@ -185,7 +185,7 @@ class SinkImplTest {
         pipe.emit("batch2-msg3");
         Thread.sleep(50);
 
-        List<Capture<String>> secondBatch = sink.drain().toList();
+        List<Capture<String, Channel<String>>> secondBatch = sink.drain().toList();
         assertThat(secondBatch).hasSize(3);
         assertThat(secondBatch)
             .extracting(Capture::emission)
@@ -201,20 +201,20 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<Long> sink = cortex.sink(conduit.source());
+        Sink<Long> sink = cortex.sink(conduit);
         Pipe<Long> pipe = conduit.get(cortex.name("counter"));
 
         pipe.emit(42L);
         Thread.sleep(50);
 
-        List<Capture<Long>> captures = sink.drain().toList();
+        List<Capture<Long, Channel<Long>>> captures = sink.drain().toList();
 
         assertThat(captures).hasSize(1);
-        Capture<Long> capture = captures.get(0);
+        Capture<Long, Channel<Long>> capture = captures.get(0);
 
         assertThat(capture.emission()).isEqualTo(42L);
         assertThat((Object) capture.subject()).isNotNull();
-        assertThat(capture.subject().type()).isEqualTo(Subject.Type.CHANNEL);
+        assertThat(capture.subject().type()).isEqualTo(Channel.class);
     }
 
     @Test
@@ -224,7 +224,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
 
         Pipe<String> pipe1 = conduit.get(cortex.name("source1"));
         Pipe<String> pipe2 = conduit.get(cortex.name("source2"));
@@ -234,7 +234,7 @@ class SinkImplTest {
 
         Thread.sleep(50);
 
-        List<Capture<String>> captures = sink.drain().toList();
+        List<Capture<String, Channel<String>>> captures = sink.drain().toList();
 
         assertThat(captures).hasSize(2);
 
@@ -254,7 +254,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
         Pipe<String> pipe = conduit.get(cortex.name("producer"));
 
         // Emit before close
@@ -262,7 +262,7 @@ class SinkImplTest {
         Thread.sleep(50);
 
         // Drain before closing to capture "before" emission
-        List<Capture<String>> capturesBeforeClose = sink.drain().toList();
+        List<Capture<String, Channel<String>>> capturesBeforeClose = sink.drain().toList();
         assertThat(capturesBeforeClose).hasSize(1);
 
         sink.close();
@@ -272,7 +272,7 @@ class SinkImplTest {
         Thread.sleep(50);
 
         // Drain after close should be empty (no new captures after close)
-        List<Capture<String>> capturesAfterClose = sink.drain().toList();
+        List<Capture<String, Channel<String>>> capturesAfterClose = sink.drain().toList();
         assertThat(capturesAfterClose).isEmpty();
     }
 
@@ -283,7 +283,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
 
         // Multiple close calls should not throw
         sink.close();
@@ -301,7 +301,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
         Pipe<String> pipe = conduit.get(cortex.name("producer"));
 
         pipe.emit("message");
@@ -310,7 +310,7 @@ class SinkImplTest {
         sink.close();
 
         // Drain after close should be empty (buffer cleared)
-        List<Capture<String>> captures = sink.drain().toList();
+        List<Capture<String, Channel<String>>> captures = sink.drain().toList();
         assertThat(captures).isEmpty();
     }
 
@@ -323,7 +323,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<Integer> sink = cortex.sink(conduit.source());
+        Sink<Integer> sink = cortex.sink(conduit);
         Pipe<Integer> pipe = conduit.get(cortex.name("producer"));
 
         int threadCount = 10;
@@ -343,7 +343,7 @@ class SinkImplTest {
         assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
         Thread.sleep(100); // Allow async processing to complete
 
-        List<Capture<Integer>> captures = sink.drain().toList();
+        List<Capture<Integer, Channel<Integer>>> captures = sink.drain().toList();
 
         assertThat(captures).hasSize(threadCount * emissionsPerThread);
     }
@@ -355,7 +355,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<Integer> sink = cortex.sink(conduit.source());
+        Sink<Integer> sink = cortex.sink(conduit);
         Pipe<Integer> pipe = conduit.get(cortex.name("producer"));
 
         // Emit some values
@@ -391,7 +391,7 @@ class SinkImplTest {
             )
         );
 
-        Sink<Integer> sink = cortex.sink(conduit.source());
+        Sink<Integer> sink = cortex.sink(conduit);
         Pipe<Integer> pipe = conduit.get(cortex.name("producer"));
 
         pipe.emit(-5);  // Filtered out
@@ -400,7 +400,7 @@ class SinkImplTest {
 
         Thread.sleep(50);
 
-        List<Capture<Integer>> captures = sink.drain().toList();
+        List<Capture<Integer, Channel<Integer>>> captures = sink.drain().toList();
 
         assertThat(captures)
             .hasSize(2)
@@ -416,8 +416,8 @@ class SinkImplTest {
         );
 
         // Create two sinks on the same source
-        Sink<String> sink1 = cortex.sink(conduit.source());
-        Sink<String> sink2 = cortex.sink(conduit.source());
+        Sink<String> sink1 = cortex.sink(conduit);
+        Sink<String> sink2 = cortex.sink(conduit);
 
         Pipe<String> pipe = conduit.get(cortex.name("producer"));
 
@@ -425,8 +425,8 @@ class SinkImplTest {
         Thread.sleep(50);
 
         // Both sinks should receive the emission
-        List<Capture<String>> captures1 = sink1.drain().toList();
-        List<Capture<String>> captures2 = sink2.drain().toList();
+        List<Capture<String, Channel<String>>> captures1 = sink1.drain().toList();
+        List<Capture<String, Channel<String>>> captures2 = sink2.drain().toList();
 
         assertThat(captures1).hasSize(1);
         assertThat(captures2).hasSize(1);
@@ -444,7 +444,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<Integer> sink = cortex.sink(conduit.source());
+        Sink<Integer> sink = cortex.sink(conduit);
         Pipe<Integer> pipe = conduit.get(cortex.name("producer"));
 
         // Emit in specific order
@@ -452,7 +452,7 @@ class SinkImplTest {
 
         Thread.sleep(100);
 
-        List<Capture<Integer>> captures = sink.drain().toList();
+        List<Capture<Integer, Channel<Integer>>> captures = sink.drain().toList();
 
         assertThat(captures)
             .hasSize(50)
@@ -475,7 +475,7 @@ class SinkImplTest {
 
         Thread.sleep(50);
 
-        List<Capture<String>> captures = sink.drain().toList();
+        List<Capture<String, Channel<String>>> captures = sink.drain().toList();
 
         assertThat(captures)
             .hasSize(1)
@@ -494,7 +494,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<String> sink = cortex.sink(conduit.source());
+        Sink<String> sink = cortex.sink(conduit);  // Conduit extends Context
         Pipe<String> pipe = conduit.get(cortex.name("producer"));
 
         pipe.emit(null);
@@ -502,7 +502,7 @@ class SinkImplTest {
 
         Thread.sleep(50);
 
-        List<Capture<String>> captures = sink.drain().toList();
+        List<Capture<String, Channel<String>>> captures = sink.drain().toList();
 
         assertThat(captures).hasSize(2);
         assertThat(captures.get(0).emission()).isNull();
@@ -518,7 +518,7 @@ class SinkImplTest {
             Composer.pipe()
         );
 
-        Sink<Integer> sink = cortex.sink(conduit.source());
+        Sink<Integer> sink = cortex.sink(conduit);
         Pipe<Integer> pipe = conduit.get(cortex.name("producer"));
 
         // Emit many values rapidly
@@ -526,7 +526,7 @@ class SinkImplTest {
 
         Thread.sleep(200);
 
-        List<Capture<Integer>> captures = sink.drain().toList();
+        List<Capture<Integer, Channel<Integer>>> captures = sink.drain().toList();
 
         assertThat(captures).hasSize(1000);
 

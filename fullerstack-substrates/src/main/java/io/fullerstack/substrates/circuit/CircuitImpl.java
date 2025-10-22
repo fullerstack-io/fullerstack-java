@@ -1,24 +1,24 @@
 package io.fullerstack.substrates.circuit;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.fullerstack.substrates.channel.ChannelImpl;
 import io.fullerstack.substrates.clock.ClockImpl;
+import io.fullerstack.substrates.conduit.ConduitImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pool.PoolImpl;
-import io.fullerstack.substrates.queue.QueueFactory;
-import io.fullerstack.substrates.queue.LinkedBlockingQueueFactory;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameFactory;
-import io.fullerstack.substrates.name.InternedNameFactory;
-import io.fullerstack.substrates.registry.LazyTrieRegistry;
-import io.fullerstack.substrates.registry.RegistryFactory;
-import io.fullerstack.substrates.registry.LazyTrieRegistryFactory;
-import io.fullerstack.substrates.queue.Queue;
+import io.fullerstack.substrates.name.NameTree;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -39,12 +39,18 @@ import java.util.function.Consumer;
  * @see Circuit
  */
 public class CircuitImpl implements Circuit, Scheduler {
-    private final NameFactory nameFactory;
-    private final QueueFactory queueFactory;
-    private final RegistryFactory registryFactory;
     private final Subject circuitSubject;
     private final Source<State> stateSource;
-    private final Queue queue; // Virtual thread is daemon - auto-cleanup on JVM shutdown
+
+    // Internal queue processor (Virtual CPU Core pattern)
+    private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
+    private final Thread queueProcessor;
+    private volatile boolean running = true;
+    private volatile boolean executing = false;
+
+    // Shared scheduler for all Clocks in this Circuit
+    private final ScheduledExecutorService clockScheduler;
+
     private final Map<Name, Clock> clocks;
     private final Map<Name, ConduitSlot> conduits;
     private volatile boolean closed = false;
@@ -96,50 +102,58 @@ public class CircuitImpl implements Circuit, Scheduler {
 
     /**
      * Creates a circuit with the specified name using defaults:
-     * {@link InternedNameFactory}, {@link LinkedBlockingQueueFactory}, and {@link LazyTrieRegistryFactory}.
+     * {@link LinkedBlockingQueueFactory} and {@link LazyTrieRegistryFactory}.
      *
      * @param name circuit name
      */
     public CircuitImpl(Name name) {
-        this(name, InternedNameFactory.getInstance(), LinkedBlockingQueueFactory.getInstance(), LazyTrieRegistryFactory.getInstance());
-    }
-
-    /**
-     * Creates a circuit with the specified name and custom {@link NameFactory},
-     * using default {@link LinkedBlockingQueueFactory} and {@link LazyTrieRegistryFactory}.
-     *
-     * @param name circuit name
-     * @param nameFactory the factory to use for creating Name instances
-     */
-    public CircuitImpl(Name name, NameFactory nameFactory) {
-        this(name, nameFactory, LinkedBlockingQueueFactory.getInstance(), LazyTrieRegistryFactory.getInstance());
-    }
-
-    /**
-     * Creates a circuit with the specified name and custom factories.
-     *
-     * @param name circuit name
-     * @param nameFactory the factory to use for creating Name instances
-     * @param queueFactory the factory to use for creating Queue instances
-     * @param registryFactory the factory to use for creating Registry instances
-     */
-    @SuppressWarnings("unchecked")
-    public CircuitImpl(Name name, NameFactory nameFactory, QueueFactory queueFactory, RegistryFactory registryFactory) {
         Objects.requireNonNull(name, "Circuit name cannot be null");
-        this.nameFactory = Objects.requireNonNull(nameFactory, "NameFactory cannot be null");
-        this.queueFactory = Objects.requireNonNull(queueFactory, "QueueFactory cannot be null");
-        this.registryFactory = Objects.requireNonNull(registryFactory, "RegistryFactory cannot be null");
-        this.clocks = (Map<Name, Clock>) registryFactory.create();
-        this.conduits = (Map<Name, ConduitSlot>) registryFactory.create();
+        this.clocks = new ConcurrentHashMap<>();
+        this.conduits = new ConcurrentHashMap<>();
         Id id = IdImpl.generate();
-        this.circuitSubject = new SubjectImpl(
+        this.circuitSubject = new SubjectImpl<>(
             id,
             name,
             StateImpl.empty(),
-            Subject.Type.CIRCUIT
+            Circuit.class
         );
         this.stateSource = new SourceImpl<>(name);
-        this.queue = queueFactory.create();
+
+        // Shared scheduler for all Clocks in this Circuit
+        this.clockScheduler = Executors.newScheduledThreadPool(1, r -> {
+            Thread thread = new Thread(r);
+            thread.setDaemon(true);
+            thread.setName("circuit-clock-" + name.part());
+            return thread;
+        });
+
+        // Start virtual thread processor for async task execution
+        this.queueProcessor = Thread.startVirtualThread(this::processQueue);
+    }
+
+    /**
+     * Background processor that executes tasks from the queue serially.
+     * Runs in a virtual thread (Virtual CPU Core pattern).
+     */
+    private void processQueue() {
+        while (running && !Thread.interrupted()) {
+            try {
+                Runnable task = taskQueue.take();  // Blocking take (FIFO)
+                executing = true;
+                try {
+                    task.run();
+                } finally {
+                    executing = false;
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                // Log error but continue processing
+                System.err.println("Error executing task: " + e.getMessage());
+                executing = false;
+            }
+        }
     }
 
     @Override
@@ -148,68 +162,93 @@ public class CircuitImpl implements Circuit, Scheduler {
     }
 
     @Override
-    public Source<State> source() {
-        return stateSource;
+    public Subscription subscribe(Subscriber<State> subscriber) {
+        return stateSource.subscribe(subscriber);
     }
 
     // Circuit.await() - public API
     @Override
     public void await() {
         checkClosed();
-        queue.await();
+        // Block until queue is empty and nothing is currently executing
+        while (running && (executing || !taskQueue.isEmpty())) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Circuit await interrupted", e);
+            }
+        }
     }
 
-    // Scheduler.await() - internal API for components
+    // Scheduler.schedule() - internal API for components
     @Override
     public void schedule(Runnable task) {
         checkClosed();
-        queue.post(task);
+        if (task != null && running) {
+            taskQueue.offer(task);  // Add to queue (FIFO)
+        }
     }
 
     @Override
     public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer) {
-        return cell(nameFactory.createRoot("cell"), composer, null);
+        return cell(NameTree.of("cell"), composer, null);
     }
 
     @Override
     public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer) {
-        return cell(nameFactory.createRoot("cell"), composer, configurer);
+        return cell(NameTree.of("cell"), composer, configurer);
     }
 
     /**
      * Internal method to create a Cell with all parameters.
+     *
+     * Per the Humainary API contract:
+     * 1. Create a Source and Channel for the Cell
+     * 2. Invoke the Composer with the Channel to get a Pipe<I>
+     * 3. Cast the Pipe<I> to Cell<I,E> (the Composer creates Cells)
      */
     private <I, E> Cell<I, E> cell(Name name, Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer) {
         checkClosed();
         Objects.requireNonNull(name, "Cell name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");
 
-        // Build hierarchical name
-        String circuitPath = circuitSubject.name().value();
-        String cellPath = name.value();
-        Name hierarchicalName = nameFactory.create(circuitPath + "." + cellPath);
+        // Build hierarchical name: circuit.name
+        Name hierarchicalName = circuitSubject.name().name(name);
 
-        // Create Cell - it will use this Circuit (via Scheduler interface)
-        return new io.fullerstack.substrates.cell.CellImpl<>(
-            hierarchicalName, composer, this, registryFactory, configurer
+        // Create Source for this Cell
+        Source<E> source = new SourceImpl<>(hierarchicalName);
+
+        // Create Channel wrapping the Source
+        Channel<E> channel = new ChannelImpl<>(
+            hierarchicalName, this, source, configurer
         );
+
+        // Invoke the Composer to create the Pipe<I> (which is actually a Cell<I,E>)
+        Pipe<I> pipe = composer.compose(channel);
+
+        // Cast to Cell<I,E> as per the API contract
+        @SuppressWarnings("unchecked")
+        Cell<I, E> cell = (Cell<I, E>) pipe;
+
+        return cell;
     }
 
     @Override
     public Clock clock() {
-        return clock(nameFactory.createRoot("clock"));
+        return clock(NameTree.of("clock"));
     }
 
     @Override
     public Clock clock(Name name) {
         checkClosed();
         Objects.requireNonNull(name, "Clock name cannot be null");
-        return clocks.computeIfAbsent(name, ClockImpl::new);
+        return clocks.computeIfAbsent(name, n -> new ClockImpl(n, clockScheduler));
     }
 
     @Override
     public <P, E> Conduit<P, E> conduit(Composer<? extends P, E> composer) {
-        return conduit(nameFactory.createRoot("conduit"), composer);
+        return conduit(NameTree.of("conduit"), composer);
     }
 
     @Override
@@ -221,7 +260,7 @@ public class CircuitImpl implements Circuit, Scheduler {
         Class<?> composerClass = composer.getClass();
 
         // FAST PATH: Try to get existing slot (identity map lookup)
-        ConduitSlot slot = conduits.get(name);  // ~4ns with InternedName identity map
+        ConduitSlot slot = conduits.get(name);  // ~4ns with NameTree identity map
 
         if (slot != null) {
             // Check if composer exists in slot
@@ -233,12 +272,10 @@ public class CircuitImpl implements Circuit, Scheduler {
         }
 
         // COLD PATH: Create new conduit (only on miss)
-        // Build hierarchical name only when needed
-        String circuitPath = circuitSubject.name().value();
-        String conduitPath = name.value();
-        Name hierarchicalName = nameFactory.create(circuitPath + "." + conduitPath);
-        Conduit<P, E> newConduit = new io.fullerstack.substrates.conduit.ConduitImpl<>(
-            hierarchicalName, composer, this, registryFactory
+        // Build hierarchical name: circuit.name -> conduit.name
+        Name hierarchicalName = circuitSubject.name().name(name);
+        Conduit<P, E> newConduit = new ConduitImpl<>(
+            hierarchicalName, composer, this
         );
 
         // Add to slot structure (thread-safe)
@@ -276,11 +313,10 @@ public class CircuitImpl implements Circuit, Scheduler {
         }
 
         // COLD PATH: Create new conduit with flow configurer
-        String circuitPath = circuitSubject.name().value();
-        String conduitPath = name.value();
-        Name hierarchicalName = nameFactory.create(circuitPath + "." + conduitPath);
-        Conduit<P, E> newConduit = new io.fullerstack.substrates.conduit.ConduitImpl<>(
-            hierarchicalName, composer, this, registryFactory, configurer
+        // Build hierarchical name: circuit.name -> conduit.name
+        Name hierarchicalName = circuitSubject.name().name(name);
+        Conduit<P, E> newConduit = new ConduitImpl<>(
+            hierarchicalName, composer, this, configurer
         );
 
         // Add to slot structure
@@ -317,8 +353,25 @@ public class CircuitImpl implements Circuit, Scheduler {
                 }
             });
 
-            // Note: Queue uses daemon virtual thread - no explicit shutdown needed
-            // Virtual threads are automatically cleaned up on JVM shutdown
+            // Stop clock scheduler
+            clockScheduler.shutdown();
+            try {
+                if (!clockScheduler.awaitTermination(1, TimeUnit.SECONDS)) {
+                    clockScheduler.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                clockScheduler.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+
+            // Stop queue processor
+            running = false;
+            queueProcessor.interrupt();
+            try {
+                queueProcessor.join(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
 
             clocks.clear();
             conduits.clear();

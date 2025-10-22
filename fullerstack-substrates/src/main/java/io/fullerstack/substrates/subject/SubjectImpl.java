@@ -4,6 +4,7 @@ import io.humainary.substrates.api.Substrates.Id;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.State;
 import io.humainary.substrates.api.Substrates.Subject;
+import io.humainary.substrates.api.Substrates.Substrate;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -24,13 +25,14 @@ import lombok.experimental.FieldDefaults;
  *   <li>Builder pattern via {@code @Builder}</li>
  * </ul>
  *
+ * @param <S> The substrate type this subject represents
  * @see Subject
  */
 @Getter
 @ToString
 @EqualsAndHashCode
 @Builder(toBuilder = true)
-public class SubjectImpl implements Subject {
+public class SubjectImpl<S extends Substrate<S>> implements Subject<S>, Comparable<Subject<?>> {
     /**
      * Unique identifier for this subject.
      */
@@ -47,14 +49,14 @@ public class SubjectImpl implements Subject {
     private final State state;
 
     /**
-     * Subject type (CIRCUIT, CONDUIT, CHANNEL, etc.).
+     * Subject type class (e.g., Channel.class, Circuit.class).
      */
-    private final Type type;
+    private final Class<S> type;
 
     /**
      * Creates a Subject with all fields.
      */
-    public SubjectImpl(@NonNull Id id, @NonNull Name name, State state, @NonNull Type type) {
+    public SubjectImpl(@NonNull Id id, @NonNull Name name, State state, @NonNull Class<S> type) {
         this.id = id;
         this.name = name;
         this.state = state;
@@ -78,7 +80,7 @@ public class SubjectImpl implements Subject {
     }
 
     @Override
-    public Type type() {
+    public Class<S> type() {
         return type;
     }
 
@@ -97,5 +99,20 @@ public class SubjectImpl implements Subject {
     @Override
     public CharSequence path(char separator) {
         return name.path(separator);
+    }
+
+    // Implement Comparable for Subject ordering
+    @Override
+    public int compareTo(Subject<?> other) {
+        if (other == null) {
+            return 1;
+        }
+        // Compare by name first
+        int nameCompare = name().toString().compareTo(other.name().toString());
+        if (nameCompare != 0) {
+            return nameCompare;
+        }
+        // Then by ID
+        return id().toString().compareTo(other.id().toString());
     }
 }
