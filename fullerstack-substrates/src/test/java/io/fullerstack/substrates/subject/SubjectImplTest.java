@@ -12,7 +12,7 @@ import io.humainary.substrates.api.Substrates.Slot;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.slot.SlotImpl;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,7 +22,7 @@ class SubjectImplTest {
     @Test
     void shouldCreateSubjectWithAllComponents() {
         Id id = IdImpl.generate();
-        Name name = NameTree.of("test-subject");
+        Name name = NameNode.of("test-subject");
         State state = StateImpl.empty();
         Class<Scope> type = Scope.class;
 
@@ -37,7 +37,7 @@ class SubjectImplTest {
 
     @Test
     void shouldReturnPartFromName() {
-        Name name = NameTree.of("kafka.broker.1");
+        Name name = NameNode.of("kafka.broker.1");
         @SuppressWarnings("unchecked")
         Subject<Conduit<Pipe<String>, String>> subject = new SubjectImpl<>(
             IdImpl.generate(),
@@ -51,8 +51,8 @@ class SubjectImplTest {
 
     @Test
     void shouldIncludeStateInSubject() {
-        Slot<Integer> countSlot = SlotImpl.of(NameTree.of("count"), 42);
-        Slot<Boolean> activeSlot = SlotImpl.of(NameTree.of("active"), true);
+        Slot<Integer> countSlot = SlotImpl.of(NameNode.of("count"), 42);
+        Slot<Boolean> activeSlot = SlotImpl.of(NameNode.of("active"), true);
 
         State state = StateImpl.empty()
             .state(countSlot)
@@ -61,7 +61,7 @@ class SubjectImplTest {
         @SuppressWarnings("unchecked")
         Subject<Circuit> subject = new SubjectImpl<>(
             IdImpl.generate(),
-            NameTree.of("test"),
+            NameNode.of("test"),
             state,
             Circuit.class
         );

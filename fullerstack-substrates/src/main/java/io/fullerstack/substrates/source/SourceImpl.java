@@ -5,7 +5,7 @@ import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 import io.fullerstack.substrates.subscription.SubscriptionImpl;
 
 import lombok.Getter;
@@ -49,10 +49,10 @@ public class SourceImpl<E> implements Source<E> {
     private final Map<Name, Map<Subscriber<E>, List<Pipe<E>>>> pipeCache = new ConcurrentHashMap<>();
 
     /**
-     * Creates a source with default name using NameTree.of().
+     * Creates a source with default name using NameNode.of().
      */
     public SourceImpl() {
-        this(NameTree.of("source"));
+        this(NameNode.of("source"));
     }
 
     /**

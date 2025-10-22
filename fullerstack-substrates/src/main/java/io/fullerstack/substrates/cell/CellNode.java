@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.channel.ChannelImpl;
 import io.fullerstack.substrates.circuit.Scheduler;
 import io.fullerstack.substrates.id.IdImpl;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
- * CellTree implementation - following SimpleName pattern exactly.
+ * CellNode implementation - following SimpleName pattern exactly.
  *
  * <p><b>Design Principles:</b>
  * <ul>
@@ -37,9 +37,9 @@ import java.util.function.Function;
  *   <li>children - cache children (just a ConcurrentHashMap, no RegistryFactory needed)</li>
  * </ul>
  */
-public final class CellTree<I, E> implements Cell<I, E> {
+public final class CellNode<I, E> implements Cell<I, E> {
 
-    private final CellTree<I, E> parent;              // Parent Cell (null for root)
+    private final CellNode<I, E> parent;              // Parent Cell (null for root)
     private final String segment;                         // This Cell's name segment
     private final Function<I, E> transformer;             // I → E transformation
     private final Source<E> source;                       // For managing subscribers
@@ -56,7 +56,7 @@ public final class CellTree<I, E> implements Cell<I, E> {
      * @param transformer function to transform I → E
      * @param scheduler scheduler for async operations
      */
-    public CellTree(CellTree<I, E> parent, Name name, Function<I, E> transformer, Scheduler scheduler) {
+    public CellNode(CellNode<I, E> parent, Name name, Function<I, E> transformer, Scheduler scheduler) {
         this.parent = parent;
         this.segment = name.part().toString();
         this.transformer = Objects.requireNonNull(transformer, "transformer cannot be null");
@@ -106,7 +106,7 @@ public final class CellTree<I, E> implements Cell<I, E> {
             // Build hierarchical Name: parent.name().name(childSegment)
             // Like SimpleName: parent.name("child") creates new SimpleName(parent, "child")
             Name childName = subject.name().name(n);
-            return new CellTree<>(this, childName, transformer, scheduler);
+            return new CellNode<>(this, childName, transformer, scheduler);
         });
     }
 

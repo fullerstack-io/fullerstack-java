@@ -5,7 +5,7 @@ import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 
 import java.util.List;
 import java.util.Objects;
@@ -47,12 +47,12 @@ public class SinkImpl<E> implements Sink<E> {
     public SinkImpl(Source<E> source) {
         Objects.requireNonNull(source, "Source cannot be null");
 
-        // Using NameTree.of() static factory
+        // Using NameNode.of() static factory
         this.source = source;
         Id sinkId = IdImpl.generate();
         this.sinkSubject = new SubjectImpl<>(
             sinkId,
-            NameTree.of("sink").name(sinkId.toString()),
+            NameNode.of("sink").name(sinkId.toString()),
             StateImpl.empty(),
             (Class<Sink<E>>) (Class<?>) Sink.class
         );
@@ -60,7 +60,7 @@ public class SinkImpl<E> implements Sink<E> {
         // Create internal subscriber's Subject once
         this.internalSubscriberSubject = new SubjectImpl<>(
             IdImpl.generate(),
-            NameTree.of("sink-subscriber"),
+            NameNode.of("sink-subscriber"),
             StateImpl.empty(),
             (Class<Subscriber<E>>) (Class<?>) Subscriber.class
         );

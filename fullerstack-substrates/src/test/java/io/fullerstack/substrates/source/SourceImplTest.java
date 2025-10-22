@@ -5,7 +5,7 @@ import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -29,7 +29,7 @@ class SourceImplTest {
             public Subject<Subscriber<E>> subject() {
                 return new SubjectImpl<>(
                     IdImpl.of(java.util.UUID.randomUUID()),
-                    NameTree.of("test-subscriber"),
+                    NameNode.of("test-subscriber"),
                     StateImpl.empty(),
                     (Class<Subscriber<E>>) (Class<?>) Subscriber.class
                 );
@@ -49,7 +49,7 @@ class SourceImplTest {
     private <E> Subject<Channel<E>> testSubject(String name) {
         return new SubjectImpl<>(
             IdImpl.generate(),
-            NameTree.of(name),
+            NameNode.of(name),
             StateImpl.empty(),
             (Class<Channel<E>>) (Class<?>) Channel.class
         );
@@ -78,7 +78,7 @@ class SourceImplTest {
 
     @Test
     void shouldCreateSourceWithCustomName() {
-        Name name = NameTree.of("custom-source");
+        Name name = NameNode.of("custom-source");
         SourceImpl<String> source = new SourceImpl<>(name);
 
         assertThat((Object) source.subject().name()).isEqualTo(name);

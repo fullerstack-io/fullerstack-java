@@ -1,6 +1,6 @@
 package io.fullerstack.substrates.state;
 
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 import io.fullerstack.substrates.slot.SlotImpl;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Slot;
@@ -143,7 +143,7 @@ public class StateImpl implements State {
         // This allows for type-safe enum retrieval
         StateImpl newState = new StateImpl(this.slots);
         // Use the enum's declaring class simple name as the slot name
-        Name enumName = NameTree.of(value.getClass().getSimpleName());
+        Name enumName = NameNode.of(value.getClass().getSimpleName());
         newState.slots.add(SlotImpl.of(enumName, value.name()));
         return newState;
     }

@@ -5,7 +5,7 @@ import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -58,7 +58,7 @@ public class ClockImpl implements Clock {
      * @param scheduler shared ScheduledExecutorService from Circuit
      */
     public ClockImpl(ScheduledExecutorService scheduler) {
-        this(NameTree.of("clock"), scheduler);
+        this(NameNode.of("clock"), scheduler);
     }
 
     @Override

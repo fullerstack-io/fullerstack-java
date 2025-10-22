@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.CortexRuntime;
 import io.fullerstack.substrates.capture.CaptureImpl;
 import io.fullerstack.substrates.circuit.CircuitImpl;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
@@ -87,14 +87,14 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldEmitPeriodicEventsViaClock() throws Exception {
-        circuit = new CircuitImpl(NameTree.of("test"));
-        Clock clock = circuit.clock(NameTree.of("timer"));
+        circuit = new CircuitImpl(NameNode.of("test"));
+        Clock clock = circuit.clock(NameNode.of("timer"));
 
         AtomicInteger tickCount = new AtomicInteger(0);
         CountDownLatch latch = new CountDownLatch(3);
 
         Subscription subscription = clock.consume(
-            NameTree.of("ticker"),
+            NameNode.of("ticker"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 tickCount.incrementAndGet();
@@ -114,7 +114,7 @@ class CircuitIntegrationTest {
     /*
     @Test
     void shouldBroadcastStateEventsViaSource() {
-        circuit = new CircuitImpl(NameTree.of("test"));
+        circuit = new CircuitImpl(NameNode.of("test"));
         Source<State> source = circuit.source();  // Get the Circuit's Source
 
         AtomicInteger emissionCount = new AtomicInteger(0);
@@ -125,7 +125,7 @@ class CircuitIntegrationTest {
             public Subject<Subscriber<State>> subject() {
                 return new io.fullerstack.substrates.subject.SubjectImpl<>(
                     io.fullerstack.substrates.id.IdImpl.generate(),
-                    NameTree.of("subscriber"),
+                    NameNode.of("subscriber"),
                     io.fullerstack.substrates.state.StateImpl.empty(),
                     (Class<Subscriber<State>>) (Class<?>) Subscriber.class
                 );
@@ -143,11 +143,11 @@ class CircuitIntegrationTest {
         @SuppressWarnings("unchecked")
         Subject<Channel<State>> testChannel = new SubjectImpl<>(
             IdImpl.generate(),
-            NameTree.of("test-channel"),
+            NameNode.of("test-channel"),
             StateImpl.empty(),
             (Class<Channel<State>>) (Class<?>) Channel.class
         );
-        State emission = StateImpl.of(NameTree.of("event"), 1);
+        State emission = StateImpl.of(NameNode.of("event"), 1);
 
         // Use SourceImpl's emission handler (like inlet Pipes do)
         Capture<State, Channel<State>> capture = new CaptureImpl<>(testChannel, emission);
@@ -190,7 +190,7 @@ class CircuitIntegrationTest {
         // Start clock
         Clock clock = circuit.clock();
         Subscription subscription = clock.consume(
-            NameTree.of("ticker"),
+            NameNode.of("ticker"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 clockTicks.incrementAndGet();
@@ -209,10 +209,10 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldSupportMultipleClocksWithDifferentCycles() throws Exception {
-        circuit = new CircuitImpl(NameTree.of("test"));
+        circuit = new CircuitImpl(NameNode.of("test"));
 
-        Clock fastClock = circuit.clock(NameTree.of("fast"));
-        Clock slowClock = circuit.clock(NameTree.of("slow"));
+        Clock fastClock = circuit.clock(NameNode.of("fast"));
+        Clock slowClock = circuit.clock(NameNode.of("slow"));
 
         AtomicInteger fastTicks = new AtomicInteger(0);
         AtomicInteger slowTicks = new AtomicInteger(0);
@@ -220,7 +220,7 @@ class CircuitIntegrationTest {
         CountDownLatch slowLatch = new CountDownLatch(2);
 
         Subscription fastSub = fastClock.consume(
-            NameTree.of("fast-ticker"),
+            NameNode.of("fast-ticker"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 fastTicks.incrementAndGet();
@@ -229,7 +229,7 @@ class CircuitIntegrationTest {
         );
 
         Subscription slowSub = slowClock.consume(
-            NameTree.of("slow-ticker"),
+            NameNode.of("slow-ticker"),
             Clock.Cycle.SECOND,
             instant -> {
                 slowTicks.incrementAndGet();
@@ -249,16 +249,16 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldCleanupAllResourcesOnClose() throws Exception {
-        circuit = new CircuitImpl(NameTree.of("test"));
+        circuit = new CircuitImpl(NameNode.of("test"));
 
         // Create all components (M15+: no queue() method)
-        Clock clock1 = circuit.clock(NameTree.of("clock1"));
-        Clock clock2 = circuit.clock(NameTree.of("clock2"));
+        Clock clock1 = circuit.clock(NameNode.of("clock1"));
+        Clock clock2 = circuit.clock(NameNode.of("clock2"));
         Source<State> source = circuit;  // Circuit implements Source
 
         AtomicInteger clockTicks = new AtomicInteger(0);
         clock1.consume(
-            NameTree.of("ticker"),
+            NameNode.of("ticker"),
             Clock.Cycle.MILLISECOND,
             instant -> clockTicks.incrementAndGet()
         );
@@ -277,18 +277,18 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldProvideAccessToAllComponents() {
-        circuit = new CircuitImpl(NameTree.of("test"));
+        circuit = new CircuitImpl(NameNode.of("test"));
 
         // M15+ API: queue() is internal, not exposed publicly
         assertThat((Object) circuit.subject()).isNotNull();
         assertThat((Object) circuit).isNotNull();
         assertThat((Object) circuit.clock()).isNotNull();
-        assertThat((Object) circuit.clock(NameTree.of("custom"))).isNotNull();
+        assertThat((Object) circuit.clock(NameNode.of("custom"))).isNotNull();
     }
 
     @Test
     void shouldSupportTapPatternForFunctionalChaining() {
-        circuit = new CircuitImpl(NameTree.of("test"));
+        circuit = new CircuitImpl(NameNode.of("test"));
 
         AtomicInteger tapCount = new AtomicInteger(0);
 

@@ -10,7 +10,7 @@ import io.fullerstack.substrates.slot.SlotImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
 import io.fullerstack.substrates.subscriber.SubscriberImpl;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 import io.fullerstack.substrates.sink.SinkImpl;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,7 +56,7 @@ public class CortexRuntime implements Cortex {
     public CortexRuntime() {
         this.circuits = new ConcurrentHashMap<>();
         this.scopes = new ConcurrentHashMap<>();
-        Name cortexName = NameTree.of("cortex");
+        Name cortexName = NameNode.of("cortex");
         this.defaultScope = new ScopeImpl(cortexName);
         // Cache default scope by its name
         this.scopes.put(cortexName, defaultScope);
@@ -66,7 +66,7 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public Circuit circuit() {
-        return circuit(NameTree.of("circuit"));
+        return circuit(NameNode.of("circuit"));
     }
 
     @Override
@@ -80,18 +80,18 @@ public class CortexRuntime implements Cortex {
     }
 
     // ========== Name Factory (8 methods) ==========
-    // All delegate directly to NameTree.of() overloaded methods
+    // All delegate directly to NameNode.of() overloaded methods
 
     @Override
     public Name name(String s) {
         // Create root name - no path parsing
-        return NameTree.of(s);
+        return NameNode.of(s);
     }
 
     @Override
     public Name name(Enum<?> e) {
         // Create root, let Name handle the hierarchy building
-        return NameTree.of(e.getDeclaringClass().getName()).name(e);
+        return NameNode.of(e.getDeclaringClass().getName()).name(e);
     }
 
     @Override
@@ -101,7 +101,7 @@ public class CortexRuntime implements Cortex {
         if (!it.hasNext()) {
             throw new IllegalArgumentException("parts cannot be empty");
         }
-        return NameTree.of(it.next()).name(it);
+        return NameNode.of(it.next()).name(it);
     }
 
     @Override
@@ -111,7 +111,7 @@ public class CortexRuntime implements Cortex {
         if (!it.hasNext()) {
             throw new IllegalArgumentException("items cannot be empty");
         }
-        return NameTree.of(mapper.apply(it.next())).name(it, mapper);
+        return NameNode.of(mapper.apply(it.next())).name(it, mapper);
     }
 
     @Override
@@ -120,7 +120,7 @@ public class CortexRuntime implements Cortex {
         if (!parts.hasNext()) {
             throw new IllegalArgumentException("parts cannot be empty");
         }
-        return NameTree.of(parts.next()).name(parts);
+        return NameNode.of(parts.next()).name(parts);
     }
 
     @Override
@@ -129,18 +129,18 @@ public class CortexRuntime implements Cortex {
         if (!items.hasNext()) {
             throw new IllegalArgumentException("items cannot be empty");
         }
-        return NameTree.of(mapper.apply(items.next())).name(items, mapper);
+        return NameNode.of(mapper.apply(items.next())).name(items, mapper);
     }
 
     @Override
     public Name name(Class<?> clazz) {
-        return NameTree.of(clazz.getName());
+        return NameNode.of(clazz.getName());
     }
 
     @Override
     public Name name(Member member) {
         // Create root, let Name.name() handle the hierarchy
-        return NameTree.of(member.getDeclaringClass().getName()).name(member);
+        return NameNode.of(member.getDeclaringClass().getName()).name(member);
     }
 
     // ========== Pool Management (1 method) ==========

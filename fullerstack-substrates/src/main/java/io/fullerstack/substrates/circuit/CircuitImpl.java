@@ -9,7 +9,7 @@ import io.fullerstack.substrates.pool.PoolImpl;
 import io.fullerstack.substrates.source.SourceImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 
 import java.util.Map;
 import java.util.Objects;
@@ -192,12 +192,12 @@ public class CircuitImpl implements Circuit, Scheduler {
 
     @Override
     public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer) {
-        return cell(NameTree.of("cell"), composer, null);
+        return cell(NameNode.of("cell"), composer, null);
     }
 
     @Override
     public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer) {
-        return cell(NameTree.of("cell"), composer, configurer);
+        return cell(NameNode.of("cell"), composer, configurer);
     }
 
     /**
@@ -236,7 +236,7 @@ public class CircuitImpl implements Circuit, Scheduler {
 
     @Override
     public Clock clock() {
-        return clock(NameTree.of("clock"));
+        return clock(NameNode.of("clock"));
     }
 
     @Override
@@ -248,7 +248,7 @@ public class CircuitImpl implements Circuit, Scheduler {
 
     @Override
     public <P, E> Conduit<P, E> conduit(Composer<? extends P, E> composer) {
-        return conduit(NameTree.of("conduit"), composer);
+        return conduit(NameNode.of("conduit"), composer);
     }
 
     @Override
@@ -260,7 +260,7 @@ public class CircuitImpl implements Circuit, Scheduler {
         Class<?> composerClass = composer.getClass();
 
         // FAST PATH: Try to get existing slot (identity map lookup)
-        ConduitSlot slot = conduits.get(name);  // ~4ns with NameTree identity map
+        ConduitSlot slot = conduits.get(name);  // ~4ns with NameNode identity map
 
         if (slot != null) {
             // Check if composer exists in slot

@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.clock;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ class ClockImplTest {
 
     @Test
     void shouldCreateClockWithCustomName() {
-        Name name = NameTree.of("custom-clock");
+        Name name = NameNode.of("custom-clock");
         clock = new ClockImpl(name, scheduler);
 
         assertThat((Object) clock.subject().name()).isEqualTo(name);
@@ -65,7 +65,7 @@ class ClockImplTest {
         CountDownLatch latch = new CountDownLatch(3);
 
         Subscription subscription = clock.consume(
-            NameTree.of("test"),
+            NameNode.of("test"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 emissions.add(instant);
@@ -87,7 +87,7 @@ class ClockImplTest {
         AtomicInteger count = new AtomicInteger(0);
 
         Subscription subscription = clock.consume(
-            NameTree.of("test"),
+            NameNode.of("test"),
             Clock.Cycle.MILLISECOND,
             instant -> count.incrementAndGet()
         );
@@ -110,7 +110,7 @@ class ClockImplTest {
         CountDownLatch latch = new CountDownLatch(6);
 
         Subscription sub1 = clock.consume(
-            NameTree.of("sub1"),
+            NameNode.of("sub1"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 count1.incrementAndGet();
@@ -119,7 +119,7 @@ class ClockImplTest {
         );
 
         Subscription sub2 = clock.consume(
-            NameTree.of("sub2"),
+            NameNode.of("sub2"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 count2.incrementAndGet();
@@ -145,7 +145,7 @@ class ClockImplTest {
 
     @Test
     void shouldRequireNonNullScheduler() {
-        assertThatThrownBy(() -> new ClockImpl(NameTree.of("test"), null))
+        assertThatThrownBy(() -> new ClockImpl(NameNode.of("test"), null))
             .isInstanceOf(NullPointerException.class)
             .hasMessageContaining("Scheduler cannot be null");
     }
@@ -157,10 +157,10 @@ class ClockImplTest {
         assertThatThrownBy(() -> clock.consume(null, Clock.Cycle.SECOND, instant -> {}))
             .isInstanceOf(NullPointerException.class);
 
-        assertThatThrownBy(() -> clock.consume(NameTree.of("test"), null, instant -> {}))
+        assertThatThrownBy(() -> clock.consume(NameNode.of("test"), null, instant -> {}))
             .isInstanceOf(NullPointerException.class);
 
-        assertThatThrownBy(() -> clock.consume(NameTree.of("test"), Clock.Cycle.SECOND, null))
+        assertThatThrownBy(() -> clock.consume(NameNode.of("test"), Clock.Cycle.SECOND, null))
             .isInstanceOf(NullPointerException.class);
     }
 
@@ -170,7 +170,7 @@ class ClockImplTest {
         clock.close();
 
         assertThatThrownBy(() -> clock.consume(
-            NameTree.of("test"),
+            NameNode.of("test"),
             Clock.Cycle.SECOND,
             instant -> {}
         ))
@@ -193,7 +193,7 @@ class ClockImplTest {
         clock = new ClockImpl(scheduler);
 
         Subscription subscription = clock.consume(
-            NameTree.of("test"),
+            NameNode.of("test"),
             Clock.Cycle.SECOND,
             instant -> {}
         );
@@ -211,7 +211,7 @@ class ClockImplTest {
         CountDownLatch latch = new CountDownLatch(2);
 
         Subscription subscription = clock.consume(
-            NameTree.of("test"),
+            NameNode.of("test"),
             Clock.Cycle.SECOND,
             instant -> {
                 count.incrementAndGet();
@@ -233,7 +233,7 @@ class ClockImplTest {
         AtomicInteger count = new AtomicInteger(0);
 
         clock.consume(
-            NameTree.of("test"),
+            NameNode.of("test"),
             Clock.Cycle.MILLISECOND,
             instant -> count.incrementAndGet()
         );

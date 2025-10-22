@@ -2,7 +2,7 @@ package io.fullerstack.substrates.state;
 
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.State;
-import io.fullerstack.substrates.name.NameTree;
+import io.fullerstack.substrates.name.NameNode;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,7 +19,7 @@ class StateImplTest {
 
     @Test
     void shouldStoreIntegerValue() {
-        Name name = NameTree.of("count");
+        Name name = NameNode.of("count");
         State state = StateImpl.of(name, 42);
 
         assertThat(state.stream().count()).isEqualTo(1);
@@ -29,9 +29,9 @@ class StateImplTest {
     void shouldStoreMultipleValues() {
         // State is immutable - each state() returns a NEW State
         State state = new StateImpl()
-            .state(NameTree.of("count"), 42)
-            .state(NameTree.of("name"), "test")
-            .state(NameTree.of("active"), true);
+            .state(NameNode.of("count"), 42)
+            .state(NameNode.of("name"), "test")
+            .state(NameNode.of("active"), true);
 
         assertThat(state.stream().count()).isEqualTo(3);
     }
@@ -39,15 +39,15 @@ class StateImplTest {
     @Test
     void shouldSupportMethodChaining() {
         State state = new StateImpl()
-            .state(NameTree.of("count"), 42)
-            .state(NameTree.of("name"), "test");
+            .state(NameNode.of("count"), 42)
+            .state(NameNode.of("name"), "test");
 
         assertThat(state.stream().count()).isEqualTo(2);
     }
 
     @Test
     void shouldStoreAllPrimitiveTypes() {
-        Name name = NameTree.of("test");
+        Name name = NameNode.of("test");
 
         State intState = StateImpl.of(name, 42);
         State longState = StateImpl.of(name, 42L);
@@ -68,8 +68,8 @@ class StateImplTest {
     void shouldBeImmutable() {
         // State is immutable - each state() returns a NEW instance
         State s1 = new StateImpl();
-        State s2 = s1.state(NameTree.of("count"), 1);
-        State s3 = s2.state(NameTree.of("count"), 2);
+        State s2 = s1.state(NameNode.of("count"), 1);
+        State s3 = s2.state(NameNode.of("count"), 2);
 
         assertThat(s1).isNotSameAs(s2);
         assertThat(s2).isNotSameAs(s3);
@@ -82,9 +82,9 @@ class StateImplTest {
     void shouldAllowDuplicateNames() {
         // State allows duplicate names (uses List, not Map)
         State state = new StateImpl()
-            .state(NameTree.of("timeout"), 30)   // First value
-            .state(NameTree.of("retries"), 3)
-            .state(NameTree.of("timeout"), 60);  // Duplicate name!
+            .state(NameNode.of("timeout"), 30)   // First value
+            .state(NameNode.of("retries"), 3)
+            .state(NameNode.of("timeout"), 60);  // Duplicate name!
 
         assertThat(state.stream().count()).isEqualTo(3);  // 3 slots (2 have same name)
     }
@@ -93,9 +93,9 @@ class StateImplTest {
     void shouldCompactRemoveDuplicates() {
         // compact() removes duplicates, keeping last occurrence
         State state = new StateImpl()
-            .state(NameTree.of("timeout"), 30)   // First value
-            .state(NameTree.of("retries"), 3)
-            .state(NameTree.of("timeout"), 60);  // Override
+            .state(NameNode.of("timeout"), 30)   // First value
+            .state(NameNode.of("retries"), 3)
+            .state(NameNode.of("timeout"), 60);  // Override
 
         State compacted = state.compact();
 
@@ -105,7 +105,7 @@ class StateImplTest {
 
     @Test
     void shouldReturnLastValueWhenDuplicates() {
-        Name timeoutName = NameTree.of("timeout");
+        Name timeoutName = NameNode.of("timeout");
 
         State state = new StateImpl()
             .state(timeoutName, 30)
@@ -118,7 +118,7 @@ class StateImplTest {
 
     @Test
     void shouldReturnAllValuesForDuplicates() {
-        Name timeoutName = NameTree.of("timeout");
+        Name timeoutName = NameNode.of("timeout");
 
         State state = new StateImpl()
             .state(timeoutName, 30)
@@ -137,9 +137,9 @@ class StateImplTest {
         // API: "Returns the value of a slot matching the specified slot
         //      or the value of the specified slot when not found"
 
-        Name missingName = NameTree.of("missing");
+        Name missingName = NameNode.of("missing");
         State state = new StateImpl()
-            .state(NameTree.of("existing"), 100);
+            .state(NameNode.of("existing"), 100);
 
         // Slot provides fallback value (42)
         Integer result = state.value(io.fullerstack.substrates.slot.SlotImpl.of(missingName, 42));
@@ -150,15 +150,15 @@ class StateImplTest {
     @Test
     void shouldSupportNestedState() {
         // State can contain State (hierarchical config)
-        Name dbConfigName = NameTree.of("database");
+        Name dbConfigName = NameNode.of("database");
 
         State innerState = new StateImpl()
-            .state(NameTree.of("host"), "localhost")
-            .state(NameTree.of("port"), 3306);
+            .state(NameNode.of("host"), "localhost")
+            .state(NameNode.of("port"), 3306);
 
         State outerState = new StateImpl()
             .state(dbConfigName, innerState)
-            .state(NameTree.of("timeout"), 30);
+            .state(NameNode.of("timeout"), 30);
 
         // Retrieve nested State
         State retrieved = outerState.value(
@@ -171,7 +171,7 @@ class StateImplTest {
     @Test
     void shouldMatchByBothNameAndType() {
         // Per article: "A State stores the type with the name, only matching when both are exact matches"
-        Name XYZ = NameTree.of("XYZ");
+        Name XYZ = NameNode.of("XYZ");
 
         // Create slots with different types
         var intSlot = io.fullerstack.substrates.slot.SlotImpl.of(XYZ, 0);
@@ -197,7 +197,7 @@ class StateImplTest {
     @Test
     void shouldCompactByNameAndType() {
         // compact() should only remove duplicates with same (name, type) pair
-        Name XYZ = NameTree.of("XYZ");
+        Name XYZ = NameNode.of("XYZ");
 
         State state = new StateImpl()
             .state(XYZ, 1)      // Integer #1

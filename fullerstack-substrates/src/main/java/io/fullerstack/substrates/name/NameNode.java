@@ -9,13 +9,13 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * Tree-based Name implementation - hierarchical parent-child structure.
+ * Node-based Name implementation - hierarchical parent-child structure.
  *
  * <p><b>Design Principles:</b>
  * <ul>
- *   <li>Cortex creates root names only: new NameTree(null, "root")</li>
+ *   <li>Cortex creates root names only: new NameNode(null, "root")</li>
  *   <li>Hierarchy built by name() methods: parent.name("child")</li>
- *   <li>Parent-child links via constructor (tree structure)</li>
+ *   <li>Parent-child links via constructor (node structure)</li>
  *   <li>All Extent methods use defaults (path, depth, iterator)</li>
  * </ul>
  *
@@ -26,16 +26,16 @@ import java.util.function.Function;
  *   <li>name() methods - create children with parent reference</li>
  * </ul>
  */
-public final class NameTree implements Name {
+public final class NameNode implements Name {
 
-    private final NameTree parent;
+    private final NameNode parent;
     private final String segment;
 
     /**
      * Package-private constructor.
      * Used internally by name() methods to create children.
      */
-    NameTree(NameTree parent, String segment) {
+    NameNode(NameNode parent, String segment) {
         this.parent = parent;
         this.segment = Objects.requireNonNull(segment, "segment cannot be null");
     }
@@ -56,7 +56,7 @@ public final class NameTree implements Name {
         // Split on dots to create hierarchy
         String[] segments = path.split("\\.");
         // Create root with constructor, then use name() for children
-        Name current = new NameTree(null, segments[0]);
+        Name current = new NameNode(null, segments[0]);
         for (int i = 1; i < segments.length; i++) {
             current = current.name(segments[i]);
         }
@@ -81,7 +81,7 @@ public final class NameTree implements Name {
     @Override
     public Name name(Name suffix) {
         Objects.requireNonNull(suffix, "suffix");
-        // Delegate to name(String) for each part - don't force NameTree creation
+        // Delegate to name(String) for each part - don't force NameNode creation
         Name current = this;
         for (Name part : suffix) {
             current = current.name(part.part().toString());
@@ -93,13 +93,13 @@ public final class NameTree implements Name {
     public Name name(String segment) {
         Objects.requireNonNull(segment, "segment");
         if (segment.isEmpty()) return this;
-        return new NameTree(this, segment);
+        return new NameNode(this, segment);
     }
 
     @Override
     public Name name(Enum<?> e) {
         Objects.requireNonNull(e, "e");
-        // Delegate to name(String) - don't force NameTree
+        // Delegate to name(String) - don't force NameNode
         return name(e.getDeclaringClass().getName()).name(e.name());
     }
 
@@ -112,14 +112,14 @@ public final class NameTree implements Name {
     @Override
     public Name name(Member member) {
         Objects.requireNonNull(member, "member");
-        // Delegate to name(String) - don't force NameTree
+        // Delegate to name(String) - don't force NameNode
         return name(member.getDeclaringClass().getName()).name(member.getName());
     }
 
     @Override
     public Name name(Iterable<String> parts) {
         Objects.requireNonNull(parts, "parts");
-        // Delegate to name(String) - don't force NameTree
+        // Delegate to name(String) - don't force NameNode
         Name current = this;
         for (String part : parts) {
             current = current.name(Objects.requireNonNull(part));
@@ -131,7 +131,7 @@ public final class NameTree implements Name {
     public <T> Name name(Iterable<? extends T> parts, Function<T, String> mapper) {
         Objects.requireNonNull(parts, "parts");
         Objects.requireNonNull(mapper, "mapper");
-        // Delegate to name(String) - don't force NameTree
+        // Delegate to name(String) - don't force NameNode
         Name current = this;
         for (T item : parts) {
             current = current.name(Objects.requireNonNull(mapper.apply(item)));
@@ -142,7 +142,7 @@ public final class NameTree implements Name {
     @Override
     public Name name(Iterator<String> parts) {
         Objects.requireNonNull(parts, "parts");
-        // Delegate to name(String) - don't force NameTree
+        // Delegate to name(String) - don't force NameNode
         Name current = this;
         while (parts.hasNext()) {
             current = current.name(Objects.requireNonNull(parts.next()));
@@ -154,7 +154,7 @@ public final class NameTree implements Name {
     public <T> Name name(Iterator<? extends T> parts, Function<T, String> mapper) {
         Objects.requireNonNull(parts, "parts");
         Objects.requireNonNull(mapper, "mapper");
-        // Delegate to name(String) - don't force NameTree
+        // Delegate to name(String) - don't force NameNode
         Name current = this;
         while (parts.hasNext()) {
             current = current.name(Objects.requireNonNull(mapper.apply(parts.next())));
