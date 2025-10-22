@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
 
     <name>Serventis Signals (Java)</name>
-    <description>Concrete signal type implementations for the Humainary Serventis observability framework, providing immutable Java records for Monitor, Service, Queue, Reporter, Probe, and Resource signals (Java 24)</description>
+    <description>Concrete signal type implementations for the Humainary Serventis observability framework, providing immutable Java records for Monitor, Service, Queue, Reporter, Probe, and Resource signals (Java 25)</description>
 
     <dependencies>
         <!-- Humainary Substrates API (for Subject types) -->
@@ -24,36 +24,30 @@
             <artifactId>humainary-substrates-api</artifactId>
         </dependency>
 
-        <!-- Humainary Serventis API modules -->
+        <!-- Humainary Serventis API modules (M16) -->
         <dependency>
             <groupId>io.humainary.modules.serventis.monitors</groupId>
             <artifactId>humainary-modules-serventis-monitors-api</artifactId>
-            <version>1.0.0-M13</version>
         </dependency>
         <dependency>
             <groupId>io.humainary.modules.serventis.services</groupId>
             <artifactId>humainary-modules-serventis-services-api</artifactId>
-            <version>1.0.0-M13</version>
         </dependency>
         <dependency>
             <groupId>io.humainary.modules.serventis.queues</groupId>
             <artifactId>humainary-modules-serventis-queues-api</artifactId>
-            <version>1.0.0-M13</version>
         </dependency>
         <dependency>
             <groupId>io.humainary.modules.serventis.reporters</groupId>
             <artifactId>humainary-modules-serventis-reporters-api</artifactId>
-            <version>1.0.0-M13</version>
         </dependency>
         <dependency>
             <groupId>io.humainary.modules.serventis.probes</groupId>
             <artifactId>humainary-modules-serventis-probes-api</artifactId>
-            <version>1.0.0-M13</version>
         </dependency>
         <dependency>
             <groupId>io.humainary.modules.serventis.resources</groupId>
             <artifactId>humainary-modules-serventis-resources-api</artifactId>
-            <version>1.0.0-M13</version>
         </dependency>
 
         <!-- Testing -->
