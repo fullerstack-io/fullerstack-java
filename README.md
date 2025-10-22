@@ -13,16 +13,31 @@ This repository serves as a monorepo for various Java-based projects and librari
 Java implementation of the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java) for building event-driven observability systems.
 
 **Features:**
-- Circuit-based event orchestration
-- Queue processing with virtual threads
-- Observable streams (Source/Subscriber pattern)
-- Transformation pipelines (Sequencer/Segment)
-- Hierarchical resource management
-- Immutable state management
+- Circuit-based event orchestration with virtual CPU core pattern
+- Hierarchical naming with dot notation (NameNode)
+- Observable event streams (subscriber management)
+- Transformation pipelines (Flow/Sift)
+- Hierarchical state management (CellNode)
+- Immutable state with slots
+- Shared scheduler optimization for Clocks
 
-**Status:** ✅ Production-ready | 264 tests passing | Apache 2.0
+**Status:** ✅ Production-ready | 247 tests passing | Apache 2.0
 
 **Documentation:** [View README](fullerstack-substrates/README.md)
+
+### [Fullerstack Serventis](fullerstack-serventis/)
+
+Concrete signal implementations for the [Humainary Serventis API](https://github.com/humainary-io/serventis-api-java) - semiotic intelligence for observability.
+
+**Features:**
+- Immutable signal records (Monitor, Service, Queue, Reporter, Probe, Resource)
+- Vector clock state management
+- Zero-allocation signal types
+- Full Serventis API M17 support
+
+**Status:** ✅ Production-ready | 12 tests passing | Apache 2.0
+
+**Documentation:** [View README](fullerstack-serventis/README.md)
 
 ---
 
@@ -35,35 +50,37 @@ Java implementation of the [Humainary Substrates API](https://github.com/humaina
 
 ### Prerequisites
 
-**Note:** This project uses Humainary API version 1.0.0-M13. The Humainary APIs are not published to Maven Central, and M13 is not tagged as a release in their repositories.
+**Note:** This project uses Humainary API version **1.0.0-M17**. The Humainary APIs are not yet published to Maven Central.
 
 **Dependency Status:**
-- **Latest Humainary** (`main` branch): v1.0.0-M15 - Requires Java 25 and has breaking API changes (missing Queue, Script, Sequencer, Segment classes)
-- **This project uses**: v1.0.0-M13 - Compatible with Java 25, stable API
-- **Installation required**: M13 artifacts must be built from specific commits
+- **This project uses**: v1.0.0-M17 - Latest with sealed interfaces (Java 25 required)
+- **Installation required**: M17 artifacts must be built from source
 
-**Building Humainary M13 Dependencies:**
+**Building Humainary M17 Dependencies:**
 
-Before building this project, you must install the Humainary M13 dependencies to your local Maven repository:
+Before building this project, you must install the Humainary M17 dependencies to your local Maven repository:
 
 ```bash
-# Clone and build Substrates API M13
+# Clone and build Substrates API M17
 git clone https://github.com/humainary-io/substrates-api-java.git
 cd substrates-api-java
-git checkout 8c9780b  # M13 commit
-mvn clean install
+# Main branch is currently at M17
+mvn clean install -DskipTests
 cd ..
 
-# Clone and build Serventis API M13
+# Clone and build Serventis API M17
 git clone https://github.com/humainary-io/serventis-api-java.git
 cd serventis-api-java
-git checkout afc1e0d  # M13 commit
-mvn clean install
+# Main branch is currently at M17
+mvn clean install -DskipTests
 cd ..
 ```
 
-**Migration to M15:**
-Updating to Humainary M15 requires significant code migration work due to API changes. The M13 version is stable and works with Java 25.
+**M17 Breaking Changes:**
+M17 introduces sealed interfaces for type safety:
+- `Source`, `Context`, `Component`, `Container` are now sealed
+- Only permits specific implementations in the type hierarchy
+- See [API-ANALYSIS.md](API-ANALYSIS.md) for migration details
 
 ### Building Fullerstack Projects
 
@@ -97,9 +114,35 @@ mvn clean install
 fullerstack-java/
 ├── fullerstack-substrates/         # Substrates API implementation
 ├── fullerstack-serventis/          # Serventis signals implementation
-├── [future-project-n]/             # Future Java projects
-└── pom.xml                         # Parent POM
+├── API-ANALYSIS.md                 # API version analysis and migration notes
+├── CELL-IMPLEMENTATION-PLAN.md     # Cell architecture documentation
+└── pom.xml                         # Parent POM (manages M17 versions)
 ```
+
+## Architecture Highlights
+
+### Simplified Design (Post-Refactoring)
+
+The implementation has been significantly simplified:
+- **Single Name implementation**: NameNode (removed 4 alternative implementations)
+- **No registry abstractions**: Removed 8 registry implementations (API provides Registry)
+- **Lean dependencies**: Removed benchmark and queue packages
+- **Optimized Clocks**: Shared ScheduledExecutorService across all Clocks in a Circuit
+- **Direct API usage**: Removed unnecessary abstraction layers
+
+### Key Implementation Classes
+
+| Package | Class | Purpose |
+|---------|-------|---------|
+| circuit | CircuitImpl | Event orchestration with virtual CPU core pattern |
+| conduit | ConduitImpl | Channel/Source coordination |
+| cell | CellNode | Hierarchical state transformation |
+| clock | ClockImpl | Scheduled event emission |
+| name | NameNode | Hierarchical dot-notation names |
+| source | SourceImpl | Internal subscriber management |
+| channel | ChannelImpl | Emission ports |
+| pipe | PipeImpl | Event transformation |
+| sink | SinkImpl | Event capture |
 
 ## Adding New Projects
 
@@ -142,9 +185,9 @@ Currently:
 
 ## Project Acknowledgments
 
-### Fullerstack Substrates
+### Fullerstack Substrates & Serventis
 
-Based on the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java) designed by [William Louth](https://humainary.io/).
+Based on the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java) and [Serventis API](https://github.com/humainary-io/serventis-api-java) designed by [William Louth](https://humainary.io/).
 
 - **API Design:** [William Louth](https://humainary.io/) ([Humainary](https://github.com/humainary-io))
 - **Implementation:** Fullerstack
@@ -153,5 +196,6 @@ Based on the [Humainary Substrates API](https://github.com/humainary-io/substrat
 **Learn more:**
 - Humainary: https://humainary.io/
 - Substrates API (Java): https://github.com/humainary-io/substrates-api-java
+- Serventis API (Java): https://github.com/humainary-io/serventis-api-java
 - Observability X Blog: https://humainary.io/blog/category/observability-x/
 - William Louth's Articles: https://humainary.io/blog/
