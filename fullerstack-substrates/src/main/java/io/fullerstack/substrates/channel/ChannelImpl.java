@@ -2,7 +2,7 @@ package io.fullerstack.substrates.channel;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.IdImpl;
-import io.fullerstack.substrates.pipe.PipeImpl;
+import io.fullerstack.substrates.pipe.ProducerPipe;
 import io.fullerstack.substrates.flow.FlowImpl;
 import io.fullerstack.substrates.state.StateImpl;
 import io.fullerstack.substrates.subject.SubjectImpl;
@@ -114,8 +114,8 @@ public class ChannelImpl<E> implements Channel<E> {
                     if (flowConfigurer != null) {
                         cachedPipe = pipe(flowConfigurer);
                     } else {
-                        // Otherwise, create a plain Pipe with emission handler from Conduit
-                        cachedPipe = new PipeImpl<>(scheduler, channelSubject, emissionHandler, hasSubscribers);
+                        // Otherwise, create a plain ProducerPipe with subscriber notifier from Conduit
+                        cachedPipe = new ProducerPipe<>(scheduler, channelSubject, emissionHandler, hasSubscribers);
                     }
                 }
             }
@@ -131,7 +131,7 @@ public class ChannelImpl<E> implements Channel<E> {
         FlowImpl<E> flow = new FlowImpl<>();
         configurer.accept(flow);
 
-        // Return a Pipe with emission handler from Conduit and Flow transformations
-        return new PipeImpl<>(scheduler, channelSubject, emissionHandler, hasSubscribers, flow);
+        // Return a ProducerPipe with subscriber notifier from Conduit and Flow transformations
+        return new ProducerPipe<>(scheduler, channelSubject, emissionHandler, hasSubscribers, flow);
     }
 }

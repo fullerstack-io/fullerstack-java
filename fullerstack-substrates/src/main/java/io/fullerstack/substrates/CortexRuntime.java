@@ -2,7 +2,7 @@ package io.fullerstack.substrates;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.capture.CaptureImpl;
-import io.fullerstack.substrates.circuit.CircuitImpl;
+import io.fullerstack.substrates.circuit.SingleThreadCircuit;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.pool.PoolImpl;
 import io.fullerstack.substrates.scope.ScopeImpl;
@@ -76,7 +76,7 @@ public class CortexRuntime implements Cortex {
     }
 
     private Circuit createCircuit(Name name) {
-        return new CircuitImpl(name);
+        return new SingleThreadCircuit(name);
     }
 
     // ========== Name Factory (8 methods) ==========

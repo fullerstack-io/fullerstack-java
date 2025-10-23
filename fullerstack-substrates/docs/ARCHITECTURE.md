@@ -130,6 +130,75 @@ public class ConduitImpl<P, E> implements Conduit<P, E> { }  // ✅
 public class CellNode<I, E> implements Cell<I, E> { }  // ✅
 ```
 
+### Everything is a Subject
+
+**Critical Architectural Insight:** The sealed hierarchy means that **every component is a Subject**.
+
+```
+Component<E, S> extends Subject<S>
+    ↓
+Circuit extends Component<State, Circuit>
+    → Circuit IS-A Subject<Circuit>
+
+Conduit<P, E> extends Container<P, E, Conduit<P, E>> extends Component<E, Conduit<P, E>>
+    → Conduit<P, E> IS-A Subject<Conduit<P, E>>
+    → Conduit<P, E> IS-A Source<E> (can be subscribed to)
+```
+
+**What This Means:**
+
+1. **Conduit is a subscribable Subject:**
+   - `Conduit<P, E>` IS-A `Source<E>` (via sealed hierarchy)
+   - You can call `conduit.subscribe(subscriber)` directly
+   - Subscribers receive `Subject<Channel<E>>` (the subjects of channels created within the conduit)
+
+2. **Subscribers see channel subjects:**
+   - When subscriber is registered, it's notified when new Channels are created
+   - Subscriber receives the **Channel's Subject** (not the Conduit's subject)
+   - Subscriber can inspect `Subject<Channel<E>>` to determine routing logic
+
+3. **Dynamic pipe registration:**
+   - Subscriber can call `conduit.get(subject.name())` to retrieve percepts
+   - Subscriber registers `Pipe<E>` instances via `Registrar<E>`
+   - Registered pipes receive all future emissions from that subject
+
+**Example:**
+
+```java
+// Create conduit (which is itself a Source<Long>)
+Conduit<Pipe<Long>, Long> conduit = circuit.conduit(
+    cortex.name("sensors"),
+    Composer.pipe()
+);
+
+// Subscribe to the conduit (possible because Conduit IS-A Source)
+conduit.subscribe(cortex.subscriber(
+    cortex.name("aggregator"),
+    (subject, registrar) -> {
+        // subject is Subject<Channel<Long>> - the channel that was created
+        // We can inspect it and decide how to route
+
+        // Get the percept for this subject (dual-key cache prevents recursion)
+        Pipe<Long> pipe = conduit.get(subject.name());
+
+        // Register our consumer pipe
+        registrar.register(value -> {
+            System.out.println("Received: " + value);
+        });
+    }
+));
+```
+
+**Two-Phase Notification:**
+1. **Phase 1:** Subscriber notified when `conduit.get(name)` creates a new Channel
+2. **Phase 2:** Subscriber notified (lazily) on first emission from a Subject
+
+This design enables **dynamic, hierarchical routing** where subscribers can:
+- Inspect channel subjects to determine routing strategy
+- Retrieve percepts to access producer channels
+- Register multiple consumer pipes per subject
+- Build hierarchical aggregation pipelines
+
 ---
 
 ## Core Entities
@@ -302,33 +371,74 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
 
 ```java
 public class ChannelImpl<E> implements Channel<E> {
-    private final PipeImpl<E> pipe;
+    private final ProducerPipe<E> cachedPipe;
 
     @Override
     public Pipe<E> pipe() {
-        return pipe;
+        return cachedPipe;  // Returns cached ProducerPipe
     }
 }
 ```
 
-**Pipe:** Event transformation and emission
+**ProducerPipe:** Producer-side pipe that emits INTO the conduit system
 
 ```java
-public class PipeImpl<E> implements Pipe<E> {
-    private final SourceImpl<E> source;
-    private final List<Function<E, E>> transformations = new ArrayList<>();
-    private final List<Predicate<E>> filters = new ArrayList<>();
+public class ProducerPipe<E> implements Pipe<E> {
+    private final Subject<Channel<E>> channelSubject;
+    private final Consumer<Capture<E, Channel<E>>> subscriberNotifier;
+    private final FlowImpl<E> flow;  // Optional transformations
 
     @Override
-    public void emit(E event) {
-        // Apply transformations
-        E transformed = applyTransformations(event);
-        if (transformed == null) return;
+    public void emit(E value) {
+        // Apply transformations (if configured)
+        E transformed = flow != null ? flow.apply(value) : value;
+        if (transformed == null) return;  // Filtered out
 
-        // Emit to subscribers
-        source.emit(transformed);
+        // Post to Circuit queue → notifies subscribers
+        scheduler.schedule(() -> {
+            Capture<E, Channel<E>> capture = new CaptureImpl<>(channelSubject, transformed);
+            subscriberNotifier.accept(capture);
+        });
     }
 }
+```
+
+**ConsumerPipe:** Consumer-side pipe that receives FROM the conduit system
+
+```java
+public class ConsumerPipe<E> implements Pipe<E> {
+    private final Consumer<E> consumer;
+
+    // Called BY Conduit when routing emissions to subscribers
+    @Override
+    public void emit(E emission) {
+        consumer.accept(emission);  // Invoke consumer lambda
+    }
+
+    // Factory methods
+    public static <E> ConsumerPipe<E> of(Consumer<E> consumer) { ... }
+    public static <E> ConsumerPipe<E> of(Name name, Consumer<E> consumer) { ... }
+}
+```
+
+**Producer-Consumer Pattern:**
+
+The `Pipe<E>` interface serves **dual purposes** via a single `emit()` method:
+
+| Pipe Type | Role | Who Calls `emit()` | What It Does |
+|-----------|------|-------------------|--------------|
+| **ProducerPipe** | Producer | Application code | Posts to circuit queue → notifies subscribers |
+| **ConsumerPipe** | Consumer | Conduit (during dispatch) | Invokes consumer lambda |
+
+```java
+// PRODUCER SIDE
+ProducerPipe<Long> producer = conduit.get("sensor1");
+producer.emit(42L);  // ← Application calls emit() to produce INTO system
+
+// CONSUMER SIDE (registered by subscriber)
+registrar.register(ConsumerPipe.of(value -> {
+    System.out.println(value);  // ← Conduit calls emit() to deliver FROM system
+}));
 ```
 
 **With Transformations (Flow/Sift):**

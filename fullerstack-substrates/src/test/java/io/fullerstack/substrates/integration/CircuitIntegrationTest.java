@@ -3,7 +3,7 @@ package io.fullerstack.substrates.integration;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.CortexRuntime;
 import io.fullerstack.substrates.capture.CaptureImpl;
-import io.fullerstack.substrates.circuit.CircuitImpl;
+import io.fullerstack.substrates.circuit.SingleThreadCircuit;
 import io.fullerstack.substrates.name.NameNode;
 import io.fullerstack.substrates.id.IdImpl;
 import io.fullerstack.substrates.state.StateImpl;
@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration test for CircuitImpl demonstrating all components working together.
+ * Integration test for SingleThreadCircuit demonstrating all components working together.
  *
  * <p>Tests the full circuit workflow:
  * <ul>
@@ -87,7 +87,7 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldEmitPeriodicEventsViaClock() throws Exception {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
         Clock clock = circuit.clock(NameNode.of("timer"));
 
         AtomicInteger tickCount = new AtomicInteger(0);
@@ -114,7 +114,7 @@ class CircuitIntegrationTest {
     /*
     @Test
     void shouldBroadcastStateEventsViaSource() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
         Source<State> source = circuit.source();  // Get the Circuit's Source
 
         AtomicInteger emissionCount = new AtomicInteger(0);
@@ -209,7 +209,7 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldSupportMultipleClocksWithDifferentCycles() throws Exception {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         Clock fastClock = circuit.clock(NameNode.of("fast"));
         Clock slowClock = circuit.clock(NameNode.of("slow"));
@@ -249,7 +249,7 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldCleanupAllResourcesOnClose() throws Exception {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         // Create all components (M15+: no queue() method)
         Clock clock1 = circuit.clock(NameNode.of("clock1"));
@@ -277,7 +277,7 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldProvideAccessToAllComponents() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         // M15+ API: queue() is internal, not exposed publicly
         assertThat((Object) circuit.subject()).isNotNull();
@@ -288,7 +288,7 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldSupportTapPatternForFunctionalChaining() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         AtomicInteger tapCount = new AtomicInteger(0);
 

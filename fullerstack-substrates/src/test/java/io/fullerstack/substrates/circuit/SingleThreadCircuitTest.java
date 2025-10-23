@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class CircuitImplTest {
-    private CircuitImpl circuit;
+class SingleThreadCircuitTest {
+    private SingleThreadCircuit circuit;
 
     @AfterEach
     void cleanup() {
@@ -20,7 +20,7 @@ class CircuitImplTest {
 
     @Test
     void shouldCreateCircuitWithName() {
-        circuit = new CircuitImpl(NameNode.of("test-circuit"));
+        circuit = new SingleThreadCircuit(NameNode.of("test-circuit"));
 
         assertThat((Object) circuit).isNotNull();
         assertThat((Object) circuit.subject()).isNotNull();
@@ -29,7 +29,7 @@ class CircuitImplTest {
 
     @Test
     void shouldProvideStateSource() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         // Circuit IS-A Source<State>
         Source<State> source = circuit;
@@ -39,7 +39,7 @@ class CircuitImplTest {
 
     @Test
     void shouldProvideDefaultClock() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         Clock clock = circuit.clock();
 
@@ -48,7 +48,7 @@ class CircuitImplTest {
 
     @Test
     void shouldProvideNamedClock() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         Clock clock = circuit.clock(NameNode.of("custom-clock"));
 
@@ -57,7 +57,7 @@ class CircuitImplTest {
 
     @Test
     void shouldCacheClocksByName() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         Clock clock1 = circuit.clock(NameNode.of("shared"));
         Clock clock2 = circuit.clock(NameNode.of("shared"));
@@ -67,7 +67,7 @@ class CircuitImplTest {
 
     @Test
     void shouldCreateIndependentClocksForDifferentNames() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         Clock clock1 = circuit.clock(NameNode.of("clock1"));
         Clock clock2 = circuit.clock(NameNode.of("clock2"));
@@ -77,7 +77,7 @@ class CircuitImplTest {
 
     @Test
     void shouldSupportTapPattern() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         Circuit result = circuit.tap(c -> {
             assertThat((Object) c).isSameAs(circuit);
@@ -89,14 +89,14 @@ class CircuitImplTest {
 
     @Test
     void shouldRequireNonNullName() {
-        assertThatThrownBy(() -> new CircuitImpl(null))
+        assertThatThrownBy(() -> new SingleThreadCircuit(null))
             .isInstanceOf(NullPointerException.class)
             .hasMessageContaining("Circuit name cannot be null");
     }
 
     @Test
     void shouldRequireNonNullClockName() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         assertThatThrownBy(() -> circuit.clock(null))
             .isInstanceOf(NullPointerException.class)
@@ -105,7 +105,7 @@ class CircuitImplTest {
 
     @Test
     void shouldRequireNonNullConduitName() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         assertThatThrownBy(() -> circuit.conduit(null, composer -> null))
             .isInstanceOf(NullPointerException.class)
@@ -114,7 +114,7 @@ class CircuitImplTest {
 
     @Test
     void shouldRequireNonNullComposer() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         assertThatThrownBy(() -> circuit.conduit(NameNode.of("test"), null))
             .isInstanceOf(NullPointerException.class)
@@ -123,7 +123,7 @@ class CircuitImplTest {
 
     @Test
     void shouldRequireNonNullTapConsumer() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         assertThatThrownBy(() -> circuit.tap(null))
             .isInstanceOf(NullPointerException.class)
@@ -132,7 +132,7 @@ class CircuitImplTest {
 
     @Test
     void shouldPreventOperationsAfterClose() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
         circuit.close();
 
         assertThatThrownBy(() -> circuit.clock())
@@ -146,7 +146,7 @@ class CircuitImplTest {
 
     @Test
     void shouldAllowMultipleCloses() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         circuit.close();
         circuit.close(); // Should not throw
@@ -156,7 +156,7 @@ class CircuitImplTest {
 
     @Test
     void shouldCloseAllClocksOnCircuitClose() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         Clock clock1 = circuit.clock(NameNode.of("clock1"));
         Clock clock2 = circuit.clock(NameNode.of("clock2"));
@@ -174,7 +174,7 @@ class CircuitImplTest {
 
     @Test
     void shouldProvideAccessToAllComponents() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         // Verify all components are accessible
         assertThat((Object) circuit.subject()).isNotNull();
@@ -184,7 +184,7 @@ class CircuitImplTest {
 
     @Test
     void shouldCreateDifferentConduitsForDifferentComposers() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         // Same name, different composers should create DIFFERENT Conduits
         Conduit<Pipe<Long>, Long> pipes = circuit.conduit(
@@ -203,7 +203,7 @@ class CircuitImplTest {
 
     @Test
     void shouldCreateDifferentConduitsForDifferentComposersWithDefaultName() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         // Using default name (unnamed), different composers should create DIFFERENT Conduits
         Conduit<Pipe<Long>, Long> pipes = circuit.conduit(Composer.pipe());
@@ -215,7 +215,7 @@ class CircuitImplTest {
 
     @Test
     void shouldCacheSameComposerWithSameName() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         // Same name, same composer should return SAME Conduit
         Conduit<Pipe<Long>, Long> conduit1 = circuit.conduit(
@@ -234,7 +234,7 @@ class CircuitImplTest {
 
     @Test
     void shouldThrowWhenAwaitCalledFromCircuitThread() {
-        circuit = new CircuitImpl(NameNode.of("test"));
+        circuit = new SingleThreadCircuit(NameNode.of("test"));
 
         // Schedule a task that tries to call await() from within the circuit thread
         // This should throw IllegalStateException

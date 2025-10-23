@@ -24,23 +24,35 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
- * Implementation of Substrates.Circuit for component orchestration.
+ * Single-threaded implementation of Substrates.Circuit using the Virtual CPU Core pattern.
  *
- * <p>Manages Queue, Clock, and Conduit components with lazy initialization
- * and caching by name.
+ * <p>This implementation processes all emissions through a single virtual thread with a FIFO queue,
+ * ensuring ordered execution and eliminating the need for locks within the Circuit domain.
  *
- * <p>Features:
+ * <p><b>Virtual CPU Core Pattern:</b>
  * <ul>
- *   <li>Single Queue for backpressure management</li>
- *   <li>Clock caching by name</li>
- *   <li>Conduit caching by (name, composer type) - different composers create different conduits</li>
- *   <li>State event sourcing via SourceImpl</li>
- *   <li>Resource lifecycle management</li>
+ *   <li>Single {@link LinkedBlockingQueue} processes all emissions (FIFO ordering)</li>
+ *   <li>Single virtual thread executes Scripts from the queue</li>
+ *   <li>All Conduits share the same queue (isolation per Circuit)</li>
+ *   <li>Guarantees ordering, eliminates locks, prevents race conditions</li>
  * </ul>
  *
+ * <p><b>Component Management:</b>
+ * <ul>
+ *   <li>Clock caching by name (shared ScheduledExecutorService)</li>
+ *   <li>Conduit caching by (name, composer type) - different composers create different conduits</li>
+ *   <li>Cell creation with hierarchical structure</li>
+ *   <li>State subscriber management (Circuit IS-A Source&lt;State&gt;)</li>
+ * </ul>
+ *
+ * <p><b>Thread Safety:</b>
+ * Single-threaded execution within Circuit domain eliminates need for synchronization.
+ * External callers can emit from any thread - emissions are posted to queue and processed serially.
+ *
  * @see Circuit
+ * @see Scheduler
  */
-public class CircuitImpl implements Circuit, Scheduler {
+public class SingleThreadCircuit implements Circuit, Scheduler {
     private final Subject circuitSubject;
 
     // Internal queue processor (Virtual CPU Core pattern)
@@ -105,12 +117,19 @@ public class CircuitImpl implements Circuit, Scheduler {
 
 
     /**
-     * Creates a circuit with the specified name using defaults:
-     * {@link LinkedBlockingQueueFactory} and {@link LazyTrieRegistryFactory}.
+     * Creates a single-threaded circuit with the specified name.
      *
-     * @param name circuit name
+     * <p>Initializes:
+     * <ul>
+     *   <li>LinkedBlockingQueue for FIFO emission processing</li>
+     *   <li>Virtual thread queue processor (Virtual CPU Core)</li>
+     *   <li>Shared ScheduledExecutorService for all Clocks</li>
+     *   <li>Component caches (Conduits, Clocks)</li>
+     * </ul>
+     *
+     * @param name circuit name (hierarchical, e.g., "account.region.cluster")
      */
-    public CircuitImpl(Name name) {
+    public SingleThreadCircuit(Name name) {
         Objects.requireNonNull(name, "Circuit name cannot be null");
         this.clocks = new ConcurrentHashMap<>();
         this.conduits = new ConcurrentHashMap<>();
