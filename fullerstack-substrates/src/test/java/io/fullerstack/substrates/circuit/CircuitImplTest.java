@@ -231,4 +231,21 @@ class CircuitImplTest {
         // Should be the same Conduit instance (cached)
         assertThat((Object) conduit1).isSameAs(conduit2);
     }
+
+    @Test
+    void shouldThrowWhenAwaitCalledFromCircuitThread() {
+        circuit = new CircuitImpl(NameNode.of("test"));
+
+        // Schedule a task that tries to call await() from within the circuit thread
+        // This should throw IllegalStateException
+        circuit.schedule(() -> {
+            assertThatThrownBy(() -> circuit.await())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot be called from within the circuit's own thread")
+                .hasMessageContaining("deadlock");
+        });
+
+        // Wait for the circuit to process the task
+        circuit.await();  // This is OK - called from test thread
+    }
 }

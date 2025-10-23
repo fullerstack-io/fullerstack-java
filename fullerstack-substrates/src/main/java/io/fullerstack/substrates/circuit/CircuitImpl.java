@@ -175,6 +175,15 @@ public class CircuitImpl implements Circuit, Scheduler {
     @Override
     public void await() {
         checkClosed();
+
+        // API Requirement: Cannot be called from circuit's own thread
+        if (Thread.currentThread() == queueProcessor) {
+            throw new IllegalStateException(
+                "Circuit.await() cannot be called from within the circuit's own thread. " +
+                "This would cause a deadlock as the circuit thread cannot wait for itself."
+            );
+        }
+
         // Block until queue is empty and nothing is currently executing
         while (running && (executing || !taskQueue.isEmpty())) {
             try {
