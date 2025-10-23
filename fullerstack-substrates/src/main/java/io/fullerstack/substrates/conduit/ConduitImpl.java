@@ -12,6 +12,7 @@ import lombok.Getter;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -91,7 +92,7 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
         );
         this.composer = composer;
         this.percepts = new ConcurrentHashMap<>();
-        this.scheduler = java.util.Objects.requireNonNull(scheduler, "Scheduler cannot be null");
+        this.scheduler = Objects.requireNonNull(scheduler, "Scheduler cannot be null");
         this.flowConfigurer = flowConfigurer; // Can be null
     }
 
@@ -109,7 +110,7 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
      */
     @Override
     public Subscription subscribe(Subscriber<E> subscriber) {
-        java.util.Objects.requireNonNull(subscriber, "Subscriber cannot be null");
+        Objects.requireNonNull(subscriber, "Subscriber cannot be null");
         subscribers.add(subscriber);
         return new SubscriptionImpl(() -> subscribers.remove(subscriber));
     }

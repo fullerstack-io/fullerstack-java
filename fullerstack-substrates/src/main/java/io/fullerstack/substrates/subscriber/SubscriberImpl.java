@@ -9,10 +9,10 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 
 /**
- * Implementation of Substrates.Subscriber interface.
+ * Implementation of Substrates.Subscriber interface using the Strategy Pattern.
  *
  * <p>Subscriber connects one or more Pipes with emitting Subjects within a Source.
- * This implementation supports two patterns:
+ * This implementation supports two patterns via {@link SubscriberStrategy}:
  * <ul>
  *   <li><b>Function-based:</b> Uses a BiConsumer to handle (Subject, Registrar) callbacks</li>
  *   <li><b>Pool-based:</b> Uses a Pool to retrieve Pipes for specific Subjects</li>
@@ -36,17 +36,19 @@ import java.util.function.BiConsumer;
  * </pre>
  *
  * <p>When a Subject emits, the Source calls accept(subject, registrar), and the
- * Subscriber registers the appropriate Pipes to receive the emission.
+ * Subscriber delegates to its strategy to register the appropriate Pipes.
  *
  * @param <E> the emission type
  * @see Subscriber
  * @see Registrar
+ * @see SubscriberStrategy
+ * @see FunctionStrategy
+ * @see PoolStrategy
  */
 public class SubscriberImpl<E> implements Subscriber<E> {
 
     private final Subject<Subscriber<E>> subscriberSubject;
-    private final BiConsumer<Subject<Channel<E>>, Registrar<E>> handler;
-    private final Pool<? extends Pipe<E>> pool;
+    private final SubscriberStrategy<E> strategy;
 
     /**
      * Creates a function-based Subscriber.
@@ -55,19 +57,10 @@ public class SubscriberImpl<E> implements Subscriber<E> {
      * @param handler the callback function that receives (Subject, Registrar)
      * @throws NullPointerException if name or handler is null
      */
-    @SuppressWarnings("unchecked")
     public SubscriberImpl(Name name, BiConsumer<Subject<Channel<E>>, Registrar<E>> handler) {
         Objects.requireNonNull(name, "Subscriber name cannot be null");
-        Objects.requireNonNull(handler, "Subscriber handler cannot be null");
-
-        this.subscriberSubject = new SubjectImpl<>(
-            IdImpl.generate(),
-            name,
-            StateImpl.empty(),
-            (Class<Subscriber<E>>) (Class<?>) Subscriber.class
-        );
-        this.handler = handler;
-        this.pool = null;
+        this.subscriberSubject = createSubject(name);
+        this.strategy = new FunctionStrategy<>(handler);
     }
 
     /**
@@ -80,19 +73,20 @@ public class SubscriberImpl<E> implements Subscriber<E> {
      * @param pool the pool of Pipes keyed by Subject name
      * @throws NullPointerException if name or pool is null
      */
-    @SuppressWarnings("unchecked")
     public SubscriberImpl(Name name, Pool<? extends Pipe<E>> pool) {
         Objects.requireNonNull(name, "Subscriber name cannot be null");
-        Objects.requireNonNull(pool, "Pipe pool cannot be null");
+        this.subscriberSubject = createSubject(name);
+        this.strategy = new PoolStrategy<>(pool);
+    }
 
-        this.subscriberSubject = new SubjectImpl<>(
+    @SuppressWarnings("unchecked")
+    private Subject<Subscriber<E>> createSubject(Name name) {
+        return new SubjectImpl<>(
             IdImpl.generate(),
             name,
             StateImpl.empty(),
             (Class<Subscriber<E>>) (Class<?>) Subscriber.class
         );
-        this.pool = pool;
-        this.handler = null;
     }
 
     @Override
@@ -102,16 +96,6 @@ public class SubscriberImpl<E> implements Subscriber<E> {
 
     @Override
     public void accept(Subject<Channel<E>> subject, Registrar<E> registrar) {
-        if (handler != null) {
-            // Function-based: delegate to user-provided handler
-            handler.accept(subject, registrar);
-        } else if (pool != null) {
-            // Pool-based: get pipe from pool and register it
-            Pipe<E> pipe = pool.get(subject.name());
-            if (pipe != null) {
-                registrar.register(pipe);
-            }
-        }
-        // If both are null (shouldn't happen due to constructor checks), do nothing
+        strategy.apply(subject, registrar);
     }
 }
