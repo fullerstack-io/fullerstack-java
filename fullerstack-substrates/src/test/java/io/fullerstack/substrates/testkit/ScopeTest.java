@@ -1,9 +1,6 @@
-/*
- * Copyright (c) 2025 William David Louth
- */
+// Copyright (c) 2025 William David Louth
 
-package io.fullerstack.substrates.authoritative;
-import io.fullerstack.substrates.CortexRuntime;
+package io.fullerstack.substrates.testkit;
 
 import io.humainary.substrates.api.Substrates.Cortex;
 import io.humainary.substrates.api.Substrates.Scope;
@@ -15,14 +12,15 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-final class ScopeTest {
+final class ScopeTest
+  extends TestSupport {
 
   private Cortex cortex;
 
   @BeforeEach
   void setup () {
 
-    cortex = new CortexRuntime();
+    cortex = cortex ();
 
   }
 

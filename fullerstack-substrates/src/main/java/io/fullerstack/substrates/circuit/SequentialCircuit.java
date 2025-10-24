@@ -228,14 +228,14 @@ public class SequentialCircuit implements Circuit, Scheduler {
     }
 
     @Override
-    public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer) {
-        return cell(HierarchicalName.of("cell"), composer, null);
+    public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer, Pipe<E> pipe) {
+        return cell(HierarchicalName.of("cell"), composer, null, pipe);
     }
 
     @Override
-    public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer) {
+    public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer, Pipe<E> pipe) {
         Objects.requireNonNull(configurer, "Flow configurer cannot be null");
-        return cell(HierarchicalName.of("cell"), composer, configurer);
+        return cell(HierarchicalName.of("cell"), composer, configurer, pipe);
     }
 
     /**
@@ -248,8 +248,10 @@ public class SequentialCircuit implements Circuit, Scheduler {
      *
      * Note: The Channel is a temporary construct. The Composer will create the actual
      * Cell implementation which manages its own subscribers independently.
+     *
+     * @param pipe The output pipe for the cell (M18 API requirement)
      */
-    private <I, E> Cell<I, E> cell(Name name, Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer) {
+    private <I, E> Cell<I, E> cell(Name name, Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer, Pipe<E> pipe) {
         checkClosed();
         Objects.requireNonNull(name, "Cell name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");

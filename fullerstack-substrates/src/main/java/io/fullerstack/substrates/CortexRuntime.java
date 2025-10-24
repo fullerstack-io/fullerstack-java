@@ -50,6 +50,9 @@ public class CortexRuntime implements Cortex {
     private final Map<Name, Scope> scopes;
     private final Scope defaultScope;
 
+    // Singleton instance for SPI provider pattern
+    private static final Cortex INSTANCE = new CortexRuntime();
+
     /**
      * Creates a new Cortex runtime.
      */
@@ -60,6 +63,16 @@ public class CortexRuntime implements Cortex {
         this.defaultScope = new ManagedScope(cortexName);
         // Cache default scope by its name
         this.scopes.put(cortexName, defaultScope);
+    }
+
+    /**
+     * SPI provider method required by Substrates API M18+.
+     * This method is discovered via system property: io.humainary.substrates.spi.provider
+     *
+     * @return The singleton Cortex instance
+     */
+    public static Cortex cortex() {
+        return INSTANCE;
     }
 
     // ========== Circuit Management (2 methods) ==========

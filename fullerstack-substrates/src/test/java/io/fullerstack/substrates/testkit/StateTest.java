@@ -1,10 +1,7 @@
-/*
- * Copyright (c) 2025 William David Louth
- */
+// Copyright (c) 2025 William David Louth
 
-package io.fullerstack.substrates.authoritative;
+package io.fullerstack.substrates.testkit;
 
-import io.fullerstack.substrates.CortexRuntime;
 import io.humainary.substrates.api.Substrates.Cortex;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Slot;
@@ -17,13 +14,16 @@ import java.util.NoSuchElementException;
 import static java.util.stream.Collectors.toList;
 import static org.junit.jupiter.api.Assertions.*;
 
-final class StateTest {
+final class StateTest
+  extends TestSupport {
 
   private Cortex cortex;
 
   @BeforeEach
   void setup () {
-    cortex = new CortexRuntime();
+
+    cortex = cortex ();
+
   }
 
   @Test

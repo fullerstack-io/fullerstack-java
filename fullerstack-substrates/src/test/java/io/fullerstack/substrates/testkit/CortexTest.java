@@ -1,10 +1,7 @@
-/*
- * Copyright (c) 2025 William David Louth
- */
+// Copyright (c) 2025 William David Louth
 
-package io.fullerstack.substrates.authoritative;
+package io.fullerstack.substrates.testkit;
 
-import io.fullerstack.substrates.CortexRuntime;
 import io.humainary.substrates.api.Substrates.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,13 +27,16 @@ import static org.junit.jupiter.api.Assertions.*;
 /// @author wlouth
 /// @since 1.0
 
-final class CortexTest {
+final class CortexTest
+  extends TestSupport {
 
   private Cortex cortex;
 
   @BeforeEach
   void setup () {
-    cortex = new CortexRuntime();
+
+    cortex = cortex ();
+
   }
 
   // ===========================

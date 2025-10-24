@@ -1,8 +1,6 @@
-/*
- * Copyright (c) 2025 William David Louth
- */
+// Copyright (c) 2025 William David Louth
 
-package io.fullerstack.substrates.authoritative;
+package io.fullerstack.substrates.testkit;
 
 import io.humainary.substrates.api.Substrates.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,8 +14,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import io.fullerstack.substrates.CortexRuntime;
 
 import static io.humainary.substrates.api.Substrates.Composer.pipe;
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,14 +32,15 @@ import static org.junit.jupiter.api.Assertions.*;
 /// @author wlouth
 /// @since 1.0
 
-final class CircuitTest {
+final class CircuitTest
+  extends TestSupport {
 
   private Cortex cortex;
 
   @BeforeEach
   void setup () {
 
-    cortex = new CortexRuntime();
+    cortex = cortex ();
 
   }
 
@@ -267,7 +264,12 @@ final class CircuitTest {
 
       assertThrows (
         NullPointerException.class,
-        () -> circuit.cell ( (Composer < Pipe < Integer >, Integer >) null )
+        () -> circuit.cell ( (Composer < Pipe < Integer >, Integer >) null, Pipe.empty () )
+      );
+
+      assertThrows (
+        NullPointerException.class,
+        () -> circuit.cell ( pipe (), null, Pipe.empty () )
       );
 
       assertThrows (
@@ -291,7 +293,7 @@ final class CircuitTest {
     try {
 
       final Cell < Integer, Integer > cell =
-        circuit.cell ( pipe () );
+        circuit.cell ( pipe (), Pipe.empty () );
 
       assertNotNull ( cell );
       assertNotNull ( cell.subject () );
@@ -315,7 +317,8 @@ final class CircuitTest {
       final Cell < String, String > cell =
         circuit.cell (
           pipe (),
-          flow -> flow.limit ( 5 )
+          flow -> flow.limit ( 5 ),
+          Pipe.empty ()
         );
 
       assertNotNull ( cell );
@@ -563,7 +566,8 @@ final class CircuitTest {
 
       final Cell < String, String > cell =
         circuit.cell (
-          channel -> channel.pipe ( flow -> flow.forward ( emissions::add ) )
+          channel -> channel.pipe ( flow -> flow.forward ( emissions::add ) ),
+          Pipe.empty ()
         );
 
       final Pipe < String > pipe = cell.get (

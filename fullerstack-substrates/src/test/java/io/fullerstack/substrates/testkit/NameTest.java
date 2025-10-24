@@ -1,9 +1,6 @@
-/*
- * Copyright (c) 2025 William David Louth
- */
+// Copyright (c) 2025 William David Louth
 
-package io.fullerstack.substrates.authoritative;
-import io.fullerstack.substrates.CortexRuntime;
+package io.fullerstack.substrates.testkit;
 
 import io.humainary.substrates.api.Substrates.Cortex;
 import io.humainary.substrates.api.Substrates.Name;
@@ -32,14 +29,15 @@ import static org.junit.jupiter.api.Assertions.*;
 /// @author wlouth
 /// @since 1.0
 
-final class NameTest {
+final class NameTest
+  extends TestSupport {
 
   private Cortex cortex;
 
   @BeforeEach
   void setup () {
 
-    cortex = new CortexRuntime();
+    cortex = cortex ();
 
   }
 
@@ -319,7 +317,7 @@ final class NameTest {
     final var name = cortex.name ( EnumWithBody.SPECIAL );
 
     assertEquals (
-      "io.fullerstack.substrates.authoritative.NameTest.EnumWithBody.SPECIAL",
+      "io.humainary.substrates.testkit.NameTest.EnumWithBody.SPECIAL",
       name.path ().toString ()
     );
 
@@ -381,7 +379,7 @@ final class NameTest {
     final var extended = base.name ( Outer.Inner.class );
 
     assertEquals (
-      "io.fullerstack.substrates.authoritative.NameTest.io.fullerstack.substrates.authoritative.NameTest.Outer.Inner",
+      "io.humainary.substrates.testkit.NameTest.io.humainary.substrates.testkit.NameTest.Outer.Inner",
       extended.path ().toString ()
     );
 
@@ -678,7 +676,7 @@ final class NameTest {
     final var name = cortex.name ( Outer.Inner.class );
 
     assertEquals (
-      "io.fullerstack.substrates.authoritative.NameTest.Outer.Inner",
+      "io.humainary.substrates.testkit.NameTest.Outer.Inner",
       name.path ().toString ()
     );
 

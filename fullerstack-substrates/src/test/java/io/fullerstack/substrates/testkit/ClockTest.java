@@ -1,9 +1,6 @@
-/*
- * Copyright (c) 2025 William David Louth
- */
+// Copyright (c) 2025 William David Louth
 
-package io.fullerstack.substrates.authoritative;
-import io.fullerstack.substrates.CortexRuntime;
+package io.fullerstack.substrates.testkit;
 
 import io.humainary.substrates.api.Substrates.Cortex;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,14 +12,15 @@ import static io.humainary.substrates.api.Substrates.Clock.Cycle.*;
 import static java.lang.Thread.currentThread;
 import static org.junit.jupiter.api.Assertions.*;
 
-final class ClockTest {
+final class ClockTest
+  extends TestSupport {
 
   private Cortex cortex;
 
   @BeforeEach
   void setup () {
 
-    cortex = new CortexRuntime();
+    cortex = cortex ();
 
   }
 

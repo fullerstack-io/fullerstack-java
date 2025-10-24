@@ -1,9 +1,6 @@
-/*
- * Copyright (c) 2025 William David Louth
- */
+// Copyright (c) 2025 William David Louth
 
-package io.fullerstack.substrates.authoritative;
-import io.fullerstack.substrates.CortexRuntime;
+package io.fullerstack.substrates.testkit;
 
 import io.humainary.substrates.api.Substrates.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,14 +13,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.util.stream.Collectors.toList;
 import static org.junit.jupiter.api.Assertions.*;
 
-final class FlowTest {
+final class FlowTest
+  extends TestSupport {
 
   private Cortex cortex;
 
   @BeforeEach
   void setup () {
 
-    cortex = new CortexRuntime();
+    cortex = cortex ();
 
   }
 
@@ -253,6 +251,104 @@ final class FlowTest {
       );
 
       sink.close ();
+
+    } finally {
+
+      circuit.close ();
+
+    }
+
+  }
+
+  @Test
+  void testSkipOperator () {
+
+    final var circuit = cortex.circuit ();
+
+    try {
+
+      final List < Integer > captured = new ArrayList <> ();
+
+      final Conduit < Pipe < Integer >, Integer > conduit =
+        circuit.conduit (
+          cortex.name ( "flow.skip.conduit" ),
+          channel -> channel.pipe (
+            flow -> flow
+              .skip ( 3L )
+              .forward ( captured::add )
+          )
+        );
+
+      final Sink < Integer > sink = cortex.sink ( conduit );
+
+      final Pipe < Integer > pipe =
+        conduit.get ( cortex.name ( "flow.skip.channel" ) );
+
+      for ( int i = 1; i <= 10; i++ ) {
+        pipe.emit ( i );
+      }
+
+      circuit.await ();
+
+      final List < Integer > drained =
+        sink.drain ()
+          .map ( Capture::emission )
+          .collect ( toList () );
+
+      assertEquals (
+        List.of ( 4, 5, 6, 7, 8, 9, 10 ),
+        captured,
+        "Skip should skip first 3 emissions"
+      );
+
+      assertEquals (
+        captured,
+        drained
+      );
+
+      sink.close ();
+
+    } finally {
+
+      circuit.close ();
+
+    }
+
+  }
+
+  @Test
+  void testSkipZeroPassesAll () {
+
+    final var circuit = cortex.circuit ();
+
+    try {
+
+      final List < Integer > captured = new ArrayList <> ();
+
+      final Conduit < Pipe < Integer >, Integer > conduit =
+        circuit.conduit (
+          cortex.name ( "flow.skip.zero.conduit" ),
+          channel -> channel.pipe (
+            flow -> flow
+              .skip ( 0L )
+              .forward ( captured::add )
+          )
+        );
+
+      final Pipe < Integer > pipe =
+        conduit.get ( cortex.name ( "flow.skip.zero.channel" ) );
+
+      for ( int i = 1; i <= 5; i++ ) {
+        pipe.emit ( i );
+      }
+
+      circuit.await ();
+
+      assertEquals (
+        List.of ( 1, 2, 3, 4, 5 ),
+        captured,
+        "Skip(0) should pass all emissions"
+      );
 
     } finally {
 

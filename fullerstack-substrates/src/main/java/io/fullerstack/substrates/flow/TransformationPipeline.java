@@ -140,6 +140,21 @@ public class TransformationPipeline<E> implements Flow<E> {
     }
 
     @Override
+    public Flow<E> skip(long n) {
+        if (n < 0) {
+            throw new IllegalArgumentException("Skip count must be non-negative");
+        }
+        long[] counter = {0};
+        return addTransformation(value -> {
+            if (counter[0] < n) {
+                counter[0]++;
+                return TransformResult.filter(); // Still skipping
+            }
+            return TransformResult.pass(value);
+        });
+    }
+
+    @Override
     public Flow<E> peek(Consumer<E> consumer) {
         Objects.requireNonNull(consumer, "Consumer cannot be null");
         return addTransformation(value -> {

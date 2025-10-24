@@ -264,8 +264,8 @@ public final class HierarchicalCell<I, E> implements Cell<I, E> {
         // Circuit interface methods
         @Override @SuppressWarnings("unchecked") public Subject<Circuit> subject() { return (Subject<Circuit>) subject; }
         @Override public Subscription subscribe(Subscriber<State> subscriber) { throw new UnsupportedOperationException(); }
-        @Override public <I2, E2> Cell<I2, E2> cell(Composer<Pipe<I2>, E2> composer) { throw new UnsupportedOperationException(); }
-        @Override public <I2, E2> Cell<I2, E2> cell(Composer<Pipe<I2>, E2> composer, Consumer<Flow<E2>> configurer) { throw new UnsupportedOperationException(); }
+        @Override public <I2, E2> Cell<I2, E2> cell(Composer<Pipe<I2>, E2> composer, Pipe<E2> pipe) { throw new UnsupportedOperationException(); }
+        @Override public <I2, E2> Cell<I2, E2> cell(Composer<Pipe<I2>, E2> composer, Consumer<Flow<E2>> configurer, Pipe<E2> pipe) { throw new UnsupportedOperationException(); }
         @Override public Clock clock() { throw new UnsupportedOperationException(); }
         @Override public Clock clock(Name n) { throw new UnsupportedOperationException(); }
         @Override public <P, E2> Conduit<P, E2> conduit(Composer<? extends P, E2> composer) { throw new UnsupportedOperationException(); }

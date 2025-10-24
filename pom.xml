@@ -27,8 +27,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Dependency Versions -->
-        <substrates-api.version>1.0.0-M17</substrates-api.version>
-        <serventis-api.version>1.0.0-M17</serventis-api.version>
+        <substrates-api.version>1.0.0-M18</substrates-api.version>
+        <serventis-api.version>1.0.0-M18</serventis-api.version>
         <junit.version>5.11.0</junit.version>
         <assertj.version>3.26.3</assertj.version>
         <mockito.version>5.14.1</mockito.version>
