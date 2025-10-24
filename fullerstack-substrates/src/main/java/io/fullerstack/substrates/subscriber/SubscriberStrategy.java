@@ -15,7 +15,7 @@ import java.util.function.BiConsumer;
  * </ul>
  *
  * @param <E> the emission type
- * @see SubscriberImpl
+ * @see FunctionalSubscriber
  * @see FunctionStrategy
  * @see PoolStrategy
  */

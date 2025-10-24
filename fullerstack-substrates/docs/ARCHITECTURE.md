@@ -126,8 +126,8 @@ public class SourceImpl<E> {
 ```java
 // These extend Context (which extends Source), so they inherit subscribe()
 public class CircuitImpl implements Circuit { }  // ✅
-public class ConduitImpl<P, E> implements Conduit<P, E> { }  // ✅
-public class CellNode<I, E> implements Cell<I, E> { }  // ✅
+public class TransformingConduit<P, E> implements Conduit<P, E> { }  // ✅
+public class HierarchicalCell<I, E> implements Cell<I, E> { }  // ✅
 ```
 
 ### Everything is a Subject
@@ -283,11 +283,11 @@ public class CircuitImpl implements Circuit {
 
 **Purpose:** Dot-notation hierarchical names (e.g., "kafka.broker.1")
 
-**NameNode Implementation:**
+**HierarchicalName Implementation:**
 
 ```java
-public final class NameNode implements Name {
-    private final NameNode parent;       // Parent in hierarchy
+public final class HierarchicalName implements Name {
+    private final HierarchicalName parent;       // Parent in hierarchy
     private final String segment;        // This segment
     private final String cachedPath;     // Full path cached
 
@@ -297,7 +297,7 @@ public final class NameNode implements Name {
 
     @Override
     public Name name(String segment) {
-        return new NameNode(this, segment);  // Create child
+        return new HierarchicalName(this, segment);  // Create child
     }
 }
 ```
@@ -342,16 +342,16 @@ messages.subscribe(
 **Implementation:**
 
 ```java
-public class ConduitImpl<P, E> implements Conduit<P, E> {
+public class TransformingConduit<P, E> implements Conduit<P, E> {
     private final SourceImpl<E> source;  // Internal subscriber management
-    private final Map<Name, ChannelImpl<E>> channels = new ConcurrentHashMap<>();
+    private final Map<Name, EmissionChannel<E>> channels = new ConcurrentHashMap<>();
     private final Consumer<Flow<E>> flowConfigurer;  // Transformations
 
     @Override
     public P get(Name subject) {
-        ChannelImpl<E> channel = channels.computeIfAbsent(
+        EmissionChannel<E> channel = channels.computeIfAbsent(
             subject,
-            s -> new ChannelImpl<>(s, circuit.scheduler(), source, flowConfigurer)
+            s -> new EmissionChannel<>(s, circuit.scheduler(), source, flowConfigurer)
         );
         return (P) channel.pipe();
     }
@@ -370,7 +370,7 @@ public class ConduitImpl<P, E> implements Conduit<P, E> {
 **Channel:** Named emission port
 
 ```java
-public class ChannelImpl<E> implements Channel<E> {
+public class EmissionChannel<E> implements Channel<E> {
     private final ProducerPipe<E> cachedPipe;
 
     @Override
@@ -386,7 +386,7 @@ public class ChannelImpl<E> implements Channel<E> {
 public class ProducerPipe<E> implements Pipe<E> {
     private final Subject<Channel<E>> channelSubject;
     private final Consumer<Capture<E, Channel<E>>> subscriberNotifier;
-    private final FlowImpl<E> flow;  // Optional transformations
+    private final TransformationPipeline<E> flow;  // Optional transformations
 
     @Override
     public void emit(E value) {
@@ -493,15 +493,15 @@ brokerCell.input(jmxClient.fetchStats());
 **Implementation:**
 
 ```java
-public class CellNode<I, E> implements Cell<I, E> {
+public class HierarchicalCell<I, E> implements Cell<I, E> {
     private final Function<I, E> transformer;  // I → E transformation
     private final SourceImpl<E> source;
-    private final Map<Name, CellNode<E, ?>> children = new ConcurrentHashMap<>();
+    private final Map<Name, HierarchicalCell<E, ?>> children = new ConcurrentHashMap<>();
 
     @Override
     public <O> Cell<E, O> cell(Name name, Function<E, O> transformer) {
         return children.computeIfAbsent(name, n ->
-            new CellNode<>(n, this, transformer, circuit)
+            new HierarchicalCell<>(n, this, transformer, circuit)
         );
     }
 
@@ -678,10 +678,10 @@ CircuitImpl
 ├── conduits: ConcurrentHashMap<Name, Conduit>
 └── clocks: ConcurrentHashMap<Name, Clock>
 
-ConduitImpl
+TransformingConduit
 └── channels: ConcurrentHashMap<Name, Channel>
 
-CellNode
+HierarchicalCell
 └── children: ConcurrentHashMap<Name, Cell>
 ```
 
@@ -720,7 +720,7 @@ CellNode
 
 ### Immutable Components
 
-- **NameNode** - Immutable parent-child structure
+- **HierarchicalName** - Immutable parent-child structure
 - **State/Slot** - Immutable state management
 - **Signal Types** - Immutable records (Serventis)
 

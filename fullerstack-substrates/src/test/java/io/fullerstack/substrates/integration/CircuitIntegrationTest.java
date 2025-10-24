@@ -3,11 +3,11 @@ package io.fullerstack.substrates.integration;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.CortexRuntime;
 import io.fullerstack.substrates.capture.CaptureImpl;
-import io.fullerstack.substrates.circuit.SingleThreadCircuit;
-import io.fullerstack.substrates.name.NameNode;
-import io.fullerstack.substrates.id.IdImpl;
-import io.fullerstack.substrates.state.StateImpl;
-import io.fullerstack.substrates.subject.SubjectImpl;
+import io.fullerstack.substrates.circuit.SequentialCircuit;
+import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.id.UuidIdentifier;
+import io.fullerstack.substrates.state.LinkedState;
+import io.fullerstack.substrates.subject.HierarchicalSubject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration test for SingleThreadCircuit demonstrating all components working together.
+ * Integration test for SequentialCircuit demonstrating all components working together.
  *
  * <p>Tests the full circuit workflow:
  * <ul>
@@ -87,14 +87,14 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldEmitPeriodicEventsViaClock() throws Exception {
-        circuit = new SingleThreadCircuit(NameNode.of("test"));
-        Clock clock = circuit.clock(NameNode.of("timer"));
+        circuit = new SequentialCircuit(HierarchicalName.of("test"));
+        Clock clock = circuit.clock(HierarchicalName.of("timer"));
 
         AtomicInteger tickCount = new AtomicInteger(0);
         CountDownLatch latch = new CountDownLatch(3);
 
         Subscription subscription = clock.consume(
-            NameNode.of("ticker"),
+            HierarchicalName.of("ticker"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 tickCount.incrementAndGet();
@@ -114,7 +114,7 @@ class CircuitIntegrationTest {
     /*
     @Test
     void shouldBroadcastStateEventsViaSource() {
-        circuit = new SingleThreadCircuit(NameNode.of("test"));
+        circuit = new SequentialCircuit(HierarchicalName.of("test"));
         Source<State> source = circuit.source();  // Get the Circuit's Source
 
         AtomicInteger emissionCount = new AtomicInteger(0);
@@ -123,10 +123,10 @@ class CircuitIntegrationTest {
             @Override
             @SuppressWarnings("unchecked")
             public Subject<Subscriber<State>> subject() {
-                return new io.fullerstack.substrates.subject.SubjectImpl<>(
-                    io.fullerstack.substrates.id.IdImpl.generate(),
-                    NameNode.of("subscriber"),
-                    io.fullerstack.substrates.state.StateImpl.empty(),
+                return new io.fullerstack.substrates.subject.HierarchicalSubject<>(
+                    io.fullerstack.substrates.id.UuidIdentifier.generate(),
+                    HierarchicalName.of("subscriber"),
+                    io.fullerstack.substrates.state.LinkedState.empty(),
                     (Class<Subscriber<State>>) (Class<?>) Subscriber.class
                 );
             }
@@ -141,13 +141,13 @@ class CircuitIntegrationTest {
         io.fullerstack.substrates.source.SourceImpl<State> sourceImpl =
             (io.fullerstack.substrates.source.SourceImpl<State>) source;
         @SuppressWarnings("unchecked")
-        Subject<Channel<State>> testChannel = new SubjectImpl<>(
-            IdImpl.generate(),
-            NameNode.of("test-channel"),
-            StateImpl.empty(),
+        Subject<Channel<State>> testChannel = new HierarchicalSubject<>(
+            UuidIdentifier.generate(),
+            HierarchicalName.of("test-channel"),
+            LinkedState.empty(),
             (Class<Channel<State>>) (Class<?>) Channel.class
         );
-        State emission = StateImpl.of(NameNode.of("event"), 1);
+        State emission = LinkedState.of(HierarchicalName.of("event"), 1);
 
         // Use SourceImpl's emission handler (like inlet Pipes do)
         Capture<State, Channel<State>> capture = new CaptureImpl<>(testChannel, emission);
@@ -190,7 +190,7 @@ class CircuitIntegrationTest {
         // Start clock
         Clock clock = circuit.clock();
         Subscription subscription = clock.consume(
-            NameNode.of("ticker"),
+            HierarchicalName.of("ticker"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 clockTicks.incrementAndGet();
@@ -209,10 +209,10 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldSupportMultipleClocksWithDifferentCycles() throws Exception {
-        circuit = new SingleThreadCircuit(NameNode.of("test"));
+        circuit = new SequentialCircuit(HierarchicalName.of("test"));
 
-        Clock fastClock = circuit.clock(NameNode.of("fast"));
-        Clock slowClock = circuit.clock(NameNode.of("slow"));
+        Clock fastClock = circuit.clock(HierarchicalName.of("fast"));
+        Clock slowClock = circuit.clock(HierarchicalName.of("slow"));
 
         AtomicInteger fastTicks = new AtomicInteger(0);
         AtomicInteger slowTicks = new AtomicInteger(0);
@@ -220,7 +220,7 @@ class CircuitIntegrationTest {
         CountDownLatch slowLatch = new CountDownLatch(2);
 
         Subscription fastSub = fastClock.consume(
-            NameNode.of("fast-ticker"),
+            HierarchicalName.of("fast-ticker"),
             Clock.Cycle.MILLISECOND,
             instant -> {
                 fastTicks.incrementAndGet();
@@ -229,7 +229,7 @@ class CircuitIntegrationTest {
         );
 
         Subscription slowSub = slowClock.consume(
-            NameNode.of("slow-ticker"),
+            HierarchicalName.of("slow-ticker"),
             Clock.Cycle.SECOND,
             instant -> {
                 slowTicks.incrementAndGet();
@@ -249,16 +249,16 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldCleanupAllResourcesOnClose() throws Exception {
-        circuit = new SingleThreadCircuit(NameNode.of("test"));
+        circuit = new SequentialCircuit(HierarchicalName.of("test"));
 
         // Create all components (M15+: no queue() method)
-        Clock clock1 = circuit.clock(NameNode.of("clock1"));
-        Clock clock2 = circuit.clock(NameNode.of("clock2"));
+        Clock clock1 = circuit.clock(HierarchicalName.of("clock1"));
+        Clock clock2 = circuit.clock(HierarchicalName.of("clock2"));
         Source<State> source = circuit;  // Circuit implements Source
 
         AtomicInteger clockTicks = new AtomicInteger(0);
         clock1.consume(
-            NameNode.of("ticker"),
+            HierarchicalName.of("ticker"),
             Clock.Cycle.MILLISECOND,
             instant -> clockTicks.incrementAndGet()
         );
@@ -277,18 +277,18 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldProvideAccessToAllComponents() {
-        circuit = new SingleThreadCircuit(NameNode.of("test"));
+        circuit = new SequentialCircuit(HierarchicalName.of("test"));
 
         // M15+ API: queue() is internal, not exposed publicly
         assertThat((Object) circuit.subject()).isNotNull();
         assertThat((Object) circuit).isNotNull();
         assertThat((Object) circuit.clock()).isNotNull();
-        assertThat((Object) circuit.clock(NameNode.of("custom"))).isNotNull();
+        assertThat((Object) circuit.clock(HierarchicalName.of("custom"))).isNotNull();
     }
 
     @Test
     void shouldSupportTapPatternForFunctionalChaining() {
-        circuit = new SingleThreadCircuit(NameNode.of("test"));
+        circuit = new SequentialCircuit(HierarchicalName.of("test"));
 
         AtomicInteger tapCount = new AtomicInteger(0);
 

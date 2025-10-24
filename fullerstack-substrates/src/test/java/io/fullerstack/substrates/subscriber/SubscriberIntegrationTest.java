@@ -2,7 +2,7 @@ package io.fullerstack.substrates.subscriber;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.CortexRuntime;
-import io.fullerstack.substrates.name.NameNode;
+import io.fullerstack.substrates.name.HierarchicalName;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CopyOnWriteArrayList;

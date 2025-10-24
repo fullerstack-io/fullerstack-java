@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.state;
 
 import io.fullerstack.substrates.CortexRuntime;
-import io.fullerstack.substrates.slot.SlotImpl;
+import io.fullerstack.substrates.slot.TypedSlot;
 import io.humainary.substrates.api.Substrates.Cortex;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Slot;
@@ -181,6 +181,8 @@ class StateSlotArticleTest {
      *  the most recently added value that matches the specified Slot."
      *
      * state.values(xyz).forEach(out::println);
+     *
+     * Note: LinkedState returns values in reverse chronological order (LIFO)
      */
     @Test
     void scenario6_multipleValuesWithSameNameAndType() {
@@ -194,9 +196,9 @@ class StateSlotArticleTest {
         // value() returns LAST occurrence
         assertThat(state.value(xyz)).isEqualTo(3);
 
-        // values() returns ALL occurrences
+        // values() returns ALL occurrences in reverse chronological order (most recent first)
         List<Integer> allValues = state.values(xyz).collect(Collectors.toList());
-        assertThat(allValues).containsExactly(1, 2, 3);
+        assertThat(allValues).containsExactly(3, 2, 1);
     }
 
     /**
@@ -213,23 +215,25 @@ class StateSlotArticleTest {
      *         slot.value()
      *       )
      *   );
+     *
+     * Note: LinkedState.stream() returns slots in reverse chronological order (LIFO)
      */
     @Test
     void scenario7_streamAllSlots() {
         State state = cortex.state()
-            .state(XYZ, 42)           // Integer
-            .state(ABC, "hello")      // String
-            .state(XYZ, true);        // Boolean (same name, different type)
+            .state(XYZ, 42)           // Integer (added first)
+            .state(ABC, "hello")      // String (added second)
+            .state(XYZ, true);        // Boolean (added third - most recent)
 
         List<Slot<?>> allSlots = state.stream().collect(Collectors.toList());
 
         assertThat(allSlots).hasSize(3);
 
-        // Verify slot details
+        // Verify slot details - returned in reverse chronological order
         Slot<?> slot1 = allSlots.get(0);
         assertThat((Object) slot1.name()).isEqualTo(XYZ);
-        assertThat((Object) slot1.type()).isEqualTo(Integer.class);
-        assertThat((Object) slot1.value()).isEqualTo(42);
+        assertThat((Object) slot1.type()).isEqualTo(boolean.class);  // Primitive type from literal
+        assertThat((Object) slot1.value()).isEqualTo(true);
 
         Slot<?> slot2 = allSlots.get(1);
         assertThat((Object) slot2.name()).isEqualTo(ABC);
@@ -238,8 +242,8 @@ class StateSlotArticleTest {
 
         Slot<?> slot3 = allSlots.get(2);
         assertThat((Object) slot3.name()).isEqualTo(XYZ);
-        assertThat((Object) slot3.type()).isEqualTo(Boolean.class);
-        assertThat((Object) slot3.value()).isEqualTo(true);
+        assertThat((Object) slot3.type()).isEqualTo(int.class);  // Primitive type from literal
+        assertThat((Object) slot3.value()).isEqualTo(42);
     }
 
     /**
@@ -262,7 +266,7 @@ class StateSlotArticleTest {
         State outerState = cortex.state().state(NODE, innerState);
 
         // Query for nested state
-        Slot<State> nodeSlot = SlotImpl.of(NODE, cortex.state(), State.class);
+        Slot<State> nodeSlot = TypedSlot.of(NODE, cortex.state(), State.class);
         State retrievedInner = outerState.value(nodeSlot);
 
         // Verify nested state content

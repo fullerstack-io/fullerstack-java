@@ -11,8 +11,8 @@ Substrates provides a flexible framework for building event-driven and observabi
 - **Circuit** - Central processing engine with virtual CPU core pattern for precise event ordering
 - **Conduit** - Container that coordinates Channels, Pipes, and subscriber management
 - **Channel** - Named emission port linking producers to the event stream
-- **CellNode** - Hierarchical container with type transformation (I → E) for building observability trees
-- **NameNode** - Hierarchical dot-notation names (e.g., "kafka.broker.1") with parent-child structure
+- **HierarchicalCell** - Hierarchical container with type transformation (I → E) for building observability trees
+- **HierarchicalName** - Hierarchical dot-notation names (e.g., "kafka.broker.1") with parent-child structure
 - **Flow/Sift** - Transformation pipelines (filter, map, reduce, limit, sample, and more)
 - **Clock** - Scheduled event emission with shared ScheduledExecutorService optimization
 - **Scope** - Hierarchical resource lifecycle management
@@ -32,7 +32,7 @@ Substrates is optimized for high-throughput, low-latency observability with a si
 - **Zero-Copy State** - Immutable slot-based state management
 
 **Test Performance:**
-- **247 tests** complete in ~16 seconds
+- **419 tests** complete in ~20 seconds
 - All tests pass with **0 failures, 0 errors**
 - Integration tests include multi-threading and timing scenarios
 
@@ -208,7 +208,7 @@ Consumer Side:
 
 ### Design Principles
 
-1. **Simplified Architecture** - Single NameNode implementation, no factory abstractions
+1. **Simplified Architecture** - Single HierarchicalName implementation, no factory abstractions
 2. **Sealed Hierarchy** - M17 sealed interfaces enforce correct type composition
 3. **Interface Types** - Public API uses interface types for flexibility
 4. **@Temporal Types** - Transient types (Registrar, Sift, Closure) are not retained
@@ -276,7 +276,7 @@ mvn clean install
 mvn test
 ```
 
-All 264 tests should pass.
+All 419 tests should pass.
 
 ## Requirements
 

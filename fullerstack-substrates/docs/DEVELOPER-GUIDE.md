@@ -247,7 +247,7 @@ private final Map<Name, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
 
 public <P, E> Conduit<P, E> conduit(Name name, Composer<P, E> composer) {
     return (Conduit<P, E>) conduits.computeIfAbsent(name, n ->
-        new ConduitImpl<>(n, this, composer)
+        new TransformingConduit<>(n, this, composer)
     );
 }
 ```
@@ -282,10 +282,10 @@ Clock clock2 = circuit.clock(name2);  // Same scheduler
 
 ---
 
-#### NameNode Performance
+#### HierarchicalName Performance
 
 ```java
-public final class NameNode implements Name {
+public final class HierarchicalName implements Name {
     private final String cachedPath;  // Built once in constructor
 
     @Override
@@ -424,10 +424,10 @@ Circuit brokers51to100 = cortex.circuit(cortex.name("brokers-51-100"));
 **Component Footprint (Approximate):**
 
 ```
-NameNode:       ~64 bytes
+HierarchicalName:       ~64 bytes
 CircuitImpl:    ~1KB
-ConduitImpl:    ~512 bytes
-ChannelImpl:    ~256 bytes
+TransformingConduit:    ~512 bytes
+EmissionChannel:    ~256 bytes
 PipeImpl:       ~512 bytes
 
 Per Metric (Pipe): ~1KB

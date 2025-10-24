@@ -148,7 +148,7 @@ Queue processes Scripts sequentially (single-threaded)
      │        ├─→ script.exec(current)
      │        │
      │        ↓
-     │   [ConduitImpl.processEmission]
+     │   [TransformingConduit.processEmission]
      │        │
      │        ├─→ Resolve Subscriber Pipes (cached or register new)
      │        │

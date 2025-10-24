@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.functional;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.cell.CellNode;
+import io.fullerstack.substrates.cell.HierarchicalCell;
 import io.fullerstack.substrates.circuit.Scheduler;
 
 import java.util.function.Function;
@@ -86,11 +86,11 @@ public class CellComposer {
     ) {
         return channel -> {
             // Create Cell with parent reference
-            // CellNode manages its own children via get()
+            // HierarchicalCell manages its own children via get()
             @SuppressWarnings("unchecked")
-            CellNode<I, E> cellParent = (CellNode<I, E>) parent;
+            HierarchicalCell<I, E> cellParent = (HierarchicalCell<I, E>) parent;
 
-            return new CellNode<>(
+            return new HierarchicalCell<>(
                 cellParent,      // Captured from closure (null for root)
                 channel.subject().name(),
                 transformer,

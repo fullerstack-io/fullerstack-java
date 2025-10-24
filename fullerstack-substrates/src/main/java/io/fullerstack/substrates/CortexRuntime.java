@@ -2,16 +2,16 @@ package io.fullerstack.substrates;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.capture.CaptureImpl;
-import io.fullerstack.substrates.circuit.SingleThreadCircuit;
-import io.fullerstack.substrates.id.IdImpl;
-import io.fullerstack.substrates.pool.PoolImpl;
-import io.fullerstack.substrates.scope.ScopeImpl;
-import io.fullerstack.substrates.slot.SlotImpl;
-import io.fullerstack.substrates.state.StateImpl;
-import io.fullerstack.substrates.subject.SubjectImpl;
-import io.fullerstack.substrates.subscriber.SubscriberImpl;
-import io.fullerstack.substrates.name.NameNode;
-import io.fullerstack.substrates.sink.SinkImpl;
+import io.fullerstack.substrates.circuit.SequentialCircuit;
+import io.fullerstack.substrates.id.UuidIdentifier;
+import io.fullerstack.substrates.pool.ConcurrentPool;
+import io.fullerstack.substrates.scope.ManagedScope;
+import io.fullerstack.substrates.slot.TypedSlot;
+import io.fullerstack.substrates.state.LinkedState;
+import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subscriber.FunctionalSubscriber;
+import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.sink.CollectingSink;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -56,8 +56,8 @@ public class CortexRuntime implements Cortex {
     public CortexRuntime() {
         this.circuits = new ConcurrentHashMap<>();
         this.scopes = new ConcurrentHashMap<>();
-        Name cortexName = NameNode.of("cortex");
-        this.defaultScope = new ScopeImpl(cortexName);
+        Name cortexName = HierarchicalName.of("cortex");
+        this.defaultScope = new ManagedScope(cortexName);
         // Cache default scope by its name
         this.scopes.put(cortexName, defaultScope);
     }
@@ -66,7 +66,9 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public Circuit circuit() {
-        return circuit(NameNode.of("circuit"));
+        // Generate unique name for each unnamed circuit (do NOT intern)
+        // This ensures each call creates a new circuit with unique subject
+        return createCircuit(HierarchicalName.of("circuit." + UuidIdentifier.generate()));
     }
 
     @Override
@@ -76,22 +78,23 @@ public class CortexRuntime implements Cortex {
     }
 
     private Circuit createCircuit(Name name) {
-        return new SingleThreadCircuit(name);
+        return new SequentialCircuit(name);
     }
 
     // ========== Name Factory (8 methods) ==========
-    // All delegate directly to NameNode.of() overloaded methods
+    // All delegate directly to HierarchicalName.of() overloaded methods
 
     @Override
     public Name name(String s) {
         // Create root name - no path parsing
-        return NameNode.of(s);
+        return HierarchicalName.of(s);
     }
 
     @Override
     public Name name(Enum<?> e) {
-        // Create root, let Name handle the hierarchy building
-        return NameNode.of(e.getDeclaringClass().getName()).name(e);
+        // Convert $ to . for proper hierarchical name, then append enum constant
+        String className = e.getDeclaringClass().getName().replace('$', '.');
+        return HierarchicalName.of(className).name(e.name());
     }
 
     @Override
@@ -101,7 +104,7 @@ public class CortexRuntime implements Cortex {
         if (!it.hasNext()) {
             throw new IllegalArgumentException("parts cannot be empty");
         }
-        return NameNode.of(it.next()).name(it);
+        return HierarchicalName.of(it.next()).name(it);
     }
 
     @Override
@@ -111,7 +114,7 @@ public class CortexRuntime implements Cortex {
         if (!it.hasNext()) {
             throw new IllegalArgumentException("items cannot be empty");
         }
-        return NameNode.of(mapper.apply(it.next())).name(it, mapper);
+        return HierarchicalName.of(mapper.apply(it.next())).name(it, mapper);
     }
 
     @Override
@@ -120,7 +123,7 @@ public class CortexRuntime implements Cortex {
         if (!parts.hasNext()) {
             throw new IllegalArgumentException("parts cannot be empty");
         }
-        return NameNode.of(parts.next()).name(parts);
+        return HierarchicalName.of(parts.next()).name(parts);
     }
 
     @Override
@@ -129,18 +132,19 @@ public class CortexRuntime implements Cortex {
         if (!items.hasNext()) {
             throw new IllegalArgumentException("items cannot be empty");
         }
-        return NameNode.of(mapper.apply(items.next())).name(items, mapper);
+        return HierarchicalName.of(mapper.apply(items.next())).name(items, mapper);
     }
 
     @Override
     public Name name(Class<?> clazz) {
-        return NameNode.of(clazz.getName());
+        // Convert $ to . for proper hierarchical name with inner classes
+        return HierarchicalName.of(clazz.getName().replace('$', '.'));
     }
 
     @Override
     public Name name(Member member) {
         // Create root, let Name.name() handle the hierarchy
-        return NameNode.of(member.getDeclaringClass().getName()).name(member);
+        return HierarchicalName.of(member.getDeclaringClass().getName()).name(member);
     }
 
     // ========== Pool Management (1 method) ==========
@@ -149,7 +153,7 @@ public class CortexRuntime implements Cortex {
     public <T> Pool<T> pool(T value) {
         Objects.requireNonNull(value, "Pool value cannot be null");
         // Create pool that returns the same value for any name
-        return new PoolImpl<>(name -> value);
+        return new ConcurrentPool<>(name -> value);
     }
 
     // ========== Scope Management (2 methods) ==========
@@ -162,14 +166,14 @@ public class CortexRuntime implements Cortex {
     @Override
     public Scope scope(Name name) {
         Objects.requireNonNull(name, "Scope name cannot be null");
-        return scopes.computeIfAbsent(name, n -> new ScopeImpl(n));
+        return scopes.computeIfAbsent(name, n -> new ManagedScope(n));
     }
 
     // ========== State Factory (1 method) ==========
 
     @Override
     public State state() {
-        return StateImpl.empty();
+        return LinkedState.empty();
     }
 
     // ========== Sink Creation (1 method) ==========
@@ -177,59 +181,60 @@ public class CortexRuntime implements Cortex {
     @Override
     public <E, S extends Context<E, S>> Sink<E> sink(Context<E, S> context) {
         Objects.requireNonNull(context, "Context cannot be null");
-        // Context extends Source, so we can create SinkImpl directly
-        return new SinkImpl<>(context);
+        // Context extends Source, so we can create CollectingSink directly
+        return new CollectingSink<>(context);
     }
 
     // ========== Slot Management (8 methods) ==========
 
     @Override
     public Slot<Boolean> slot(Name name, boolean value) {
-        return SlotImpl.of(name, value);
+        return TypedSlot.of(name, value);
     }
 
     @Override
     public Slot<Integer> slot(Name name, int value) {
-        return SlotImpl.of(name, value);
+        return TypedSlot.of(name, value);
     }
 
     @Override
     public Slot<Long> slot(Name name, long value) {
-        return SlotImpl.of(name, value);
+        return TypedSlot.of(name, value);
     }
 
     @Override
     public Slot<Double> slot(Name name, double value) {
-        return SlotImpl.of(name, value);
+        return TypedSlot.of(name, value);
     }
 
     @Override
     public Slot<Float> slot(Name name, float value) {
-        return SlotImpl.of(name, value);
+        return TypedSlot.of(name, value);
     }
 
     @Override
     public Slot<String> slot(Name name, String value) {
-        return SlotImpl.of(name, value);
+        return TypedSlot.of(name, value);
     }
 
     @Override
     public Slot<Name> slot(Name name, Name value) {
-        return SlotImpl.of(name, value, Name.class);
+        return TypedSlot.of(name, value);
     }
 
     @Override
     public Slot<State> slot(Name name, State value) {
-        return SlotImpl.of(name, value, State.class);
+        return TypedSlot.of(name, value);
     }
 
     @Override
     public Slot<Name> slot(Enum<?> value) {
         Objects.requireNonNull(value, "Enum value cannot be null");
-        Name enumName = name(value.getClass().getSimpleName()).name(value.name());
-        return SlotImpl.of(
-            name(value.getClass().getSimpleName()),
-            enumName,
+        // Slot name = fully qualified enum class name
+        // Slot value = fully qualified enum class + class name again + constant
+        return TypedSlot.of(
+            name(value.getDeclaringClass()),
+            name(value),
             Name.class
         );
     }
@@ -238,11 +243,11 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public <E> Subscriber<E> subscriber(Name name, BiConsumer<Subject<Channel<E>>, Registrar<E>> fn) {
-        return new SubscriberImpl<>(name, fn);
+        return new FunctionalSubscriber<>(name, fn);
     }
 
     @Override
     public <E> Subscriber<E> subscriber(Name name, Pool<? extends Pipe<E>> pool) {
-        return new SubscriberImpl<>(name, pool);
+        return new FunctionalSubscriber<>(name, pool);
     }
 }
