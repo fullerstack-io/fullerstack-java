@@ -139,7 +139,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <systemPropertyVariables>
-                        <!-- Configure Substrates API to use our CortexRuntime -->
+                        <!-- Configure Substrates API to use our CortexRuntime implementation -->
                         <io.humainary.substrates.spi.provider>io.fullerstack.substrates.CortexRuntime</io.humainary.substrates.spi.provider>
                     </systemPropertyVariables>
                 </configuration>

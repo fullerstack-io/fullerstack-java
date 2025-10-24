@@ -317,7 +317,7 @@ final class NameTest
     final var name = cortex.name ( EnumWithBody.SPECIAL );
 
     assertEquals (
-      "io.humainary.substrates.testkit.NameTest.EnumWithBody.SPECIAL",
+      "io.fullerstack.substrates.testkit.NameTest.EnumWithBody.SPECIAL",
       name.path ().toString ()
     );
 
@@ -379,7 +379,7 @@ final class NameTest
     final var extended = base.name ( Outer.Inner.class );
 
     assertEquals (
-      "io.humainary.substrates.testkit.NameTest.io.humainary.substrates.testkit.NameTest.Outer.Inner",
+      "io.fullerstack.substrates.testkit.NameTest.io.fullerstack.substrates.testkit.NameTest.Outer.Inner",
       extended.path ().toString ()
     );
 
@@ -676,7 +676,7 @@ final class NameTest
     final var name = cortex.name ( Outer.Inner.class );
 
     assertEquals (
-      "io.humainary.substrates.testkit.NameTest.Outer.Inner",
+      "io.fullerstack.substrates.testkit.NameTest.Outer.Inner",
       name.path ().toString ()
     );
 

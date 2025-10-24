@@ -229,12 +229,16 @@ public class SequentialCircuit implements Circuit, Scheduler {
 
     @Override
     public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer, Pipe<E> pipe) {
+        Objects.requireNonNull(composer, "Composer cannot be null");
+        Objects.requireNonNull(pipe, "Pipe cannot be null");
         return cell(HierarchicalName.of("cell"), composer, null, pipe);
     }
 
     @Override
     public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer, Pipe<E> pipe) {
+        Objects.requireNonNull(composer, "Composer cannot be null");
         Objects.requireNonNull(configurer, "Flow configurer cannot be null");
+        Objects.requireNonNull(pipe, "Pipe cannot be null");
         return cell(HierarchicalName.of("cell"), composer, configurer, pipe);
     }
 

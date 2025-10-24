@@ -46,9 +46,7 @@ import java.util.stream.Stream;
  */
 public class CortexRuntime implements Cortex {
 
-    private final Map<Name, Circuit> circuits;
     private final Map<Name, Scope> scopes;
-    private final Scope defaultScope;
 
     // Singleton instance for SPI provider pattern
     private static final Cortex INSTANCE = new CortexRuntime();
@@ -57,12 +55,7 @@ public class CortexRuntime implements Cortex {
      * Creates a new Cortex runtime.
      */
     public CortexRuntime() {
-        this.circuits = new ConcurrentHashMap<>();
         this.scopes = new ConcurrentHashMap<>();
-        Name cortexName = HierarchicalName.of("cortex");
-        this.defaultScope = new ManagedScope(cortexName);
-        // Cache default scope by its name
-        this.scopes.put(cortexName, defaultScope);
     }
 
     /**
@@ -87,7 +80,9 @@ public class CortexRuntime implements Cortex {
     @Override
     public Circuit circuit(Name name) {
         Objects.requireNonNull(name, "Circuit name cannot be null");
-        return circuits.computeIfAbsent(name, this::createCircuit);
+        // Create a new circuit each time instead of caching
+        // This prevents issues where a closed circuit is reused
+        return createCircuit(name);
     }
 
     private Circuit createCircuit(Name name) {
@@ -173,7 +168,9 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public Scope scope() {
-        return defaultScope;
+        // Create a new scope with a unique name each time
+        // Each scope is independent and can be closed without affecting others
+        return new ManagedScope(HierarchicalName.of("scope." + UuidIdentifier.generate().toString()));
     }
 
     @Override
