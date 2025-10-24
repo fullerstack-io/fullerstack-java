@@ -243,39 +243,46 @@ public class SequentialCircuit implements Circuit, Scheduler {
     }
 
     /**
-     * Internal method to create a Cell with all parameters.
+     * Internal method to create a Cell with all parameters (M18 API).
      *
-     * Per the Humainary API contract:
-     * 1. Create a temporary Channel for the Cell
-     * 2. Invoke the Composer with the Channel to get a Pipe<I>
-     * 3. Cast the Pipe<I> to Cell<I,E> (the Composer creates Cells)
+     * Per the M18 API contract:
+     * 1. Create a Conduit to provide Channel infrastructure
+     * 2. Invoke the Composer with a Channel to get the input Pipe<I>
+     * 3. Create a SimpleCell wrapping the input pipe and output pipe
      *
-     * Note: The Channel is a temporary construct. The Composer will create the actual
-     * Cell implementation which manages its own subscribers independently.
+     * The Cell:
+     * - Receives I values via Cell.emit(I) → delegates to input Pipe<I>
+     * - Emits E values via the output Pipe<E> parameter
+     * - Uses Conduit for Source<E> subscription infrastructure
      *
-     * @param pipe The output pipe for the cell (M18 API requirement)
+     * @param name Cell name
+     * @param composer Creates the input Pipe<I> from a Channel<E>
+     * @param configurer Optional Flow<E> configuration
+     * @param outputPipe Output pipe for E emissions (M18 API requirement)
      */
-    private <I, E> Cell<I, E> cell(Name name, Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer, Pipe<E> pipe) {
+    private <I, E> Cell<I, E> cell(Name name, Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer, Pipe<E> outputPipe) {
         checkClosed();
         Objects.requireNonNull(name, "Cell name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");
+        Objects.requireNonNull(outputPipe, "Output pipe cannot be null");
 
-        // Create a Conduit to provide Channel infrastructure
-        // The Conduit provides the Circuit queue and Subject hierarchy
+        // Create a Conduit to provide Channel and Source infrastructure
+        // The Conduit manages the Circuit queue and Subject hierarchy
         Conduit<Pipe<I>, E> conduit = configurer == null
             ? new TransformingConduit<>(name, composer, this)
             : new TransformingConduit<>(name, composer, this, configurer);
 
-        // Create the root pipe by getting it from the conduit
-        // This invokes the composer with a Channel and returns the composed Pipe
-        Pipe<I> rootPipe = conduit.get(name);
+        // Get the input pipe by invoking the conduit
+        // This creates a Channel and invokes the composer to create Pipe<I>
+        Pipe<I> inputPipe = conduit.get(name);
 
-        // Wrap the Pipe in a Cell that adds hierarchy support (get method)
+        // Create a SimpleCell with both input and output pipes (M18 API)
         return new SimpleCell<>(
             null,           // No parent - this is a root Cell
             name,           // Cell name
-            rootPipe,       // The pipe created by the composer
-            conduit,        // Conduit for creating children
+            inputPipe,      // Input: Pipe<I> created by composer
+            outputPipe,     // Output: Pipe<E> provided by caller (M18 API)
+            conduit,        // Conduit for Source<E> subscriptions and children
             circuitSubject  // Parent Subject for hierarchy
         );
     }

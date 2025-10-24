@@ -32,7 +32,7 @@ import lombok.experimental.FieldDefaults;
  * @param <S> The substrate type this subject represents
  * @see Subject
  * @see HierarchicalName
- * @see HierarchicalCell
+ * @see SimpleCell
  */
 @Getter
 @EqualsAndHashCode

@@ -16,53 +16,58 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 /**
- * Simple Cell implementation for Circuit.cell() support.
+ * Simple Cell implementation for Circuit.cell() support (M18 API).
  *
  * <p>Cell<I, E> provides bidirectional signal transformation:
  * <ul>
- *   <li>Accepts input type I via emit() - delegates to wrapped Pipe</li>
- *   <li>Emits type E to subscribers via Conduit's infrastructure</li>
+ *   <li>Accepts input type I via emit() - delegates to input Pipe<I></li>
+ *   <li>Emits type E to output Pipe<E> (M18 API)</li>
  *   <li>Supports hierarchical children via get(Name)</li>
  * </ul>
  *
- * <p><b>Design:</b>
- * - Wraps a Pipe<I> created by the Composer
- * - Uses Conduit for emission infrastructure
- * - Implements Pipe<I> by delegating to wrapped pipe
+ * <p><b>M18 API Design:</b>
+ * - Input: Pipe<I> created by Composer (receives I values)
+ * - Output: Pipe<E> provided by caller (emits E values)
+ * - The Conduit provides the Source<E> subscription infrastructure
+ * - Implements Pipe<I> by delegating to input pipe
  * - Implements Source<E> by delegating to conduit
  * - Implements Extent for hierarchy (get, enclosure)
  *
  * @param <I> input type (what Cell receives)
- * @param <E> emission type (what Cell emits to subscribers)
+ * @param <E> emission type (what Cell emits to output pipe)
  */
 public class SimpleCell<I, E> implements Cell<I, E> {
 
     private final SimpleCell<I, E> parent;
     private final String segment;
-    private final Pipe<I> pipe;                      // Pipe created by Composer
-    private final Conduit<Pipe<I>, E> conduit;       // Conduit for emission infrastructure
+    private final Pipe<I> inputPipe;                 // Input: created by Composer
+    private final Pipe<E> outputPipe;                // Output: provided by M18 API
+    private final Conduit<Pipe<I>, E> conduit;       // Provides subscription infrastructure
     private final Subject subject;
     private final Map<Name, Cell<I, E>> children = new ConcurrentHashMap<>();
 
     /**
-     * Creates a new Cell wrapping a Pipe.
+     * Creates a new Cell with input and output pipes (M18 API).
      *
      * @param parent parent Cell (null for root)
      * @param name Cell name
-     * @param pipe Pipe created by Composer for handling emissions
-     * @param conduit Conduit providing emission infrastructure
+     * @param inputPipe Pipe created by Composer (receives I values)
+     * @param outputPipe Pipe for emitting E values (M18 API parameter)
+     * @param conduit Conduit providing subscription infrastructure
      * @param parentSubject parent Subject for hierarchy (null for root)
      */
     public SimpleCell(
         SimpleCell<I, E> parent,
         Name name,
-        Pipe<I> pipe,
+        Pipe<I> inputPipe,
+        Pipe<E> outputPipe,
         Conduit<Pipe<I>, E> conduit,
         Subject<?> parentSubject
     ) {
         this.parent = parent;
         this.segment = name.part().toString();
-        this.pipe = Objects.requireNonNull(pipe, "pipe cannot be null");
+        this.inputPipe = Objects.requireNonNull(inputPipe, "inputPipe cannot be null");
+        this.outputPipe = Objects.requireNonNull(outputPipe, "outputPipe cannot be null");
         this.conduit = Objects.requireNonNull(conduit, "conduit cannot be null");
         this.subject = new HierarchicalSubject<>(
             UuidIdentifier.generate(),
@@ -77,8 +82,9 @@ public class SimpleCell<I, E> implements Cell<I, E> {
 
     @Override
     public void emit(I input) {
-        // Delegate to the wrapped pipe created by the Composer
-        pipe.emit(input);
+        // Delegate to the input pipe created by the Composer
+        // The Composer handles I→E transformation and emits to outputPipe
+        inputPipe.emit(input);
     }
 
     // ========== Source<E> implementation (output) ==========
@@ -104,12 +110,13 @@ public class SimpleCell<I, E> implements Cell<I, E> {
     @Override
     public Cell<I, E> get(Name name) {
         return children.computeIfAbsent(name, n -> {
-            // Get the child pipe from the conduit
+            // Get the child input pipe from the conduit
             // This creates a new Channel and invokes the composer
-            Pipe<I> childPipe = conduit.get(n);
+            Pipe<I> childInputPipe = conduit.get(n);
 
-            // Wrap it in a Cell with this Cell as parent
-            return new SimpleCell<>(this, n, childPipe, conduit, this.subject);
+            // Child cells share the same output pipe as the parent
+            // (all cells in the hierarchy emit to the same output)
+            return new SimpleCell<>(this, n, childInputPipe, outputPipe, conduit, this.subject);
         });
     }
 
