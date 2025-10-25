@@ -21,6 +21,45 @@ import lombok.experimental.FieldDefaults;
  *   <li>Subject.path() walks hierarchy via enclosure(), showing all ancestors</li>
  * </ul>
  *
+ * <p><b>Name vs Subject (William's Architecture):</b>
+ * <ul>
+ *   <li><b>Name</b> = Linguistic referent (like "Miles" the identifier)</li>
+ *   <li><b>Subject</b> = Temporal/contextual instantiation (Miles-at-time-T-in-context-C)</li>
+ *   <li>Same Name can have multiple Subjects across different Circuits or contexts</li>
+ *   <li>Each Subject has a unique Id but shares the same Name reference</li>
+ * </ul>
+ *
+ * <p><b>Example - Multiple Temporal Subjects:</b>
+ * <pre>
+ * Cortex cortex = Cortex.of();
+ * Name milesName = cortex.name("Miles");  // Referent
+ *
+ * // Circuit A creates a Subject for "Miles" (context A)
+ * Subject&lt;?&gt; milesInCircuitA = HierarchicalSubject.builder()
+ *     .id(UuidIdentifier.generate())
+ *     .name(milesName)                    // Same name reference
+ *     .state(cortex.state()
+ *         .set(cortex.slot("status", "online"))
+ *         .set(cortex.slot("circuit", "A")))
+ *     .type(Person.class)
+ *     .build();
+ *
+ * // Circuit B creates a different Subject for "Miles" (context B)
+ * Subject&lt;?&gt; milesInCircuitB = HierarchicalSubject.builder()
+ *     .id(UuidIdentifier.generate())
+ *     .name(milesName)                    // Same name reference
+ *     .state(cortex.state()
+ *         .set(cortex.slot("status", "idle"))
+ *         .set(cortex.slot("circuit", "B")))
+ *     .type(Person.class)
+ *     .build();
+ *
+ * // Same Name referent, different temporal/contextual instances:
+ * // milesInCircuitA.id() != milesInCircuitB.id()  // Different IDs
+ * // milesInCircuitA.name() == milesInCircuitB.name()  // Same Name
+ * // milesInCircuitA.state() != milesInCircuitB.state()  // Different states
+ * </pre>
+ *
  * <p><b>Comparison with HierarchicalName:</b>
  * <ul>
  *   <li>HierarchicalName: Hierarchical identifiers (strings)</li>

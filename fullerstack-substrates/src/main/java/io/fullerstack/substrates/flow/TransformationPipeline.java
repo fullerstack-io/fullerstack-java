@@ -26,6 +26,14 @@ import java.util.function.*;
  *   <li>Lazy - transformations are captured, not executed immediately</li>
  *   <li>Composable - transformations chain fluently with @Fluent annotations</li>
  *   <li>Executed by Circuit - not by emitting thread (per Humainary design)</li>
+ *   <li>Optimized - fuses adjacent transformations like JVM hot loop optimization</li>
+ * </ul>
+ *
+ * <p><b>Pipeline Optimization:</b>
+ * <ul>
+ *   <li>Adjacent skip() calls are fused: skip(3).skip(2) → skip(5)</li>
+ *   <li>Adjacent limit() calls are minimized: limit(10).limit(5) → limit(5)</li>
+ *   <li>Reduces transformation overhead in hot paths</li>
  * </ul>
  *
  * <p>Usage (M15+ with Consumer):
@@ -48,6 +56,25 @@ public class TransformationPipeline<E> implements Flow<E> {
      * Transformation operations that can be applied to emissions.
      */
     private final List<Function<E, TransformResult<E>>> transformations = new ArrayList<>();
+
+    /**
+     * Metadata about transformations for optimization.
+     */
+    private enum TransformType {
+        SKIP, LIMIT, GUARD, REPLACE, OTHER
+    }
+
+    private static class TransformMetadata {
+        final TransformType type;
+        final Object metadata; // Skip count, limit count, etc.
+
+        TransformMetadata(TransformType type, Object metadata) {
+            this.type = type;
+            this.metadata = metadata;
+        }
+    }
+
+    private final List<TransformMetadata> metadata = new ArrayList<>();
 
     public TransformationPipeline() {
     }
@@ -129,14 +156,32 @@ public class TransformationPipeline<E> implements Flow<E> {
         if (maxEmissions < 0) {
             throw new IllegalArgumentException("Limit must be non-negative");
         }
+
+        // OPTIMIZATION: Fuse adjacent limit() calls - take minimum
+        // limit(10).limit(5) → limit(5)
+        if (!metadata.isEmpty() && metadata.get(metadata.size() - 1).type == TransformType.LIMIT) {
+            TransformMetadata lastMeta = metadata.get(metadata.size() - 1);
+            long existingLimit = (Long) lastMeta.metadata;
+            long fusedLimit = Math.min(existingLimit, maxEmissions);
+
+            // Remove last transformation and metadata
+            transformations.remove(transformations.size() - 1);
+            metadata.remove(metadata.size() - 1);
+
+            // Re-add with fused limit
+            return limit(fusedLimit);
+        }
+
         long[] counter = {0};
-        return addTransformation(value -> {
+        addTransformation(value -> {
             if (counter[0] >= maxEmissions) {
                 return TransformResult.filter(); // Limit reached
             }
             counter[0]++;
             return TransformResult.pass(value);
         });
+        metadata.add(new TransformMetadata(TransformType.LIMIT, maxEmissions));
+        return this;
     }
 
     @Override
@@ -144,14 +189,32 @@ public class TransformationPipeline<E> implements Flow<E> {
         if (n < 0) {
             throw new IllegalArgumentException("Skip count must be non-negative");
         }
+
+        // OPTIMIZATION: Fuse adjacent skip() calls - sum the counts
+        // skip(3).skip(2) → skip(5)
+        if (!metadata.isEmpty() && metadata.get(metadata.size() - 1).type == TransformType.SKIP) {
+            TransformMetadata lastMeta = metadata.get(metadata.size() - 1);
+            long existingSkip = (Long) lastMeta.metadata;
+            long fusedSkip = existingSkip + n;
+
+            // Remove last transformation and metadata
+            transformations.remove(transformations.size() - 1);
+            metadata.remove(metadata.size() - 1);
+
+            // Re-add with fused skip
+            return skip(fusedSkip);
+        }
+
         long[] counter = {0};
-        return addTransformation(value -> {
+        addTransformation(value -> {
             if (counter[0] < n) {
                 counter[0]++;
                 return TransformResult.filter(); // Still skipping
             }
             return TransformResult.pass(value);
         });
+        metadata.add(new TransformMetadata(TransformType.SKIP, n));
+        return this;
     }
 
     @Override
@@ -234,6 +297,7 @@ public class TransformationPipeline<E> implements Flow<E> {
 
     private Flow<E> addTransformation(Function<E, TransformResult<E>> transformation) {
         this.transformations.add(transformation);
+        this.metadata.add(new TransformMetadata(TransformType.OTHER, null));
         return this;
     }
 

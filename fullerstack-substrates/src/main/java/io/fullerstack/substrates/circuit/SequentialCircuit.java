@@ -11,12 +11,11 @@ import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.subject.HierarchicalSubject;
 import io.fullerstack.substrates.subscription.CallbackSubscription;
 import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.valve.Valve;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -31,11 +30,12 @@ import java.util.function.Function;
  * <p>This implementation processes all emissions through a single virtual thread with a FIFO queue,
  * ensuring ordered execution and eliminating the need for locks within the Circuit domain.
  *
- * <p><b>Virtual CPU Core Pattern:</b>
+ * <p><b>Virtual CPU Core Pattern (William's Valve Architecture):</b>
  * <ul>
- *   <li>Single {@link LinkedBlockingQueue} processes all emissions (FIFO ordering)</li>
- *   <li>Single virtual thread executes Scripts from the queue</li>
- *   <li>All Conduits share the same queue (isolation per Circuit)</li>
+ *   <li>Single {@link Valve} processes all emissions (FIFO ordering)</li>
+ *   <li>Valve = BlockingQueue + Virtual Thread processor</li>
+ *   <li>Emissions → Tasks (submitted to valve)</li>
+ *   <li>All Conduits share the same valve (isolation per Circuit)</li>
  *   <li>Guarantees ordering, eliminates locks, prevents race conditions</li>
  * </ul>
  *
@@ -57,11 +57,8 @@ import java.util.function.Function;
 public class SequentialCircuit implements Circuit, Scheduler {
     private final Subject circuitSubject;
 
-    // Internal queue processor (Virtual CPU Core pattern)
-    private final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
-    private final Thread queueProcessor;
-    private volatile boolean running = true;
-    private volatile boolean executing = false;
+    // Valve (William's pattern: BlockingQueue + Virtual Thread)
+    private final Valve valve;
 
     // Shared scheduler for all Clocks in this Circuit
     private final ScheduledExecutorService clockScheduler;
@@ -123,8 +120,7 @@ public class SequentialCircuit implements Circuit, Scheduler {
      *
      * <p>Initializes:
      * <ul>
-     *   <li>LinkedBlockingQueue for FIFO emission processing</li>
-     *   <li>Virtual thread queue processor (Virtual CPU Core)</li>
+     *   <li>Valve (BlockingQueue + Virtual Thread) for FIFO emission processing</li>
      *   <li>Shared ScheduledExecutorService for all Clocks</li>
      *   <li>Component caches (Conduits, Clocks)</li>
      * </ul>
@@ -151,33 +147,8 @@ public class SequentialCircuit implements Circuit, Scheduler {
             return thread;
         });
 
-        // Start virtual thread processor for async task execution
-        this.queueProcessor = Thread.startVirtualThread(this::processQueue);
-    }
-
-    /**
-     * Background processor that executes tasks from the queue serially.
-     * Runs in a virtual thread (Virtual CPU Core pattern).
-     */
-    private void processQueue() {
-        while (running && !Thread.interrupted()) {
-            try {
-                Runnable task = taskQueue.take();  // Blocking take (FIFO)
-                executing = true;
-                try {
-                    task.run();
-                } finally {
-                    executing = false;
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                // Log error but continue processing
-                System.err.println("Error executing task: " + e.getMessage());
-                executing = false;
-            }
-        }
+        // Create valve for task execution (William's pattern)
+        this.valve = new Valve("circuit-" + name.part());
     }
 
     @Override
@@ -200,30 +171,16 @@ public class SequentialCircuit implements Circuit, Scheduler {
             return;
         }
 
-        // API Requirement: Cannot be called from circuit's own thread
-        if (Thread.currentThread() == queueProcessor) {
-            throw new IllegalStateException(
-                "Cannot call Circuit::await from within a circuit's thread"
-            );
-        }
-
-        // Block until queue is empty and nothing is currently executing
-        while (running && (executing || !taskQueue.isEmpty())) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException("Circuit await interrupted", e);
-            }
-        }
+        // Delegate to valve's await with "Circuit" context for error messages
+        valve.await("Circuit");
     }
 
     // Scheduler.schedule() - internal API for components
     @Override
     public void schedule(Runnable task) {
         checkClosed();
-        if (task != null && running) {
-            taskQueue.offer(task);  // Add to queue (FIFO)
+        if (task != null) {
+            valve.submit(task);  // Submit to valve
         }
     }
 
@@ -417,14 +374,8 @@ public class SequentialCircuit implements Circuit, Scheduler {
                 Thread.currentThread().interrupt();
             }
 
-            // Stop queue processor
-            running = false;
-            queueProcessor.interrupt();
-            try {
-                queueProcessor.join(1000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            // Close valve
+            valve.close();
 
             clocks.clear();
             conduits.clear();

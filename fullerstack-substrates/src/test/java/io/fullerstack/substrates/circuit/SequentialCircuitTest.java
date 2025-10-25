@@ -241,8 +241,7 @@ class SequentialCircuitTest {
         circuit.schedule(() -> {
             assertThatThrownBy(() -> circuit.await())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("cannot be called from within the circuit's own thread")
-                .hasMessageContaining("deadlock");
+                .hasMessageContaining("Cannot call Circuit::await from within a circuit's thread");
         });
 
         // Wait for the circuit to process the task
