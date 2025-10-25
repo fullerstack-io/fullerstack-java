@@ -177,13 +177,13 @@ Conduit<P, E> extends Container<P, E, Conduit<P, E>> extends Component<E, Condui
 ```java
 // Create conduit (which is itself a Source<Long>)
 Conduit<Pipe<Long>, Long> conduit = circuit.conduit(
-    cortex.name("sensors"),
+    Cortex.name("sensors"),
     Composer.pipe()
 );
 
 // Subscribe to the conduit (possible because Conduit IS-A Source)
-conduit.subscribe(cortex.subscriber(
-    cortex.name("aggregator"),
+conduit.subscribe(Cortex.subscriber(
+    Cortex.name("aggregator"),
     (subject, registrar) -> {
         // subject is Subject<Channel<Long>> - the channel that was created
         // We can inspect it and decide how to route
@@ -215,13 +215,16 @@ This design enables **dynamic, hierarchical routing** where subscribers can:
 
 ### 1. Cortex (Entry Point)
 
-**Purpose:** Factory for creating Circuits and Scopes
+**Purpose:** Static factory for creating Circuits and Scopes
 
 ```java
-Cortex cortex = CortexRuntime.create();
-Circuit circuit = cortex.circuit(cortex.name("kafka"));
-Name brokerName = cortex.name("kafka.broker.1");
+import static io.humainary.substrates.api.Substrates.*;
+
+Circuit circuit = Cortex.circuit(Cortex.name("kafka"));
+Name brokerName = Cortex.name("kafka.broker.1");
 ```
+
+**M18 Change:** Cortex is now accessed statically via `Substrates.Cortex`, not instantiated.
 
 **Implementation:**
 
@@ -250,12 +253,12 @@ public class CortexRuntime implements Cortex {
 - Component lifecycle management
 
 ```java
-Circuit circuit = cortex.circuit(cortex.name("kafka.monitoring"));
+Circuit circuit = Cortex.circuit(Cortex.name("kafka.monitoring"));
 
 Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
-    circuit.conduit(cortex.name("monitors"), Composer.pipe());
+    circuit.conduit(Cortex.name("monitors"), Composer.pipe());
 
-Clock clock = circuit.clock(cortex.name("timer"));
+Clock clock = circuit.clock(Cortex.name("timer"));
 ```
 
 **Virtual CPU Core Pattern:**
@@ -316,10 +319,10 @@ public final class HierarchicalName implements Name {
 
 ```java
 // From string
-Name name = cortex.name("kafka.broker.1.metrics.bytes-in");
+Name name = Cortex.name("kafka.broker.1.metrics.bytes-in");
 
 // Hierarchically
-Name kafka = cortex.name("kafka");
+Name kafka = Cortex.name("kafka");
 Name broker = kafka.name("broker").name("1");
 Name metrics = broker.name("metrics");
 Name bytesIn = metrics.name("bytes-in");
@@ -334,16 +337,16 @@ Name bytesIn = metrics.name("bytes-in");
 
 ```java
 Conduit<Pipe<String>, String> messages =
-    circuit.conduit(cortex.name("messages"), Composer.pipe());
+    circuit.conduit(Cortex.name("messages"), Composer.pipe());
 
 // Get Pipe for specific subject
-Pipe<String> pipe = messages.get(cortex.name("user.login"));
+Pipe<String> pipe = messages.get(Cortex.name("user.login"));
 pipe.emit("User logged in");
 
 // Subscribe to all subjects (Conduit IS-A Source in M17)
 messages.subscribe(
-    cortex.subscriber(
-        cortex.name("logger"),
+    Cortex.subscriber(
+        Cortex.name("logger"),
         (subject, registrar) -> registrar.register(msg -> log.info(msg))
     )
 );
@@ -455,7 +458,7 @@ registrar.register(ConsumerPipe.of(value -> {
 
 ```java
 Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-    cortex.name("filtered-numbers"),
+    Cortex.name("filtered-numbers"),
     Composer.pipe(flow -> flow
         .sift(n -> n > 0)     // Only positive
         .limit(100)           // Max 100 emissions
@@ -473,20 +476,20 @@ Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
 ```java
 // Level 1: JMX stats → Broker health
 Cell<JMXStats, BrokerHealth> brokerCell = circuit.cell(
-    cortex.name("broker-1"),
+    Cortex.name("broker-1"),
     stats -> assessBrokerHealth(stats)
 );
 
 // Level 2: Broker health → Cluster health
 Cell<BrokerHealth, ClusterHealth> clusterCell = brokerCell.cell(
-    cortex.name("cluster"),
+    Cortex.name("cluster"),
     health -> aggregateClusterHealth(health)
 );
 
 // Subscribe to cluster health
 clusterCell.subscribe(
-    cortex.subscriber(
-        cortex.name("alerting"),
+    Cortex.subscriber(
+        Cortex.name("alerting"),
         (subject, registrar) -> registrar.register(health -> {
             if (health.status() == ClusterStatus.CRITICAL) {
                 sendAlert(health);
@@ -529,11 +532,11 @@ public class HierarchicalCell<I, E> implements Cell<I, E> {
 **Purpose:** Timer utility for time-driven behaviors
 
 ```java
-Clock clock = circuit.clock(cortex.name("poller"));
+Clock clock = circuit.clock(Cortex.name("poller"));
 
 // Poll every second
 clock.consume(
-    cortex.name("jmx-poll"),
+    Cortex.name("jmx-poll"),
     Clock.Cycle.SECOND,
     instant -> {
         BrokerStats stats = jmxClient.fetchStats();
@@ -547,10 +550,10 @@ clock.consume(
 All Clocks in a Circuit share one ScheduledExecutorService:
 
 ```java
-Circuit circuit = cortex.circuit(cortex.name("kafka"));
-Clock clock1 = circuit.clock(cortex.name("clock-1"));  // Uses circuit scheduler
-Clock clock2 = circuit.clock(cortex.name("clock-2"));  // Same scheduler
-Clock clock3 = circuit.clock(cortex.name("clock-3"));  // Same scheduler
+Circuit circuit = Cortex.circuit(Cortex.name("kafka"));
+Clock clock1 = circuit.clock(Cortex.name("clock-1"));  // Uses circuit scheduler
+Clock clock2 = circuit.clock(Cortex.name("clock-2"));  // Same scheduler
+Clock clock3 = circuit.clock(Cortex.name("clock-3"));  // Same scheduler
 ```
 
 **Benefits:** Reduced thread overhead, better resource utilization.
@@ -562,11 +565,11 @@ Clock clock3 = circuit.clock(cortex.name("clock-3"));  // Same scheduler
 **Purpose:** Automatic resource cleanup
 
 ```java
-Scope scope = cortex.scope(cortex.name("session"));
+Scope scope = Cortex.scope(Cortex.name("session"));
 
-Circuit circuit = scope.register(cortex.circuit(cortex.name("kafka")));
+Circuit circuit = scope.register(Cortex.circuit(Cortex.name("kafka")));
 Conduit<Pipe<Event>, Event> events = scope.register(
-    circuit.conduit(cortex.name("events"), Composer.pipe())
+    circuit.conduit(Cortex.name("events"), Composer.pipe())
 );
 
 // Use resources...
@@ -611,17 +614,17 @@ public class SourceImpl<E> {
 
 ```java
 // Create state
-State state = cortex.state()
-    .state(cortex.name("broker-id"), 1)
-    .state(cortex.name("heap-used"), 850_000_000L)
-    .state(cortex.name("status"), "HEALTHY");
+State state = Cortex.state()
+    .state(Cortex.name("broker-id"), 1)
+    .state(Cortex.name("heap-used"), 850_000_000L)
+    .state(Cortex.name("status"), "HEALTHY");
 
 // Access values (type-safe)
-Integer brokerId = state.value(slot(cortex.name("broker-id"), 0));
-Long heapUsed = state.value(slot(cortex.name("heap-used"), 0L));
+Integer brokerId = state.value(slot(Cortex.name("broker-id"), 0));
+Long heapUsed = state.value(slot(Cortex.name("heap-used"), 0L));
 
 // State is immutable - create new state to change
-State newState = state.state(cortex.name("heap-used"), 900_000_000L);
+State newState = state.state(Cortex.name("heap-used"), 900_000_000L);
 ```
 
 **Key Features:**
@@ -882,7 +885,7 @@ flow.skip(100)
 
 ```java
 // NAME = Linguistic referent (like "Miles" the identifier)
-Name milesName = cortex.name("Miles");
+Name milesName = Cortex.name("Miles");
 
 // SUBJECT = Temporal/contextual instantiation
 Subject<?> milesInCircuitA = HierarchicalSubject.builder()
@@ -910,12 +913,12 @@ milesInCircuitA.state() != milesInCircuitB.state() // Different states
 ```java
 // Example: "Miles" exists in multiple Circuits simultaneously
 
-Circuit circuitA = cortex.circuit(cortex.name("circuit-A"));
-Circuit circuitB = cortex.circuit(cortex.name("circuit-B"));
+Circuit circuitA = Cortex.circuit(Cortex.name("circuit-A"));
+Circuit circuitB = Cortex.circuit(Cortex.name("circuit-B"));
 
 // Both circuits create Channels named "Miles"
-Channel<Metric> milesInA = conduitA.get(cortex.name("Miles"));
-Channel<Metric> milesInB = conduitB.get(cortex.name("Miles"));
+Channel<Metric> milesInA = conduitA.get(Cortex.name("Miles"));
+Channel<Metric> milesInB = conduitB.get(Cortex.name("Miles"));
 
 // Same Name referent, different Subject instances:
 // - milesInA.subject() → Subject with unique ID in Circuit A context
@@ -1018,17 +1021,17 @@ Scope.close()
 
 ```java
 // 1. Try-with-resources
-try (Circuit circuit = cortex.circuit(cortex.name("test"))) {
+try (Circuit circuit = Cortex.circuit(Cortex.name("test"))) {
     // Use circuit
 }
 
 // 2. Scope for grouped cleanup
-Scope scope = cortex.scope(cortex.name("session"));
-Circuit circuit = scope.register(cortex.circuit(cortex.name("kafka")));
+Scope scope = Cortex.scope(Cortex.name("session"));
+Circuit circuit = scope.register(Cortex.circuit(Cortex.name("kafka")));
 scope.close();  // Closes all registered resources
 
 // 3. Manual cleanup
-Circuit circuit = cortex.circuit(cortex.name("kafka"));
+Circuit circuit = Cortex.circuit(Cortex.name("kafka"));
 try {
     // Use circuit
 } finally {
@@ -1044,15 +1047,15 @@ try {
 
 ```java
 // Create Circuit
-Circuit circuit = cortex.circuit(cortex.name("kafka.broker.health"));
+Circuit circuit = Cortex.circuit(Cortex.name("kafka.broker.health"));
 
 // Create Conduit for MonitorSignals
 Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
-    circuit.conduit(cortex.name("monitors"), Composer.pipe());
+    circuit.conduit(Cortex.name("monitors"), Composer.pipe());
 
 // Get Pipe for specific subject
 Pipe<MonitorSignal> heapPipe =
-    monitors.get(cortex.name("broker-1.jvm.heap"));
+    monitors.get(Cortex.name("broker-1.jvm.heap"));
 
 // Emit MonitorSignal
 MonitorSignal signal = new MonitorSignal(
@@ -1068,8 +1071,8 @@ heapPipe.emit(signal);
 
 // Subscribe to observe signals
 monitors.subscribe(
-    cortex.subscriber(
-        cortex.name("health-aggregator"),
+    Cortex.subscriber(
+        Cortex.name("health-aggregator"),
         (subject, registrar) -> {
             registrar.register(s -> {
                 if (s.status() == MonitorStatus.DEGRADED) {

@@ -41,19 +41,19 @@ onNext() returns
 
 ```java
 // Substrates Pipe
-Circuit circuit = cortex.circuit();
+Circuit circuit = Cortex.circuit();
 Conduit<Pipe<String>, String> conduit = circuit.conduit(
-    cortex.name("test"),
+    Cortex.name("test"),
     Composer.pipe()
 );
 
 AtomicReference<String> received = new AtomicReference<>();
-conduit.source().subscribe(cortex.subscriber(
-    cortex.name("sub"),
+conduit.source().subscribe(Cortex.subscriber(
+    Cortex.name("sub"),
     (subject, registrar) -> registrar.register(received::set)
 ));
 
-Pipe<String> pipe = conduit.get(cortex.name("channel"));
+Pipe<String> pipe = conduit.get(Cortex.name("channel"));
 pipe.emit("hello");  // ← Returns IMMEDIATELY (posts Script to Queue)
 
 // ❌ WRONG: received.get() is still NULL (async hasn't executed yet)
@@ -245,20 +245,20 @@ This is the PRIMARY use case for `circuit.await()` in tests:
 @Test
 void testEmission() throws Exception {
     // Setup
-    Circuit circuit = cortex.circuit();
+    Circuit circuit = Cortex.circuit();
     Conduit<Pipe<String>, String> conduit = circuit.conduit(
-        cortex.name("test"),
+        Cortex.name("test"),
         Composer.pipe()
     );
 
     AtomicReference<String> received = new AtomicReference<>();
-    conduit.source().subscribe(cortex.subscriber(
-        cortex.name("sub"),
+    conduit.source().subscribe(Cortex.subscriber(
+        Cortex.name("sub"),
         (subject, registrar) -> registrar.register(received::set)
     ));
 
     // Act
-    Pipe<String> pipe = conduit.get(cortex.name("channel"));
+    Pipe<String> pipe = conduit.get(Cortex.name("channel"));
     pipe.emit("hello");
 
     // Assert - MUST wait for async processing
@@ -270,7 +270,7 @@ void testEmission() throws Exception {
 **Use Case 2: Graceful Shutdown**
 
 ```java
-Circuit circuit = cortex.circuit();
+Circuit circuit = Cortex.circuit();
 // ... use circuit ...
 
 // Ensure all pending emissions are processed before closing
@@ -330,8 +330,8 @@ void testEmission_WRONG() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
     AtomicReference<String> received = new AtomicReference<>();
 
-    conduit.source().subscribe(cortex.subscriber(
-        cortex.name("sub"),
+    conduit.source().subscribe(Cortex.subscriber(
+        Cortex.name("sub"),
         (subject, registrar) -> registrar.register(value -> {
             received.set(value);
             latch.countDown();  // Trying to signal completion
@@ -356,8 +356,8 @@ void testEmission_WRONG() throws Exception {
 void testEmission_CORRECT() throws Exception {
     AtomicReference<String> received = new AtomicReference<>();
 
-    conduit.source().subscribe(cortex.subscriber(
-        cortex.name("sub"),
+    conduit.source().subscribe(Cortex.subscriber(
+        Cortex.name("sub"),
         (subject, registrar) -> registrar.register(received::set)
     ));
 
@@ -542,7 +542,7 @@ T+10ms:  Subscriber receives "hello"
 
 ```java
 // Check if queue is processing
-Circuit circuit = cortex.circuit();
+Circuit circuit = Cortex.circuit();
 Queue queue = circuit.queue();
 
 pipe.emit("value");

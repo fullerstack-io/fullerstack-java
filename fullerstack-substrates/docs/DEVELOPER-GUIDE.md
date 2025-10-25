@@ -21,7 +21,7 @@
 
 ✅ **GOOD:**
 ```java
-Pipe<MetricValue> pipe = conduit.get(cortex.name("kafka.broker.1.bytes-in"));
+Pipe<MetricValue> pipe = conduit.get(Cortex.name("kafka.broker.1.bytes-in"));
 
 for (int i = 0; i < 1000000; i++) {
     pipe.emit(new MetricValue(System.currentTimeMillis(), bytesIn));
@@ -31,7 +31,7 @@ for (int i = 0; i < 1000000; i++) {
 ❌ **BAD:**
 ```java
 for (int i = 0; i < 1000000; i++) {
-    conduit.get(cortex.name("kafka.broker.1.bytes-in"))
+    conduit.get(Cortex.name("kafka.broker.1.bytes-in"))
         .emit(new MetricValue(System.currentTimeMillis(), bytesIn));
 }
 ```
@@ -44,7 +44,7 @@ for (int i = 0; i < 1000000; i++) {
 
 ✅ **GOOD:**
 ```java
-Name brokerName = cortex.name("kafka.broker.1");
+Name brokerName = Cortex.name("kafka.broker.1");
 Name metricsName = brokerName.name("metrics");
 Name bytesInName = metricsName.name("bytes-in");
 // Result: "kafka.broker.1.metrics.bytes-in"
@@ -53,7 +53,7 @@ Name bytesInName = metricsName.name("bytes-in");
 ❌ **BAD:**
 ```java
 String name = "kafka.broker.1.metrics.bytes-in";
-Pipe<MetricValue> pipe = conduit.get(cortex.name(name));
+Pipe<MetricValue> pipe = conduit.get(Cortex.name(name));
 ```
 
 **Why:** Hierarchical names preserve parent-child relationships.
@@ -64,21 +64,21 @@ Pipe<MetricValue> pipe = conduit.get(cortex.name(name));
 
 ✅ **GOOD:**
 ```java
-try (Circuit circuit = cortex.circuit(cortex.name("my-circuit"))) {
+try (Circuit circuit = Cortex.circuit(Cortex.name("my-circuit"))) {
     // Use circuit
 }
 ```
 
 Or with Scope:
 ```java
-Scope scope = cortex.scope(cortex.name("transaction"));
-Circuit circuit = scope.register(cortex.circuit(cortex.name("my-circuit")));
+Scope scope = Cortex.scope(Cortex.name("transaction"));
+Circuit circuit = scope.register(Cortex.circuit(Cortex.name("my-circuit")));
 scope.close();  // Closes all registered resources
 ```
 
 ❌ **BAD:**
 ```java
-Circuit circuit = cortex.circuit(cortex.name("my-circuit"));
+Circuit circuit = Cortex.circuit(Cortex.name("my-circuit"));
 // Never closed - resource leak!
 ```
 
@@ -90,7 +90,7 @@ Circuit circuit = cortex.circuit(cortex.name("my-circuit"));
 
 ```java
 // Application domain hierarchy
-Name kafkaName = cortex.name("kafka");
+Name kafkaName = Cortex.name("kafka");
 Name brokerName = kafkaName.name("broker").name("1");
 Name metricsName = brokerName.name("metrics");
 Name bytesInName = metricsName.name("bytes-in");
@@ -101,14 +101,14 @@ Name bytesInName = metricsName.name("bytes-in");
 
 ```java
 // ✅ GOOD - Consistent, hierarchical
-cortex.name("kafka.broker.1.jvm.heap.used")
-cortex.name("kafka.broker.1.jvm.heap.max")
-cortex.name("kafka.broker.1.jvm.gc.count")
+Cortex.name("kafka.broker.1.jvm.heap.used")
+Cortex.name("kafka.broker.1.jvm.heap.max")
+Cortex.name("kafka.broker.1.jvm.gc.count")
 
 // ❌ BAD - Inconsistent structure
-cortex.name("kafka_broker1_heap_used")
-cortex.name("broker-1-gc-count")
-cortex.name("JVM_MAX_HEAP_broker_1")
+Cortex.name("kafka_broker1_heap_used")
+Cortex.name("broker-1-gc-count")
+Cortex.name("JVM_MAX_HEAP_broker_1")
 ```
 
 ---
@@ -119,14 +119,14 @@ cortex.name("JVM_MAX_HEAP_broker_1")
 
 ```java
 // ✅ GOOD - Separate circuits for different domains
-Circuit kafkaCircuit = cortex.circuit(cortex.name("kafka"));
-Circuit systemCircuit = cortex.circuit(cortex.name("system"));
-Circuit appCircuit = cortex.circuit(cortex.name("application"));
+Circuit kafkaCircuit = Cortex.circuit(Cortex.name("kafka"));
+Circuit systemCircuit = Cortex.circuit(Cortex.name("system"));
+Circuit appCircuit = Cortex.circuit(Cortex.name("application"));
 ```
 
 ❌ **BAD:**
 ```java
-Circuit everythingCircuit = cortex.circuit(cortex.name("everything"));
+Circuit everythingCircuit = Cortex.circuit(Cortex.name("everything"));
 ```
 
 **Why:** Better isolation, easier to reason about event ordering per domain.
@@ -140,16 +140,16 @@ Circuit everythingCircuit = cortex.circuit(cortex.name("everything"));
 ```java
 // ✅ GOOD - One conduit per signal type
 Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
-    circuit.conduit(cortex.name("monitors"), Composer.pipe());
+    circuit.conduit(Cortex.name("monitors"), Composer.pipe());
 
 Conduit<Pipe<ServiceSignal>, ServiceSignal> services =
-    circuit.conduit(cortex.name("services"), Composer.pipe());
+    circuit.conduit(Cortex.name("services"), Composer.pipe());
 ```
 
 ❌ **BAD:**
 ```java
 Conduit<Pipe<Object>, Object> everything =
-    circuit.conduit(cortex.name("everything"), Composer.pipe());
+    circuit.conduit(Cortex.name("everything"), Composer.pipe());
 ```
 
 **Why:** Type safety, clear separation of concerns.
@@ -162,7 +162,7 @@ Conduit<Pipe<Object>, Object> everything =
 
 ```java
 Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-    cortex.name("numbers"),
+    Cortex.name("numbers"),
     Composer.pipe(flow -> flow
         .sift(n -> n > 0)           // Filter: only positive
         .limit(1000)                // Max 1000 emissions
@@ -191,8 +191,8 @@ flow.sample(10).sift(n -> n > 100)
 
 ```java
 monitors.subscribe(
-    cortex.subscriber(
-        cortex.name("health-aggregator"),
+    Cortex.subscriber(
+        Cortex.name("health-aggregator"),
         (subject, registrar) -> {
             registrar.register(signal -> aggregateHealth(signal));
         }
@@ -272,7 +272,7 @@ public <P, E> Conduit<P, E> conduit(Name name, Composer<P, E> composer) {
 
 ```java
 // All Clocks in Circuit share one ScheduledExecutorService
-Circuit circuit = cortex.circuit(name);
+Circuit circuit = Cortex.circuit(name);
 Clock clock1 = circuit.clock(name1);  // Shares scheduler
 Clock clock2 = circuit.clock(name2);  // Same scheduler
 
@@ -368,7 +368,7 @@ flow.sift(expensiveCheck)    // Expensive filter first
 ❌ **BAD:**
 ```java
 conduit.subscribe(
-    cortex.subscriber(name, (subject, registrar) -> {
+    Cortex.subscriber(name, (subject, registrar) -> {
         registrar.register(event -> {
             Thread.sleep(1000);  // Blocks event processing!
         });
@@ -380,7 +380,7 @@ conduit.subscribe(
 ```java
 ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 conduit.subscribe(
-    cortex.subscriber(name, (subject, registrar) -> {
+    Cortex.subscriber(name, (subject, registrar) -> {
         registrar.register(event -> {
             executor.submit(() -> processSlowly(event));
         });
@@ -411,10 +411,10 @@ conduit.subscribe(
 **Partition by broker:**
 ```java
 // JVM 1: Brokers 1-50
-Circuit brokers1to50 = cortex.circuit(cortex.name("brokers-1-50"));
+Circuit brokers1to50 = Cortex.circuit(Cortex.name("brokers-1-50"));
 
 // JVM 2: Brokers 51-100
-Circuit brokers51to100 = cortex.circuit(cortex.name("brokers-51-100"));
+Circuit brokers51to100 = Cortex.circuit(Cortex.name("brokers-51-100"));
 ```
 
 ---
@@ -499,22 +499,22 @@ clock.consume(name, Clock.Cycle.SECOND, instant -> {
 ```java
 @Test
 void testPipeEmission() {
-    Cortex cortex = CortexRuntime.create();
-    Circuit circuit = cortex.circuit(cortex.name("test"));
+    // Cortex is accessed statically (M18)
+    Circuit circuit = Cortex.circuit(Cortex.name("test"));
 
     Conduit<Pipe<String>, String> conduit =
-        circuit.conduit(cortex.name("messages"), Composer.pipe());
+        circuit.conduit(Cortex.name("messages"), Composer.pipe());
 
     List<String> received = new CopyOnWriteArrayList<>();
 
     conduit.subscribe(
-        cortex.subscriber(
-            cortex.name("collector"),
+        Cortex.subscriber(
+            Cortex.name("collector"),
             (subject, registrar) -> registrar.register(received::add)
         )
     );
 
-    Pipe<String> pipe = conduit.get(cortex.name("test-subject"));
+    Pipe<String> pipe = conduit.get(Cortex.name("test-subject"));
     pipe.emit("Hello");
     pipe.emit("World");
 
@@ -534,23 +534,23 @@ void testPipeEmission() {
 ```java
 @Test
 void testSiftTransformation() {
-    Cortex cortex = CortexRuntime.create();
-    Circuit circuit = cortex.circuit(cortex.name("test"));
+    // Cortex is accessed statically (M18)
+    Circuit circuit = Cortex.circuit(Cortex.name("test"));
 
     Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-        cortex.name("numbers"),
+        Cortex.name("numbers"),
         Composer.pipe(flow -> flow.sift(n -> n > 0))
     );
 
     List<Integer> received = new CopyOnWriteArrayList<>();
     conduit.subscribe(
-        cortex.subscriber(
-            cortex.name("collector"),
+        Cortex.subscriber(
+            Cortex.name("collector"),
             (subject, registrar) -> registrar.register(received::add)
         )
     );
 
-    Pipe<Integer> pipe = conduit.get(cortex.name("test"));
+    Pipe<Integer> pipe = conduit.get(Cortex.name("test"));
     pipe.emit(-1);  // Filtered out
     pipe.emit(0);   // Filtered out
     pipe.emit(1);   // Passes
@@ -571,14 +571,14 @@ void testSiftTransformation() {
 ```java
 @Test
 void testClockTicks() throws InterruptedException {
-    Cortex cortex = CortexRuntime.create();
-    Circuit circuit = cortex.circuit(cortex.name("test"));
-    Clock clock = circuit.clock(cortex.name("timer"));
+    // Cortex is accessed statically (M18)
+    Circuit circuit = Cortex.circuit(Cortex.name("test"));
+    Clock clock = circuit.clock(Cortex.name("timer"));
 
     AtomicInteger tickCount = new AtomicInteger(0);
 
     clock.consume(
-        cortex.name("counter"),
+        Cortex.name("counter"),
         Clock.Cycle.MILLISECOND.scale(100),  // Every 100ms
         instant -> tickCount.incrementAndGet()
     );
@@ -598,11 +598,11 @@ void testClockTicks() throws InterruptedException {
 ```java
 @Test
 void testScopeCleanup() {
-    Cortex cortex = CortexRuntime.create();
-    Scope scope = cortex.scope(cortex.name("test-scope"));
+    // Cortex is accessed statically (M18)
+    Scope scope = Cortex.scope(Cortex.name("test-scope"));
 
     AtomicBoolean circuitClosed = new AtomicBoolean(false);
-    Circuit circuit = scope.register(cortex.circuit(cortex.name("test")));
+    Circuit circuit = scope.register(Cortex.circuit(Cortex.name("test")));
 
     // Override close to verify it's called
     // (in real code, you'd use a spy or mock)
@@ -623,7 +623,7 @@ void testScopeCleanup() {
 ❌ **PROBLEM:**
 ```java
 public void startMonitoring() {
-    Circuit circuit = cortex.circuit(cortex.name("kafka"));
+    Circuit circuit = Cortex.circuit(Cortex.name("kafka"));
     // Use circuit
 } // Circuit never closed!
 ```
@@ -634,7 +634,7 @@ public class MonitoringService {
     private Circuit circuit;
 
     public void start() {
-        circuit = cortex.circuit(cortex.name("kafka"));
+        circuit = Cortex.circuit(Cortex.name("kafka"));
     }
 
     public void stop() {
@@ -652,7 +652,7 @@ public class MonitoringService {
 ❌ **PROBLEM:**
 ```java
 Conduit<Pipe<Object>, Object> mixed =
-    circuit.conduit(cortex.name("mixed"), Composer.pipe());
+    circuit.conduit(Cortex.name("mixed"), Composer.pipe());
 
 mixed.get(name).emit(new MonitorSignal(/* ... */));
 mixed.get(name).emit("A string?");  // Type safety lost!
@@ -661,7 +661,7 @@ mixed.get(name).emit("A string?");  // Type safety lost!
 ✅ **SOLUTION:**
 ```java
 Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
-    circuit.conduit(cortex.name("monitors"), Composer.pipe());
+    circuit.conduit(Cortex.name("monitors"), Composer.pipe());
 
 monitors.get(name).emit(new MonitorSignal(/* ... */));
 ```
@@ -674,19 +674,19 @@ monitors.get(name).emit(new MonitorSignal(/* ... */));
 ```java
 // One circuit per metric!
 for (String metric : metrics) {
-    Circuit circuit = cortex.circuit(cortex.name(metric));
+    Circuit circuit = Cortex.circuit(Cortex.name(metric));
 }
 ```
 
 ✅ **SOLUTION:**
 ```java
 // One circuit per domain
-Circuit kafkaCircuit = cortex.circuit(cortex.name("kafka"));
+Circuit kafkaCircuit = Cortex.circuit(Cortex.name("kafka"));
 
 // Many conduits in one circuit
 for (String metric : metrics) {
     Conduit<Pipe<MetricValue>, MetricValue> conduit =
-        kafkaCircuit.conduit(cortex.name(metric), Composer.pipe());
+        kafkaCircuit.conduit(Cortex.name(metric), Composer.pipe());
 }
 ```
 
@@ -699,7 +699,7 @@ for (String metric : metrics) {
 List<String> received = new ArrayList<>();
 
 conduit.subscribe(
-    cortex.subscriber(name, (subject, registrar) ->
+    Cortex.subscriber(name, (subject, registrar) ->
         registrar.register(received::add)
     )
 );
@@ -713,7 +713,7 @@ assertEquals(1, received.size());  // FAILS! Async processing not complete
 List<String> received = new CopyOnWriteArrayList<>();
 
 conduit.subscribe(
-    cortex.subscriber(name, (subject, registrar) ->
+    Cortex.subscriber(name, (subject, registrar) ->
         registrar.register(received::add)
     )
 );
@@ -730,7 +730,7 @@ assertEquals(1, received.size());  // Now passes
 ❌ **PROBLEM:**
 ```java
 conduit.subscribe(
-    cortex.subscriber(name, (subject, registrar) -> {
+    Cortex.subscriber(name, (subject, registrar) -> {
         registrar.register(event -> {
             expensiveBlockingOperation();  // BLOCKS CIRCUIT!
         });
@@ -743,7 +743,7 @@ conduit.subscribe(
 ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
 conduit.subscribe(
-    cortex.subscriber(name, (subject, registrar) -> {
+    Cortex.subscriber(name, (subject, registrar) -> {
         registrar.register(event -> {
             executor.submit(() -> expensiveBlockingOperation());
         });
