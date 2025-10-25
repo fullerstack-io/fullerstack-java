@@ -83,28 +83,38 @@ subscriber callback executes
 received.set("hello")
 ```
 
-## Circuit Queue Architecture
+## Circuit Queue Architecture - Valve Pattern
 
-### Virtual CPU Core Pattern
+### Valve: The Virtual CPU Core
 
-Each Circuit acts as a **"Virtual CPU Core"** with:
-- **Single Queue** (LinkedBlockingQueue)
-- **Single virtual thread** processor
-- **FIFO ordering** (strict FIFO guarantee)
-- **All Conduits share the Queue**
+Each Circuit contains a **Valve** - the combination of BlockingQueue + Virtual Thread:
+
+**What is a Valve?**
+```java
+public class Valve implements AutoCloseable {
+    private final BlockingQueue<Runnable> queue;  // FIFO task queue
+    private final Thread processor;                // Virtual thread
+    private final Object idleLock;                 // Event-driven synchronization
+}
+```
 
 **Architecture**:
 ```
-Circuit (Virtual CPU Core)
-  └─ Single Queue (QueueImpl)
-       ├─ Conduit 1: Pipes post Scripts → circuitQueue.post()
-       ├─ Conduit 2: Pipes post Scripts → circuitQueue.post()
-       └─ Conduit 3: Pipes post Scripts → circuitQueue.post()
+Circuit
+  └─ Valve ("valve-circuit-name")
+       ├─ BlockingQueue<Runnable>  (FIFO task queue)
+       ├─ Virtual Thread           (parks when empty, unparks on task)
+       └─ Object idleLock          (wait/notify synchronization)
 
-Queue processes Scripts sequentially (single-threaded)
-  → Script 1: Conduit1.processEmission(capture)
-  → Script 2: Conduit2.processEmission(capture)
-  → Script 3: Conduit1.processEmission(capture)
+All Conduits share the same Valve:
+  Conduit 1: Pipes → valve.submit(task)
+  Conduit 2: Pipes → valve.submit(task)
+  Conduit 3: Pipes → valve.submit(task)
+
+Valve processes tasks sequentially (single-threaded):
+  → Task 1: Conduit1.processEmission(capture)
+  → Task 2: Conduit2.processEmission(capture)
+  → Task 3: Conduit1.processEmission(capture)
 ```
 
 ### Benefits of Async-First Design
@@ -161,31 +171,69 @@ Queue processes Scripts sequentially (single-threaded)
      │            [Subscriber Logic]          // User's consumption logic
 ```
 
-## circuit.await() - The Synchronization Primitive
+## circuit.await() - Event-Driven Synchronization
 
 ### Purpose
 
-`circuit.await()` blocks the calling thread until:
-1. The Circuit Queue is empty (`!runnables.isEmpty()`)
-2. No Runnable is currently executing (`!executing`)
+`circuit.await()` blocks the calling thread until the Valve is idle:
+1. The task queue is empty (`queue.isEmpty()`)
+2. No task is currently executing (`!executing`)
 
-### Implementation
+### Implementation - Event-Driven (No Polling!)
 
+**New Approach (M18):**
 ```java
-// LinkedBlockingQueueImpl.java:48-58
-@Override
-public void await() {
-    // Block until queue is empty and nothing is currently executing
-    while (running && (executing || !runnables.isEmpty())) {
+// Valve.java - Event-driven with wait/notify
+public void await(String contextName) {
+    // Cannot be called from valve's own thread (would deadlock)
+    if (Thread.currentThread() == processor) {
+        throw new IllegalStateException(
+            "Cannot call " + contextName + "::await from within a " +
+            contextName.toLowerCase() + "'s thread"
+        );
+    }
+
+    // Event-driven wait - no polling!
+    synchronized (idleLock) {
+        while (running && (executing || !queue.isEmpty())) {
+            idleLock.wait();  // ✅ Block until notified
+        }
+    }
+}
+
+// Valve processor notifies when idle:
+private void processQueue() {
+    while (running) {
+        Runnable task = queue.take();  // Park when empty
+        executing = true;
         try {
-            Thread.sleep(10);  // Poll every 10ms
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Queue await interrupted", e);
+            task.run();
+        } finally {
+            executing = false;
+
+            // Notify awaiting threads if valve is now idle
+            if (queue.isEmpty()) {
+                synchronized (idleLock) {
+                    idleLock.notifyAll();  // ✅ Wake up all waiters
+                }
+            }
         }
     }
 }
 ```
+
+**Performance Comparison:**
+
+| Approach | Wake-up Latency | CPU Usage | Scalability |
+|----------|----------------|-----------|-------------|
+| **Polling (Old)** | 0-10ms random | 100 polls/sec per thread | Poor (N threads = N polling loops) |
+| **Event-Driven (New)** | <1ms deterministic | Zero (parked) | Excellent (N threads = 0 overhead) |
+
+**Benefits:**
+- ✅ **Zero-latency** - Threads wake immediately when valve is idle
+- ✅ **Zero CPU waste** - No polling loops consuming cycles
+- ✅ **Scalable** - 1000 circuits don't create 1000 polling threads
+- ✅ **Precise** - Deterministic notification vs random delay
 
 ### When to Use circuit.await()
 

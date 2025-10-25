@@ -1,8 +1,8 @@
 # Fullerstack Substrates - Architecture & Core Concepts
 
-**API Version:** M17 (Sealed Interfaces)
+**API Version:** M18 (Cell API + Flow.skip)
 **Java Version:** 25 (LTS with Virtual Threads)
-**Status:** Production-ready (247 tests passing)
+**Status:** Production-ready (497 tests passing)
 
 ---
 
@@ -44,9 +44,11 @@ Steering (automated responses)
 ### Key Capabilities
 
 - ✅ **Type-safe event routing** - From producers to consumers via Channels/Pipes
-- ✅ **Transformation pipelines** - Filter, map, reduce, limit, sample emissions
+- ✅ **Transformation pipelines** - Filter, map, reduce, limit, sample emissions with JVM-style fusion
 - ✅ **Dynamic subscription** - Observers subscribe/unsubscribe at runtime
-- ✅ **Precise ordering** - Virtual CPU core pattern guarantees FIFO processing
+- ✅ **Precise ordering** - Valve pattern (Virtual CPU core) guarantees FIFO processing
+- ✅ **Event-driven synchronization** - Zero-latency await() with wait/notify (no polling)
+- ✅ **Pipeline optimization** - Automatic fusion of adjacent skip/limit operations
 - ✅ **Hierarchical naming** - Dot-notation organization (kafka.broker.1.metrics)
 - ✅ **Resource lifecycle** - Automatic cleanup with Scope
 - ✅ **Immutable state** - Thread-safe state via Slot API
@@ -60,21 +62,29 @@ Steering (automated responses)
 ### Architecture Principles
 
 1. **Simplified Design** - Single implementations, no factory abstractions
-2. **M17 Sealed Hierarchy** - Type-safe API contracts enforced by sealed interfaces
-3. **Virtual CPU Core Pattern** - Single-threaded event processing per Circuit for precise ordering
-4. **Immutable State** - Slot-based state management with value semantics
-5. **Resource Lifecycle** - Explicit cleanup via `close()` on all components
-6. **Thread Safety** - Concurrent collections where needed, immutability elsewhere
-7. **Clear Separation** - Public API (interfaces) vs internal implementation (concrete classes)
+2. **M18 Sealed Hierarchy** - Type-safe API contracts enforced by sealed interfaces
+3. **Valve Pattern** (William's architecture) - BlockingQueue + Virtual Thread per Circuit
+4. **Event-Driven Synchronization** - Zero-latency await() using wait/notify (no polling)
+5. **Pipeline Fusion** - JVM-style optimization of adjacent transformations
+6. **Immutable State** - Slot-based state management with value semantics
+7. **Resource Lifecycle** - Explicit cleanup via `close()` on all components
+8. **Thread Safety** - Concurrent collections where needed, immutability elsewhere
+9. **Clear Separation** - Public API (interfaces) vs internal implementation (concrete classes)
+
+### What We DO Optimize
+
+✅ **Pipeline Fusion** - Automatic optimization of adjacent skip/limit operations
+✅ **Event-Driven Await** - Zero-latency synchronization (no polling)
+✅ **Name Interning** - HierarchicalName identity-based caching
 
 ### What We DON'T Do
 
-❌ **No premature optimization** - Keep it simple
+❌ **No premature optimization** - Keep it simple first
 ❌ **No factory abstractions** - Direct component creation
-❌ **No complex caching** - Just ConcurrentHashMap
-❌ **No identity maps** - Standard Java equality
+❌ **No complex caching** - Simple ConcurrentHashMap patterns
+❌ **No polling loops** - Event-driven synchronization instead
 
-**Philosophy:** Build it simple, build it correct, optimize when profiling shows actual bottlenecks.
+**Philosophy:** Build it simple, build it correct, then optimize hot paths identified by profiling or architectural insight.
 
 ---
 
@@ -663,6 +673,262 @@ Circuit Queue (FIFO):
 
 ---
 
+## Valve Pattern (Virtual CPU Core)
+
+**Core Concept:** Each Circuit contains a Valve - a combination of BlockingQueue + Virtual Thread that processes all emissions serially.
+
+### What is a Valve?
+
+```java
+public class Valve implements AutoCloseable {
+    private final BlockingQueue<Runnable> queue;  // FIFO task queue
+    private final Thread processor;                // Virtual thread
+    private final Object idleLock;                 // Event-driven synchronization
+
+    // Emissions → Tasks (submitted to valve)
+    public boolean submit(Runnable task);
+
+    // Event-driven await (zero-latency, no polling)
+    public void await(String contextName);
+}
+```
+
+### Architecture
+
+```
+Circuit
+  └── Valve ("valve-circuit-name")
+        ├── BlockingQueue<Runnable>  (FIFO task queue)
+        ├── Virtual Thread           (parks when empty, unparks on task)
+        └── Object idleLock          (wait/notify synchronization)
+
+Emission Flow:
+  Pipe.emit(value)
+    → Valve.submit(task)              // Add to queue
+      → BlockingQueue.offer(task)     // FIFO enqueue
+        → Virtual Thread.take()       // Unpark and execute
+          → task.run()                // Process emission
+            → notifyAll()             // Wake awaiting threads
+```
+
+### Event-Driven Synchronization
+
+**Before (Polling):**
+```java
+// Old approach - polling with Thread.sleep(10)
+while (running && (executing || !queue.isEmpty())) {
+    Thread.sleep(10);  // ❌ 0-10ms latency, CPU waste
+}
+```
+
+**After (Event-Driven):**
+```java
+// New approach - wait/notify
+synchronized (idleLock) {
+    while (running && (executing || !queue.isEmpty())) {
+        idleLock.wait();  // ✅ <1ms latency, zero CPU
+    }
+}
+
+// Processor notifies when idle:
+executing = false;
+if (queue.isEmpty()) {
+    synchronized (idleLock) {
+        idleLock.notifyAll();  // Wake all waiters
+    }
+}
+```
+
+**Benefits:**
+- ✅ **Zero latency** - Threads wake immediately when valve is idle
+- ✅ **Zero CPU waste** - No polling loops consuming cycles
+- ✅ **Scalable** - 1000 circuits don't create 1000 polling threads
+- ✅ **Precise** - Deterministic notification vs random 0-10ms delay
+
+### Virtual CPU Core Guarantees
+
+1. **FIFO Ordering** - Tasks execute in submission order
+2. **Single-Threaded** - No concurrent execution within Circuit domain
+3. **Thread Isolation** - Each Circuit has independent Valve
+4. **Lock-Free** - BlockingQueue handles concurrency, no locks in Circuit code
+5. **Event-Driven** - Parking/unparking via BlockingQueue.take() and wait/notify
+
+---
+
+## Pipeline Fusion Optimization
+
+**Core Concept:** Automatically combine adjacent identical transformations to reduce overhead.
+
+### What Gets Fused?
+
+**Skip Fusion:**
+```java
+flow.skip(3).skip(2).skip(1)  // 3 transformations
+
+// Optimized to:
+flow.skip(6)  // 1 transformation (sum: 3+2+1)
+```
+
+**Limit Fusion:**
+```java
+flow.limit(10).limit(5).limit(7)  // 3 transformations
+
+// Optimized to:
+flow.limit(5)  // 1 transformation (minimum)
+```
+
+### How It Works
+
+```java
+public Flow<E> skip(long n) {
+    // Check if last transformation was also skip()
+    if (!metadata.isEmpty() &&
+        metadata.get(metadata.size() - 1).type == TransformType.SKIP) {
+
+        // Fuse: remove last skip, add counts, recurse
+        long existingSkip = (Long) lastMeta.metadata;
+        transformations.remove(transformations.size() - 1);
+        metadata.remove(metadata.size() - 1);
+
+        return skip(existingSkip + n);  // Recursive fusion
+    }
+
+    // No fusion - add normal skip
+    addTransformation(skipLogic);
+    metadata.add(new TransformMetadata(SKIP, n));
+    return this;
+}
+```
+
+### When Does Fusion Happen?
+
+**Fusion occurs when:**
+- ✅ Multiple configuration sources add transformations
+- ✅ Plugin systems independently add filters
+- ✅ Inheritance hierarchies layer transformations
+- ✅ Runtime conditions add dynamic limits
+
+**Example - Config Composition:**
+```java
+// base-config.yaml → skip(1000)
+// env-config.yaml → skip(500)
+// user-prefs.json → skip(2000)
+
+// Result: skip(1000).skip(500).skip(2000)
+// Fused to: skip(3500) automatically
+
+// Performance: 1 counter check instead of 3
+```
+
+**Example - Dynamic Limits:**
+```java
+// Multiple rate limiting policies
+flow.limit(systemMax);      // 10,000
+flow.limit(userTierLimit);  // 1,000
+flow.limit(regionalLimit);  // 3,000
+flow.limit(customLimit);    // 2,000
+
+// Fused to: limit(1000) - single counter (minimum)
+// Processing 1M requests: 1M checks instead of 4M
+```
+
+### Performance Impact
+
+```
+Scenario: 1M messages/sec with skip(100).skip(200).skip(300)
+
+Without Fusion:
+- 3 transformations
+- 3M function calls/sec
+- 3M counter increments
+- 3M comparisons
+
+With Fusion:
+- 1 transformation (skip(600))
+- 1M function calls/sec
+- 1M counter increments
+- 1M comparisons
+
+Savings: 66% reduction in CPU cycles
+```
+
+### Current Limitations
+
+**Implemented:**
+- ✅ `skip(n1).skip(n2)` → `skip(n1+n2)`
+- ✅ `limit(n1).limit(n2)` → `limit(min(n1,n2))`
+
+**Not Yet Implemented:**
+- ⏳ `replace(f1).replace(f2)` → `replace(f1.andThen(f2))`
+- ⏳ `guard(p1).guard(p2)` → `guard(x -> p1.test(x) && p2.test(x))`
+- ⏳ `sample(n).sample(m)` → `sample(n*m)`
+
+**Non-Adjacent Don't Fuse:**
+```java
+flow.skip(100)
+    .guard(x -> x.isValid())  // ← Breaks fusion chain
+    .skip(200);
+
+// Result: 2 skip transformations (correct - different semantics)
+```
+
+---
+
+## Name vs Subject Distinction
+
+**Key Concept:** Names are referents (identifiers), Subjects are temporal/contextual instances.
+
+### The Distinction
+
+```java
+// NAME = Linguistic referent (like "Miles" the identifier)
+Name milesName = cortex.name("Miles");
+
+// SUBJECT = Temporal/contextual instantiation
+Subject<?> milesInCircuitA = HierarchicalSubject.builder()
+    .id(id1)                    // Unique ID
+    .name(milesName)            // Same name reference
+    .state(stateA)              // Different state (context A)
+    .type(Person.class)
+    .build();
+
+Subject<?> milesInCircuitB = HierarchicalSubject.builder()
+    .id(id2)                    // Different ID
+    .name(milesName)            // Same name reference
+    .state(stateB)              // Different state (context B)
+    .type(Person.class)
+    .build();
+
+// Same Name, different temporal instances:
+milesInCircuitA.id() != milesInCircuitB.id()      // Different IDs
+milesInCircuitA.name() == milesInCircuitB.name()  // Same Name
+milesInCircuitA.state() != milesInCircuitB.state() // Different states
+```
+
+### Why This Matters
+
+```java
+// Example: "Miles" exists in multiple Circuits simultaneously
+
+Circuit circuitA = cortex.circuit(cortex.name("circuit-A"));
+Circuit circuitB = cortex.circuit(cortex.name("circuit-B"));
+
+// Both circuits create Channels named "Miles"
+Channel<Metric> milesInA = conduitA.get(cortex.name("Miles"));
+Channel<Metric> milesInB = conduitB.get(cortex.name("Miles"));
+
+// Same Name referent, different Subject instances:
+// - milesInA.subject() → Subject with unique ID in Circuit A context
+// - milesInB.subject() → Subject with unique ID in Circuit B context
+```
+
+### Analogy
+
+- **Name** = Word in dictionary ("run")
+- **Subject** = Specific usage in context ("I run marathons" vs "Water runs downhill")
+
+---
+
 ## Implementation Details
 
 ### Caching Strategy
@@ -695,8 +961,9 @@ HierarchicalCell
 ### Performance Characteristics
 
 **Test Suite:**
-- 247 tests in ~16 seconds
+- 497 tests in ~12 seconds
 - 0 failures, 0 errors
+- Includes 308 tests from official Substrates testkit
 
 **Production Target:**
 - 100k+ metrics @ 1Hz

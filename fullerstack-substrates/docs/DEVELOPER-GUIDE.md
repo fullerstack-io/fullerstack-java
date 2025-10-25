@@ -780,5 +780,5 @@ conduit.subscribe(
 
 - [Architecture & Concepts](ARCHITECTURE.md)
 - [Async Architecture](ASYNC-ARCHITECTURE.md)
-- [M17 Migration Guide](../../API-ANALYSIS.md)
+- [M18 Migration Guide](../../API-ANALYSIS.md)
 - [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java)
