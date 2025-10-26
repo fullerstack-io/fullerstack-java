@@ -55,17 +55,30 @@ This library implements all six Serventis signal types:
 - Network throughput
 - Request latency
 
-**Example:**
+**Factory Method Example:**
 ```java
-MonitorSignal signal = new MonitorSignal(
-    UUID.randomUUID(),
-    "kafka.broker.health",
-    "broker-1.jvm.heap",  // subject
-    Instant.now(),
-    new VectorClock(Map.of("broker-1", 42L)),
-    MonitorStatus.DEGRADED,
+Subject brokerHeap = Cortex.subject(
+    Cortex.name("kafka.broker.health"),
+    Cortex.name("broker-1.jvm.heap")
+);
+
+MonitorSignal signal = MonitorSignal.degraded(
+    brokerHeap,
+    Monitors.Confidence.CONFIRMED,
     Map.of("heapUsed", "85%", "threshold", "90%")
 );
+```
+
+**Builder Pattern Example:**
+```java
+MonitorSignal signal = MonitorSignal.builder()
+    .subject(brokerHeap)
+    .degraded()  // Sets condition
+    .confidence(Monitors.Confidence.HIGH)
+    .vectorClock(new VectorClock(Map.of("broker-1", 42L)))
+    .addPayload("heapUsed", "85%")
+    .addPayload("threshold", "90%")
+    .build();
 ```
 
 ### 2. ServiceSignal (Services API)
@@ -81,17 +94,28 @@ MonitorSignal signal = new MonitorSignal(
 - Database transactions
 - Message processing
 
-**Example:**
+**Factory Method Example:**
 ```java
-ServiceSignal signal = new ServiceSignal(
-    UUID.randomUUID(),
-    "kafka.client.interactions",
-    "orders.0.producer.order-service",  // subject
-    Instant.now(),
-    new VectorClock(Map.of("order-service", 15L)),
-    ServiceStatus.COMPLETED,
+Subject producerSubject = Cortex.subject(
+    Cortex.name("kafka.client.interactions"),
+    Cortex.name("orders.0.producer.order-service")
+);
+
+ServiceSignal signal = ServiceSignal.succeed(
+    producerSubject,
     Map.of("latency", "45ms", "recordSize", "2048")
 );
+```
+
+**Builder Pattern Example:**
+```java
+ServiceSignal signal = ServiceSignal.builder()
+    .subject(producerSubject)
+    .succeed()  // Sets Services.Signal.SUCCESS
+    .vectorClock(new VectorClock(Map.of("order-service", 15L)))
+    .addPayload("latency", "45ms")
+    .addPayload("recordSize", "2048")
+    .build();
 ```
 
 ### 3. QueueSignal (Queues API)
@@ -106,17 +130,28 @@ ServiceSignal signal = new ServiceSignal(
 - Message backlogs
 - Processing queues
 
-**Example:**
+**Factory Method Example:**
 ```java
-QueueSignal signal = new QueueSignal(
-    UUID.randomUUID(),
-    "kafka.partition.behavior",
-    "orders.0.lag",  // subject
-    Instant.now(),
-    new VectorClock(Map.of("partition-sensor", 100L)),
-    QueueStatus.LAGGING,
+Subject lagSubject = Cortex.subject(
+    Cortex.name("kafka.partition.behavior"),
+    Cortex.name("orders.0.lag")
+);
+
+QueueSignal signal = QueueSignal.lagging(
+    lagSubject,
     Map.of("lag", "5000", "rate", "100/s")
 );
+```
+
+**Builder Pattern Example:**
+```java
+QueueSignal signal = QueueSignal.builder()
+    .subject(lagSubject)
+    .take()  // Sets Queues.Sign.TAKE
+    .vectorClock(new VectorClock(Map.of("partition-sensor", 100L)))
+    .addPayload("lag", "5000")
+    .addPayload("rate", "100/s")
+    .build();
 ```
 
 ### 4. ReporterSignal (Reporters API)
@@ -131,20 +166,31 @@ QueueSignal signal = new QueueSignal(
 - Capacity overflow predictions
 - Health summaries
 
-**Example:**
+**Factory Method Example:**
 ```java
-ReporterSignal signal = new ReporterSignal(
-    UUID.randomUUID(),
-    "kafka.situations",
-    "cluster.situation",  // subject
-    Instant.now(),
-    new VectorClock(Map.of("health-aggregator", 250L)),
-    ReporterSeverity.CRITICAL,
+Subject situationSubject = Cortex.subject(
+    Cortex.name("kafka.situations"),
+    Cortex.name("cluster.situation")
+);
+
+ReporterSignal signal = ReporterSignal.critical(
+    situationSubject,
     Map.of(
         "pattern", "cluster-degradation",
         "affectedBrokers", "broker-1,broker-2"
     )
 );
+```
+
+**Builder Pattern Example:**
+```java
+ReporterSignal signal = ReporterSignal.builder()
+    .subject(situationSubject)
+    .critical()  // Sets Reporters.Situation.CRITICAL
+    .vectorClock(new VectorClock(Map.of("health-aggregator", 250L)))
+    .addPayload("pattern", "cluster-degradation")
+    .addPayload("affectedBrokers", "broker-1,broker-2")
+    .build();
 ```
 
 ### 5. ProbeSignal (Probes API)
@@ -316,42 +362,42 @@ Raw     Context    Meaning
     <dependency>
         <groupId>io.humainary.modules.serventis.monitors</groupId>
         <artifactId>humainary-modules-serventis-monitors-api</artifactId>
-        <version>1.0.0-M17</version>
+        <version>1.0.0-M18</version>
     </dependency>
 
     <!-- Services API -->
     <dependency>
         <groupId>io.humainary.modules.serventis.services</groupId>
         <artifactId>humainary-modules-serventis-services-api</artifactId>
-        <version>1.0.0-M17</version>
+        <version>1.0.0-M18</version>
     </dependency>
 
     <!-- Queues API -->
     <dependency>
         <groupId>io.humainary.modules.serventis.queues</groupId>
         <artifactId>humainary-modules-serventis-queues-api</artifactId>
-        <version>1.0.0-M17</version>
+        <version>1.0.0-M18</version>
     </dependency>
 
     <!-- Reporters API -->
     <dependency>
         <groupId>io.humainary.modules.serventis.reporters</groupId>
         <artifactId>humainary-modules-serventis-reporters-api</artifactId>
-        <version>1.0.0-M17</version>
+        <version>1.0.0-M18</version>
     </dependency>
 
     <!-- Probes API -->
     <dependency>
         <groupId>io.humainary.modules.serventis.probes</groupId>
         <artifactId>humainary-modules-serventis-probes-api</artifactId>
-        <version>1.0.0-M17</version>
+        <version>1.0.0-M18</version>
     </dependency>
 
     <!-- Resources API -->
     <dependency>
         <groupId>io.humainary.modules.serventis.resources</groupId>
         <artifactId>humainary-modules-serventis-resources-api</artifactId>
-        <version>1.0.0-M17</version>
+        <version>1.0.0-M18</version>
     </dependency>
 </dependencies>
 ```
@@ -375,7 +421,7 @@ Add to your `pom.xml`:
 ## Requirements
 
 - **Java 25** or higher (LTS)
-- **Humainary Serventis APIs** (1.0.0-M17)
+- **Humainary Serventis APIs** (1.0.0-M18)
 
 ---
 

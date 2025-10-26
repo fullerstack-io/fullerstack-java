@@ -294,6 +294,145 @@ public record MonitorSignal(
     }
 
     /**
+     * Creates a new MonitorSignal with an updated vector clock.
+     *
+     * @param newClock the new vector clock
+     * @return new MonitorSignal with updated clock
+     */
+    public MonitorSignal withClock(VectorClock newClock) {
+        return new MonitorSignal(id, subject, timestamp, newClock, status, payload);
+    }
+
+    /**
+     * Creates a new MonitorSignal with additional payload entries.
+     *
+     * @param additionalPayload additional metadata to merge
+     * @return new MonitorSignal with merged payload
+     */
+    public MonitorSignal withPayload(Map<String, String> additionalPayload) {
+        Map<String, String> merged = new java.util.HashMap<>(payload);
+        merged.putAll(additionalPayload);
+        return new MonitorSignal(id, subject, timestamp, vectorClock, status, merged);
+    }
+
+    /**
+     * Creates a builder for constructing MonitorSignals.
+     *
+     * @return new Builder instance
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder for MonitorSignal with fluent API.
+     */
+    public static class Builder {
+        private UUID id = UUID.randomUUID();
+        private Subject subject;
+        private Instant timestamp = Instant.now();
+        private VectorClock vectorClock = VectorClock.empty();
+        private Monitors.Condition condition;
+        private Monitors.Confidence confidence = Monitors.Confidence.CONFIRMED;
+        private final Map<String, String> payload = new java.util.HashMap<>();
+
+        private Builder() {}
+
+        public Builder id(UUID id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder subject(Subject subject) {
+            this.subject = subject;
+            return this;
+        }
+
+        public Builder timestamp(Instant timestamp) {
+            this.timestamp = timestamp;
+            return this;
+        }
+
+        public Builder vectorClock(VectorClock vectorClock) {
+            this.vectorClock = vectorClock;
+            return this;
+        }
+
+        public Builder condition(Monitors.Condition condition) {
+            this.condition = condition;
+            return this;
+        }
+
+        public Builder confidence(Monitors.Confidence confidence) {
+            this.confidence = confidence;
+            return this;
+        }
+
+        public Builder payload(Map<String, String> payload) {
+            this.payload.clear();
+            this.payload.putAll(payload);
+            return this;
+        }
+
+        public Builder addPayload(String key, String value) {
+            this.payload.put(key, value);
+            return this;
+        }
+
+        public Builder stable() {
+            this.condition = Monitors.Condition.STABLE;
+            return this;
+        }
+
+        public Builder converging() {
+            this.condition = Monitors.Condition.CONVERGING;
+            return this;
+        }
+
+        public Builder diverging() {
+            this.condition = Monitors.Condition.DIVERGING;
+            return this;
+        }
+
+        public Builder erratic() {
+            this.condition = Monitors.Condition.ERRATIC;
+            return this;
+        }
+
+        public Builder degraded() {
+            this.condition = Monitors.Condition.DEGRADED;
+            return this;
+        }
+
+        public Builder defective() {
+            this.condition = Monitors.Condition.DEFECTIVE;
+            return this;
+        }
+
+        public Builder down() {
+            this.condition = Monitors.Condition.DOWN;
+            return this;
+        }
+
+        public MonitorSignal build() {
+            if (subject == null) {
+                throw new IllegalStateException("Subject is required");
+            }
+            if (condition == null) {
+                throw new IllegalStateException("Condition is required");
+            }
+            return new MonitorSignal(
+                id,
+                subject,
+                timestamp,
+                vectorClock,
+                new MonitorStatusImpl(condition, confidence),
+                payload
+            );
+        }
+    }
+
+    /**
      * Simple implementation of Monitors.Status
      */
     record MonitorStatusImpl(

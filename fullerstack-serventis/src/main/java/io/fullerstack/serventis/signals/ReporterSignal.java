@@ -235,4 +235,124 @@ public record ReporterSignal(
     public String getReason() {
         return reason;
     }
+
+    /**
+     * Creates a new ReporterSignal with an updated vector clock.
+     *
+     * @param newClock the new vector clock
+     * @return new ReporterSignal with updated clock
+     */
+    public ReporterSignal withClock(VectorClock newClock) {
+        return new ReporterSignal(id, subject, timestamp, newClock, situation, reason, metadata);
+    }
+
+    /**
+     * Creates a new ReporterSignal with additional payload entries.
+     *
+     * @param additionalPayload additional metadata to merge
+     * @return new ReporterSignal with merged payload
+     */
+    public ReporterSignal withPayload(Map<String, String> additionalPayload) {
+        Map<String, String> merged = new java.util.HashMap<>(metadata);
+        merged.putAll(additionalPayload);
+        return new ReporterSignal(id, subject, timestamp, vectorClock, situation, reason, merged);
+    }
+
+    /**
+     * Creates a builder for constructing ReporterSignals.
+     *
+     * @return new Builder instance
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder for ReporterSignal with fluent API.
+     */
+    public static class Builder {
+        private UUID id = UUID.randomUUID();
+        private Subject subject;
+        private Instant timestamp = Instant.now();
+        private VectorClock vectorClock = VectorClock.empty();
+        private Reporters.Situation situation;
+        private String reason = "";
+        private final Map<String, String> metadata = new java.util.HashMap<>();
+
+        private Builder() {}
+
+        public Builder id(UUID id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder subject(Subject subject) {
+            this.subject = subject;
+            return this;
+        }
+
+        public Builder timestamp(Instant timestamp) {
+            this.timestamp = timestamp;
+            return this;
+        }
+
+        public Builder vectorClock(VectorClock vectorClock) {
+            this.vectorClock = vectorClock;
+            return this;
+        }
+
+        public Builder situation(Reporters.Situation situation) {
+            this.situation = situation;
+            return this;
+        }
+
+        public Builder reason(String reason) {
+            this.reason = reason;
+            return this;
+        }
+
+        public Builder metadata(Map<String, String> metadata) {
+            this.metadata.clear();
+            this.metadata.putAll(metadata);
+            return this;
+        }
+
+        public Builder addPayload(String key, String value) {
+            this.metadata.put(key, value);
+            return this;
+        }
+
+        public Builder normal() {
+            this.situation = Reporters.Situation.NORMAL;
+            return this;
+        }
+
+        public Builder warning() {
+            this.situation = Reporters.Situation.WARNING;
+            return this;
+        }
+
+        public Builder critical() {
+            this.situation = Reporters.Situation.CRITICAL;
+            return this;
+        }
+
+        public ReporterSignal build() {
+            if (subject == null) {
+                throw new IllegalStateException("Subject is required");
+            }
+            if (situation == null) {
+                throw new IllegalStateException("Situation is required");
+            }
+            return new ReporterSignal(
+                id,
+                subject,
+                timestamp,
+                vectorClock,
+                situation,
+                reason,
+                metadata
+            );
+        }
+    }
 }

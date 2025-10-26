@@ -373,4 +373,157 @@ public record ServiceSignal(
     public boolean isObserved() {
         return orientation() == Services.Orientation.RECEIPT;
     }
+
+    /**
+     * Creates a new ServiceSignal with an updated vector clock.
+     *
+     * @param newClock the new vector clock
+     * @return new ServiceSignal with updated clock
+     */
+    public ServiceSignal withClock(VectorClock newClock) {
+        return new ServiceSignal(id, subject, timestamp, newClock, signal, payload);
+    }
+
+    /**
+     * Creates a new ServiceSignal with additional payload entries.
+     *
+     * @param additionalPayload additional metadata to merge
+     * @return new ServiceSignal with merged payload
+     */
+    public ServiceSignal withPayload(Map<String, String> additionalPayload) {
+        Map<String, String> merged = new java.util.HashMap<>(payload);
+        merged.putAll(additionalPayload);
+        return new ServiceSignal(id, subject, timestamp, vectorClock, signal, merged);
+    }
+
+    /**
+     * Creates a builder for constructing ServiceSignals.
+     *
+     * @return new Builder instance
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder for ServiceSignal with fluent API.
+     */
+    public static class Builder {
+        private UUID id = UUID.randomUUID();
+        private Subject subject;
+        private Instant timestamp = Instant.now();
+        private VectorClock vectorClock = VectorClock.empty();
+        private Services.Signal signal;
+        private final Map<String, String> payload = new java.util.HashMap<>();
+
+        private Builder() {}
+
+        public Builder id(UUID id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder subject(Subject subject) {
+            this.subject = subject;
+            return this;
+        }
+
+        public Builder timestamp(Instant timestamp) {
+            this.timestamp = timestamp;
+            return this;
+        }
+
+        public Builder vectorClock(VectorClock vectorClock) {
+            this.vectorClock = vectorClock;
+            return this;
+        }
+
+        public Builder signal(Services.Signal signal) {
+            this.signal = signal;
+            return this;
+        }
+
+        public Builder payload(Map<String, String> payload) {
+            this.payload.clear();
+            this.payload.putAll(payload);
+            return this;
+        }
+
+        public Builder addPayload(String key, String value) {
+            this.payload.put(key, value);
+            return this;
+        }
+
+        public Builder call() {
+            this.signal = Services.Signal.CALL;
+            return this;
+        }
+
+        public Builder called() {
+            this.signal = Services.Signal.CALLED;
+            return this;
+        }
+
+        public Builder success() {
+            this.signal = Services.Signal.SUCCESS;
+            return this;
+        }
+
+        public Builder succeeded() {
+            this.signal = Services.Signal.SUCCEEDED;
+            return this;
+        }
+
+        public Builder fail() {
+            this.signal = Services.Signal.FAIL;
+            return this;
+        }
+
+        public Builder failed() {
+            this.signal = Services.Signal.FAILED;
+            return this;
+        }
+
+        public Builder start() {
+            this.signal = Services.Signal.START;
+            return this;
+        }
+
+        public Builder started() {
+            this.signal = Services.Signal.STARTED;
+            return this;
+        }
+
+        public Builder stop() {
+            this.signal = Services.Signal.STOP;
+            return this;
+        }
+
+        public Builder stopped() {
+            this.signal = Services.Signal.STOPPED;
+            return this;
+        }
+
+        public Builder retry() {
+            this.signal = Services.Signal.RETRY;
+            return this;
+        }
+
+        public ServiceSignal build() {
+            if (subject == null) {
+                throw new IllegalStateException("Subject is required");
+            }
+            if (signal == null) {
+                throw new IllegalStateException("Signal is required");
+            }
+            return new ServiceSignal(
+                id,
+                subject,
+                timestamp,
+                vectorClock,
+                signal,
+                payload
+            );
+        }
+    }
 }

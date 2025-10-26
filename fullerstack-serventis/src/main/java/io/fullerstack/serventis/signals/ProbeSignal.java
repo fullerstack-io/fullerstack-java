@@ -318,6 +318,167 @@ public record ProbeSignal(
     }
 
     /**
+     * Creates a new ProbeSignal with an updated vector clock.
+     *
+     * @param newClock the new vector clock
+     * @return new ProbeSignal with updated clock
+     */
+    public ProbeSignal withClock(VectorClock newClock) {
+        return new ProbeSignal(id, subject, timestamp, newClock, observation, payload);
+    }
+
+    /**
+     * Creates a new ProbeSignal with additional payload entries.
+     *
+     * @param additionalPayload additional metadata to merge
+     * @return new ProbeSignal with merged payload
+     */
+    public ProbeSignal withPayload(Map<String, String> additionalPayload) {
+        Map<String, String> merged = new java.util.HashMap<>(payload);
+        merged.putAll(additionalPayload);
+        return new ProbeSignal(id, subject, timestamp, vectorClock, observation, merged);
+    }
+
+    /**
+     * Creates a builder for constructing ProbeSignals.
+     *
+     * @return new Builder instance
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder for ProbeSignal with fluent API.
+     */
+    public static class Builder {
+        private UUID id = UUID.randomUUID();
+        private Subject subject;
+        private Instant timestamp = Instant.now();
+        private VectorClock vectorClock = VectorClock.empty();
+        private Probes.Origin origin;
+        private Probes.Operation operation;
+        private Probes.Outcome outcome;
+        private final Map<String, String> payload = new java.util.HashMap<>();
+
+        private Builder() {}
+
+        public Builder id(UUID id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder subject(Subject subject) {
+            this.subject = subject;
+            return this;
+        }
+
+        public Builder timestamp(Instant timestamp) {
+            this.timestamp = timestamp;
+            return this;
+        }
+
+        public Builder vectorClock(VectorClock vectorClock) {
+            this.vectorClock = vectorClock;
+            return this;
+        }
+
+        public Builder origin(Probes.Origin origin) {
+            this.origin = origin;
+            return this;
+        }
+
+        public Builder operation(Probes.Operation operation) {
+            this.operation = operation;
+            return this;
+        }
+
+        public Builder outcome(Probes.Outcome outcome) {
+            this.outcome = outcome;
+            return this;
+        }
+
+        public Builder payload(Map<String, String> payload) {
+            this.payload.clear();
+            this.payload.putAll(payload);
+            return this;
+        }
+
+        public Builder addPayload(String key, String value) {
+            this.payload.put(key, value);
+            return this;
+        }
+
+        public Builder connect() {
+            this.operation = Probes.Operation.CONNECT;
+            return this;
+        }
+
+        public Builder send() {
+            this.operation = Probes.Operation.SEND;
+            return this;
+        }
+
+        public Builder receive() {
+            this.operation = Probes.Operation.RECEIVE;
+            return this;
+        }
+
+        public Builder process() {
+            this.operation = Probes.Operation.PROCESS;
+            return this;
+        }
+
+        public Builder close() {
+            this.operation = Probes.Operation.CLOSE;
+            return this;
+        }
+
+        public Builder client() {
+            this.origin = Probes.Origin.CLIENT;
+            return this;
+        }
+
+        public Builder server() {
+            this.origin = Probes.Origin.SERVER;
+            return this;
+        }
+
+        public Builder success() {
+            this.outcome = Probes.Outcome.SUCCESS;
+            return this;
+        }
+
+        public Builder failure() {
+            this.outcome = Probes.Outcome.FAILURE;
+            return this;
+        }
+
+        public ProbeSignal build() {
+            if (subject == null) {
+                throw new IllegalStateException("Subject is required");
+            }
+            if (origin == null) {
+                throw new IllegalStateException("Origin is required");
+            }
+            if (operation == null) {
+                throw new IllegalStateException("Operation is required");
+            }
+            if (outcome == null) {
+                throw new IllegalStateException("Outcome is required");
+            }
+            return new ProbeSignal(
+                id,
+                subject,
+                timestamp,
+                vectorClock,
+                new ProbeObservationImpl(origin, operation, outcome),
+                payload
+            );
+        }
+    }
+
+    /**
      * Simple implementation of Probes.Observation interface.
      */
     record ProbeObservationImpl(

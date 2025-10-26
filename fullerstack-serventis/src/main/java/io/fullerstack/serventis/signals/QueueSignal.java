@@ -247,6 +247,130 @@ public record QueueSignal(
     }
 
     /**
+     * Creates a new QueueSignal with an updated vector clock.
+     *
+     * @param newClock the new vector clock
+     * @return new QueueSignal with updated clock
+     */
+    public QueueSignal withClock(VectorClock newClock) {
+        return new QueueSignal(id, subject, timestamp, newClock, queueSignal, payload);
+    }
+
+    /**
+     * Creates a new QueueSignal with additional payload entries.
+     *
+     * @param additionalPayload additional metadata to merge
+     * @return new QueueSignal with merged payload
+     */
+    public QueueSignal withPayload(Map<String, String> additionalPayload) {
+        Map<String, String> merged = new java.util.HashMap<>(payload);
+        merged.putAll(additionalPayload);
+        return new QueueSignal(id, subject, timestamp, vectorClock, queueSignal, merged);
+    }
+
+    /**
+     * Creates a builder for constructing QueueSignals.
+     *
+     * @return new Builder instance
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder for QueueSignal with fluent API.
+     */
+    public static class Builder {
+        private UUID id = UUID.randomUUID();
+        private Subject subject;
+        private Instant timestamp = Instant.now();
+        private VectorClock vectorClock = VectorClock.empty();
+        private Queues.Sign sign;
+        private long units = 0;
+        private final Map<String, String> payload = new java.util.HashMap<>();
+
+        private Builder() {}
+
+        public Builder id(UUID id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder subject(Subject subject) {
+            this.subject = subject;
+            return this;
+        }
+
+        public Builder timestamp(Instant timestamp) {
+            this.timestamp = timestamp;
+            return this;
+        }
+
+        public Builder vectorClock(VectorClock vectorClock) {
+            this.vectorClock = vectorClock;
+            return this;
+        }
+
+        public Builder sign(Queues.Sign sign) {
+            this.sign = sign;
+            return this;
+        }
+
+        public Builder units(long units) {
+            this.units = units;
+            return this;
+        }
+
+        public Builder payload(Map<String, String> payload) {
+            this.payload.clear();
+            this.payload.putAll(payload);
+            return this;
+        }
+
+        public Builder addPayload(String key, String value) {
+            this.payload.put(key, value);
+            return this;
+        }
+
+        public Builder put() {
+            this.sign = Queues.Sign.PUT;
+            return this;
+        }
+
+        public Builder take() {
+            this.sign = Queues.Sign.TAKE;
+            return this;
+        }
+
+        public Builder overflow() {
+            this.sign = Queues.Sign.OVERFLOW;
+            return this;
+        }
+
+        public Builder underflow() {
+            this.sign = Queues.Sign.UNDERFLOW;
+            return this;
+        }
+
+        public QueueSignal build() {
+            if (subject == null) {
+                throw new IllegalStateException("Subject is required");
+            }
+            if (sign == null) {
+                throw new IllegalStateException("Sign is required");
+            }
+            return new QueueSignal(
+                id,
+                subject,
+                timestamp,
+                vectorClock,
+                new QueueSignalImpl(sign, units),
+                payload
+            );
+        }
+    }
+
+    /**
      * Simple implementation of Queues.Signal
      */
     record QueueSignalImpl(

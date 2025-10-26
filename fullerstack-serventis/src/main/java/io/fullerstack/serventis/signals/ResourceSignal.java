@@ -299,6 +299,140 @@ public record ResourceSignal(
     }
 
     /**
+     * Creates a new ResourceSignal with an updated vector clock.
+     *
+     * @param newClock the new vector clock
+     * @return new ResourceSignal with updated clock
+     */
+    public ResourceSignal withClock(VectorClock newClock) {
+        return new ResourceSignal(id, subject, timestamp, newClock, resourceSignal, payload);
+    }
+
+    /**
+     * Creates a new ResourceSignal with additional payload entries.
+     *
+     * @param additionalPayload additional metadata to merge
+     * @return new ResourceSignal with merged payload
+     */
+    public ResourceSignal withPayload(Map<String, String> additionalPayload) {
+        Map<String, String> merged = new java.util.HashMap<>(payload);
+        merged.putAll(additionalPayload);
+        return new ResourceSignal(id, subject, timestamp, vectorClock, resourceSignal, merged);
+    }
+
+    /**
+     * Creates a builder for constructing ResourceSignals.
+     *
+     * @return new Builder instance
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder for ResourceSignal with fluent API.
+     */
+    public static class Builder {
+        private UUID id = UUID.randomUUID();
+        private Subject subject;
+        private Instant timestamp = Instant.now();
+        private VectorClock vectorClock = VectorClock.empty();
+        private Resources.Sign sign;
+        private long units = 0;
+        private final Map<String, String> payload = new java.util.HashMap<>();
+
+        private Builder() {}
+
+        public Builder id(UUID id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder subject(Subject subject) {
+            this.subject = subject;
+            return this;
+        }
+
+        public Builder timestamp(Instant timestamp) {
+            this.timestamp = timestamp;
+            return this;
+        }
+
+        public Builder vectorClock(VectorClock vectorClock) {
+            this.vectorClock = vectorClock;
+            return this;
+        }
+
+        public Builder sign(Resources.Sign sign) {
+            this.sign = sign;
+            return this;
+        }
+
+        public Builder units(long units) {
+            this.units = units;
+            return this;
+        }
+
+        public Builder payload(Map<String, String> payload) {
+            this.payload.clear();
+            this.payload.putAll(payload);
+            return this;
+        }
+
+        public Builder addPayload(String key, String value) {
+            this.payload.put(key, value);
+            return this;
+        }
+
+        public Builder attempt() {
+            this.sign = Resources.Sign.ATTEMPT;
+            return this;
+        }
+
+        public Builder acquire() {
+            this.sign = Resources.Sign.ACQUIRE;
+            return this;
+        }
+
+        public Builder grant() {
+            this.sign = Resources.Sign.GRANT;
+            return this;
+        }
+
+        public Builder deny() {
+            this.sign = Resources.Sign.DENY;
+            return this;
+        }
+
+        public Builder timeout() {
+            this.sign = Resources.Sign.TIMEOUT;
+            return this;
+        }
+
+        public Builder release() {
+            this.sign = Resources.Sign.RELEASE;
+            return this;
+        }
+
+        public ResourceSignal build() {
+            if (subject == null) {
+                throw new IllegalStateException("Subject is required");
+            }
+            if (sign == null) {
+                throw new IllegalStateException("Sign is required");
+            }
+            return new ResourceSignal(
+                id,
+                subject,
+                timestamp,
+                vectorClock,
+                new ResourceSignalImpl(sign, units),
+                payload
+            );
+        }
+    }
+
+    /**
      * Simple implementation of Resources.Signal interface.
      */
     record ResourceSignalImpl(
