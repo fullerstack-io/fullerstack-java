@@ -10,7 +10,7 @@
 
 1. [What is Substrates?](#what-is-substrates)
 2. [Design Philosophy](#design-philosophy)
-3. [M17 Sealed Hierarchy](#m17-sealed-hierarchy)
+3. [M18 Sealed Hierarchy](#m17-sealed-hierarchy)
 4. [Core Entities](#core-entities)
 5. [Data Flow](#data-flow)
 6. [Implementation Details](#implementation-details)
@@ -88,11 +88,11 @@ Steering (automated responses)
 
 ---
 
-## M17 Sealed Hierarchy
+## M18 Sealed Hierarchy
 
 ### Sealed Interfaces (Java JEP 409)
 
-M17 uses sealed interfaces to restrict which classes can implement them:
+M18 uses sealed interfaces to restrict which classes can implement them:
 
 ```java
 sealed interface Source<E> permits Context
@@ -135,9 +135,9 @@ public class SourceImpl<E> {
 
 ```java
 // These extend Context (which extends Source), so they inherit subscribe()
-public class CircuitImpl implements Circuit { }  // ✅
+public class SequentialCircuit implements Circuit { }  // ✅
 public class TransformingConduit<P, E> implements Conduit<P, E> { }  // ✅
-public class HierarchicalCell<I, E> implements Cell<I, E> { }  // ✅
+public class SimpleCell<I, E> implements Cell<I, E> { }  // ✅
 ```
 
 ### Everything is a Subject
@@ -235,7 +235,7 @@ public class CortexRuntime implements Cortex {
 
     @Override
     public Circuit circuit(Name name) {
-        return circuits.computeIfAbsent(name, CircuitImpl::new);
+        return circuits.computeIfAbsent(name, SequentialCircuit::new);
     }
 }
 ```
@@ -272,7 +272,7 @@ Events → BlockingQueue → Single Virtual Thread → FIFO Processing → Subsc
 **Implementation:**
 
 ```java
-public class CircuitImpl implements Circuit {
+public class SequentialCircuit implements Circuit {
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -343,7 +343,7 @@ Conduit<Pipe<String>, String> messages =
 Pipe<String> pipe = messages.get(Cortex.name("user.login"));
 pipe.emit("User logged in");
 
-// Subscribe to all subjects (Conduit IS-A Source in M17)
+// Subscribe to all subjects (Conduit IS-A Source in M18)
 messages.subscribe(
     Cortex.subscriber(
         Cortex.name("logger"),
@@ -506,15 +506,15 @@ brokerCell.input(jmxClient.fetchStats());
 **Implementation:**
 
 ```java
-public class HierarchicalCell<I, E> implements Cell<I, E> {
+public class SimpleCell<I, E> implements Cell<I, E> {
     private final Function<I, E> transformer;  // I → E transformation
     private final SourceImpl<E> source;
-    private final Map<Name, HierarchicalCell<E, ?>> children = new ConcurrentHashMap<>();
+    private final Map<Name, SimpleCell<E, ?>> children = new ConcurrentHashMap<>();
 
     @Override
     public <O> Cell<E, O> cell(Name name, Function<E, O> transformer) {
         return children.computeIfAbsent(name, n ->
-            new HierarchicalCell<>(n, this, transformer, circuit)
+            new SimpleCell<>(n, this, transformer, circuit)
         );
     }
 
@@ -943,14 +943,14 @@ CortexRuntime
 ├── circuits: ConcurrentHashMap<Name, Circuit>
 └── scopes: ConcurrentHashMap<Name, Scope>
 
-CircuitImpl
+SequentialCircuit
 ├── conduits: ConcurrentHashMap<Name, Conduit>
 └── clocks: ConcurrentHashMap<Name, Clock>
 
 TransformingConduit
 └── channels: ConcurrentHashMap<Name, Channel>
 
-HierarchicalCell
+SimpleCell
 └── children: ConcurrentHashMap<Name, Cell>
 ```
 
@@ -1091,7 +1091,7 @@ monitors.subscribe(
 **Fullerstack Substrates:**
 
 ✅ **Simple** - No complex optimizations, easy to understand
-✅ **Correct** - 247 tests passing, proper M17 sealed interface usage
+✅ **Correct** - 247 tests passing, proper M18 sealed interface usage
 ✅ **Fast Enough** - Handles 100k+ metrics @ 1Hz
 ✅ **Thread-Safe** - Proper concurrent collections
 ✅ **Clean** - Explicit resource lifecycle management
@@ -1105,6 +1105,6 @@ monitors.subscribe(
 
 - [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java)
 - [Observability X Blog Series](https://humainary.io/blog/category/observability-x/)
-- [M17 Migration Guide](../../API-ANALYSIS.md)
+- [M18 Migration Guide](../../API-ANALYSIS.md)
 - [Developer Guide](DEVELOPER-GUIDE.md)
 - [Async Architecture](ASYNC-ARCHITECTURE.md)

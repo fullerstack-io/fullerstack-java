@@ -203,14 +203,14 @@ scope.close();
 
 **Core Documentation:**
 
-1. **[Architecture & Core Concepts](docs/ARCHITECTURE.md)** - System design, M17 sealed hierarchy, all core entities
+1. **[Architecture & Core Concepts](docs/ARCHITECTURE.md)** - System design, M18 sealed hierarchy, all core entities
 2. **[Developer Guide](docs/DEVELOPER-GUIDE.md)** - Best practices, performance tips, testing strategies
 3. **[Async-First Architecture](docs/ASYNC-ARCHITECTURE.md)** ⚠️ **CRITICAL** - Understanding async queue processing
 
 **Additional Resources:**
 
 - **[Examples](docs/examples/)** - Hands-on examples from simple to complex
-- **[M17 Migration Guide](../API-ANALYSIS.md)** - Sealed interfaces and migration from M16
+- **[M18 Migration Guide](../API-ANALYSIS.md)** - Sealed interfaces and migration from M16
 
 ## Key Concepts
 
@@ -249,7 +249,7 @@ Consumer Side:
 ### Design Principles
 
 1. **Simplified Architecture** - Single HierarchicalName implementation, no factory abstractions
-2. **Sealed Hierarchy** - M17 sealed interfaces enforce correct type composition
+2. **Sealed Hierarchy** - M18 sealed interfaces enforce correct type composition
 3. **Interface Types** - Public API uses interface types for flexibility
 4. **@Temporal Types** - Transient types (Registrar, Sift, Closure) are not retained
 5. **Thread Safety** - CopyOnWriteArrayList for subscribers (read-optimized)

@@ -21,7 +21,7 @@ Java implementation of the [Humainary Substrates API](https://github.com/humaina
 - Immutable state with slots
 - Shared scheduler optimization for Clocks
 
-**Status:** ✅ Production-ready | 247 tests passing | Apache 2.0
+**Status:** ✅ 540 tests passing | Apache 2.0
 
 **Documentation:** [View README](fullerstack-substrates/README.md)
 
@@ -33,9 +33,9 @@ Concrete signal implementations for the [Humainary Serventis API](https://github
 - Immutable signal records (Monitor, Service, Queue, Reporter, Probe, Resource)
 - Vector clock state management
 - Zero-allocation signal types
-- Full Serventis API M17 support
+- Full Serventis API M18 support
 
-**Status:** ✅ Production-ready | 12 tests passing | Apache 2.0
+**Status:** ✅ 36 tests passing | Apache 2.0
 
 **Documentation:** [View README](fullerstack-serventis/README.md)
 
@@ -50,36 +50,39 @@ Concrete signal implementations for the [Humainary Serventis API](https://github
 
 ### Prerequisites
 
-**Note:** This project uses Humainary API version **1.0.0-M17**. The Humainary APIs are not yet published to Maven Central.
+**Note:** This project uses Humainary API version **1.0.0-M18**. The Humainary APIs are not yet published to Maven Central.
 
 **Dependency Status:**
-- **This project uses**: v1.0.0-M17 - Latest with sealed interfaces (Java 25 required)
-- **Installation required**: M17 artifacts must be built from source
+- **This project uses**: v1.0.0-M18 - Latest with static Cortex access (Java 25 required)
+- **Installation required**: M18 artifacts must be built from source
 
-**Building Humainary M17 Dependencies:**
+**Building Humainary M18 Dependencies:**
 
-Before building this project, you must install the Humainary M17 dependencies to your local Maven repository:
+Before building this project, you must install the Humainary M18 dependencies to your local Maven repository:
 
 ```bash
-# Clone and build Substrates API M17
+# Clone and build Substrates API M18
 git clone https://github.com/humainary-io/substrates-api-java.git
 cd substrates-api-java
-# Main branch is currently at M17
+# Main branch is currently at M18
 mvn clean install -DskipTests
 cd ..
 
-# Clone and build Serventis API M17
+# Clone and build Serventis API M18
 git clone https://github.com/humainary-io/serventis-api-java.git
 cd serventis-api-java
-# Main branch is currently at M17
+# Main branch is currently at M18
 mvn clean install -DskipTests
 cd ..
 ```
 
-**M17 Breaking Changes:**
-M17 introduces sealed interfaces for type safety:
-- `Source`, `Context`, `Component`, `Container` are now sealed
-- Only permits specific implementations in the type hierarchy
+**M18 Key Features:**
+M18 introduces major improvements:
+- **Static Cortex access** - `Cortex.circuit()`, `Cortex.name()`, etc. (no more instance creation)
+- **Cell hierarchy** - Cells can contain child cells via `Container.get(name)`
+- **Conduit creation** - Three variants for creating conduits
+- **Flow.skip()** - New skip transformation
+- Sealed interfaces for type safety (`Source`, `Context`, `Component`, `Container`)
 - See [API-ANALYSIS.md](API-ANALYSIS.md) for migration details
 
 ### Building Fullerstack Projects
@@ -116,7 +119,7 @@ fullerstack-java/
 ├── fullerstack-serventis/          # Serventis signals implementation
 ├── API-ANALYSIS.md                 # API version analysis and migration notes
 ├── CELL-IMPLEMENTATION-PLAN.md     # Cell architecture documentation
-└── pom.xml                         # Parent POM (manages M17 versions)
+└── pom.xml                         # Parent POM (manages M18 versions)
 ```
 
 ## Architecture Highlights
