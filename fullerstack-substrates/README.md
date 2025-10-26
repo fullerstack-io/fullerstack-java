@@ -8,6 +8,7 @@ Substrates provides a flexible framework for building event-driven and observabi
 
 ## Features
 
+### Core Infrastructure
 - **Circuit** - Central processing engine with virtual CPU core pattern for precise event ordering
 - **Conduit** - Container that coordinates Channels, Pipes, and subscriber management
 - **Channel** - Named emission port linking producers to the event stream
@@ -19,7 +20,16 @@ Substrates provides a flexible framework for building event-driven and observabi
 - **Sink** - Event capture and storage for testing and debugging
 - **Subscriber Management** - Thread-safe subscriber registration and notification (via internal SourceImpl)
 - **Immutable State** - Slot-based state management with type safety
-- **M17 API** - Full support for sealed interface hierarchy with type safety guarantees
+- **M18 API** - Full support for sealed interface hierarchy with type safety guarantees
+
+### Bootstrap System (NEW)
+- **SubstratesBootstrap** - **ONE LINE** automatic circuit discovery and initialization
+- **CircuitDiscovery** - Convention-based discovery from `config_*.properties` files
+- **HierarchicalConfig** - Zero-dependency configuration using ResourceBundle
+- **SPI Extensibility** - Applications provide structure and sensors via ServiceLoader
+- **Type-Safe Application Layer** - Framework is type-agnostic, applications use typed composers
+
+See [Bootstrap Guide](docs/BOOTSTRAP-GUIDE.md) for complete documentation.
 
 ## Performance
 
@@ -55,14 +65,44 @@ See [Developer Guide](docs/DEVELOPER-GUIDE.md) for performance details and best 
 </dependency>
 ```
 
-### Basic Usage
+### Option 1: Automatic Bootstrap (Recommended)
+
+The easiest way to get started - **ONE LINE** bootstraps your entire application:
+
+```java
+import io.fullerstack.substrates.bootstrap.SubstratesBootstrap;
+import io.fullerstack.substrates.bootstrap.SubstratesBootstrap.BootstrapResult;
+
+public class MyApp {
+    public static void main(String[] args) {
+        // ONE LINE - discovers circuits, creates structure, starts sensors
+        BootstrapResult result = SubstratesBootstrap.bootstrap();
+
+        System.out.println("Circuits: " + result.getCircuitNames());
+    }
+}
+```
+
+**Prerequisites:**
+1. Create `config_my-circuit.properties` with `circuit.enabled=true`
+2. Implement `CircuitStructureProvider` SPI to build your circuit structure
+3. Implement `SensorProvider` SPI to provide your data sources
+4. Register SPIs in `META-INF/services/`
+
+See [Bootstrap Guide](docs/BOOTSTRAP-GUIDE.md) for complete tutorial.
+
+### Option 2: Manual Usage
+
+For fine-grained control, create circuits manually:
 
 ```java
 import io.fullerstack.substrates.CortexRuntime;
 import io.humainary.substrates.api.Substrates.*;
 
-// Create runtime
-Cortex cortex = CortexRuntime.create();
+import static io.fullerstack.substrates.CortexRuntime.cortex;
+
+// Get singleton Cortex
+Cortex cortex = cortex();
 
 // Create circuit
 Circuit circuit = cortex.circuit(cortex.name("my-circuit"));
@@ -73,7 +113,7 @@ Conduit<Pipe<String>, String> conduit = circuit.conduit(
     Composer.pipe()
 );
 
-// Subscribe to observe emissions (Conduit implements Source in M17)
+// Subscribe to observe emissions
 conduit.subscribe(
     cortex.subscriber(
         cortex.name("logger"),
