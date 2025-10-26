@@ -458,12 +458,65 @@ fullerstack-serventis-java/
 
 ---
 
+## Configuration
+
+Serventis uses Substrates' hierarchical configuration system for health thresholds and other settings.
+
+### HealthThresholds
+
+Circuit-specific health assessment thresholds:
+
+```java
+import io.fullerstack.serventis.config.HealthThresholds;
+
+// Load circuit-specific thresholds
+HealthThresholds thresholds = HealthThresholds.forCircuit("broker-health");
+
+// Use thresholds for signal assessment
+double heapUsage = jmxClient.getHeapUsage();
+if (heapUsage > thresholds.heapDegraded()) {
+    signal = MonitorSignal.degraded(subject, ...);
+} else if (heapUsage > thresholds.heapStable()) {
+    signal = MonitorSignal.converging(subject, ...);
+} else {
+    signal = MonitorSignal.stable(subject, ...);
+}
+```
+
+### Configuration Files
+
+**Global defaults** (`config.properties`):
+```properties
+health.thresholds.heap.stable=0.75
+health.thresholds.heap.degraded=0.90
+health.thresholds.cpu.stable=0.70
+health.thresholds.cpu.degraded=0.85
+```
+
+**Circuit-specific overrides** (`config_broker-health.properties`):
+```properties
+# Brokers can tolerate higher heap
+health.thresholds.heap.stable=0.80
+health.thresholds.heap.degraded=0.95
+```
+
+**Container-specific overrides** (`config_broker-health-brokers.properties`):
+```properties
+# Specific brokers have even higher tolerance
+health.thresholds.heap.stable=0.85
+```
+
+See [Substrates Bootstrap Guide](../fullerstack-substrates/docs/BOOTSTRAP-GUIDE.md) for complete configuration documentation.
+
+---
+
 ## Further Reading
 
 - [Humainary Alignment Analysis](docs/HUMAINARY_ALIGNMENT_ANALYSIS.md) - Detailed explanation of Serventis vs Signetics
 - [Serventis Blog Post](https://humainary.io/blog/serventis-a-semiotic-framework-for-observability/)
 - [The Semiotic Loop](https://humainary.io/blog/the-semiotic-loop-cybernetics-meaning-and-substrates/)
 - [Fullerstack Substrates README](../fullerstack-substrates-java/README.md)
+- [Substrates Bootstrap Guide](../fullerstack-substrates/docs/BOOTSTRAP-GUIDE.md)
 
 ---
 
