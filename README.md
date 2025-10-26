@@ -14,10 +14,10 @@ Java implementation of the [Humainary Substrates API](https://github.com/humaina
 
 **Features:**
 - Circuit-based event orchestration with virtual CPU core pattern
-- Hierarchical naming with dot notation (NameNode)
+- Hierarchical naming with dot notation (HierarchicalName)
 - Observable event streams (subscriber management)
 - Transformation pipelines (Flow/Sift)
-- Hierarchical state management (CellNode)
+- Hierarchical state transformation (SimpleCell)
 - Immutable state with slots
 - Shared scheduler optimization for Clocks
 
@@ -127,7 +127,7 @@ fullerstack-java/
 ### Simplified Design (Post-Refactoring)
 
 The implementation has been significantly simplified:
-- **Single Name implementation**: NameNode (removed 4 alternative implementations)
+- **Single Name implementation**: HierarchicalName (removed 4 alternative implementations)
 - **No registry abstractions**: Removed 8 registry implementations (API provides Registry)
 - **Lean dependencies**: Removed benchmark and queue packages
 - **Optimized Clocks**: Shared ScheduledExecutorService across all Clocks in a Circuit
@@ -137,15 +137,16 @@ The implementation has been significantly simplified:
 
 | Package | Class | Purpose |
 |---------|-------|---------|
-| circuit | CircuitImpl | Event orchestration with virtual CPU core pattern |
-| conduit | ConduitImpl | Channel/Source coordination |
-| cell | CellNode | Hierarchical state transformation |
-| clock | ClockImpl | Scheduled event emission |
-| name | NameNode | Hierarchical dot-notation names |
-| source | SourceImpl | Internal subscriber management |
-| channel | ChannelImpl | Emission ports |
-| pipe | PipeImpl | Event transformation |
-| sink | SinkImpl | Event capture |
+| circuit | SequentialCircuit | Event orchestration with Valve (virtual CPU core pattern) |
+| conduit | TransformingConduit | Channel/Source coordination with type transformation |
+| cell | SimpleCell | Hierarchical state transformation with child cell support |
+| clock | ScheduledClock | Scheduled event emission with shared executor |
+| name | HierarchicalName | Hierarchical dot-notation names with parent/child structure |
+| source | SourceSupport | Internal subscriber management utility |
+| channel | EmissionChannel | Named emission ports for signal flow |
+| pipe | ConsumerPipe, ProducerPipe | Event transformation and routing |
+| sink | CollectingSink | Event capture for testing and debugging |
+| capture | SubjectCapture | Pairs Subject with emission for queue processing |
 
 ## Adding New Projects
 

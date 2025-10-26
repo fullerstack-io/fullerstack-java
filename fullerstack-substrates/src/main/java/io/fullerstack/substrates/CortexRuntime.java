@@ -1,7 +1,7 @@
 package io.fullerstack.substrates;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.capture.CaptureImpl;
+import io.fullerstack.substrates.capture.SubjectCapture;
 import io.fullerstack.substrates.circuit.SequentialCircuit;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.pool.ConcurrentPool;

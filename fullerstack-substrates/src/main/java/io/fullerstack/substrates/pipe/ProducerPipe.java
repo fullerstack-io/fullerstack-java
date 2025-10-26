@@ -1,6 +1,6 @@
 package io.fullerstack.substrates.pipe;
 
-import io.fullerstack.substrates.capture.CaptureImpl;
+import io.fullerstack.substrates.capture.SubjectCapture;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.flow.TransformationPipeline;
 import io.fullerstack.substrates.circuit.Scheduler;
@@ -122,7 +122,7 @@ public class ProducerPipe<E> implements Pipe<E> {
 
         // Post to Circuit's queue - ensures ordering guarantees
         scheduler.schedule(() -> {
-            Capture<E, Channel<E>> capture = new CaptureImpl<>(channelSubject, value);
+            Capture<E, Channel<E>> capture = new SubjectCapture<>(channelSubject, value);
             subscriberNotifier.accept(capture);
         });
     }

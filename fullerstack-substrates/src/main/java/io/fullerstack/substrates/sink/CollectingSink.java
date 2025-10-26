@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.sink;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.capture.CaptureImpl;
+import io.fullerstack.substrates.capture.SubjectCapture;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.subject.HierarchicalSubject;
@@ -77,7 +77,7 @@ public class CollectingSink<E> implements Sink<E> {
                 // Register a pipe that captures emissions into the buffer
                 registrar.register(emission -> {
                     if (!closed) {
-                        buffer.add(new CaptureImpl<>(subject, emission));
+                        buffer.add(new SubjectCapture<>(subject, emission));
                     }
                 });
             }

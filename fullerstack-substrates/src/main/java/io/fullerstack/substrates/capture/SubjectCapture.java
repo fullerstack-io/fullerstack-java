@@ -7,9 +7,9 @@ import io.humainary.substrates.api.Substrates.Substrate;
 import java.util.Objects;
 
 /**
- * Implementation of Substrates.Capture for pairing Subject with emission.
+ * Pairs a Subject with its emission for queue processing.
  *
- * <p>Capture represents a single emission event with full context:
+ * <p>SubjectCapture represents a single emission event with full context:
  * <ul>
  *   <li><b>Subject</b> - WHO emitted (the Channel's subject)</li>
  *   <li><b>Emission</b> - WHAT was emitted (the value)</li>
@@ -22,9 +22,9 @@ import java.util.Objects;
  *   <li>Subscribers need the Channel's Subject for hierarchical routing</li>
  * </ol>
  *
- * <p><b>Data Flow with Capture:</b>
+ * <p><b>Data Flow with SubjectCapture:</b>
  * <pre>
- * Channel("sensor1") creates Capture(channelSubject, value)
+ * Channel("sensor1") creates SubjectCapture(channelSubject, value)
  *   ↓
  * Queue&lt;Capture&lt;E, S&gt;&gt; stores both Subject and value
  *   ↓
@@ -40,16 +40,16 @@ import java.util.Objects;
  * @see Capture
  * @see Subject
  */
-public record CaptureImpl<E, S extends Substrate<S>>(Subject<S> subject, E emission) implements Capture<E, S> {
+public record SubjectCapture<E, S extends Substrate<S>>(Subject<S> subject, E emission) implements Capture<E, S> {
 
     /**
-     * Creates a Capture pairing Subject with emission.
+     * Creates a SubjectCapture pairing Subject with emission.
      *
      * @param subject the Subject that emitted (Channel's subject)
      * @param emission the value emitted
      * @throws NullPointerException if subject is null
      */
-    public CaptureImpl {
+    public SubjectCapture {
         Objects.requireNonNull(subject, "Capture subject cannot be null");
         // emission can be null (nullable emissions are allowed)
     }

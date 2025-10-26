@@ -409,7 +409,7 @@ public class ProducerPipe<E> implements Pipe<E> {
 
         // Post to Circuit queue → notifies subscribers
         scheduler.schedule(() -> {
-            Capture<E, Channel<E>> capture = new CaptureImpl<>(channelSubject, transformed);
+            Capture<E, Channel<E>> capture = new SubjectCapture<>(channelSubject, transformed);
             subscriberNotifier.accept(capture);
         });
     }

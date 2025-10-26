@@ -2,7 +2,7 @@ package io.fullerstack.substrates.integration;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.CortexRuntime;
-import io.fullerstack.substrates.capture.CaptureImpl;
+import io.fullerstack.substrates.capture.SubjectCapture;
 import io.fullerstack.substrates.circuit.SequentialCircuit;
 import io.fullerstack.substrates.name.HierarchicalName;
 import io.fullerstack.substrates.id.UuidIdentifier;
@@ -150,7 +150,7 @@ class CircuitIntegrationTest {
         State emission = LinkedState.of(HierarchicalName.of("event"), 1);
 
         // Use SourceImpl's emission handler (like inlet Pipes do)
-        Capture<State, Channel<State>> capture = new CaptureImpl<>(testChannel, emission);
+        Capture<State, Channel<State>> capture = new SubjectCapture<>(testChannel, emission);
         sourceImpl.emissionHandler().accept(capture);
 
         assertThat(emissionCount.get()).isEqualTo(1);
