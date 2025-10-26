@@ -25,7 +25,7 @@ class ComposersTest {
     @Test
     void filter_appliesPredicateToEmissions() {
         // Given: Circuit with filtered conduit using direct Pipe API
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit(cortex.name("test"));
 
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
@@ -58,7 +58,7 @@ class ComposersTest {
     @Test
     void limit_restrictsEmissionCount() {
         // Given: Circuit with limited conduit using direct Pipe API
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit(cortex.name("test"));
 
         Conduit<Pipe<String>, String> conduit = circuit.conduit(
@@ -93,7 +93,7 @@ class ComposersTest {
     @Test
     void diff_filtersConsecutiveDuplicates() {
         // Given: Circuit with diff sequencer using direct Pipe API
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit(cortex.name("test"));
 
         Conduit<Pipe<String>, String> conduit = circuit.conduit(
@@ -127,7 +127,7 @@ class ComposersTest {
     @Test
     void sample_emitsEveryNth() {
         // Given: Circuit with sampling using direct Pipe API
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit(cortex.name("test"));
 
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
@@ -159,7 +159,7 @@ class ComposersTest {
     @Test
     void compose_appliesMultipleTransformations() {
         // Given: Circuit with composed transformations using direct Pipe API
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit(cortex.name("test"));
 
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
@@ -202,7 +202,7 @@ class ComposersTest {
     @Test
     void configure_appliesConfigurationAndReturnsCircuit() {
         // Given: Cortex
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
 
         // When: Configuring circuit
         Circuit circuit = Composers.configure(
@@ -221,7 +221,7 @@ class ComposersTest {
     @Test
     void tap_allowsSideEffectsWithoutBreakingChain() {
         // Given: Cortex and circuit
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit(cortex.name("test"));
 
         // When: Tapping for side effects

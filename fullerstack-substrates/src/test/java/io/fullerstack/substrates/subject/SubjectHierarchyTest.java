@@ -20,7 +20,7 @@ class SubjectHierarchyTest {
     @Test
     void shouldBuildSubjectHierarchyViaEnclosure() {
         // Recreate the Humainary blog example
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
 
         // Create Circuit
         Circuit circuit = cortex.circuit(cortex.name("Redis"));
@@ -75,7 +75,7 @@ class SubjectHierarchyTest {
     @Test
     void shouldFormatSubjectPathWithHierarchy() {
         // Recreate the Humainary blog example
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
 
         // Create Circuit → Conduit → Channel hierarchy
         Circuit circuit = cortex.circuit(cortex.name("Redis"));
@@ -120,7 +120,7 @@ class SubjectHierarchyTest {
     @Test
     void shouldFormatSubjectPartWithMetadata() {
         // Subject.part() should return formatted string with name, type, and id
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit(cortex.name("Redis"));
 
         Subject<?> circuitSubject = circuit.subject();

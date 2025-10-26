@@ -21,7 +21,7 @@ class SubscriberIntegrationTest {
     @Test
     void shouldSetupCortexCircuitConduitAndSource() {
         // Example 1: Basic Cortex Setup
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit();
         Conduit<Pipe<Long>, Long> conduit = circuit.conduit(
             cortex.name("test-conduit"),
@@ -39,7 +39,7 @@ class SubscriberIntegrationTest {
     @Test
     void shouldForwardEmissionsAcrossNamespaceHierarchy() throws Exception {
         // Simplified: Demonstrate subscriber routing to specific pipes
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit();
         Conduit<Pipe<Long>, Long> conduit = circuit.conduit(
             cortex.name("metrics"),
@@ -78,7 +78,7 @@ class SubscriberIntegrationTest {
     @Test
     void shouldRegisterPipesUsingRegistrarPattern() throws Exception {
         // Example 3: Subscriber with Registrar pattern
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit();
         Conduit<Pipe<Long>, Long> conduit = circuit.conduit(
             cortex.name("sensors"),
@@ -117,7 +117,7 @@ class SubscriberIntegrationTest {
     @Test
     void shouldUsePoolBasedSubscriber() throws Exception {
         // Pool-based Subscriber pattern
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit();
         Conduit<Pipe<Long>, Long> conduit = circuit.conduit(
             cortex.name("counters"),
@@ -153,7 +153,7 @@ class SubscriberIntegrationTest {
     @Test
     void shouldIterateThroughNameHierarchy() {
         // Demonstrate Name iteration capabilities
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
 
         Name hierarchicalName = cortex.name("app")
             .name("service")
@@ -175,7 +175,7 @@ class SubscriberIntegrationTest {
     @Test
     void shouldHandleMultipleSubscribers() throws Exception {
         // Multiple subscribers on same source
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         Circuit circuit = cortex.circuit();
         Conduit<Pipe<Long>, Long> conduit = circuit.conduit(
             cortex.name("events"),

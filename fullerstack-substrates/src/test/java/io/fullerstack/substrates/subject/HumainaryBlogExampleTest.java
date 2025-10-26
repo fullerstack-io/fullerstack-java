@@ -24,7 +24,7 @@ class HumainaryBlogExampleTest {
      */
     @Test
     void shouldMatchBlogExample_SubjectHierarchy() throws Exception {
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
 
         // Exact blog example code
         var resource = cortex.circuit(cortex.name("Redis"));
@@ -98,7 +98,7 @@ class HumainaryBlogExampleTest {
      */
     @Test
     void shouldMatchBlogExample_NameHierarchy() throws Exception {
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
 
         // Blog example: naming percepts with hierarchical names
         var circuit = cortex.circuit(cortex.name("network.5g"));
@@ -161,7 +161,7 @@ class HumainaryBlogExampleTest {
      */
     @Test
     void shouldExtendNamesLikeBlogExample() {
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
 
         // Start with a base name
         Name baseName = cortex.name(java.lang.String.class);

@@ -42,7 +42,7 @@ class CircuitIntegrationTest {
 
     @Test
     void shouldCreateCircuitViaCortex() {
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
 
         circuit = cortex.circuit(cortex.name("integration-test"));
 
@@ -54,7 +54,7 @@ class CircuitIntegrationTest {
     @Test
     void shouldProcessEmissionsViaCircuitQueue() throws Exception {
         // M15+ API: Queue is internal, access via Pipe emissions
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         circuit = cortex.circuit(cortex.name("test"));
 
         AtomicInteger counter = new AtomicInteger(0);
@@ -160,7 +160,7 @@ class CircuitIntegrationTest {
     @Test
     void shouldIntegratePipeEmissionsAndClock() throws Exception {
         // M15+ API: Test Pipe emissions + Clock working together
-        Cortex cortex = new CortexRuntime();
+        Cortex cortex = CortexRuntime.cortex();
         circuit = cortex.circuit(cortex.name("integration"));
 
         AtomicInteger pipeEmissions = new AtomicInteger(0);

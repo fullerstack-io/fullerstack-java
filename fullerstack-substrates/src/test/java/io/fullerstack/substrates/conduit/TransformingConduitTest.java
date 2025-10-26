@@ -23,7 +23,7 @@ class TransformingConduitTest {
 
     @BeforeEach
     void setUp() {
-        cortex = new CortexRuntime();
+        cortex = CortexRuntime.cortex();
         circuit = cortex.circuit();
     }
 

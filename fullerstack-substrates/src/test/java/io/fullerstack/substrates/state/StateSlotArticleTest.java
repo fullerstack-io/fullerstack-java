@@ -31,7 +31,7 @@ class StateSlotArticleTest {
 
     @BeforeEach
     void setUp() {
-        cortex = new CortexRuntime();
+        cortex = CortexRuntime.cortex();
         XYZ = cortex.name("x.y.z");
         ABC = cortex.name("a.b.c");
         NAME = cortex.name("name");

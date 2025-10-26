@@ -52,9 +52,10 @@ public class CortexRuntime implements Cortex {
     private static final Cortex INSTANCE = new CortexRuntime();
 
     /**
-     * Creates a new Cortex runtime.
+     * Private constructor to enforce singleton pattern.
+     * Use {@link #cortex()} to get the singleton instance.
      */
-    public CortexRuntime() {
+    private CortexRuntime() {
         this.scopes = new ConcurrentHashMap<>();
     }
 
