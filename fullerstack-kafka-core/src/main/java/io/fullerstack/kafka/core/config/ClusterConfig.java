@@ -1,6 +1,5 @@
 package io.fullerstack.kafka.core.config;
 
-import io.fullerstack.serventis.config.HealthThresholds;
 import io.humainary.substrates.api.Substrates.Cortex;
 import io.humainary.substrates.api.Substrates.Name;
 
@@ -26,26 +25,25 @@ import java.util.Objects;
  * <p>
  * Example usage:
  * <pre>
- * // With default health thresholds
  * ClusterConfig config = new ClusterConfig(
  *     "prod-account",                              // AWS account identifier
  *     "us-east-1",                                 // AWS region
  *     "transactions-cluster",                      // MSK cluster name
  *     "b-1.trans.xyz.kafka.us-east-1.amazonaws.com:9092,...",  // Bootstrap brokers
  *     "b-1.trans.xyz.kafka.us-east-1.amazonaws.com:11001",     // JMX endpoint
- *     30_000,                                      // Collection interval (30 seconds)
- *     null                                         // Health thresholds (null = use defaults)
+ *     30_000                                       // Collection interval (30 seconds)
  * );
  *
- * // With custom health thresholds
- * HealthThresholds customThresholds = new HealthThresholds(0.80, 0.95, 0.75, 0.90);
+ * // Factory method with defaults
  * ClusterConfig config2 = ClusterConfig.of(
  *     "prod-account", "us-east-1", "transactions-cluster",
- *     "b-1.trans...:9092,...", "b-1.trans...:11001",
- *     customThresholds
+ *     "b-1.trans...:9092,...", "b-1.trans...:11001"
  * );
  * // Results in hierarchical names: msk.prod-account.us-east-1.transactions-cluster.broker-1
  * </pre>
+ * <p>
+ * <b>Note:</b> Health thresholds are now configured via properties files (config_broker-health.properties)
+ * and loaded through HierarchicalConfig by the BrokerHealthStructureProvider.
  *
  * @param accountName AWS account identifier (e.g., "prod-account", "dev-account", "staging")
  * @param regionName AWS region (e.g., "us-east-1", "eu-west-1", "ap-south-1")
@@ -53,7 +51,6 @@ import java.util.Objects;
  * @param bootstrapServers Kafka bootstrap servers (comma-separated MSK broker endpoints)
  * @param jmxUrl JMX connection URL for broker metrics collection (MSK exposes JMX on port 11001)
  * @param collectionIntervalMs Interval between metric collections in milliseconds
- * @param healthThresholds Health assessment thresholds for STABLE/DEGRADED conditions (defaults if null)
  */
 public record ClusterConfig(
         String accountName,
@@ -61,8 +58,7 @@ public record ClusterConfig(
         String clusterName,
         String bootstrapServers,
         String jmxUrl,
-        long collectionIntervalMs,
-        HealthThresholds healthThresholds
+        long collectionIntervalMs
 ) {
     /**
      * Default collection interval: 30 seconds.
@@ -86,9 +82,6 @@ public record ClusterConfig(
 
     /**
      * Compact constructor with validation.
-     * <p>
-     * Applies defaults:
-     * - healthThresholds: HealthThresholds.withDefaults() if null
      */
     public ClusterConfig {
         Objects.requireNonNull(accountName, "accountName cannot be null");
@@ -114,11 +107,6 @@ public record ClusterConfig(
         }
         if (collectionIntervalMs <= 0) {
             throw new IllegalArgumentException("collectionIntervalMs must be positive");
-        }
-
-        // Apply default health thresholds if not provided
-        if (healthThresholds == null) {
-            healthThresholds = HealthThresholds.withDefaults();
         }
     }
 
@@ -210,49 +198,32 @@ public record ClusterConfig(
     }
 
     /**
-     * Create a ClusterConfig with default collection interval and health thresholds.
+     * Create a ClusterConfig with default collection interval.
      *
      * @param accountName AWS account identifier
      * @param regionName AWS region
      * @param clusterName MSK cluster name
      * @param bootstrapServers MSK bootstrap broker endpoints
      * @param jmxUrl JMX connection URL (typically port 11001 for MSK)
-     * @return ClusterConfig with 30-second collection interval and default health thresholds
+     * @return ClusterConfig with 30-second collection interval
      */
     public static ClusterConfig of(String accountName, String regionName, String clusterName,
                                     String bootstrapServers, String jmxUrl) {
         return new ClusterConfig(accountName, regionName, clusterName, bootstrapServers, jmxUrl,
-                                DEFAULT_COLLECTION_INTERVAL_MS, null);  // null triggers default thresholds
+                                DEFAULT_COLLECTION_INTERVAL_MS);
     }
 
     /**
-     * Create a ClusterConfig with default collection interval and custom health thresholds.
-     *
-     * @param accountName AWS account identifier
-     * @param regionName AWS region
-     * @param clusterName MSK cluster name
-     * @param bootstrapServers MSK bootstrap broker endpoints
-     * @param jmxUrl JMX connection URL (typically port 11001 for MSK)
-     * @param healthThresholds Custom health thresholds
-     * @return ClusterConfig with 30-second collection interval and custom health thresholds
-     */
-    public static ClusterConfig of(String accountName, String regionName, String clusterName,
-                                    String bootstrapServers, String jmxUrl, HealthThresholds healthThresholds) {
-        return new ClusterConfig(accountName, regionName, clusterName, bootstrapServers, jmxUrl,
-                                DEFAULT_COLLECTION_INTERVAL_MS, healthThresholds);
-    }
-
-    /**
-     * Create a ClusterConfig with default account, region, cluster name, collection interval, and health thresholds.
+     * Create a ClusterConfig with default account, region, cluster name, and collection interval.
      * <p>
      * Useful for single-cluster monitoring scenarios or local development.
      *
      * @param bootstrapServers Kafka bootstrap servers
      * @param jmxUrl JMX connection URL
-     * @return ClusterConfig with default account/region/cluster, 30-second collection interval, and default health thresholds
+     * @return ClusterConfig with default account/region/cluster and 30-second collection interval
      */
     public static ClusterConfig withDefaults(String bootstrapServers, String jmxUrl) {
         return new ClusterConfig(DEFAULT_ACCOUNT_NAME, DEFAULT_REGION_NAME, DEFAULT_CLUSTER_NAME,
-                                bootstrapServers, jmxUrl, DEFAULT_COLLECTION_INTERVAL_MS, null);  // null triggers defaults
+                                bootstrapServers, jmxUrl, DEFAULT_COLLECTION_INTERVAL_MS);
     }
 }
