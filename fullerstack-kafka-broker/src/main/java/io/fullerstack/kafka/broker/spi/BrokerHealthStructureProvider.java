@@ -1,6 +1,7 @@
 package io.fullerstack.kafka.broker.spi;
 
 import io.fullerstack.serventis.signals.MonitorSignal;
+import io.fullerstack.substrates.bootstrap.BootstrapContext;
 import io.fullerstack.substrates.config.HierarchicalConfig;
 import io.fullerstack.substrates.spi.CircuitStructureProvider;
 import io.humainary.substrates.api.Substrates.*;
@@ -34,7 +35,8 @@ public class BrokerHealthStructureProvider implements CircuitStructureProvider {
             String circuitName,
             Circuit circuit,
             Cortex cortex,
-            HierarchicalConfig config
+            HierarchicalConfig config,
+            BootstrapContext context
     ) {
         if (!"broker-health".equals(circuitName)) {
             return;  // Not our circuit
@@ -52,7 +54,11 @@ public class BrokerHealthStructureProvider implements CircuitStructureProvider {
                 Pipe.empty()
         );
 
+        // Register cell in context so SensorProvider can retrieve it
+        context.register("cluster-cell", clusterCell);
+
         logger.info("Created cluster cell with BrokerHealthCellComposer (config-driven thresholds)");
+        logger.info("Registered 'cluster-cell' in BootstrapContext for sensor access");
 
         // Broker cells will be created dynamically by sensors when they discover brokers
         // via clusterCell.get(cortex.name(brokerId)) pattern

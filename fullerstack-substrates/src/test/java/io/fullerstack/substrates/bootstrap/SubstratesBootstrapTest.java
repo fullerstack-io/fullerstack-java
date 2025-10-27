@@ -108,7 +108,8 @@ class SubstratesBootstrapTest {
                 String circuitName,
                 Circuit circuit,
                 Cortex cortex,
-                HierarchicalConfig config
+                HierarchicalConfig config,
+                BootstrapContext context
         ) {
             // No sensors for test circuits
             return List.of();

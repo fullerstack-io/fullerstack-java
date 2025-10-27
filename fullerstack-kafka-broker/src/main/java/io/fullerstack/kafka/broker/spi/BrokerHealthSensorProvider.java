@@ -1,6 +1,7 @@
 package io.fullerstack.kafka.broker.spi;
 
 import io.fullerstack.serventis.signals.MonitorSignal;
+import io.fullerstack.substrates.bootstrap.BootstrapContext;
 import io.fullerstack.substrates.config.HierarchicalConfig;
 import io.fullerstack.substrates.spi.SensorProvider;
 import io.humainary.substrates.api.Substrates.Cell;
@@ -14,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * SPI provider for broker health monitoring sensors.
@@ -54,13 +56,18 @@ public class BrokerHealthSensorProvider implements SensorProvider {
             String circuitName,
             Circuit circuit,
             Cortex cortex,
-            HierarchicalConfig config
+            HierarchicalConfig config,
+            BootstrapContext context
     ) {
         if (!"broker-health".equals(circuitName)) {
             return List.of();
         }
 
         logger.info("Creating broker health monitoring sensor for circuit '{}'", circuitName);
+
+        // Retrieve cluster cell from BootstrapContext (created by StructureProvider)
+        Cell<BrokerMetrics, MonitorSignal> clusterCell = context.getRequired("cluster-cell", Cell.class);
+        logger.debug("Retrieved 'cluster-cell' from BootstrapContext");
 
         // Load Kafka configuration
         String bootstrapServers = config.getString("kafka.bootstrap.servers", "localhost:9092");
@@ -71,12 +78,9 @@ public class BrokerHealthSensorProvider implements SensorProvider {
         // Create ClusterConfig
         ClusterConfig clusterConfig = ClusterConfig.withDefaults(bootstrapServers, jmxUrl);
 
-        // Get cluster cell (created by BrokerHealthStructureProvider)
-        // The cell has BrokerHealthCellComposer which transforms BrokerMetrics → MonitorSignal
-        Cell<BrokerMetrics, MonitorSignal> clusterCell = circuit.cell(
-                new BrokerHealthCellComposer(),
-                io.humainary.substrates.api.Substrates.Pipe.empty()
-        );
+        // Cache for broker cells - dynamically created from cluster cell
+        // Key: brokerId, Value: Cell<BrokerMetrics, MonitorSignal>
+        Map<String, Cell<BrokerMetrics, MonitorSignal>> brokerCells = new java.util.concurrent.ConcurrentHashMap<>();
 
         // Create monitoring agent
         BrokerMonitoringAgent agent = new BrokerMonitoringAgent(
@@ -85,9 +89,14 @@ public class BrokerHealthSensorProvider implements SensorProvider {
                     // Extract broker ID from hierarchical Name
                     String brokerId = ClusterConfig.extractBrokerId(metrics.brokerId());
 
-                    // Get broker cell (child of cluster cell)
-                    Cell<BrokerMetrics, MonitorSignal> brokerCell = clusterCell.get(
-                            cortex.name(brokerId)
+                    // Get or create broker cell from cluster cell hierarchy
+                    Cell<BrokerMetrics, MonitorSignal> brokerCell = brokerCells.computeIfAbsent(
+                            brokerId,
+                            id -> {
+                                logger.debug("Creating child cell for broker: {}", id);
+                                // Create child cell using Container.get() - inherits Composer
+                                return clusterCell.get(cortex.name(id));
+                            }
                     );
 
                     // Emit metrics - BrokerHealthCellComposer transforms to MonitorSignal

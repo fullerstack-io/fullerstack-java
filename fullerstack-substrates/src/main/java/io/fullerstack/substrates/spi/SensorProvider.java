@@ -1,5 +1,6 @@
 package io.fullerstack.substrates.spi;
 
+import io.fullerstack.substrates.bootstrap.BootstrapContext;
 import io.fullerstack.substrates.config.HierarchicalConfig;
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Cortex;
@@ -63,8 +64,9 @@ public interface SensorProvider {
      * Called by the framework during circuit bootstrap. Return all sensors
      * that should emit signals into this circuit.
      * <p>
-     * The Circuit, Cortex, and HierarchicalConfig are provided so sensors can:
+     * The Circuit, Cortex, HierarchicalConfig, and BootstrapContext are provided so sensors can:
      * <ul>
+     *   <li><b>Retrieve components</b> registered by CircuitStructureProvider (e.g., {@code context.get("brokers-cell", Cell.class)})</li>
      *   <li>Access cells/conduits for signal emission (circuit.cell(), circuit.conduit())</li>
      *   <li>Create names (cortex.name())</li>
      *   <li>Load configuration (config.getString(), config.getInt())</li>
@@ -74,13 +76,15 @@ public interface SensorProvider {
      * @param circuit Circuit instance for signal emission
      * @param cortex Cortex instance for creating Names
      * @param config Configuration for this circuit
+     * @param context Bootstrap context for retrieving registered components (Service Registry pattern)
      * @return List of sensors to start, or empty list if no sensors for this circuit
      */
     List<Sensor> getSensors(
             String circuitName,
             Circuit circuit,
             Cortex cortex,
-            HierarchicalConfig config
+            HierarchicalConfig config,
+            BootstrapContext context
     );
 
     /**
@@ -175,5 +179,5 @@ public interface SensorProvider {
      * <p>
      * Useful as a default implementation or for testing.
      */
-    SensorProvider EMPTY = (circuitName, circuit, cortex, config) -> Collections.emptyList();
+    SensorProvider EMPTY = (circuitName, circuit, cortex, config, context) -> Collections.emptyList();
 }

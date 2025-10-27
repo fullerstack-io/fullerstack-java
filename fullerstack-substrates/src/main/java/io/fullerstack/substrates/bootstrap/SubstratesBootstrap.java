@@ -158,14 +158,21 @@ public class SubstratesBootstrap {
             for (String circuitName : circuitNames) {
                 try {
                     // Create circuit and build structure
-                    Circuit circuit = createCircuit(circuitName, structureProviders);
-                    circuits.put(circuitName, circuit);
-                    onCircuitCreated.accept(circuitName, circuit);
+                    CircuitContext circuitContext = createCircuit(circuitName, structureProviders);
+                    circuits.put(circuitName, circuitContext.circuit());
+                    onCircuitCreated.accept(circuitName, circuitContext.circuit());
 
                     // Get sensors for this circuit
                     HierarchicalConfig config = HierarchicalConfig.forCircuit(circuitName);
                     Cortex cortex = cortex();
-                    List<Sensor> sensors = getSensorsForCircuit(circuitName, circuit, cortex, config, sensorProviders);
+                    List<Sensor> sensors = getSensorsForCircuit(
+                        circuitName,
+                        circuitContext.circuit(),
+                        cortex,
+                        config,
+                        circuitContext.context(),  // Pass context to sensor providers
+                        sensorProviders
+                    );
                     allSensors.addAll(sensors);
 
                     // Start sensors
@@ -185,7 +192,7 @@ public class SubstratesBootstrap {
             return new BootstrapResult(circuits, allSensors);
         }
 
-        private Circuit createCircuit(String circuitName, ServiceLoader<CircuitStructureProvider> providers) {
+        private CircuitContext createCircuit(String circuitName, ServiceLoader<CircuitStructureProvider> providers) {
             logger.debug("Creating circuit: {}", circuitName);
 
             HierarchicalConfig config = HierarchicalConfig.forCircuit(circuitName);
@@ -197,28 +204,39 @@ public class SubstratesBootstrap {
             Name name = cortex.name(circuitName);
             Circuit circuit = cortex.circuit(name);
 
+            // Create bootstrap context for this circuit (Service Registry pattern)
+            BootstrapContext context = new BootstrapContext(circuitName);
+
             // Let application providers build structure (containers, conduits, cells)
             // Application knows the signal types, we don't!
+            // Providers can register components in context for sensor access
             for (CircuitStructureProvider provider : providers) {
-                provider.buildStructure(circuitName, circuit, cortex, config);
+                provider.buildStructure(circuitName, circuit, cortex, config, context);
                 logger.debug("Structure provider {} built structure for circuit '{}'",
                     provider.getClass().getSimpleName(), circuitName);
             }
 
-            return circuit;
+            logger.debug("Circuit '{}' registered {} components: {}",
+                circuitName, context.getRegisteredNames().size(), context.getRegisteredNames());
+
+            return new CircuitContext(circuit, context);
         }
+
+        // Helper record to return both circuit and context
+        private record CircuitContext(Circuit circuit, BootstrapContext context) {}
 
         private List<Sensor> getSensorsForCircuit(
                 String circuitName,
                 Circuit circuit,
                 Cortex cortex,
                 HierarchicalConfig config,
+                BootstrapContext context,
                 ServiceLoader<SensorProvider> providers
         ) {
             List<Sensor> sensors = new ArrayList<>();
 
             for (SensorProvider provider : providers) {
-                List<Sensor> providerSensors = provider.getSensors(circuitName, circuit, cortex, config);
+                List<Sensor> providerSensors = provider.getSensors(circuitName, circuit, cortex, config, context);
                 sensors.addAll(providerSensors);
                 logger.debug("Provider {} provided {} sensors for circuit '{}'",
                     provider.getClass().getSimpleName(), providerSensors.size(), circuitName);

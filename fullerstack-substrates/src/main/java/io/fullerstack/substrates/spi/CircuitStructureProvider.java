@@ -1,5 +1,6 @@
 package io.fullerstack.substrates.spi;
 
+import io.fullerstack.substrates.bootstrap.BootstrapContext;
 import io.fullerstack.substrates.config.HierarchicalConfig;
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Cortex;
@@ -86,6 +87,7 @@ public interface CircuitStructureProvider {
      *   <li>Read structure from config ({@code circuit.containers}, {@code circuit.conduits}, {@code circuit.cells})</li>
      *   <li>Create typed components using the provided circuit and cortex</li>
      *   <li>Build hierarchical cell structures as needed</li>
+     *   <li><b>Register components</b> in context for SensorProvider access (e.g., {@code context.register("brokers-cell", cell)})</li>
      *   <li>Handle unknown circuit names gracefully (return without action)</li>
      * </ul>
      *
@@ -93,11 +95,13 @@ public interface CircuitStructureProvider {
      * @param circuit Empty circuit to build structure in
      * @param cortex Cortex instance for creating names
      * @param config Circuit-specific hierarchical configuration
+     * @param context Bootstrap context for registering components (Service Registry pattern)
      */
     void buildStructure(
         String circuitName,
         Circuit circuit,
         Cortex cortex,
-        HierarchicalConfig config
+        HierarchicalConfig config,
+        BootstrapContext context
     );
 }
