@@ -4,6 +4,7 @@ import io.humainary.substrates.api.Substrates.Cortex;
 import io.humainary.substrates.api.Substrates.Name;
 import io.fullerstack.kafka.broker.models.BrokerMetrics;
 import io.fullerstack.kafka.core.config.ClusterConfig;
+import io.fullerstack.kafka.core.config.JmxConnectionPoolConfig;
 import io.fullerstack.serventis.signals.VectorClockManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,9 +51,13 @@ public class BrokerMonitoringAgent {
     private final VectorClockManager vectorClock;
     private final ScheduledExecutorService scheduler;
     private final List<BrokerEndpoint> brokerEndpoints;
+    private final JmxConnectionPool connectionPool;  // Optional connection pool (null if disabled)
 
     /**
      * Create a new BrokerMonitoringAgent.
+     * <p>
+     * If {@code config.jmxConnectionPoolConfig()} is non-null and enabled,
+     * creates a JMX connection pool for high-frequency monitoring.
      *
      * @param config Cluster configuration with bootstrap servers
      * @param metricsEmitter Callback to emit metrics (receives broker Name and BrokerMetrics)
@@ -61,7 +66,20 @@ public class BrokerMonitoringAgent {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.metricsEmitter = Objects.requireNonNull(metricsEmitter, "metricsEmitter cannot be null");
         this.cortex = cortex();
-        this.collector = new JmxMetricsCollector();
+
+        // Create connection pool if configured
+        JmxConnectionPoolConfig poolConfig = config.jmxConnectionPoolConfig();
+        if (poolConfig != null && poolConfig.enabled()) {
+            this.connectionPool = new JmxConnectionPool();
+            logger.info("JMX connection pooling ENABLED for high-frequency monitoring");
+        } else {
+            this.connectionPool = null;
+            logger.info("JMX connection pooling DISABLED (standard mode)");
+        }
+
+        // Create collector with optional connection pool
+        this.collector = new JmxMetricsCollector(connectionPool);
+
         this.vectorClock = new VectorClockManager();
         this.scheduler = Executors.newScheduledThreadPool(1, r -> {
             Thread t = new Thread(r, "broker-monitoring-agent");
@@ -200,7 +218,8 @@ public class BrokerMonitoringAgent {
     /**
      * Gracefully shutdown monitoring agent.
      * <p>
-     * Stops scheduled collection and waits for in-flight tasks to complete.
+     * Stops scheduled collection, waits for in-flight tasks to complete,
+     * and closes the JMX connection pool (if enabled).
      */
     public void shutdown() {
         logger.info("Shutting down broker monitoring agent");
@@ -215,6 +234,12 @@ public class BrokerMonitoringAgent {
             Thread.currentThread().interrupt();
             logger.error("Interrupted while waiting for scheduler shutdown", e);
             scheduler.shutdownNow();
+        }
+
+        // Close connection pool if present
+        if (connectionPool != null) {
+            connectionPool.close();
+            logger.info("JMX connection pool closed");
         }
     }
 

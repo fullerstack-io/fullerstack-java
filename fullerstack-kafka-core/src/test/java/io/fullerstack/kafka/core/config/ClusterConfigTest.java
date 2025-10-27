@@ -23,7 +23,8 @@ class ClusterConfigTest {
                 "transactions-cluster",
                 "b-1.trans.xyz.kafka.us-east-1.amazonaws.com:9092,b-2.trans.xyz.kafka.us-east-1.amazonaws.com:9092",
                 "b-1.trans.xyz.kafka.us-east-1.amazonaws.com:11001",
-                30_000
+                30_000,
+                null
         );
 
         assertEquals("prod-account", config.accountName());
@@ -77,7 +78,8 @@ class ClusterConfigTest {
                         "test-cluster",
                         "localhost:9092",
                         "localhost:11001",
-                        30_000
+                        30_000,
+                        null
                 )
         );
     }
@@ -91,7 +93,8 @@ class ClusterConfigTest {
                         "test-cluster",
                         "localhost:9092",
                         "localhost:11001",
-                        30_000
+                        30_000,
+                        null
                 )
         );
     }
@@ -105,7 +108,8 @@ class ClusterConfigTest {
                         "test-cluster",
                         "localhost:9092",
                         "localhost:11001",
-                        30_000
+                        30_000,
+                        null
                 )
         );
     }
@@ -119,7 +123,8 @@ class ClusterConfigTest {
                         "test-cluster",
                         "localhost:9092",
                         "localhost:11001",
-                        30_000
+                        30_000,
+                        null
                 )
         );
     }
@@ -133,7 +138,8 @@ class ClusterConfigTest {
                         null,
                         "localhost:9092",
                         "localhost:11001",
-                        30_000
+                        30_000,
+                        null
                 )
         );
     }
@@ -147,7 +153,8 @@ class ClusterConfigTest {
                         "",
                         "localhost:9092",
                         "localhost:11001",
-                        30_000
+                        30_000,
+                        null
                 )
         );
     }
@@ -161,7 +168,8 @@ class ClusterConfigTest {
                         "test-cluster",
                         null,
                         "localhost:11001",
-                        30_000
+                        30_000,
+                        null
                 )
         );
     }
@@ -175,7 +183,8 @@ class ClusterConfigTest {
                         "test-cluster",
                         "",
                         "localhost:11001",
-                        30_000
+                        30_000,
+                        null
                 )
         );
     }
@@ -189,7 +198,8 @@ class ClusterConfigTest {
                         "test-cluster",
                         "localhost:9092",
                         null,
-                        30_000
+                        30_000,
+                        null
                 )
         );
     }
@@ -203,7 +213,8 @@ class ClusterConfigTest {
                         "test-cluster",
                         "localhost:9092",
                         "",
-                        30_000
+                        30_000,
+                        null
                 )
         );
     }
@@ -217,7 +228,8 @@ class ClusterConfigTest {
                         "test-cluster",
                         "localhost:9092",
                         "localhost:11001",
-                        0
+                        0,
+                        null
                 )
         );
 
@@ -228,7 +240,8 @@ class ClusterConfigTest {
                         "test-cluster",
                         "localhost:9092",
                         "localhost:11001",
-                        -1000
+                        -1000,
+                        null
                 )
         );
     }
@@ -241,7 +254,8 @@ class ClusterConfigTest {
                 "transactions-cluster",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:9092",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:11001",
-                30_000
+                30_000,
+                null
         );
 
         ClusterConfig staging = new ClusterConfig(
@@ -250,7 +264,8 @@ class ClusterConfigTest {
                 "analytics-cluster",
                 "b-1.analytics.kafka.eu-west-1.amazonaws.com:9092",
                 "b-1.analytics.kafka.eu-west-1.amazonaws.com:11001",
-                60_000
+                60_000,
+                null
         );
 
         assertNotEquals(prod, staging);
@@ -269,7 +284,8 @@ class ClusterConfigTest {
                 "transactions-cluster",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:9092",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:11001",
-                30_000
+                30_000,
+                null
         );
 
         Name clusterName = config.getClusterName(cortex);
@@ -319,7 +335,8 @@ class ClusterConfigTest {
                 "transactions-cluster",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:9092",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:11001",
-                30_000
+                30_000,
+                null
         );
 
         // Test with full MSK hostname
@@ -341,7 +358,8 @@ class ClusterConfigTest {
                 "transactions-cluster",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:9092",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:11001",
-                30_000
+                30_000,
+                null
         );
 
         ClusterConfig stagingConfig = new ClusterConfig(
@@ -350,7 +368,8 @@ class ClusterConfigTest {
                 "analytics-cluster",
                 "b-1.analytics.kafka.eu-west-1.amazonaws.com:9092",
                 "b-1.analytics.kafka.eu-west-1.amazonaws.com:11001",
-                30_000
+                30_000,
+                null
         );
 
         Name prodBroker = prodConfig.getBrokerName(cortex, "b-1");
@@ -369,7 +388,8 @@ class ClusterConfigTest {
                 "transactions-cluster",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:9092",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:11001",
-                30_000
+                30_000,
+                null
         );
 
         ClusterConfig config2 = new ClusterConfig(
@@ -378,7 +398,8 @@ class ClusterConfigTest {
                 "transactions-cluster",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:9092",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:11001",
-                30_000
+                30_000,
+                null
         );
 
         assertEquals(config1, config2);
