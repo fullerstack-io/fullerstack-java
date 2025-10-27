@@ -26,6 +26,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - Confidence assessment based on metric freshness
  * - Context/payload population
  * - Subject hierarchy matches Cell hierarchy
+ * <p>
+ * <b>Async Synchronization:</b>
+ * Tests use {@code circuit.await()} for event-driven synchronization instead of
+ * {@code Thread.sleep()}. This provides zero-latency wake-up when the Circuit's
+ * Valve completes async signal processing (no polling overhead).
  */
 class BrokerHealthCellComposerTest {
 
@@ -59,7 +64,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testStableCondition_HealthyBroker() throws InterruptedException {
+    void testStableCondition_HealthyBroker() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
         AtomicReference<Subject> receivedSubject = new AtomicReference<>();
@@ -94,8 +99,8 @@ class BrokerHealthCellComposerTest {
 
         healthCell.emit(healthyMetrics);
 
-        // Wait briefly for async emission
-        Thread.sleep(100);
+        // Wait for async signal processing (event-driven, zero latency)
+        circuit.await();
 
         // Verify
         assertThat((List<MonitorSignal>) received).hasSize(1);
@@ -110,7 +115,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testDegradedCondition_HighHeap() throws InterruptedException {
+    void testDegradedCondition_HighHeap() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -131,7 +136,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(degradedMetrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat((List<MonitorSignal>) received).hasSize(1);
@@ -143,7 +148,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testDegradedCondition_HighCpu() throws InterruptedException {
+    void testDegradedCondition_HighCpu() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -164,7 +169,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(degradedMetrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat((List<MonitorSignal>) received).hasSize(1);
@@ -175,7 +180,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testDegradedCondition_UnderReplicatedPartitions() throws InterruptedException {
+    void testDegradedCondition_UnderReplicatedPartitions() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -199,7 +204,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(degradedMetrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat((List<MonitorSignal>) received).hasSize(1);
@@ -210,7 +215,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testDownCondition_CriticalHeap() throws InterruptedException {
+    void testDownCondition_CriticalHeap() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -231,7 +236,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(downMetrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat((List<MonitorSignal>) received).hasSize(1);
@@ -242,7 +247,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testDownCondition_CriticalCpu() throws InterruptedException {
+    void testDownCondition_CriticalCpu() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -263,7 +268,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(downMetrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat((List<MonitorSignal>) received).hasSize(1);
@@ -274,7 +279,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testDownCondition_OfflinePartitions() throws InterruptedException {
+    void testDownCondition_OfflinePartitions() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -298,7 +303,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(downMetrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat((List<MonitorSignal>) received).hasSize(1);
@@ -309,7 +314,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testDownCondition_NoActiveController() throws InterruptedException {
+    void testDownCondition_NoActiveController() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -331,7 +336,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(downMetrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat((List<MonitorSignal>) received).hasSize(1);
@@ -342,7 +347,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testConfidence_FreshMetrics() throws InterruptedException {
+    void testConfidence_FreshMetrics() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -363,7 +368,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(freshMetrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat(received).hasSize(1);
@@ -371,7 +376,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testConfidence_SomewhatFreshMetrics() throws InterruptedException {
+    void testConfidence_SomewhatFreshMetrics() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -392,7 +397,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(somewhatFreshMetrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat(received).hasSize(1);
@@ -401,7 +406,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testConfidence_StaleMetrics() throws InterruptedException {
+    void testConfidence_StaleMetrics() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -422,7 +427,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(staleMetrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat(received).hasSize(1);
@@ -431,7 +436,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testNullMetrics_HandledGracefully() throws InterruptedException {
+    void testNullMetrics_HandledGracefully() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -442,14 +447,14 @@ class BrokerHealthCellComposerTest {
 
         // Emit null - should be handled gracefully (no emission or error signal)
         healthCell.emit(null);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify no signal emitted (Composer logs warning and returns without emitting)
         assertThat((List<MonitorSignal>) received).isEmpty();
     }
 
     @Test
-    void testContextPayloadPopulation() throws InterruptedException {
+    void testContextPayloadPopulation() {
         // Setup
         List<MonitorSignal> received = new CopyOnWriteArrayList<>();
 
@@ -478,7 +483,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(metrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify
         assertThat((List<MonitorSignal>) received).hasSize(1);
@@ -503,7 +508,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testSubjectComesFromChannelInfrastructure() throws InterruptedException {
+    void testSubjectComesFromChannelInfrastructure() {
         // Setup
         AtomicReference<Subject> channelSubject = new AtomicReference<>();
 
@@ -528,7 +533,7 @@ class BrokerHealthCellComposerTest {
         );
 
         healthCell.emit(metrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify channel subject was captured
         assertThat((Object) channelSubject.get()).isNotNull();
@@ -536,7 +541,7 @@ class BrokerHealthCellComposerTest {
     }
 
     @Test
-    void testHierarchicalCellStructure() throws InterruptedException {
+    void testHierarchicalCellStructure() {
         // Create broker child cell
         Cell<BrokerMetrics, MonitorSignal> broker1Cell = healthCell.get(cortex.name("broker-1"));
 
@@ -560,7 +565,7 @@ class BrokerHealthCellComposerTest {
         );
 
         broker1Cell.emit(metrics);
-        Thread.sleep(100);
+        circuit.await();
 
         // Verify subject name contains Cell hierarchy
         assertThat((List<String>) receivedSubjectNames).hasSize(1);
