@@ -1,9 +1,12 @@
 package io.fullerstack.substrates.bootstrap;
 
 import io.fullerstack.substrates.bootstrap.SubstratesBootstrap.BootstrapResult;
+import io.fullerstack.substrates.config.HierarchicalConfig;
 import io.fullerstack.substrates.spi.ComposerProvider;
 import io.fullerstack.substrates.spi.SensorProvider;
+import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Composer;
+import io.humainary.substrates.api.Substrates.Cortex;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -101,7 +104,12 @@ class SubstratesBootstrapTest {
     public static class TestSensorProvider implements SensorProvider {
 
         @Override
-        public List<Sensor> getSensors(String circuitName) {
+        public List<Sensor> getSensors(
+                String circuitName,
+                Circuit circuit,
+                Cortex cortex,
+                HierarchicalConfig config
+        ) {
             // No sensors for test circuits
             return List.of();
         }

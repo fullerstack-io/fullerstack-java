@@ -163,7 +163,9 @@ public class SubstratesBootstrap {
                     onCircuitCreated.accept(circuitName, circuit);
 
                     // Get sensors for this circuit
-                    List<Sensor> sensors = getSensorsForCircuit(circuitName, sensorProviders);
+                    HierarchicalConfig config = HierarchicalConfig.forCircuit(circuitName);
+                    Cortex cortex = cortex();
+                    List<Sensor> sensors = getSensorsForCircuit(circuitName, circuit, cortex, config, sensorProviders);
                     allSensors.addAll(sensors);
 
                     // Start sensors
@@ -206,11 +208,17 @@ public class SubstratesBootstrap {
             return circuit;
         }
 
-        private List<Sensor> getSensorsForCircuit(String circuitName, ServiceLoader<SensorProvider> providers) {
+        private List<Sensor> getSensorsForCircuit(
+                String circuitName,
+                Circuit circuit,
+                Cortex cortex,
+                HierarchicalConfig config,
+                ServiceLoader<SensorProvider> providers
+        ) {
             List<Sensor> sensors = new ArrayList<>();
 
             for (SensorProvider provider : providers) {
-                List<Sensor> providerSensors = provider.getSensors(circuitName);
+                List<Sensor> providerSensors = provider.getSensors(circuitName, circuit, cortex, config);
                 sensors.addAll(providerSensors);
                 logger.debug("Provider {} provided {} sensors for circuit '{}'",
                     provider.getClass().getSimpleName(), providerSensors.size(), circuitName);

@@ -1,5 +1,9 @@
 package io.fullerstack.substrates.spi;
 
+import io.fullerstack.substrates.config.HierarchicalConfig;
+import io.humainary.substrates.api.Substrates.Circuit;
+import io.humainary.substrates.api.Substrates.Cortex;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -11,8 +15,8 @@ import java.util.List;
  * <p>
  * <strong>Contract:</strong>
  * <ul>
- *   <li>Framework calls {@link #getSensors(String)} for each discovered circuit</li>
- *   <li>Application returns list of sensors to start</li>
+ *   <li>Framework calls {@link #getSensors(String, Circuit, Cortex, HierarchicalConfig)} for each discovered circuit</li>
+ *   <li>Application creates sensors with access to Circuit for signal emission</li>
  *   <li>Framework calls {@link Sensor#start()} on each sensor</li>
  *   <li>Framework calls {@link Sensor#close()} on shutdown</li>
  * </ul>
@@ -21,11 +25,20 @@ import java.util.List;
  * <pre>
  * public class MySensorProvider implements SensorProvider {
  *     &#64;Override
- *     public List&lt;Sensor&gt; getSensors(String circuitName) {
+ *     public List&lt;Sensor&gt; getSensors(
+ *             String circuitName,
+ *             Circuit circuit,
+ *             Cortex cortex,
+ *             HierarchicalConfig config
+ *     ) {
  *         if (circuitName.equals("broker-health")) {
+ *             // Load config
+ *             String bootstrapServers = config.getString("kafka.bootstrap.servers");
+ *             String jmxEndpoint = config.getString("kafka.jmx.endpoint");
+ *
+ *             // Create sensor that emits to circuit
  *             return List.of(
- *                 new JmxMonitoringSensor("localhost:9092"),
- *                 new MetricsCollectorSensor(5000)
+ *                 new BrokerMonitoringSensor(circuit, bootstrapServers, jmxEndpoint)
  *             );
  *         }
  *         return List.of();
@@ -49,11 +62,26 @@ public interface SensorProvider {
      * <p>
      * Called by the framework during circuit bootstrap. Return all sensors
      * that should emit signals into this circuit.
+     * <p>
+     * The Circuit, Cortex, and HierarchicalConfig are provided so sensors can:
+     * <ul>
+     *   <li>Access cells/conduits for signal emission (circuit.cell(), circuit.conduit())</li>
+     *   <li>Create names (cortex.name())</li>
+     *   <li>Load configuration (config.getString(), config.getInt())</li>
+     * </ul>
      *
      * @param circuitName Circuit name (e.g., "broker-health", "partition-flow")
+     * @param circuit Circuit instance for signal emission
+     * @param cortex Cortex instance for creating Names
+     * @param config Configuration for this circuit
      * @return List of sensors to start, or empty list if no sensors for this circuit
      */
-    List<Sensor> getSensors(String circuitName);
+    List<Sensor> getSensors(
+            String circuitName,
+            Circuit circuit,
+            Cortex cortex,
+            HierarchicalConfig config
+    );
 
     /**
      * Sensor interface - represents a signal emitter.
@@ -147,5 +175,5 @@ public interface SensorProvider {
      * <p>
      * Useful as a default implementation or for testing.
      */
-    SensorProvider EMPTY = circuitName -> Collections.emptyList();
+    SensorProvider EMPTY = (circuitName, circuit, cortex, config) -> Collections.emptyList();
 }
