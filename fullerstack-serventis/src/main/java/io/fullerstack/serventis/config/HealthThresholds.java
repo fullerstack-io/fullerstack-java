@@ -131,14 +131,15 @@ public record HealthThresholds(
      * </pre>
      *
      * @param config Hierarchical configuration
-     * @return HealthThresholds with values from config
+     * @return HealthThresholds with values from config (or defaults if keys missing)
      */
     public static HealthThresholds fromConfig(HierarchicalConfig config) {
+        HealthThresholds defaults = withDefaults();
         return new HealthThresholds(
-            config.getDouble("health.thresholds.heap.stable"),
-            config.getDouble("health.thresholds.heap.degraded"),
-            config.getDouble("health.thresholds.cpu.stable"),
-            config.getDouble("health.thresholds.cpu.degraded")
+            config.getDouble("health.thresholds.heap.stable", defaults.heapStable),
+            config.getDouble("health.thresholds.heap.degraded", defaults.heapDegraded),
+            config.getDouble("health.thresholds.cpu.stable", defaults.cpuStable),
+            config.getDouble("health.thresholds.cpu.degraded", defaults.cpuDegraded)
         );
     }
 

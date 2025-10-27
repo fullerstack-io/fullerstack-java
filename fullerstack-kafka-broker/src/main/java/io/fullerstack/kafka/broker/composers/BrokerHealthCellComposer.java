@@ -1,5 +1,6 @@
 package io.fullerstack.kafka.broker.composers;
 
+import io.fullerstack.serventis.config.HealthThresholds;
 import io.fullerstack.serventis.signals.MonitorSignal;
 import io.fullerstack.substrates.config.HierarchicalConfig;
 import io.humainary.modules.serventis.monitors.api.Monitors;
@@ -71,10 +72,7 @@ public class BrokerHealthCellComposer implements Composer<Pipe<BrokerMetrics>, M
     private static final long METRIC_FRESHNESS_THRESHOLD_MS = 60_000; // 1 minute
 
     // Configurable health assessment thresholds
-    private final double heapUsageStableThreshold;
-    private final double heapUsageDegradedThreshold;
-    private final double cpuUsageStableThreshold;
-    private final double cpuUsageDegradedThreshold;
+    private final HealthThresholds healthThresholds;
 
     /**
      * Creates a BrokerHealthCellComposer loading configuration from HierarchicalConfig.
@@ -89,38 +87,36 @@ public class BrokerHealthCellComposer implements Composer<Pipe<BrokerMetrics>, M
      * externalized configuration via properties files.
      */
     public BrokerHealthCellComposer() {
-        // Load configuration from HierarchicalConfig (convention: config_broker-health.properties)
-        HierarchicalConfig config = HierarchicalConfig.forCircuit("broker-health");
+        this(HealthThresholds.forCircuit("broker-health"));
+    }
 
-        this.heapUsageStableThreshold = config.getDouble("health.thresholds.heap.stable", 0.75);
-        this.heapUsageDegradedThreshold = config.getDouble("health.thresholds.heap.degraded", 0.90);
-        this.cpuUsageStableThreshold = config.getDouble("health.thresholds.cpu.stable", 0.70);
-        this.cpuUsageDegradedThreshold = config.getDouble("health.thresholds.cpu.degraded", 0.85);
+    /**
+     * Creates a BrokerHealthCellComposer with specified HealthThresholds.
+     * <p>
+     * This constructor is useful when:
+     * - You need programmatic threshold control
+     * - You're testing with custom thresholds
+     * - You want to use different thresholds than config files
+     * <p>
+     * Production code should typically use the no-arg constructor which
+     * loads configuration from properties files.
+     *
+     * @param healthThresholds Health assessment thresholds configuration
+     */
+    public BrokerHealthCellComposer(HealthThresholds healthThresholds) {
+        this.healthThresholds = healthThresholds;
 
-        // Validation
-        if (heapUsageStableThreshold >= heapUsageDegradedThreshold) {
-            throw new IllegalArgumentException(
-                    "health.thresholds.heap.stable must be < health.thresholds.heap.degraded, got: "
-                            + heapUsageStableThreshold + " >= " + heapUsageDegradedThreshold
-            );
-        }
-        if (cpuUsageStableThreshold >= cpuUsageDegradedThreshold) {
-            throw new IllegalArgumentException(
-                    "health.thresholds.cpu.stable must be < health.thresholds.cpu.degraded, got: "
-                            + cpuUsageStableThreshold + " >= " + cpuUsageDegradedThreshold
-            );
-        }
-
-        logger.info("BrokerHealthCellComposer initialized with thresholds from config - heap: {}/{}, cpu: {}/{}",
-                heapUsageStableThreshold, heapUsageDegradedThreshold,
-                cpuUsageStableThreshold, cpuUsageDegradedThreshold);
+        logger.info("BrokerHealthCellComposer initialized with thresholds - heap: {}/{}, cpu: {}/{}",
+                healthThresholds.heapStable(), healthThresholds.heapDegraded(),
+                healthThresholds.cpuStable(), healthThresholds.cpuDegraded());
     }
 
     /**
      * Creates a BrokerHealthCellComposer with custom thresholds.
      * <p>
      * <b>Note:</b> This constructor is primarily for testing. Production code should use
-     * the no-arg constructor which loads configuration from properties files.
+     * the no-arg constructor which loads configuration from properties files, or use
+     * the {@link #BrokerHealthCellComposer(HealthThresholds)} constructor.
      * <p>
      * Allows tuning health assessment for different cluster profiles:
      * - High-throughput clusters may tolerate higher heap usage
@@ -132,7 +128,7 @@ public class BrokerHealthCellComposer implements Composer<Pipe<BrokerMetrics>, M
      * @param cpuStableThreshold CPU usage below this is STABLE (0.0-1.0)
      * @param cpuDegradedThreshold CPU usage above this is DOWN (0.0-1.0)
      * @throws IllegalArgumentException if thresholds are invalid
-     * @deprecated Use no-arg constructor for production - loads from config_broker-health.properties
+     * @deprecated Use {@link #BrokerHealthCellComposer(HealthThresholds)} instead
      */
     @Deprecated(since = "1.0.0", forRemoval = false)
     public BrokerHealthCellComposer(
@@ -141,27 +137,10 @@ public class BrokerHealthCellComposer implements Composer<Pipe<BrokerMetrics>, M
             double cpuStableThreshold,
             double cpuDegradedThreshold
     ) {
-        // Validation
-        if (heapStableThreshold >= heapDegradedThreshold) {
-            throw new IllegalArgumentException(
-                    "heapStableThreshold must be < heapDegradedThreshold, got: "
-                            + heapStableThreshold + " >= " + heapDegradedThreshold
-            );
-        }
-        if (cpuStableThreshold >= cpuDegradedThreshold) {
-            throw new IllegalArgumentException(
-                    "cpuStableThreshold must be < cpuDegradedThreshold, got: "
-                            + cpuStableThreshold + " >= " + cpuDegradedThreshold
-            );
-        }
+        this(new HealthThresholds(heapStableThreshold, heapDegradedThreshold,
+                cpuStableThreshold, cpuDegradedThreshold));
 
-        this.heapUsageStableThreshold = heapStableThreshold;
-        this.heapUsageDegradedThreshold = heapDegradedThreshold;
-        this.cpuUsageStableThreshold = cpuStableThreshold;
-        this.cpuUsageDegradedThreshold = cpuDegradedThreshold;
-
-        logger.warn("BrokerHealthCellComposer created with explicit thresholds (deprecated) - heap: {}/{}, cpu: {}/{}",
-                heapStableThreshold, heapDegradedThreshold, cpuStableThreshold, cpuDegradedThreshold);
+        logger.warn("BrokerHealthCellComposer created with explicit thresholds (deprecated) - prefer HealthThresholds constructor");
     }
 
     /**
@@ -251,13 +230,13 @@ public class BrokerHealthCellComposer implements Composer<Pipe<BrokerMetrics>, M
         double heapUsageRatio = (double) metrics.heapUsed() / metrics.heapMax();
 
         // DOWN conditions (most critical)
-        if (heapUsageRatio > heapUsageDegradedThreshold) {
+        if (heapUsageRatio > healthThresholds.heapDegraded()) {
             logger.warn("Broker {} DOWN: heap usage {}%",
                     metrics.brokerId(), String.format("%.1f", heapUsageRatio * 100));
             return Monitors.Condition.DOWN;
         }
 
-        if (metrics.cpuUsage() > cpuUsageDegradedThreshold) {
+        if (metrics.cpuUsage() > healthThresholds.cpuDegraded()) {
             logger.warn("Broker {} DOWN: CPU usage {}%",
                     metrics.brokerId(), String.format("%.1f", metrics.cpuUsage() * 100));
             return Monitors.Condition.DOWN;
@@ -275,13 +254,13 @@ public class BrokerHealthCellComposer implements Composer<Pipe<BrokerMetrics>, M
         }
 
         // DEGRADED conditions
-        if (heapUsageRatio > heapUsageStableThreshold) {
+        if (heapUsageRatio > healthThresholds.heapStable()) {
             logger.info("Broker {} DEGRADED: heap usage {}%",
                     metrics.brokerId(), String.format("%.1f", heapUsageRatio * 100));
             return Monitors.Condition.DEGRADED;
         }
 
-        if (metrics.cpuUsage() > cpuUsageStableThreshold) {
+        if (metrics.cpuUsage() > healthThresholds.cpuStable()) {
             logger.info("Broker {} DEGRADED: CPU usage {}%",
                     metrics.brokerId(), String.format("%.1f", metrics.cpuUsage() * 100));
             return Monitors.Condition.DEGRADED;
