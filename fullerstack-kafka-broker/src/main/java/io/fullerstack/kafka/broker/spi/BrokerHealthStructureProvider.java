@@ -42,22 +42,9 @@ public class BrokerHealthStructureProvider implements CircuitStructureProvider {
 
         logger.info("Building broker-health circuit structure...");
 
-        // Get health threshold configuration
-        double heapStable = config.getDouble("health.thresholds.heap.stable", 0.75);
-        double heapDegraded = config.getDouble("health.thresholds.heap.degraded", 0.90);
-        double cpuStable = config.getDouble("health.thresholds.cpu.stable", 0.70);
-        double cpuDegraded = config.getDouble("health.thresholds.cpu.degraded", 0.85);
-
-        logger.info("Health thresholds - heap: {}/{}, cpu: {}/{}",
-                heapStable, heapDegraded, cpuStable, cpuDegraded);
-
         // Create cluster-level cell with health assessment composer
-        BrokerHealthCellComposer composer = new BrokerHealthCellComposer(
-                heapStable,
-                heapDegraded,
-                cpuStable,
-                cpuDegraded
-        );
+        // Composer loads its own configuration from HierarchicalConfig
+        BrokerHealthCellComposer composer = new BrokerHealthCellComposer();
 
         // Create cell with composer - M18 API: cell(Composer, Pipe)
         Cell<BrokerMetrics, MonitorSignal> clusterCell = circuit.cell(
@@ -65,7 +52,7 @@ public class BrokerHealthStructureProvider implements CircuitStructureProvider {
                 Pipe.empty()
         );
 
-        logger.info("Created cluster cell with configurable health thresholds");
+        logger.info("Created cluster cell with BrokerHealthCellComposer (config-driven thresholds)");
 
         // Broker cells will be created dynamically by sensors when they discover brokers
         // via clusterCell.get(cortex.name(brokerId)) pattern

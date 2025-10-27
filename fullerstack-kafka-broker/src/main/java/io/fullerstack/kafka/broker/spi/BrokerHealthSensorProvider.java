@@ -16,18 +16,35 @@ import java.util.List;
 import java.util.function.BiConsumer;
 
 /**
- * SPI provider that creates broker health monitoring sensors.
+ * SPI provider for broker health monitoring sensors.
  * <p>
- * Creates a BrokerMonitoringAgent that:
- * - Collects JMX metrics from all brokers in cluster
- * - Emits BrokerMetrics to appropriate broker Cells
- * - Maintains VectorClock for causal ordering
+ * <b>IMPORTANT:</b> This provider returns an empty list because the SensorProvider SPI
+ * interface only provides the circuit name, not the Circuit/Cortex instances needed
+ * to create sensors that emit to Cells.
  * <p>
- * The sensor creates broker child cells dynamically via {@code clusterCell.get(brokerName)}
- * pattern, ensuring each broker has its own Cell in the hierarchy.
+ * <b>Sensor Creation Pattern:</b>
+ * Instead of using this SPI, broker monitoring sensors should be created manually:
+ * <pre>{@code
+ * // After bootstrap creates circuit structure
+ * SubstratesBootstrap.Result result = SubstratesBootstrap.start();
+ * Circuit brokerHealthCircuit = result.getCircuit("broker-health");
+ *
+ * // Create monitoring agent with Circuit reference
+ * ClusterConfig config = ClusterConfig.withDefaults("localhost:9092", "localhost:11001");
+ * BrokerMonitoringAgent agent = new BrokerMonitoringAgent(
+ *     config,
+ *     (name, metrics) -> {
+ *         Cell<BrokerMetrics, MonitorSignal> cell = brokerHealthCircuit.cell(...);
+ *         cell.emit(metrics);
+ *     }
+ * );
+ * agent.start();
+ * }</pre>
+ * <p>
+ * This manual approach gives full control over sensor lifecycle and circuit wiring.
  *
  * @see BrokerMonitoringAgent
- * @see SensorProvider
+ * @see io.fullerstack.substrates.bootstrap.SubstratesBootstrap
  */
 public class BrokerHealthSensorProvider implements SensorProvider {
     private static final Logger logger = LoggerFactory.getLogger(BrokerHealthSensorProvider.class);
@@ -35,15 +52,12 @@ public class BrokerHealthSensorProvider implements SensorProvider {
     @Override
     public List<Sensor> getSensors(String circuitName) {
         if (!"broker-health".equals(circuitName)) {
-            return List.of();  // Not our circuit
+            return List.of();
         }
 
-        logger.info("Creating broker health monitoring sensors for circuit: {}", circuitName);
-
-        // Return placeholder - actual sensor creation happens in start() when we have runtime context
-        // For now, return empty list - sensors will be created through other means
-        // TODO: Implement sensor creation when we have access to Circuit reference
-        logger.warn("Sensor creation deferred - SPI interface doesn't provide Circuit reference");
+        // SensorProvider SPI doesn't provide Circuit/Cortex, so we can't create sensors here.
+        // Sensors must be created manually after bootstrap - see class javadoc for pattern.
+        logger.debug("BrokerHealthSensorProvider called for circuit '{}' - sensors created manually (see javadoc)", circuitName);
 
         return List.of();
     }
