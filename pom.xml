@@ -19,6 +19,8 @@
         <module>fullerstack-serventis</module>
         <module>fullerstack-kafka-core</module>
         <module>fullerstack-kafka-broker</module>
+        <module>fullerstack-kafka-producer</module>
+        <module>fullerstack-kafka-runtime</module>
     </modules>
 
     <properties>
@@ -102,6 +104,16 @@
             <dependency>
                 <groupId>io.fullerstack</groupId>
                 <artifactId>fullerstack-kafka-broker</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.fullerstack</groupId>
+                <artifactId>fullerstack-kafka-producer</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.fullerstack</groupId>
+                <artifactId>fullerstack-kafka-runtime</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
