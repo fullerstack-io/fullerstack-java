@@ -3,7 +3,11 @@ package io.fullerstack.kafka.runtime;
 import io.fullerstack.kafka.broker.composers.BrokerHealthCellComposer;
 import io.fullerstack.kafka.broker.models.BrokerMetrics;
 import io.fullerstack.kafka.broker.sensors.BrokerSensor;
+import io.fullerstack.kafka.consumer.composers.ConsumerHealthCellComposer;
+import io.fullerstack.kafka.consumer.models.ConsumerMetrics;
+import io.fullerstack.kafka.consumer.sensors.ConsumerSensor;
 import io.fullerstack.kafka.core.config.BrokerSensorConfig;
+import io.fullerstack.kafka.core.config.ConsumerEndpoint;
 import io.fullerstack.kafka.core.config.ProducerSensorConfig;
 import io.fullerstack.kafka.producer.composers.ProducerHealthCellComposer;
 import io.fullerstack.kafka.producer.models.ProducerMetrics;
@@ -25,7 +29,7 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  * Unified runtime for Kafka observability.
  * <p>
  * This runtime owns ALL Circuit and Cell hierarchy management, and manages
- * the lifecycle of all sensors (BrokerSensor, ProducerSensor).
+ * the lifecycle of all sensors (BrokerSensor, ProducerSensor, ConsumerSensor).
  * <p>
  * <b>Architecture:</b>
  * <pre>
@@ -37,17 +41,24 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  *   │   │   ├── broker-1 (Cell&lt;BrokerMetrics, MonitorSignal&gt;)
  *   │   │   ├── broker-2
  *   │   │   └── broker-3
- *   │   └── producers/ (Container&lt;MonitorSignal&gt;)
- *   │       ├── producer-1 (Cell&lt;ProducerMetrics, MonitorSignal&gt;)
- *   │       └── producer-2
+ *   │   ├── producers/ (Container&lt;MonitorSignal&gt;)
+ *   │   │   ├── producer-1 (Cell&lt;ProducerMetrics, MonitorSignal&gt;)
+ *   │   │   └── producer-2
+ *   │   └── consumers/ (Container&lt;MonitorSignal&gt;)
+ *   │       ├── group-1/ (Cell&lt;ConsumerMetrics, MonitorSignal&gt;)
+ *   │       │   ├── consumer-a (Cell&lt;ConsumerMetrics, MonitorSignal&gt;)
+ *   │       │   └── consumer-b
+ *   │       └── group-2/
+ *   │           └── consumer-c
  *   └── Sensors (just collect, no Circuit knowledge):
  *       ├── BrokerSensor → emits to brokers/
- *       └── ProducerSensor → emits to producers/
+ *       ├── ProducerSensor → emits to producers/
+ *       └── ConsumerSensor → emits to consumers/group/member
  * </pre>
  * <p>
  * <b>Responsibilities:</b>
  * - Create and manage Cortex + Circuit
- * - Build Cell hierarchy (brokers/, producers/)
+ * - Build Cell hierarchy (brokers/, producers/, consumers/)
  * - Instantiate and wire sensors with emission callbacks
  * - Route sensor emissions to correct Cells
  * - Expose root Containers for Epic 2 subscribers
@@ -59,7 +70,7 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  * runtime.start();
  *
  * // Epic 2: Subscribe to broker health signals
- * runtime.getBrokersContainer().subscribe(signal -> {...});
+ * runtime.getBrokersRootCell().subscribe(signal -> {...});
  *
  * // ... later ...
  * runtime.close();
@@ -75,10 +86,12 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
     // Cell hierarchy roots
     private final Cell<BrokerMetrics, MonitorSignal> brokersRootCell;
     private final Cell<ProducerMetrics, MonitorSignal> producersRootCell;
+    private final Cell<ConsumerMetrics, MonitorSignal> consumersRootCell;
 
     // Sensors (just collect)
     private final BrokerSensor brokerSensor;
     private final ProducerSensor producerSensor;
+    private final ConsumerSensor consumerSensor;
 
     private volatile boolean started = false;
     private volatile boolean closed = false;
@@ -106,10 +119,12 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
         // Create Cell hierarchy
         this.brokersRootCell = createBrokersRootCell();
         this.producersRootCell = createProducersRootCell();
+        this.consumersRootCell = createConsumersRootCell();
 
         // Create sensors with emission callbacks
         this.brokerSensor = createBrokerSensor();
         this.producerSensor = createProducerSensor();
+        this.consumerSensor = createConsumerSensor();
 
         logger.info("KafkaObservabilityRuntime initialized for cluster: {}", config.clusterName());
     }
@@ -151,6 +166,37 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
             Name producerName = cortex.name(producerId);
             Cell<ProducerMetrics, MonitorSignal> producerCell = rootCell.get(producerName);
             logger.debug("Pre-created producer Cell: {}", producerId);
+        }
+
+        return rootCell;
+    }
+
+    /**
+     * Create consumers/ root Cell with ConsumerHealthCellComposer.
+     * <p>
+     * Creates 3-level hierarchy: consumers/ → group → member
+     *
+     * @return Root Cell for consumer health monitoring
+     */
+    private Cell<ConsumerMetrics, MonitorSignal> createConsumersRootCell() {
+        ConsumerHealthCellComposer composer = new ConsumerHealthCellComposer();
+        Cell<ConsumerMetrics, MonitorSignal> rootCell = circuit.cell(composer, Pipe.empty());
+        logger.info("Created consumers/ root Cell in circuit");
+
+        // Pre-create consumer child Cells from config (group → member hierarchy)
+        for (var endpoint : config.consumerSensorConfig().endpoints()) {
+            String groupName = endpoint.consumerGroup();
+            String consumerId = endpoint.consumerId();
+
+            // Create group Cell if not exists
+            Name groupCellName = cortex.name(groupName);
+            Cell<ConsumerMetrics, MonitorSignal> groupCell = rootCell.get(groupCellName);
+
+            // Create member Cell under group
+            Name memberCellName = cortex.name(consumerId);
+            Cell<ConsumerMetrics, MonitorSignal> memberCell = groupCell.get(memberCellName);
+
+            logger.debug("Pre-created consumer Cell: {}/{}", groupName, consumerId);
         }
 
         return rootCell;
@@ -201,6 +247,55 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
     }
 
     /**
+     * Create ConsumerSensor wired to emit to consumers/ root Cell.
+     * <p>
+     * Routes emissions through group hierarchy: consumers/ → group → member
+     *
+     * @return Configured ConsumerSensor
+     */
+    private ConsumerSensor createConsumerSensor() {
+        // Callback: route emissions to correct consumer Cell through group hierarchy
+        return new ConsumerSensor(config.consumerSensorConfig(), (consumerId, metrics) -> {
+            // Find consumer's group from config
+            String consumerGroup = findConsumerGroup(consumerId);
+            if (consumerGroup == null) {
+                logger.warn("No group found for consumer: {}", consumerId);
+                return;
+            }
+
+            Name groupName = cortex.name(consumerGroup);
+            Name memberName = cortex.name(consumerId);
+
+            Cell<ConsumerMetrics, MonitorSignal> groupCell = consumersRootCell.get(groupName);
+            if (groupCell != null) {
+                Cell<ConsumerMetrics, MonitorSignal> memberCell = groupCell.get(memberName);
+                if (memberCell != null) {
+                    memberCell.emit(metrics);
+                    logger.trace("Emitted ConsumerMetrics to Cell: {}/{}", consumerGroup, consumerId);
+                } else {
+                    logger.warn("No member Cell found for consumer: {}/{}", consumerGroup, consumerId);
+                }
+            } else {
+                logger.warn("No group Cell found for consumer: {}/{}", consumerGroup, consumerId);
+            }
+        });
+    }
+
+    /**
+     * Find consumer group for given consumer ID from config.
+     *
+     * @param consumerId Consumer ID
+     * @return Consumer group name, or null if not found
+     */
+    private String findConsumerGroup(String consumerId) {
+        return config.consumerSensorConfig().endpoints().stream()
+                .filter(endpoint -> endpoint.consumerId().equals(consumerId))
+                .map(ConsumerEndpoint::consumerGroup)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
      * Start metric collection from all sensors.
      * <p>
      * Sensors begin collecting metrics at configured intervals and emitting
@@ -220,6 +315,7 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
 
         brokerSensor.start();
         producerSensor.start();
+        consumerSensor.start();
 
         started = true;
         logger.info("KafkaObservabilityRuntime started - sensors collecting metrics");
@@ -245,6 +341,18 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
      */
     public Cell<ProducerMetrics, MonitorSignal> getProducersRootCell() {
         return producersRootCell;
+    }
+
+    /**
+     * Get consumers/ root Cell for Epic 2 subscriptions.
+     * <p>
+     * Subscribers will receive MonitorSignal emissions from ALL consumer Cells
+     * across all groups.
+     *
+     * @return Consumers root Cell
+     */
+    public Cell<ConsumerMetrics, MonitorSignal> getConsumersRootCell() {
+        return consumersRootCell;
     }
 
     /**
@@ -283,6 +391,7 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
         // Close sensors
         brokerSensor.close();
         producerSensor.close();
+        consumerSensor.close();
 
         // Close Circuit (releases all Cells)
         circuit.close();
@@ -292,9 +401,10 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
 
     @Override
     public String toString() {
-        return String.format("KafkaObservabilityRuntime[cluster=%s, started=%s, brokers=%d, producers=%d]",
+        return String.format("KafkaObservabilityRuntime[cluster=%s, started=%s, brokers=%d, producers=%d, consumers=%d]",
                 config.clusterName(), started,
                 config.brokerSensorConfig().endpoints().size(),
-                config.producerSensorConfig().endpoints().size());
+                config.producerSensorConfig().endpoints().size(),
+                config.consumerSensorConfig().endpoints().size());
     }
 }

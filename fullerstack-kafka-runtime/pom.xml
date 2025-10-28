@@ -32,6 +32,10 @@
             <groupId>io.fullerstack</groupId>
             <artifactId>fullerstack-kafka-producer</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.fullerstack</groupId>
+            <artifactId>fullerstack-kafka-consumer</artifactId>
+        </dependency>
 
         <!-- Substrates Framework -->
         <dependency>
