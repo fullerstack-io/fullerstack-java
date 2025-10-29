@@ -1,6 +1,7 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.modules.serventis.services.api.Services;
+import io.fullerstack.kafka.producer.models.ProducerEventMetrics;
+import io.humainary.substrates.api.Substrates.Pipe;
 import org.apache.kafka.clients.producer.ProducerInterceptor;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -8,61 +9,61 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Kafka ProducerInterceptor implementation that uses Humainary {@link Services.Service} interface.
+ * Kafka ProducerInterceptor that captures producer-broker interaction events as rich metrics.
  * <p>
- * Captures producer-broker interaction lifecycle events by calling methods on the {@link Services.Service}
- * interface, which emits {@link Services.Signal} enums (CALL, SUCCEEDED, FAILED, RETRY) into the
- * Substrates signal pipeline.
+ * Unlike the previous Services.Service approach (which lost all contextual data), this interceptor
+ * emits {@link ProducerEventMetrics} records containing full context: topic, partition, offset,
+ * latency, exceptions, and metadata.
+ *
+ * <h3>Architecture Pattern (Matching BrokerMetrics):</h3>
+ * <pre>
+ * ProducerEventInterceptor
+ *   → emit(ProducerEventMetrics)  [Rich domain data]
+ *   → Cell<ProducerEventMetrics, ServiceSignal>
+ *   → ProducerEventComposer
+ *   → emit(ServiceSignal)  [Semiotic signal]
+ *   → Observers
+ * </pre>
  *
  * <h3>Lifecycle Tracking:</h3>
  * <pre>
  * 1. Application calls producer.send(record)
- *    → onSend() → service.call() → Services.Signal.CALL emitted
+ *    → onSend() → ProducerEventMetrics.call(producerId, topic, partition)
  *
  * 2. Broker acknowledges write
- *    → onAcknowledgement(metadata, null) → service.succeeded() → Services.Signal.SUCCEEDED emitted
+ *    → onAcknowledgement(metadata, null)
+ *    → ProducerEventMetrics.succeeded(producerId, metadata, latency)
  *
  * 3. Send fails (timeout, network error, etc.)
- *    → onAcknowledgement(metadata, exception) → service.failed() → Services.Signal.FAILED emitted
+ *    → onAcknowledgement(metadata, exception)
+ *    → ProducerEventMetrics.failed(producerId, topic, partition, exception, latency)
  * </pre>
- *
- * <h3>Signal Semantics (Humainary Serventis):</h3>
- * <ul>
- *   <li><b>CALL</b> (RELEASE orientation) - Producer initiates send (present tense)</li>
- *   <li><b>SUCCEEDED</b> (RECEIPT orientation) - Broker acknowledged in past (past participle)</li>
- *   <li><b>FAILED</b> (RECEIPT orientation) - Broker rejected in past (past participle)</li>
- * </ul>
  *
  * <h3>Configuration:</h3>
  * <pre>{@code
- * // Runtime creates Services.Service from ServicesComposer
- * Cell<Services.Service, Services.Signal> cell = circuit.cell(
- *     new ServicesComposer(),
- *     signalPipe
+ * // Runtime creates Cell with ProducerEventComposer
+ * Cell<ProducerEventMetrics, ServiceSignal> producerCell = circuit.cell(
+ *     new ProducerEventComposer(),
+ *     observerPipe
  * );
- * Services.Service service = cell.pipe();
  *
- * // Configure producer with interceptor and service
+ * // Configure producer with interceptor and Pipe
  * Properties props = new Properties();
  * props.put("bootstrap.servers", "localhost:9092");
  * props.put("client.id", "my-producer");
  * props.put("interceptor.classes", ProducerEventInterceptor.class.getName());
- * props.put("fullerstack.service", service);  // Inject Services.Service
+ * props.put(ProducerEventInterceptor.METRICS_PIPE_KEY, producerCell);  // Cell IS-A Pipe
  *
  * KafkaProducer<String, String> producer = new KafkaProducer<>(props);
  * }</pre>
  *
- * <h3>Signal Flow:</h3>
- * <pre>
- * Interceptor.call()
- *   → Services.Signal.CALL
- *   → ServicesComposer emits signal
- *   → SignalEnrichmentComposer adds Subject/VectorClock
- *   → ServiceSignal
- *   → Observers
- * </pre>
+ * <h3>Latency Tracking:</h3>
+ * Uses in-flight map to correlate onSend() with onAcknowledgement() for accurate latency measurement.
+ * <p>
+ * Key format: {@code "topic:partition"} (best effort - partitions may not be assigned at send time)
  *
  * <h3>Error Handling:</h3>
  * All interceptor logic is wrapped in try-catch to prevent failures from breaking the producer.
@@ -72,23 +73,30 @@ import java.util.Map;
  * @param <V> Producer record value type
  *
  * @author Fullerstack
- * @see Services.Service
- * @see Services.Signal
- * @see io.fullerstack.serventis.composers.ServicesComposer
+ * @see ProducerEventMetrics
+ * @see io.fullerstack.kafka.producer.composers.ProducerEventComposer
  */
 public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V> {
 
     private static final Logger logger = LoggerFactory.getLogger(ProducerEventInterceptor.class);
 
     /**
-     * Configuration key for injecting the Humainary Services.Service interface.
+     * Configuration key for injecting the metrics Pipe (typically a Cell).
      * <p>
-     * Value must be a {@link Services.Service} instance created by the runtime.
+     * Value must be a {@link Pipe}{@code <ProducerEventMetrics>} instance.
      */
-    public static final String SERVICE_CONFIG_KEY = "fullerstack.service";
+    public static final String METRICS_PIPE_KEY = "fullerstack.metrics.pipe";
 
     private String producerId;
-    private Services.Service service;
+    private Pipe<ProducerEventMetrics> metricsPipe;
+
+    /**
+     * Tracks in-flight requests for latency measurement.
+     * <p>
+     * Key: "topic:partition" (partition may be -1 if not yet assigned)
+     * Value: Send timestamp (nanoTime)
+     */
+    private final Map<String, Long> inFlightRequests = new ConcurrentHashMap<>();
 
     /**
      * Configure the interceptor with producer properties.
@@ -96,47 +104,58 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
      * Extracts:
      * <ul>
      *   <li>{@code client.id} → producerId</li>
-     *   <li>{@code fullerstack.service} → Services.Service instance</li>
+     *   <li>{@code fullerstack.metrics.pipe} → Pipe instance for metrics</li>
      * </ul>
      *
      * @param configs Producer configuration map
      */
     @Override
+    @SuppressWarnings("unchecked")
     public void configure(Map<String, ?> configs) {
         // Extract producer ID from client.id config
         Object clientIdObj = configs.get("client.id");
         this.producerId = clientIdObj != null ? clientIdObj.toString() : "unknown-producer";
 
-        // Extract Services.Service from config
-        Object serviceObj = configs.get(SERVICE_CONFIG_KEY);
-        if (serviceObj instanceof Services.Service) {
-            this.service = (Services.Service) serviceObj;
-            logger.info("ProducerEventInterceptor configured for producer: {} with Services.Service",
+        // Extract Pipe<ProducerEventMetrics> from config
+        Object pipeObj = configs.get(METRICS_PIPE_KEY);
+        if (pipeObj instanceof Pipe) {
+            this.metricsPipe = (Pipe<ProducerEventMetrics>) pipeObj;
+            logger.info("ProducerEventInterceptor configured for producer: {} with metrics pipe",
                 producerId);
         } else {
-            logger.warn("ProducerEventInterceptor configured without Services.Service for producer: {}. " +
-                "Signals will not be emitted. Set '{}' in producer config.",
-                producerId, SERVICE_CONFIG_KEY);
+            logger.warn("ProducerEventInterceptor configured without metrics pipe for producer: {}. " +
+                "Metrics will not be emitted. Set '{}' in producer config.",
+                producerId, METRICS_PIPE_KEY);
         }
     }
 
     /**
      * Called when producer initiates a send operation (before network transmission).
      * <p>
-     * Emits {@link Services.Signal#CALL} (RELEASE orientation - present tense).
+     * Emits ProducerEventMetrics with CALL signal and records send time for latency tracking.
      *
      * @param record Producer record being sent
      * @return Original record (unmodified - this interceptor is read-only)
      */
     @Override
     public ProducerRecord<K, V> onSend(ProducerRecord<K, V> record) {
-        if (service == null) {
+        if (metricsPipe == null) {
             return record;  // Not configured, pass through
         }
 
         try {
-            // Emit CALL signal (RELEASE orientation - producer initiates)
-            service.call();
+            // Record send time for latency tracking
+            String key = requestKey(record.topic(), record.partition());
+            inFlightRequests.put(key, System.nanoTime());
+
+            // Emit CALL metrics
+            ProducerEventMetrics metrics = ProducerEventMetrics.call(
+                producerId,
+                record.topic(),
+                record.partition() != null ? record.partition() : -1
+            );
+
+            metricsPipe.emit(metrics);
 
             logger.trace("Producer {} CALL for topic {} partition {}",
                 producerId, record.topic(), record.partition());
@@ -153,35 +172,55 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
     /**
      * Called after broker responds (either acknowledgement or failure).
      * <p>
-     * Emits either {@link Services.Signal#SUCCEEDED} (exception == null) or
-     * {@link Services.Signal#FAILED} (exception != null).
-     * Both use RECEIPT orientation (past tense - broker's action happened in the past).
+     * Emits ProducerEventMetrics with SUCCEEDED (exception == null) or FAILED (exception != null).
+     * Includes latency measurement if send time was recorded.
      *
      * @param metadata Record metadata (topic, partition, offset)
      * @param exception Null for successful ack, non-null for failures
      */
     @Override
     public void onAcknowledgement(RecordMetadata metadata, Exception exception) {
-        if (service == null) {
+        if (metricsPipe == null) {
             return;  // Not configured
         }
 
         try {
-            if (exception == null) {
-                // ACK received - SUCCEEDED (RECEIPT orientation - broker succeeded in past)
-                service.succeeded();
+            // Calculate latency
+            String key = requestKey(metadata.topic(), metadata.partition());
+            Long sendTime = inFlightRequests.remove(key);
+            long latencyMs = sendTime != null
+                ? (System.nanoTime() - sendTime) / 1_000_000
+                : 0L;
 
-                logger.trace("Producer {} SUCCEEDED for topic {} partition {} offset {}",
-                    producerId, metadata.topic(), metadata.partition(), metadata.offset());
+            ProducerEventMetrics metrics;
+
+            if (exception == null) {
+                // ACK received - SUCCEEDED
+                metrics = ProducerEventMetrics.succeeded(
+                    producerId,
+                    metadata,
+                    latencyMs
+                );
+
+                logger.trace("Producer {} SUCCEEDED for topic {} partition {} offset {} latency={}ms",
+                    producerId, metadata.topic(), metadata.partition(), metadata.offset(), latencyMs);
 
             } else {
-                // Send failed - FAILED (RECEIPT orientation - broker failed in past)
-                service.failed();
+                // Send failed - FAILED
+                metrics = ProducerEventMetrics.failed(
+                    producerId,
+                    metadata.topic(),
+                    metadata.partition(),
+                    exception,
+                    latencyMs
+                );
 
-                logger.debug("Producer {} FAILED for topic {} partition {}: {}",
-                    producerId, metadata.topic(), metadata.partition(),
+                logger.debug("Producer {} FAILED for topic {} partition {} latency={}ms error={}",
+                    producerId, metadata.topic(), metadata.partition(), latencyMs,
                     exception.getClass().getSimpleName());
             }
+
+            metricsPipe.emit(metrics);
 
         } catch (Exception e) {
             // CRITICAL: Don't let interceptor errors break the producer
@@ -195,6 +234,19 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
      */
     @Override
     public void close() {
+        inFlightRequests.clear();
         logger.info("ProducerEventInterceptor closed for producer: {}", producerId);
+    }
+
+    /**
+     * Generate key for in-flight request tracking.
+     *
+     * @param topic Topic name
+     * @param partition Partition (may be null or -1)
+     * @return Key string "topic:partition"
+     */
+    private String requestKey(String topic, Integer partition) {
+        int p = partition != null ? partition : -1;
+        return topic + ":" + p;
     }
 }
