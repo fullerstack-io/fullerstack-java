@@ -1,8 +1,11 @@
 package io.fullerstack.kafka.runtime;
 
 import io.fullerstack.kafka.broker.composers.BrokerHealthCellComposer;
+import io.fullerstack.kafka.broker.composers.ThreadPoolResourceComposer;
 import io.fullerstack.kafka.broker.models.BrokerMetrics;
+import io.fullerstack.kafka.broker.models.ThreadPoolMetrics;
 import io.fullerstack.kafka.broker.sensors.BrokerSensor;
+import io.fullerstack.kafka.broker.sensors.ThreadPoolSensor;
 import io.fullerstack.kafka.consumer.composers.ConsumerHealthCellComposer;
 import io.fullerstack.kafka.consumer.models.ConsumerMetrics;
 import io.fullerstack.kafka.consumer.sensors.ConsumerSensor;
@@ -13,6 +16,7 @@ import io.fullerstack.kafka.producer.composers.ProducerHealthCellComposer;
 import io.fullerstack.kafka.producer.models.ProducerMetrics;
 import io.fullerstack.kafka.producer.sensors.ProducerSensor;
 import io.fullerstack.serventis.signals.MonitorSignal;
+import io.fullerstack.serventis.signals.ResourceSignal;
 import io.humainary.substrates.api.Substrates.Cell;
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Cortex;
@@ -41,6 +45,13 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  *   │   │   ├── broker-1 (Cell&lt;BrokerMetrics, MonitorSignal&gt;)
  *   │   │   ├── broker-2
  *   │   │   └── broker-3
+ *   │   ├── broker-thread-pools/ (Container&lt;ResourceSignal&gt;)
+ *   │   │   ├── broker-1/ (Cell&lt;ThreadPoolMetrics, ResourceSignal&gt;)
+ *   │   │   │   ├── network (Cell&lt;ThreadPoolMetrics, ResourceSignal&gt;)
+ *   │   │   │   ├── io
+ *   │   │   │   └── log-cleaner
+ *   │   │   └── broker-2/
+ *   │   │       └── ...
  *   │   ├── producers/ (Container&lt;MonitorSignal&gt;)
  *   │   │   ├── producer-1 (Cell&lt;ProducerMetrics, MonitorSignal&gt;)
  *   │   │   └── producer-2
@@ -52,6 +63,7 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  *   │           └── consumer-c
  *   └── Sensors (just collect, no Circuit knowledge):
  *       ├── BrokerSensor → emits to brokers/
+ *       ├── ThreadPoolSensor → emits to broker-thread-pools/broker/pool
  *       ├── ProducerSensor → emits to producers/
  *       └── ConsumerSensor → emits to consumers/group/member
  * </pre>
@@ -85,11 +97,13 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
 
     // Cell hierarchy roots
     private final Cell<BrokerMetrics, MonitorSignal> brokersRootCell;
+    private final Cell<ThreadPoolMetrics, ResourceSignal> brokerThreadPoolsRootCell;
     private final Cell<ProducerMetrics, MonitorSignal> producersRootCell;
     private final Cell<ConsumerMetrics, MonitorSignal> consumersRootCell;
 
     // Sensors (just collect)
     private final BrokerSensor brokerSensor;
+    private final ThreadPoolSensor threadPoolSensor;
     private final ProducerSensor producerSensor;
     private final ConsumerSensor consumerSensor;
 
@@ -118,11 +132,13 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
 
         // Create Cell hierarchy
         this.brokersRootCell = createBrokersRootCell();
+        this.brokerThreadPoolsRootCell = createBrokerThreadPoolsRootCell();
         this.producersRootCell = createProducersRootCell();
         this.consumersRootCell = createConsumersRootCell();
 
         // Create sensors with emission callbacks
         this.brokerSensor = createBrokerSensor();
+        this.threadPoolSensor = createThreadPoolSensor();
         this.producerSensor = createProducerSensor();
         this.consumerSensor = createConsumerSensor();
 
@@ -145,6 +161,42 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
             Name brokerName = cortex.name(brokerId);
             Cell<BrokerMetrics, MonitorSignal> brokerCell = rootCell.get(brokerName);
             logger.debug("Pre-created broker Cell: {}", brokerId);
+        }
+
+        return rootCell;
+    }
+
+    /**
+     * Create broker-thread-pools/ root Cell with ThreadPoolResourceComposer.
+     * <p>
+     * Creates a 3-level hierarchy: broker-thread-pools/ → broker-N → pool-type
+     * <p>
+     * Thread pool types: network, io, log-cleaner
+     *
+     * @return Root Cell for thread pool resource monitoring
+     */
+    private Cell<ThreadPoolMetrics, ResourceSignal> createBrokerThreadPoolsRootCell() {
+        ThreadPoolResourceComposer composer = new ThreadPoolResourceComposer();
+        Cell<ThreadPoolMetrics, ResourceSignal> rootCell = circuit.cell(composer, Pipe.empty());
+        logger.info("Created broker-thread-pools/ root Cell in circuit");
+
+        // Pre-create broker thread pool Cells from config
+        for (var endpoint : config.brokerSensorConfig().endpoints()) {
+            String brokerId = endpoint.brokerId();
+            Name brokerName = cortex.name(brokerId);
+            Cell<ThreadPoolMetrics, ResourceSignal> brokerCell = rootCell.get(brokerName);
+
+            // Pre-create child Cells for each pool type (network, io, log-cleaner)
+            // Note: log-cleaner is optional and may not emit if compaction disabled
+            Name networkPoolName = cortex.name("network");
+            Name ioPoolName = cortex.name("io");
+            Name logCleanerPoolName = cortex.name("log-cleaner");
+
+            brokerCell.get(networkPoolName);
+            brokerCell.get(ioPoolName);
+            brokerCell.get(logCleanerPoolName);
+
+            logger.debug("Pre-created thread pool Cells for broker: {}", brokerId);
         }
 
         return rootCell;
@@ -220,6 +272,37 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
                 logger.trace("Emitted BrokerMetrics to Cell: {}", brokerId);
             } else {
                 logger.warn("No Cell found for broker: {}", brokerId);
+            }
+        });
+    }
+
+    /**
+     * Create ThreadPoolSensor wired to emit to broker-thread-pools/ root Cell.
+     * <p>
+     * Routes emissions through broker + pool-type hierarchy:
+     * broker-thread-pools/ → broker-N → pool-type (network/io/log-cleaner)
+     *
+     * @return Configured ThreadPoolSensor
+     */
+    private ThreadPoolSensor createThreadPoolSensor() {
+        BrokerSensorConfig sensorConfig = config.brokerSensorConfig();
+
+        // Callback: route emissions to correct broker → pool type Cell
+        return new ThreadPoolSensor(sensorConfig, (brokerId, metrics) -> {
+            Name brokerName = cortex.name(brokerId);
+            Name poolName = cortex.name(metrics.poolType().displayName());
+
+            Cell<ThreadPoolMetrics, ResourceSignal> brokerCell = brokerThreadPoolsRootCell.get(brokerName);
+            if (brokerCell != null) {
+                Cell<ThreadPoolMetrics, ResourceSignal> poolCell = brokerCell.get(poolName);
+                if (poolCell != null) {
+                    poolCell.emit(metrics);
+                    logger.trace("Emitted ThreadPoolMetrics to Cell: {}/{}", brokerId, metrics.poolType().displayName());
+                } else {
+                    logger.warn("No pool Cell found for thread pool: {}/{}", brokerId, metrics.poolType());
+                }
+            } else {
+                logger.warn("No broker Cell found for thread pool metrics: {}", brokerId);
             }
         });
     }
@@ -314,6 +397,7 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
         logger.info("Starting KafkaObservabilityRuntime");
 
         brokerSensor.start();
+        threadPoolSensor.start();
         producerSensor.start();
         consumerSensor.start();
 
@@ -356,6 +440,18 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
     }
 
     /**
+     * Get broker-thread-pools/ root Cell for Epic 2 subscriptions.
+     * <p>
+     * Subscribers will receive ResourceSignal emissions from ALL thread pool Cells
+     * across all brokers and pool types (network, io, log-cleaner).
+     *
+     * @return Broker thread pools root Cell
+     */
+    public Cell<ThreadPoolMetrics, ResourceSignal> getBrokerThreadPoolsRootCell() {
+        return brokerThreadPoolsRootCell;
+    }
+
+    /**
      * Get Circuit for advanced usage.
      *
      * @return Circuit instance
@@ -390,6 +486,7 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
 
         // Close sensors
         brokerSensor.close();
+        threadPoolSensor.close();
         producerSensor.close();
         consumerSensor.close();
 
