@@ -92,7 +92,7 @@ public record ProbeSignal(
             subject,
             Instant.now(),
             VectorClock.empty(),
-            new ProbeObservationImpl(origin, operation, outcome),
+            new Observation(origin, operation, outcome),
             metadata
         );
     }
@@ -472,16 +472,34 @@ public record ProbeSignal(
                 subject,
                 timestamp,
                 vectorClock,
-                new ProbeObservationImpl(origin, operation, outcome),
+                new Observation(origin, operation, outcome),
                 payload
             );
         }
     }
 
     /**
-     * Simple implementation of Probes.Observation interface.
+     * Observation represents a probe operation with origin, operation type, and outcome.
+     *
+     * <p>This is an immutable value object combining:
+     * <ul>
+     *   <li><b>Origin</b> - Where the probe originated (CLIENT or SERVER)</li>
+     *   <li><b>Operation</b> - What was attempted (CONNECT, SEND, RECEIVE, PROCESS, CLOSE)</li>
+     *   <li><b>Outcome</b> - What happened (SUCCESS or FAILURE)</li>
+     * </ul>
+     *
+     * <p>The observation provides the semantic meaning of communication attempts -
+     * it tells us what type of network/communication operation was attempted,
+     * from whose perspective, and whether it succeeded or failed.
+     *
+     * <p><b>Example Semantics:</b>
+     * <ul>
+     *   <li>CLIENT/CONNECT/SUCCESS → Client successfully connected to broker</li>
+     *   <li>SERVER/RECEIVE/FAILURE → Broker failed to receive message from client</li>
+     *   <li>CLIENT/SEND/SUCCESS → Client successfully sent message to broker</li>
+     * </ul>
      */
-    record ProbeObservationImpl(
+    record Observation(
         Probes.Origin origin,
         Probes.Operation operation,
         Probes.Outcome outcome

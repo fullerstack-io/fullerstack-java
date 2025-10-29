@@ -80,7 +80,7 @@ public record QueueSignal(
             subject,
             Instant.now(),
             VectorClock.empty(),
-            new QueueSignalImpl(sign, units),
+            new Activity(sign, units),
             metadata
         );
     }
@@ -364,16 +364,32 @@ public record QueueSignal(
                 subject,
                 timestamp,
                 vectorClock,
-                new QueueSignalImpl(sign, units),
+                new Activity(sign, units),
                 payload
             );
         }
     }
 
     /**
-     * Simple implementation of Queues.Signal
+     * Activity represents a queue operation with sign and unit count.
+     *
+     * <p>This is an immutable value object combining the queue operation type
+     * (PUT, TAKE, OVERFLOW, UNDERFLOW) with the number of message units
+     * involved in the operation.
+     *
+     * <p>The activity provides the semantic meaning of queue behavior -
+     * it tells us what type of queue operation occurred and how many units
+     * (messages) were involved in the operation.
+     *
+     * <p><b>Example Semantics:</b>
+     * <ul>
+     *   <li>PUT/100 → 100 messages written to partition</li>
+     *   <li>TAKE/50 → 50 messages consumed from partition</li>
+     *   <li>OVERFLOW/10 → 10 messages couldn't be added (disk full)</li>
+     *   <li>UNDERFLOW/5 → Consumer tried to fetch 5 messages but partition empty</li>
+     * </ul>
      */
-    record QueueSignalImpl(
+    record Activity(
         Queues.Sign sign,
         long units
     ) implements Queues.Signal {

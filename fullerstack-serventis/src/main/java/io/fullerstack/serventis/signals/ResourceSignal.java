@@ -90,7 +90,7 @@ public record ResourceSignal(
             subject,
             Instant.now(),
             VectorClock.empty(),
-            new ResourceSignalImpl(sign, units),
+            new Allocation(sign, units),
             metadata
         );
     }
@@ -426,16 +426,31 @@ public record ResourceSignal(
                 subject,
                 timestamp,
                 vectorClock,
-                new ResourceSignalImpl(sign, units),
+                new Allocation(sign, units),
                 payload
             );
         }
     }
 
     /**
-     * Simple implementation of Resources.Signal interface.
+     * Allocation represents a resource operation with sign and unit count.
+     *
+     * <p>This is an immutable value object combining the resource operation type
+     * (ATTEMPT, ACQUIRE, GRANT, DENY, TIMEOUT, RELEASE) with the number of
+     * resource units involved in the operation.
+     *
+     * <p>The allocation provides the semantic meaning of resource lifecycle -
+     * it tells us what type of resource operation occurred and how many units
+     * were involved (requested, granted, denied, or released).
+     *
+     * <p><b>Example Semantics:</b>
+     * <ul>
+     *   <li>GRANT/5 → 5 units successfully allocated</li>
+     *   <li>DENY/10 → 10 units could not be allocated (pool exhausted)</li>
+     *   <li>RELEASE/3 → 3 units returned to pool</li>
+     * </ul>
      */
-    record ResourceSignalImpl(
+    record Allocation(
         Resources.Sign sign,
         long units
     ) implements Resources.Signal {

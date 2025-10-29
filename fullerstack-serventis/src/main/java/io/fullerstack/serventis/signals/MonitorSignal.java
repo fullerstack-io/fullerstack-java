@@ -79,7 +79,7 @@ public record MonitorSignal(
             subject,
             Instant.now(),
             VectorClock.empty(),
-            new MonitorStatusImpl(condition, confidence),
+            new Assessment(condition, confidence),
             metadata
         );
     }
@@ -426,16 +426,24 @@ public record MonitorSignal(
                 subject,
                 timestamp,
                 vectorClock,
-                new MonitorStatusImpl(condition, confidence),
+                new Assessment(condition, confidence),
                 payload
             );
         }
     }
 
     /**
-     * Simple implementation of Monitors.Status
+     * Assessment represents the monitored health condition with confidence level.
+     *
+     * <p>This is an immutable value object combining operational condition
+     * (STABLE, DEGRADED, DOWN, etc.) with statistical confidence level
+     * (CONFIRMED, SUSPECTED, HIGH, LOW).
+     *
+     * <p>The assessment provides the semantic meaning of a monitor signal -
+     * it tells us not just that something changed, but what the health
+     * status is and how certain we are about it.
      */
-    record MonitorStatusImpl(
+    record Assessment(
         Monitors.Condition condition,
         Monitors.Confidence confidence
     ) implements Monitors.Status {
