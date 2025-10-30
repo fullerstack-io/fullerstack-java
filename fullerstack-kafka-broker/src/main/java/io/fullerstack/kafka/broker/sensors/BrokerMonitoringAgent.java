@@ -1,11 +1,18 @@
 package io.fullerstack.kafka.broker.sensors;
 
-import io.humainary.substrates.api.Substrates.Cortex;
-import io.humainary.substrates.api.Substrates.Name;
+import io.fullerstack.kafka.broker.assessment.BrokerHealthAssessor;
+import io.fullerstack.kafka.broker.baseline.BaselineService;
 import io.fullerstack.kafka.broker.models.BrokerMetrics;
 import io.fullerstack.kafka.core.config.ClusterConfig;
 import io.fullerstack.kafka.core.config.JmxConnectionPoolConfig;
+import io.fullerstack.serventis.signals.MonitorSignal;
+import io.fullerstack.serventis.signals.VectorClock;
 import io.fullerstack.serventis.signals.VectorClockManager;
+import io.humainary.substrates.api.Substrates.Cortex;
+import io.humainary.substrates.api.Substrates.Id;
+import io.humainary.substrates.api.Substrates.Name;
+import io.humainary.substrates.api.Substrates.State;
+import io.humainary.substrates.api.Substrates.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,21 +27,27 @@ import java.util.function.BiConsumer;
 import static io.fullerstack.substrates.CortexRuntime.cortex;
 
 /**
- * Monitors multiple Kafka brokers and emits metrics to appropriate broker Cells.
+ * Monitors multiple Kafka brokers and emits interpreted MonitorSignals (signal-first architecture).
+ * <p>
+ * <b>Signal-First Architecture:</b>
+ * This sensor INTERPRETS JMX data at the point of observation (where context exists)
+ * and emits MonitorSignals with embedded meaning, NOT raw data bags.
  * <p>
  * Responsibilities:
  * - Schedule periodic JMX collection from all brokers in cluster
  * - Extract broker IDs from bootstrap servers
- * - Emit BrokerMetrics to correct broker Cell in hierarchy
+ * - INTERPRET JMX data using BrokerHealthAssessor with baseline context
+ * - Emit MonitorSignals with assessment, evidence, recommendations
  * - Maintain VectorClock for causal ordering
  * - Handle collection failures gracefully
  * <p>
  * Usage:
  * <pre>
  * ClusterConfig config = ClusterConfig.withDefaults("localhost:9092", "localhost:11001");
- * BiConsumer&lt;Name, BrokerMetrics&gt; emitter = (name, metrics) -> ...;
+ * BaselineService baselineService = new SimpleBaselineService();
+ * BiConsumer&lt;Name, MonitorSignal&gt; emitter = (name, signal) -> ...;
  *
- * BrokerMonitoringAgent agent = new BrokerMonitoringAgent(config, emitter);
+ * BrokerMonitoringAgent agent = new BrokerMonitoringAgent(config, baselineService, emitter);
  * agent.start();
  *
  * // ... later ...
@@ -45,7 +58,9 @@ public class BrokerMonitoringAgent {
     private static final Logger logger = LoggerFactory.getLogger(BrokerMonitoringAgent.class);
 
     private final ClusterConfig config;
-    private final BiConsumer<Name, BrokerMetrics> metricsEmitter;
+    private final BaselineService baselineService;
+    private final BrokerHealthAssessor assessor;
+    private final BiConsumer<Name, MonitorSignal> signalEmitter;
     private final Cortex cortex;
     private final JmxMetricsCollector collector;
     private final VectorClockManager vectorClock;
@@ -60,12 +75,21 @@ public class BrokerMonitoringAgent {
      * creates a JMX connection pool for high-frequency monitoring.
      *
      * @param config Cluster configuration with bootstrap servers
-     * @param metricsEmitter Callback to emit metrics (receives broker Name and BrokerMetrics)
+     * @param baselineService Service providing baseline expectations and trends
+     * @param signalEmitter Callback to emit signals (receives broker Name and MonitorSignal)
      */
-    public BrokerMonitoringAgent(ClusterConfig config, BiConsumer<Name, BrokerMetrics> metricsEmitter) {
+    public BrokerMonitoringAgent(
+        ClusterConfig config,
+        BaselineService baselineService,
+        BiConsumer<Name, MonitorSignal> signalEmitter
+    ) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
-        this.metricsEmitter = Objects.requireNonNull(metricsEmitter, "metricsEmitter cannot be null");
+        this.baselineService = Objects.requireNonNull(baselineService, "baselineService cannot be null");
+        this.signalEmitter = Objects.requireNonNull(signalEmitter, "signalEmitter cannot be null");
         this.cortex = cortex();
+
+        // Create assessor for signal-first interpretation
+        this.assessor = new BrokerHealthAssessor(baselineService);
 
         // Create connection pool if configured
         JmxConnectionPoolConfig poolConfig = config.jmxConnectionPoolConfig();
@@ -157,44 +181,60 @@ public class BrokerMonitoringAgent {
     }
 
     /**
-     * Collect metrics from a single broker and emit via callback.
+     * Collect JMX data, interpret with assessor, and emit MonitorSignal.
+     * <p>
+     * <b>Signal-First Transformation:</b>
+     * 1. Collect raw JMX metrics
+     * 2. Convert to JmxData for assessor
+     * 3. Create Subject (circuit + entity)
+     * 4. INTERPRET using BrokerHealthAssessor (baseline comparison, trend detection, condition assessment)
+     * 5. Emit MonitorSignal with embedded meaning (not raw data)
      *
      * @param endpoint Broker endpoint to collect from
      */
     private void collectAndEmit(BrokerEndpoint endpoint) {
-        // Collect metrics via JMX
-        BrokerMetrics metrics = collector.collect(endpoint.jmxUrl);
+        // 1. Collect raw JMX metrics
+        BrokerMetrics rawMetrics = collector.collect(endpoint.jmxUrl);
 
-        // Override broker ID to ensure it matches our extracted ID
-        // (JmxMetricsCollector extracts from JMX URL, but we want to use ClusterConfig extraction)
-        BrokerMetrics normalizedMetrics = new BrokerMetrics(
-                endpoint.brokerId,  // Use our extracted broker ID
-                metrics.heapUsed(),
-                metrics.heapMax(),
-                metrics.cpuUsage(),
-                metrics.requestRate(),
-                metrics.byteInRate(),
-                metrics.byteOutRate(),
-                metrics.activeControllers(),
-                metrics.underReplicatedPartitions(),
-                metrics.offlinePartitionsCount(),
-                metrics.networkProcessorAvgIdlePercent(),
-                metrics.requestHandlerAvgIdlePercent(),
-                metrics.fetchConsumerTotalTimeMs(),
-                metrics.produceTotalTimeMs(),
-                metrics.timestamp()
+        // 2. Convert to JmxData for assessor
+        double heapPercent = rawMetrics.heapUsagePercent();
+        BrokerHealthAssessor.JmxData jmxData = new BrokerHealthAssessor.JmxData(
+            heapPercent,
+            rawMetrics.cpuUsage(),
+            rawMetrics.requestRate(),
+            rawMetrics.underReplicatedPartitions(),
+            rawMetrics.offlinePartitionsCount(),
+            rawMetrics.networkProcessorAvgIdlePercent(),
+            rawMetrics.requestHandlerAvgIdlePercent()
         );
 
-        // Increment VectorClock before emission
-        vectorClock.increment(endpoint.brokerId);
-
-        // Create broker Name using ClusterConfig
+        // 3. Create Name for broker
         Name brokerName = config.getBrokerName(cortex, endpoint.brokerId);
 
-        // Emit metrics via callback
-        metricsEmitter.accept(brokerName, normalizedMetrics);
+        // Create a simple Subject wrapping the broker name
+        // In full circuit context, this would come from Cell.subject()
+        Subject brokerSubject = createSubject(brokerName);
 
-        logger.debug("Emitted metrics for broker {} to Name {}", endpoint.brokerId, brokerName);
+        // 4. INTERPRET using assessor (THIS IS WHERE INTERPRETATION HAPPENS)
+        MonitorSignal signal = assessor.assess(
+            endpoint.brokerId,
+            brokerSubject,
+            jmxData
+        );
+
+        // 5. Increment VectorClock and attach to signal
+        vectorClock.increment(endpoint.brokerId);
+        VectorClock clock = vectorClock.snapshot();
+        MonitorSignal signalWithClock = signal.withClock(clock);
+
+        // 6. Emit SIGNAL with meaning (not raw data)
+        signalEmitter.accept(brokerName, signalWithClock);
+
+        logger.debug("Emitted signal for broker {}: condition={}, confidence={}",
+            endpoint.brokerId,
+            signal.status().condition(),
+            signal.status().confidence()
+        );
     }
 
     /**
@@ -241,6 +281,46 @@ public class BrokerMonitoringAgent {
             connectionPool.close();
             logger.info("JMX connection pool closed");
         }
+    }
+
+    /**
+     * Create a simple Subject for signal emission.
+     * <p>
+     * In full Circuit context, Subject would come from Cell.subject().
+     * This is a simplified version for standalone sensor usage.
+     *
+     * @param name Broker name
+     * @return Subject wrapping the name
+     */
+    @SuppressWarnings("unchecked")
+    private Subject createSubject(final Name name) {
+        return new Subject() {
+            @Override
+            public Id id() {
+                return null; // No specific ID
+            }
+
+            @Override
+            public Name name() {
+                return name;
+            }
+
+            @Override
+            public Class<MonitorSignal> type() {
+                return MonitorSignal.class;
+            }
+
+            @Override
+            public State state() {
+                return null; // No state - Subject is used for signal identity only
+            }
+
+            @Override
+            public int compareTo(Object o) {
+                if (!(o instanceof Subject)) return -1;
+                return name.toString().compareTo(((Subject) o).name().toString());
+            }
+        };
     }
 
     /**

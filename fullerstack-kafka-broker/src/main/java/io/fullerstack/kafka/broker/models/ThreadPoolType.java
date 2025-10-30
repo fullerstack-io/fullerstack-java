@@ -16,7 +16,7 @@ public enum ThreadPoolType {
      * <p>
      * JMX MBean: {@code kafka.network:type=SocketServer,name=NetworkProcessorAvgIdlePercent}
      */
-    NETWORK("network"),
+    NETWORK("Network Threads"),
 
     /**
      * I/O threads process requests (produce, fetch, metadata) from request queue.
@@ -24,14 +24,14 @@ public enum ThreadPoolType {
      * <p>
      * JMX MBean: {@code kafka.server:type=KafkaRequestHandlerPool,name=RequestHandlerAvgIdlePercent}
      */
-    IO("io"),
+    IO("I/O Threads"),
 
     /**
      * Log cleaner threads compact log segments (only if log compaction enabled).
      * <p>
      * JMX MBean: {@code kafka.log:type=LogCleaner,name=cleaner-recopy-percent}
      */
-    LOG_CLEANER("log-cleaner");
+    LOG_CLEANER("Log Cleaner Threads");
 
     private final String displayName;
 

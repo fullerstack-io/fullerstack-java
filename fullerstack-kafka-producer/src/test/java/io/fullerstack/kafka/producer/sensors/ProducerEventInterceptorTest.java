@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.fullerstack.kafka.producer.models.ProducerEventMetrics;
+import io.fullerstack.serventis.signals.ServiceSignal;
 import io.humainary.modules.serventis.services.api.Services;
 import io.humainary.substrates.api.Substrates.Pipe;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -20,25 +20,27 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 /**
  * Unit tests for {@link ProducerEventInterceptor}.
  * <p>
- * Verifies that the interceptor correctly emits ProducerEventMetrics with full context
- * (topic, partition, offset, latency, exception details) in response to producer lifecycle events.
+ * Verifies that the interceptor correctly emits ServiceSignals with interpreted meaning
+ * (latency assessments, error analysis) in response to producer lifecycle events.
+ * <p>
+ * Updated for signal-first architecture: tests now verify signal interpretation, not data bags.
  */
 class ProducerEventInterceptorTest {
 
     private ProducerEventInterceptor<String, String> interceptor;
-    private List<ProducerEventMetrics> capturedMetrics;
-    private Pipe<ProducerEventMetrics> mockPipe;
+    private List<ServiceSignal> capturedSignals;
+    private Pipe<ServiceSignal> mockPipe;
 
     @BeforeEach
     void setUp() {
         interceptor = new ProducerEventInterceptor<>();
-        capturedMetrics = new ArrayList<>();
+        capturedSignals = new ArrayList<>();
 
-        // Create a mock Pipe that captures emitted metrics
+        // Create a mock Pipe that captures emitted signals
         mockPipe = new Pipe<>() {
             @Override
-            public void emit(ProducerEventMetrics metrics) {
-                capturedMetrics.add(metrics);
+            public void emit(ServiceSignal signal) {
+                capturedSignals.add(signal);
             }
         };
     }
@@ -48,7 +50,7 @@ class ProducerEventInterceptorTest {
         // Given: Configuration with Pipe
         Map<String, Object> config = new HashMap<>();
         config.put("client.id", "test-producer");
-        config.put(ProducerEventInterceptor.METRICS_PIPE_KEY, mockPipe);
+        config.put(ProducerEventInterceptor.SIGNAL_PIPE_KEY, mockPipe);
 
         // When: Configuring interceptor
         interceptor.configure(config);
@@ -57,8 +59,8 @@ class ProducerEventInterceptorTest {
         ProducerRecord<String, String> record = new ProducerRecord<>("test-topic", "key", "value");
         interceptor.onSend(record);
 
-        assertThat(capturedMetrics).hasSize(1);
-        assertThat(capturedMetrics.get(0).signal()).isEqualTo(Services.Signal.CALL);
+        assertThat(capturedSignals).hasSize(1);
+        assertThat(capturedSignals.get(0).signal()).isEqualTo(Services.Signal.CALL);
     }
 
     @Test
@@ -75,7 +77,7 @@ class ProducerEventInterceptorTest {
         ProducerRecord<String, String> result = interceptor.onSend(record);
 
         assertThat(result).isEqualTo(record);
-        assertThat(capturedMetrics).isEmpty();
+        assertThat(capturedSignals).isEmpty();
     }
 
     @Test
@@ -83,7 +85,7 @@ class ProducerEventInterceptorTest {
         // Given: Configuration with wrong type for pipe
         Map<String, Object> config = new HashMap<>();
         config.put("client.id", "test-producer");
-        config.put(ProducerEventInterceptor.METRICS_PIPE_KEY, "not-a-pipe");
+        config.put(ProducerEventInterceptor.SIGNAL_PIPE_KEY, "not-a-pipe");
 
         // When: Configuring interceptor
         interceptor.configure(config);
@@ -92,14 +94,14 @@ class ProducerEventInterceptorTest {
         ProducerRecord<String, String> record = new ProducerRecord<>("test-topic", "key", "value");
         interceptor.onSend(record);
 
-        assertThat(capturedMetrics).isEmpty();
+        assertThat(capturedSignals).isEmpty();
     }
 
     @Test
     void configure_withoutClientId_shouldUseDefaultProducerId() {
         // Given: Configuration without client.id
         Map<String, Object> config = new HashMap<>();
-        config.put(ProducerEventInterceptor.METRICS_PIPE_KEY, mockPipe);
+        config.put(ProducerEventInterceptor.SIGNAL_PIPE_KEY, mockPipe);
 
         // When: Configuring interceptor (should not fail)
         assertThatCode(() -> interceptor.configure(config)).doesNotThrowAnyException();
@@ -108,8 +110,8 @@ class ProducerEventInterceptorTest {
         ProducerRecord<String, String> record = new ProducerRecord<>("test-topic", "key", "value");
         interceptor.onSend(record);
 
-        assertThat(capturedMetrics).hasSize(1);
-        assertThat(capturedMetrics.get(0).producerId()).isEqualTo("unknown-producer");
+        assertThat(capturedSignals).hasSize(1);
+        assertThat(capturedSignals.get(0).payload().get("producer_id")).isEqualTo("unknown-producer");
     }
 
     @Test
@@ -123,16 +125,13 @@ class ProducerEventInterceptorTest {
 
         // Then: Should emit CALL metrics and return original record
         assertThat(result).isEqualTo(record);
-        assertThat(capturedMetrics).hasSize(1);
+        assertThat(capturedSignals).hasSize(1);
 
-        ProducerEventMetrics metrics = capturedMetrics.get(0);
-        assertThat(metrics.producerId()).isEqualTo("test-producer");
-        assertThat(metrics.topic()).isEqualTo("orders");
-        assertThat(metrics.partition()).isEqualTo(2);
-        assertThat(metrics.offset()).isEqualTo(-1L);  // Not yet assigned
-        assertThat(metrics.signal()).isEqualTo(Services.Signal.CALL);
-        assertThat(metrics.exception()).isNull();
-        assertThat(metrics.latencyMs()).isEqualTo(0L);
+        ServiceSignal signal = capturedSignals.get(0);
+        assertThat(signal.signal()).isEqualTo(Services.Signal.CALL);
+        assertThat(signal.payload().get("producer_id")).isEqualTo("test-producer");
+        assertThat(signal.payload().get("topic")).isEqualTo("orders");
+        assertThat(signal.payload().get("partition")).isEqualTo("2");
     }
 
     @Test
@@ -148,22 +147,22 @@ class ProducerEventInterceptorTest {
 
         // Then: Should return record unchanged, no metrics emitted
         assertThat(result).isEqualTo(record);
-        assertThat(capturedMetrics).isEmpty();
+        assertThat(capturedSignals).isEmpty();
     }
 
     @Test
     void onSend_withException_shouldNotBreakProducer() {
         // Given: Pipe that throws exception
-        Pipe<ProducerEventMetrics> faultyPipe = new Pipe<>() {
+        Pipe<ServiceSignal> faultyPipe = new Pipe<>() {
             @Override
-            public void emit(ProducerEventMetrics metrics) {
+            public void emit(ServiceSignal signal) {
                 throw new RuntimeException("Pipe failed");
             }
         };
 
         Map<String, Object> config = new HashMap<>();
         config.put("client.id", "test-producer");
-        config.put(ProducerEventInterceptor.METRICS_PIPE_KEY, faultyPipe);
+        config.put(ProducerEventInterceptor.SIGNAL_PIPE_KEY, faultyPipe);
         interceptor.configure(config);
 
         ProducerRecord<String, String> record = new ProducerRecord<>("test-topic", "key", "value");
@@ -182,16 +181,18 @@ class ProducerEventInterceptorTest {
         interceptor.onAcknowledgement(metadata, null);
 
         // Then: Should emit SUCCEEDED metrics
-        assertThat(capturedMetrics).hasSize(1);
+        assertThat(capturedSignals).hasSize(1);
 
-        ProducerEventMetrics metrics = capturedMetrics.get(0);
-        assertThat(metrics.producerId()).isEqualTo("test-producer");
-        assertThat(metrics.topic()).isEqualTo("orders");
-        assertThat(metrics.partition()).isEqualTo(2);
-        assertThat(metrics.offset()).isEqualTo(123L);
-        assertThat(metrics.signal()).isEqualTo(Services.Signal.SUCCEEDED);
-        assertThat(metrics.exception()).isNull();
-        assertThat(metrics.latencyMs()).isGreaterThanOrEqualTo(0L);
+        ServiceSignal signal = capturedSignals.get(0);
+        assertThat(signal.payload().get("producer_id")).isEqualTo("test-producer");
+        assertThat(signal.payload().get("topic")).isEqualTo("orders");
+        assertThat(signal.payload().get("partition")).isEqualTo("2");
+        assertThat(signal.payload().get("offset")).isEqualTo("123");
+        assertThat(signal.signal()).isEqualTo(Services.Signal.SUCCEEDED);
+        // No error_type for successful operations
+        assertThat(signal.payload().containsKey("error_type")).isFalse();
+        // Latency is present
+        assertThat(signal.payload().get("latency_ms")).isNotNull();
     }
 
     @Test
@@ -205,16 +206,18 @@ class ProducerEventInterceptorTest {
         interceptor.onAcknowledgement(metadata, exception);
 
         // Then: Should emit FAILED metrics
-        assertThat(capturedMetrics).hasSize(1);
+        assertThat(capturedSignals).hasSize(1);
 
-        ProducerEventMetrics metrics = capturedMetrics.get(0);
-        assertThat(metrics.producerId()).isEqualTo("test-producer");
-        assertThat(metrics.topic()).isEqualTo("orders");
-        assertThat(metrics.partition()).isEqualTo(2);
-        assertThat(metrics.offset()).isEqualTo(-1L);  // Not assigned on failure
-        assertThat(metrics.signal()).isEqualTo(Services.Signal.FAILED);
-        assertThat(metrics.exception()).isEqualTo(exception);
-        assertThat(metrics.latencyMs()).isGreaterThanOrEqualTo(0L);
+        ServiceSignal signal = capturedSignals.get(0);
+        assertThat(signal.payload().get("producer_id")).isEqualTo("test-producer");
+        assertThat(signal.payload().get("topic")).isEqualTo("orders");
+        assertThat(signal.payload().get("partition")).isEqualTo("2");
+        // No offset for failures
+        assertThat(signal.payload().containsKey("offset")).isFalse();
+        assertThat(signal.signal()).isEqualTo(Services.Signal.FAILED);
+        // Error type is exception class name
+        assertThat(signal.payload().get("error_type")).isEqualTo("RuntimeException");
+        assertThat(signal.payload().get("latency_ms")).isNotNull();
     }
 
     @Test
@@ -230,22 +233,22 @@ class ProducerEventInterceptorTest {
         interceptor.onAcknowledgement(metadata, null);
 
         // Then: Should not emit metrics
-        assertThat(capturedMetrics).isEmpty();
+        assertThat(capturedSignals).isEmpty();
     }
 
     @Test
     void onAcknowledgement_withException_shouldNotBreakProducer() {
         // Given: Pipe that throws exception
-        Pipe<ProducerEventMetrics> faultyPipe = new Pipe<>() {
+        Pipe<ServiceSignal> faultyPipe = new Pipe<>() {
             @Override
-            public void emit(ProducerEventMetrics metrics) {
+            public void emit(ServiceSignal signal) {
                 throw new RuntimeException("Pipe failed");
             }
         };
 
         Map<String, Object> config = new HashMap<>();
         config.put("client.id", "test-producer");
-        config.put(ProducerEventInterceptor.METRICS_PIPE_KEY, faultyPipe);
+        config.put(ProducerEventInterceptor.SIGNAL_PIPE_KEY, faultyPipe);
         interceptor.configure(config);
 
         RecordMetadata metadata = createMetadata("test-topic", 0, 123L);
@@ -268,21 +271,22 @@ class ProducerEventInterceptorTest {
         interceptor.onAcknowledgement(metadata, null);
 
         // Then: Should emit CALL followed by SUCCEEDED
-        assertThat(capturedMetrics).hasSize(2);
+        assertThat(capturedSignals).hasSize(2);
 
         // CALL metrics
-        ProducerEventMetrics callMetrics = capturedMetrics.get(0);
+        ServiceSignal callMetrics = capturedSignals.get(0);
         assertThat(callMetrics.signal()).isEqualTo(Services.Signal.CALL);
-        assertThat(callMetrics.topic()).isEqualTo("orders");
-        assertThat(callMetrics.partition()).isEqualTo(2);
-        assertThat(callMetrics.offset()).isEqualTo(-1L);
+        assertThat(callMetrics.payload().get("topic")).isEqualTo("orders");
+        assertThat(callMetrics.payload().get("partition")).isEqualTo("2");
+        // CALL doesn't have offset
+        assertThat(callMetrics.payload().containsKey("offset")).isFalse();
 
         // SUCCEEDED metrics
-        ProducerEventMetrics succeededMetrics = capturedMetrics.get(1);
+        ServiceSignal succeededMetrics = capturedSignals.get(1);
         assertThat(succeededMetrics.signal()).isEqualTo(Services.Signal.SUCCEEDED);
-        assertThat(succeededMetrics.topic()).isEqualTo("orders");
-        assertThat(succeededMetrics.partition()).isEqualTo(2);
-        assertThat(succeededMetrics.offset()).isEqualTo(123L);
+        assertThat(succeededMetrics.payload().get("topic")).isEqualTo("orders");
+        assertThat(succeededMetrics.payload().get("partition")).isEqualTo("2");
+        assertThat(succeededMetrics.payload().get("offset")).isEqualTo("123");
     }
 
     @Test
@@ -299,14 +303,15 @@ class ProducerEventInterceptorTest {
         interceptor.onAcknowledgement(metadata, exception);
 
         // Then: Should emit CALL followed by FAILED
-        assertThat(capturedMetrics).hasSize(2);
+        assertThat(capturedSignals).hasSize(2);
 
-        ProducerEventMetrics callMetrics = capturedMetrics.get(0);
+        ServiceSignal callMetrics = capturedSignals.get(0);
         assertThat(callMetrics.signal()).isEqualTo(Services.Signal.CALL);
 
-        ProducerEventMetrics failedMetrics = capturedMetrics.get(1);
+        ServiceSignal failedMetrics = capturedSignals.get(1);
         assertThat(failedMetrics.signal()).isEqualTo(Services.Signal.FAILED);
-        assertThat(failedMetrics.exception()).isEqualTo(exception);
+        // Error type is exception class name
+        assertThat(failedMetrics.payload().get("error_type")).isEqualTo("RuntimeException");
     }
 
     @Test
@@ -329,9 +334,13 @@ class ProducerEventInterceptorTest {
         interceptor.onAcknowledgement(metadata, null);
 
         // Then: SUCCEEDED metrics should have non-zero latency
-        assertThat(capturedMetrics).hasSize(2);
-        ProducerEventMetrics succeededMetrics = capturedMetrics.get(1);
-        assertThat(succeededMetrics.latencyMs()).isGreaterThan(0L);
+        assertThat(capturedSignals).hasSize(2);
+        ServiceSignal succeededMetrics = capturedSignals.get(1);
+        // Latency is present and parseable
+        String latencyStr = succeededMetrics.payload().get("latency_ms");
+        assertThat(latencyStr).isNotNull();
+        long latency = Long.parseLong(latencyStr);
+        assertThat(latency).isGreaterThan(0L);
     }
 
     @Test
@@ -349,11 +358,11 @@ class ProducerEventInterceptorTest {
         interceptor.onSend(record3);
 
         // Then: Should emit three CALL metrics
-        assertThat(capturedMetrics).hasSize(3);
-        assertThat(capturedMetrics).allMatch(m -> m.signal() == Services.Signal.CALL);
-        assertThat(capturedMetrics.get(0).topic()).isEqualTo("topic1");
-        assertThat(capturedMetrics.get(1).topic()).isEqualTo("topic2");
-        assertThat(capturedMetrics.get(2).topic()).isEqualTo("topic3");
+        assertThat(capturedSignals).hasSize(3);
+        assertThat(capturedSignals).allMatch(m -> m.signal() == Services.Signal.CALL);
+        assertThat(capturedSignals.get(0).payload().get("topic")).isEqualTo("topic1");
+        assertThat(capturedSignals.get(1).payload().get("topic")).isEqualTo("topic2");
+        assertThat(capturedSignals.get(2).payload().get("topic")).isEqualTo("topic3");
     }
 
     @Test
@@ -371,11 +380,11 @@ class ProducerEventInterceptorTest {
         interceptor.onAcknowledgement(createMetadata("orders", 1, -1L), new RuntimeException("Error"));
 
         // Then: Should emit CALL, SUCCEEDED, CALL, FAILED
-        assertThat(capturedMetrics).hasSize(4);
-        assertThat(capturedMetrics.get(0).signal()).isEqualTo(Services.Signal.CALL);
-        assertThat(capturedMetrics.get(1).signal()).isEqualTo(Services.Signal.SUCCEEDED);
-        assertThat(capturedMetrics.get(2).signal()).isEqualTo(Services.Signal.CALL);
-        assertThat(capturedMetrics.get(3).signal()).isEqualTo(Services.Signal.FAILED);
+        assertThat(capturedSignals).hasSize(4);
+        assertThat(capturedSignals.get(0).signal()).isEqualTo(Services.Signal.CALL);
+        assertThat(capturedSignals.get(1).signal()).isEqualTo(Services.Signal.SUCCEEDED);
+        assertThat(capturedSignals.get(2).signal()).isEqualTo(Services.Signal.CALL);
+        assertThat(capturedSignals.get(3).signal()).isEqualTo(Services.Signal.FAILED);
     }
 
     @Test
@@ -406,7 +415,8 @@ class ProducerEventInterceptorTest {
     private void configureInterceptor(String producerId) {
         Map<String, Object> config = new HashMap<>();
         config.put("client.id", producerId);
-        config.put(ProducerEventInterceptor.METRICS_PIPE_KEY, mockPipe);
+        config.put(ProducerEventInterceptor.SIGNAL_PIPE_KEY, mockPipe);
+        // Note: Baseline service is optional - interceptor handles null gracefully
         interceptor.configure(config);
     }
 

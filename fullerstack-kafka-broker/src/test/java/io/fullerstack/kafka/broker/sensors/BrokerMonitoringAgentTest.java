@@ -1,11 +1,11 @@
 package io.fullerstack.kafka.broker.sensors;
 
-import io.fullerstack.substrates.CortexRuntime;
-import io.humainary.substrates.api.Substrates.Cortex;
-import io.humainary.substrates.api.Substrates.Name;
-import io.fullerstack.kafka.broker.models.BrokerMetrics;
-import io.fullerstack.kafka.broker.sensors.BrokerMonitoringAgent.BrokerEndpoint;
+import io.fullerstack.kafka.broker.baseline.BaselineService;
+import io.fullerstack.kafka.broker.baseline.SimpleBaselineService;
 import io.fullerstack.kafka.core.config.ClusterConfig;
+import io.fullerstack.kafka.broker.sensors.BrokerMonitoringAgent.BrokerEndpoint;
+import io.fullerstack.serventis.signals.MonitorSignal;
+import io.humainary.substrates.api.Substrates.Name;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,16 +21,22 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for BrokerMonitoringAgent.
+ * <p>
+ * Tests updated for signal-first architecture:
+ * - Agent now requires BaselineService
+ * - Emits MonitorSignal instead of BrokerMetrics
  */
 class BrokerMonitoringAgentTest {
 
     private ClusterConfig config;
-    private BiConsumer<Name, BrokerMetrics> mockEmitter;
+    private BaselineService baselineService;
+    private BiConsumer<Name, MonitorSignal> mockEmitter;
     private BrokerMonitoringAgent agent;
 
     @BeforeEach
     void setUp() {
         config = ClusterConfig.withDefaults("localhost:9092", "localhost:11001");
+        baselineService = new SimpleBaselineService();
         mockEmitter = mock(BiConsumer.class);
     }
 
@@ -43,7 +49,7 @@ class BrokerMonitoringAgentTest {
 
     @Test
     void testConstructor() {
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
 
         assertNotNull(agent);
         assertNotNull(agent.getVectorClock());
@@ -53,21 +59,28 @@ class BrokerMonitoringAgentTest {
     @Test
     void testConstructor_NullConfig() {
         assertThrows(NullPointerException.class, () ->
-                new BrokerMonitoringAgent(null, mockEmitter)
+                new BrokerMonitoringAgent(null, baselineService, mockEmitter)
+        );
+    }
+
+    @Test
+    void testConstructor_NullBaselineService() {
+        assertThrows(NullPointerException.class, () ->
+                new BrokerMonitoringAgent(config, null, mockEmitter)
         );
     }
 
     @Test
     void testConstructor_NullEmitter() {
         assertThrows(NullPointerException.class, () ->
-                new BrokerMonitoringAgent(config, null)
+                new BrokerMonitoringAgent(config, baselineService, null)
         );
     }
 
     @Test
     void testParseBrokerEndpoints_SingleBroker() {
         config = ClusterConfig.withDefaults("localhost:9092", "localhost:11001");
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
 
         List<BrokerEndpoint> endpoints = agent.getBrokerEndpoints();
 
@@ -82,7 +95,7 @@ class BrokerMonitoringAgentTest {
                 "b-1.kafka.us-east-1.amazonaws.com:9092,b-2.kafka.us-east-1.amazonaws.com:9092,b-3.kafka.us-east-1.amazonaws.com:9092",
                 "b-1.kafka.us-east-1.amazonaws.com:11001,b-2.kafka.us-east-1.amazonaws.com:11001,b-3.kafka.us-east-1.amazonaws.com:11001"
         );
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
 
         List<BrokerEndpoint> endpoints = agent.getBrokerEndpoints();
 
@@ -110,7 +123,7 @@ class BrokerMonitoringAgentTest {
                 30_000,
                 null
         );
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
 
         List<BrokerEndpoint> endpoints = agent.getBrokerEndpoints();
 
@@ -121,7 +134,7 @@ class BrokerMonitoringAgentTest {
 
     @Test
     void testGetBrokerEndpoints_DefensiveCopy() {
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
 
         List<BrokerEndpoint> endpoints1 = agent.getBrokerEndpoints();
         List<BrokerEndpoint> endpoints2 = agent.getBrokerEndpoints();
@@ -157,7 +170,7 @@ class BrokerMonitoringAgentTest {
 
     @Test
     void testVectorClock_InitiallyEmpty() {
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
 
         assertEquals(0L, agent.getVectorClock().get("broker-1"));
         assertEquals(0L, agent.getVectorClock().get("broker-2"));
@@ -165,7 +178,7 @@ class BrokerMonitoringAgentTest {
 
     @Test
     void testShutdown_GracefulTermination() throws InterruptedException {
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
         agent.start();
 
         // Give scheduler time to start
@@ -181,7 +194,7 @@ class BrokerMonitoringAgentTest {
 
     @Test
     void testShutdown_Idempotent() {
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
         agent.start();
 
         agent.shutdown();
@@ -197,7 +210,7 @@ class BrokerMonitoringAgentTest {
                 "b-1.kafka.us-east-1.amazonaws.com:9092,b-2.kafka.us-east-1.amazonaws.com:9092,b-3.kafka.us-east-1.amazonaws.com:9092",
                 "b-1.kafka.us-east-1.amazonaws.com:11001,b-2.kafka.us-east-1.amazonaws.com:11001"
         );
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
 
         List<BrokerEndpoint> endpoints = agent.getBrokerEndpoints();
 
@@ -217,7 +230,7 @@ class BrokerMonitoringAgentTest {
                 30_000,
                 null
         );
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
 
         List<BrokerEndpoint> endpoints = agent.getBrokerEndpoints();
 
@@ -231,7 +244,7 @@ class BrokerMonitoringAgentTest {
                 "b-1.trans.kafka.us-east-1.amazonaws.com:9092",
                 "b-1.trans.kafka.us-east-1.amazonaws.com:11001"
         );
-        agent = new BrokerMonitoringAgent(config, mockEmitter);
+        agent = new BrokerMonitoringAgent(config, baselineService, mockEmitter);
 
         List<BrokerEndpoint> endpoints = agent.getBrokerEndpoints();
 
