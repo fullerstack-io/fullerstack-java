@@ -1,48 +1,44 @@
 package io.fullerstack.kafka.broker.monitors;
 
-import io.fullerstack.kafka.broker.baseline.BaselineService;
 import io.fullerstack.kafka.broker.models.ThreadPoolMetrics;
 import io.fullerstack.kafka.broker.models.ThreadPoolType;
 import io.fullerstack.serventis.signals.ResourceSignal;
 import io.humainary.modules.serventis.resources.api.Resources;
-import io.humainary.substrates.api.Substrates.Cortex;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pipe;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
 import static io.fullerstack.substrates.CortexRuntime.cortex;
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Comprehensive tests for ThreadPoolResourceMonitor (signal-first architecture).
+ * Tests for ThreadPoolResourceMonitor (Layer 2 - Signal Emission).
  *
- * <p>Test Coverage:
+ * <p><b>Per ADR-002:</b> Tests validate simple threshold-based signal emission only.
+ * Removed: BaselineService, interpretation text, recommendations, trend analysis.
+ *
+ * <p>Test Coverage (Layer 2 Only):
  * <ul>
- *   <li>Condition assessment: AVAILABLE, DEGRADED, EXHAUSTED</li>
- *   <li>Baseline integration: contextual thresholds</li>
- *   <li>Trend analysis: degrading, improving, stable</li>
- *   <li>Payload completeness: metrics + interpretation + recommendations</li>
+ *   <li>Sign assessment: GRANT (healthy/degraded), DENY (exhausted)</li>
+ *   <li>Simple fixed thresholds (no contextual baselines)</li>
+ *   <li>Payload completeness: raw metrics only</li>
  *   <li>Subject creation: circuit + entity</li>
- *   <li>Observation recording: BaselineService integration</li>
  *   <li>Error handling: graceful degradation</li>
  * </ul>
  */
-@DisplayName("ThreadPoolResourceMonitor (Signal-First)")
+@DisplayName("ThreadPoolResourceMonitor (Layer 2 - Signal Emission)")
 class ThreadPoolResourceMonitorTest {
 
     private Name circuitName;
     private Pipe<ResourceSignal> signalPipe;
-    private BaselineService baselineService;
     private ThreadPoolResourceMonitor monitor;
 
     private List<ResourceSignal> emittedSignals;
@@ -51,9 +47,8 @@ class ThreadPoolResourceMonitorTest {
     void setUp() {
         circuitName = cortex().name("kafka.broker.resources");
         signalPipe = createSignalCaptor();
-        baselineService = mock(BaselineService.class);
 
-        monitor = new ThreadPoolResourceMonitor(circuitName, signalPipe, baselineService);
+        monitor = new ThreadPoolResourceMonitor(circuitName, signalPipe);
 
         emittedSignals = new ArrayList<>();
     }
@@ -108,255 +103,165 @@ class ThreadPoolResourceMonitorTest {
     }
 
     // ========================================================================
-    // AVAILABLE Condition Tests
+    // GRANT Condition Tests (Healthy >= 30% idle)
     // ========================================================================
 
     @Nested
-    @DisplayName("AVAILABLE Condition Assessment")
-    class AvailableTests {
+    @DisplayName("GRANT Sign (Healthy - >= 30% idle)")
+    class HealthyTests {
 
         @Test
-        @DisplayName("Should emit AVAILABLE when idle >= 30%")
-        void testAvailableCondition_HealthyPool() {
-            // Given: 40% idle (healthy)
+        @DisplayName("Should emit GRANT when idle >= 30%")
+        void testHealthy_HighIdle() {
+            // Given: 40% idle (healthy - above 30% threshold)
             ThreadPoolMetrics metrics = createMetrics(
                 "broker-1",
                 ThreadPoolType.NETWORK,
                 3,
-                1,  // 1 idle out of 3 = 33%
+                1,
                 0.40
             );
 
-            // Baseline: 35% expected
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
             assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
-            assertThat(signal.payload().get("assessment")).isEqualTo("AVAILABLE");
-            assertThat(signal.payload().get("interpretation")).contains("healthy");
+            assertThat(signal.resourceSignal().units()).isEqualTo(1);  // idleThreads
             assertThat(signal.payload().get("avgIdlePercent")).isEqualTo("0.40");
         }
 
         @Test
-        @DisplayName("Should emit AVAILABLE when above baseline")
-        void testAvailableCondition_AboveBaseline() {
-            // Given: 35% idle, baseline 30%
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.IO, 8, 3, 0.35);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
+        @DisplayName("Should emit GRANT at exactly 30% idle")
+        void testHealthy_ExactlyAtThreshold() {
+            // Given: Exactly 30% idle (boundary)
+            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.IO, 10, 3, 0.30);
 
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
             assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
-            assertThat(signal.payload().get("assessment")).isEqualTo("AVAILABLE");
-        }
-
-        @Test
-        @DisplayName("Should note over-provisioning if significantly above baseline")
-        void testAvailableCondition_OverProvisioned() {
-            // Given: 80% idle (way above 30% baseline)
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 2, 0.80);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
-            // When
-            monitor.interpret(metrics);
-
-            // Then
-            ResourceSignal signal = getLastSignal();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
-            assertThat(signal.payload().get("note")).contains("under-utilized");
+            assertThat(signal.resourceSignal().units()).isEqualTo(3);
         }
 
         @Test
         @DisplayName("Should include all required payload fields")
-        void testAvailableCondition_PayloadCompleteness() {
+        void testHealthy_PayloadCompleteness() {
             // Given
             ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.IO, 8, 4, 0.50);
 
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
             assertThat(signal.payload())
                 .containsKeys(
-                    "assessment",
-                    "interpretation",
                     "brokerId",
                     "poolType",
                     "totalThreads",
                     "activeThreads",
                     "idleThreads",
                     "avgIdlePercent",
-                    "utilizationPercent",
-                    "expectedIdlePercent"
+                    "utilizationPercent"
                 );
 
             assertThat(signal.payload().get("brokerId")).isEqualTo("broker-1");
             assertThat(signal.payload().get("poolType")).isEqualTo("I/O Threads");
             assertThat(signal.payload().get("totalThreads")).isEqualTo("8");
             assertThat(signal.payload().get("idleThreads")).isEqualTo("4");
+            assertThat(signal.payload().get("activeThreads")).isEqualTo("4");
+
+            // No interpretation, no recommendation, no baseline fields
+            assertThat(signal.payload()).doesNotContainKeys(
+                "interpretation", "recommendation", "assessment", "expectedIdlePercent", "trend"
+            );
         }
     }
 
     // ========================================================================
-    // DEGRADED Condition Tests
+    // GRANT Condition Tests (Degraded 10-30% idle)
     // ========================================================================
 
     @Nested
-    @DisplayName("DEGRADED Condition Assessment")
+    @DisplayName("GRANT Sign (Degraded - 10-30% idle)")
     class DegradedTests {
 
         @Test
-        @DisplayName("Should emit DEGRADED when idle 10-30%")
-        void testDegradedCondition_ModerateLoad() {
-            // Given: 22% idle (degraded)
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.22);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
+        @DisplayName("Should emit GRANT when idle is 10-30%")
+        void testDegraded_ModerateLoad() {
+            // Given: 22% idle (degraded - between 10% and 30%)
+            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 10, 2, 0.22);
 
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
             assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
-// confidence not applicable for ResourceSignal
-            assertThat(signal.payload().get("assessment")).isEqualTo("DEGRADED");
-            assertThat(signal.payload().get("interpretation")).contains("under pressure");
+            assertThat(signal.resourceSignal().units()).isEqualTo(2);  // Still has capacity
         }
 
         @Test
-        @DisplayName("Should emit DEGRADED when below 80% of baseline")
-        void testDegradedCondition_BelowBaseline() {
-            // Given: 20% idle, which is below 80% of 30% baseline (24%)
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.IO, 8, 2, 0.20);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
+        @DisplayName("Should emit GRANT at exactly 10% idle")
+        void testDegraded_ExactlyAtLowerThreshold() {
+            // Given: Exactly 10% idle (boundary - still GRANT)
+            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.IO, 10, 1, 0.10);
 
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
             assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
-            assertThat(signal.payload().get("assessment")).isEqualTo("DEGRADED");
-        }
-
-        @Test
-        @DisplayName("Should include monitoring recommendation")
-        void testDegradedCondition_Recommendation() {
-            // Given
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.25);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
-            // When
-            monitor.interpret(metrics);
-
-            // Then
-            ResourceSignal signal = getLastSignal();
-            assertThat(signal.payload().get("recommendation"))
-                .contains("Monitor")
-                .contains("Network Threads");
-        }
-
-        @Test
-        @DisplayName("Should add trend interpretation if data available")
-        void testDegradedCondition_TrendAnalysis() {
-            // Given: 22% idle now, was 30% previously (degrading)
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.22);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
-            // When
-            monitor.interpret(metrics);
-
-            // Then
-            ResourceSignal signal = getLastSignal();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
-
-            // Note: Trend won't appear in first observation (no historical data)
-            // This test validates that the code handles missing historical data gracefully
+            assertThat(signal.resourceSignal().units()).isEqualTo(1);
         }
     }
 
     // ========================================================================
-    // EXHAUSTED Condition Tests
+    // DENY Condition Tests (Exhausted < 10% idle)
     // ========================================================================
 
     @Nested
-    @DisplayName("EXHAUSTED Condition Assessment")
+    @DisplayName("DENY Sign (Exhausted - < 10% idle)")
     class ExhaustedTests {
 
         @Test
-        @DisplayName("Should emit EXHAUSTED when idle < 10%")
-        void testExhaustedCondition_LowIdle() {
+        @DisplayName("Should emit DENY when idle < 10%")
+        void testExhausted_LowIdle() {
             // Given: 8% idle (exhausted)
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 0, 0.08);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
+            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 10, 1, 0.08);
 
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
             assertThat(signal.sign()).isEqualTo(Resources.Sign.DENY);
-// confidence not applicable for ResourceSignal
-            assertThat(signal.payload().get("assessment")).isEqualTo("EXHAUSTED");
-            assertThat(signal.payload().get("interpretation")).contains("critically saturated");
+            assertThat(signal.resourceSignal().units()).isEqualTo(0);  // No capacity
         }
 
         @Test
-        @DisplayName("Should emit EXHAUSTED when significantly below baseline")
-        void testExhaustedCondition_BelowBaseline() {
-            // Given: 12% idle, which is below 50% of 30% baseline (15%)
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.IO, 8, 1, 0.12);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
+        @DisplayName("Should emit DENY at 0% idle")
+        void testExhausted_ZeroIdle() {
+            // Given: 0% idle (fully saturated)
+            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 0, 0.0);
 
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
             assertThat(signal.sign()).isEqualTo(Resources.Sign.DENY);
-            assertThat(signal.payload().get("interpretation")).contains("below baseline");
+            assertThat(signal.resourceSignal().units()).isEqualTo(0);
         }
 
         @Test
-        @DisplayName("Should include critical recommendation")
-        void testExhaustedCondition_CriticalRecommendation() {
-            // Given
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 0, 0.05);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
-            // When
-            monitor.interpret(metrics);
-
-            // Then
-            ResourceSignal signal = getLastSignal();
-            assertThat(signal.payload().get("recommendation"))
-                .contains("CRITICAL")
-                .contains("Increase")
-                .contains("3 threads");
-        }
-
-        @Test
-        @DisplayName("Should escalate severity if rejections occurring")
-        void testExhaustedCondition_WithRejections() {
+        @DisplayName("Should include rejection count in payload if non-zero")
+        void testExhausted_WithRejections() {
             // Given: Exhausted pool with task rejections
             ThreadPoolMetrics metricsWithRejections = new ThreadPoolMetrics(
                 "broker-1",
@@ -365,98 +270,19 @@ class ThreadPoolResourceMonitorTest {
                 3,  // all active
                 0,  // none idle
                 0.02,  // 2% idle
-                0L,  // queueSize
-                1000L,  // totalTasksProcessed
-                5L,  // rejectionCount - CRITICAL!
+                0L,
+                1000L,
+                5L,  // rejectionCount
                 System.currentTimeMillis()
             );
 
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
             // When
-            monitor.interpret(metricsWithRejections);
+            monitor.emit(metricsWithRejections);
 
             // Then
             ResourceSignal signal = getLastSignal();
             assertThat(signal.sign()).isEqualTo(Resources.Sign.DENY);
-            assertThat(signal.payload().get("rejections")).isEqualTo("5");
-            assertThat(signal.payload().get("severity")).contains("CRITICAL");
-            assertThat(signal.payload().get("severity")).contains("rejected");
-        }
-    }
-
-    // ========================================================================
-    // Baseline Integration Tests
-    // ========================================================================
-
-    @Nested
-    @DisplayName("BaselineService Integration")
-    class BaselineTests {
-
-        @Test
-        @DisplayName("Should use default baseline when no historical data")
-        void testBaseline_NoHistoricalData() {
-            // Given
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.35);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
-            // When
-            monitor.interpret(metrics);
-
-            // Then
-            ResourceSignal signal = getLastSignal();
-            // Default baseline is 30%, so 35% should be AVAILABLE
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
-            assertThat(signal.payload().get("expectedIdlePercent")).isEqualTo("0.30");
-        }
-
-        @Test
-        @DisplayName("Should record observation to BaselineService")
-        void testBaseline_RecordObservation() {
-            // Given
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.35);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
-            // When
-            monitor.interpret(metrics);
-
-            // Then: Observation should be recorded
-            verify(baselineService).recordObservation(
-                eq("broker-1"),
-                eq("thread_pool_idle_network"),
-                eq(0.35),
-                any(Instant.class)
-            );
-        }
-
-        @Test
-        @DisplayName("Should record observation for all pool types")
-        void testBaseline_RecordForAllPoolTypes() {
-            // Given: Different pool types
-            ThreadPoolMetrics networkMetrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.35);
-            ThreadPoolMetrics ioMetrics = createMetrics("broker-1", ThreadPoolType.IO, 8, 3, 0.40);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
-            // When
-            monitor.interpret(networkMetrics);
-            monitor.interpret(ioMetrics);
-
-            // Then: Different metric keys
-            verify(baselineService).recordObservation(
-                eq("broker-1"),
-                eq("thread_pool_idle_network"),
-                anyDouble(),
-                any(Instant.class)
-            );
-            verify(baselineService).recordObservation(
-                eq("broker-1"),
-                eq("thread_pool_idle_io"),
-                anyDouble(),
-                any(Instant.class)
-            );
+            assertThat(signal.payload().get("rejectionCount")).isEqualTo("5");
         }
     }
 
@@ -469,15 +295,13 @@ class ThreadPoolResourceMonitorTest {
     class SubjectTests {
 
         @Test
-        @DisplayName("Should create subject with circuit + entity")
-        void testSubject_CircuitAndEntity() {
+        @DisplayName("Should create subject with entity name")
+        void testSubject_EntityName() {
             // Given
             ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.35);
 
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
@@ -491,13 +315,11 @@ class ThreadPoolResourceMonitorTest {
             ThreadPoolMetrics networkMetrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.35);
             ThreadPoolMetrics ioMetrics = createMetrics("broker-1", ThreadPoolType.IO, 8, 3, 0.40);
 
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
             // When
-            monitor.interpret(networkMetrics);
+            monitor.emit(networkMetrics);
             ResourceSignal networkSignal = getLastSignal();
 
-            monitor.interpret(ioMetrics);
+            monitor.emit(ioMetrics);
             ResourceSignal ioSignal = getLastSignal();
 
             // Then: Different entity names
@@ -531,10 +353,8 @@ class ThreadPoolResourceMonitorTest {
                 System.currentTimeMillis()
             );
 
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
             // When
-            monitor.interpret(metricsWithQueue);
+            monitor.emit(metricsWithQueue);
 
             // Then
             ResourceSignal signal = getLastSignal();
@@ -547,10 +367,8 @@ class ThreadPoolResourceMonitorTest {
             // Given: Metrics with zero queue size
             ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.35);
 
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
@@ -558,30 +376,25 @@ class ThreadPoolResourceMonitorTest {
         }
 
         @Test
-        @DisplayName("Should include rejection count if non-zero")
-        void testPayload_RejectionCountIncluded() {
-            // Given: Metrics with rejections
-            ThreadPoolMetrics metricsWithRejections = new ThreadPoolMetrics(
-                "broker-1",
-                ThreadPoolType.NETWORK,
-                3,
-                3,
-                0,
-                0.05,
-                0L,
-                1000L,
-                10L,  // rejectionCount - should appear
-                System.currentTimeMillis()
-            );
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
+        @DisplayName("Should not include Layer 4 fields")
+        void testPayload_NoLayer4Fields() {
+            // Given
+            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.22);
 
             // When
-            monitor.interpret(metricsWithRejections);
+            monitor.emit(metrics);
 
-            // Then
+            // Then: NO interpretation, recommendation, baseline, or assessment
             ResourceSignal signal = getLastSignal();
-            assertThat(signal.payload().get("rejectionCount")).isEqualTo("10");
+            assertThat(signal.payload()).doesNotContainKeys(
+                "interpretation",
+                "recommendation",
+                "assessment",
+                "expectedIdlePercent",
+                "trend",
+                "severity",
+                "note"
+            );
         }
     }
 
@@ -597,44 +410,27 @@ class ThreadPoolResourceMonitorTest {
         @DisplayName("Should not throw on null metrics")
         void testErrorHandling_NullMetrics() {
             // When/Then: Should throw NPE from Objects.requireNonNull
-            assertThatThrownBy(() -> monitor.interpret(null))
+            assertThatThrownBy(() -> monitor.emit(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("metrics cannot be null");
         }
 
         @Test
-        @DisplayName("Should handle BaselineService failure gracefully")
-        void testErrorHandling_BaselineServiceFailure() {
-            // Given: BaselineService throws exception
+        @DisplayName("Should handle Pipe failure gracefully")
+        void testErrorHandling_PipeFailure() {
+            // Given: Pipe that throws
+            Pipe<ResourceSignal> throwingPipe = mock(Pipe.class);
+            doThrow(new RuntimeException("Pipe error"))
+                .when(throwingPipe).emit(any(ResourceSignal.class));
+
+            ThreadPoolResourceMonitor monitorWithThrowingPipe =
+                new ThreadPoolResourceMonitor(circuitName, throwingPipe);
+
             ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.35);
 
-            when(baselineService.hasBaseline("broker-1")).thenThrow(new RuntimeException("Database error"));
-
-            // When: Should not propagate exception
-            assertThatCode(() -> monitor.interpret(metrics))
+            // When: Should not propagate exception (monitoring failures shouldn't break system)
+            assertThatCode(() -> monitorWithThrowingPipe.emit(metrics))
                 .doesNotThrowAnyException();
-
-            // Then: Should still emit signal using default baseline
-            assertThat(emittedSignals).isNotEmpty();
-        }
-
-        @Test
-        @DisplayName("Should handle observation recording failure gracefully")
-        void testErrorHandling_RecordObservationFailure() {
-            // Given: recordObservation throws exception
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.35);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-            doThrow(new RuntimeException("Storage error"))
-                .when(baselineService)
-                .recordObservation(anyString(), anyString(), anyDouble(), any(Instant.class));
-
-            // When: Should not propagate exception
-            assertThatCode(() -> monitor.interpret(metrics))
-                .doesNotThrowAnyException();
-
-            // Then: Should still emit signal
-            assertThat(emittedSignals).isNotEmpty();
         }
     }
 
@@ -650,7 +446,7 @@ class ThreadPoolResourceMonitorTest {
         @DisplayName("Should reject null circuitName")
         void testConstructor_NullCircuitName() {
             assertThatThrownBy(() ->
-                new ThreadPoolResourceMonitor(null, signalPipe, baselineService)
+                new ThreadPoolResourceMonitor(null, signalPipe)
             ).isInstanceOf(NullPointerException.class)
              .hasMessageContaining("circuitName cannot be null");
         }
@@ -659,18 +455,9 @@ class ThreadPoolResourceMonitorTest {
         @DisplayName("Should reject null signalPipe")
         void testConstructor_NullSignalPipe() {
             assertThatThrownBy(() ->
-                new ThreadPoolResourceMonitor(circuitName, null, baselineService)
+                new ThreadPoolResourceMonitor(circuitName, null)
             ).isInstanceOf(NullPointerException.class)
              .hasMessageContaining("signalPipe cannot be null");
-        }
-
-        @Test
-        @DisplayName("Should reject null baselineService")
-        void testConstructor_NullBaselineService() {
-            assertThatThrownBy(() ->
-                new ThreadPoolResourceMonitor(circuitName, signalPipe, null)
-            ).isInstanceOf(NullPointerException.class)
-             .hasMessageContaining("baselineService cannot be null");
         }
     }
 
@@ -683,37 +470,31 @@ class ThreadPoolResourceMonitorTest {
     class SemanticTests {
 
         @Test
-        @DisplayName("EXHAUSTED should require attention")
-        void testSemantic_ExhaustedRequiresAttention() {
+        @DisplayName("DENY should require attention")
+        void testSemantic_DenyRequiresAttention() {
             // Given
             ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 0, 0.05);
 
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
             assertThat(signal.requiresAttention()).isTrue();
-            // severity check removed - ResourceSignal doesn't have condition-based severity
         }
 
         @Test
-        @DisplayName("AVAILABLE should not require attention")
-        void testSemantic_AvailableNoAttention() {
+        @DisplayName("GRANT should not require attention")
+        void testSemantic_GrantNoAttention() {
             // Given
-            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 1, 0.50);
-
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
+            ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 2, 0.50);
 
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
             assertThat(signal.requiresAttention()).isFalse();
-            // severity check removed - ResourceSignal doesn't have condition-based severity
         }
 
         @Test
@@ -722,16 +503,14 @@ class ThreadPoolResourceMonitorTest {
             // Given
             ThreadPoolMetrics metrics = createMetrics("broker-1", ThreadPoolType.NETWORK, 3, 0, 0.05);
 
-            when(baselineService.hasBaseline("broker-1")).thenReturn(false);
-
             // When
-            monitor.interpret(metrics);
+            monitor.emit(metrics);
 
             // Then
             ResourceSignal signal = getLastSignal();
             String interpretation = signal.interpret();
             assertThat(interpretation).isNotNull();
-            // ResourceSignal.interpret() should provide semantic interpretation
+            // ResourceSignal.interpret() provides semantic interpretation based on sign
         }
     }
 }

@@ -1,18 +1,14 @@
 package io.fullerstack.kafka.broker.monitors;
 
-import io.fullerstack.kafka.broker.baseline.BaselineService;
 import io.fullerstack.kafka.broker.models.ThreadPoolMetrics;
 import io.fullerstack.kafka.broker.models.ThreadPoolType;
 import io.fullerstack.serventis.signals.ResourceSignal;
-import io.humainary.modules.serventis.resources.api.Resources;
-import io.humainary.substrates.api.Substrates.Cortex;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pipe;
 import io.humainary.substrates.api.Substrates.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -20,26 +16,23 @@ import java.util.Objects;
 import static io.fullerstack.substrates.CortexRuntime.cortex;
 
 /**
- * Interprets thread pool metrics and emits ResourceSignal with contextual assessment.
+ * Emits ResourceSignal for thread pool metrics using Serventis vocabulary.
  *
- * <p><b>Signal-First Architecture:</b>
- * This monitor INTERPRETS thread pool state at the point of observation (where context exists)
- * and emits ResourceSignals with embedded meaning, NOT raw data bags.
+ * <p><b>Layer 2: Serventis Signal Emission</b>
+ * This monitor emits signals with Resources API vocabulary (GRANT/DENY), NOT interpretations.
+ * Interpretation of signals (contextual assessment, recommendations) belongs in Layer 4
+ * (Semiosphere Observers) - see Epic 2.
  *
- * <h3>Assessment Levels:</h3>
+ * <h3>Assessment (Simple Fixed Thresholds):</h3>
  * <pre>
- * AVAILABLE:  ≥30% idle (or above baseline)
- * DEGRADED:   10-30% idle (or below baseline but not critical)
- * EXHAUSTED:  <10% idle (or at/near capacity)
+ * GRANT (healthy): ≥30% idle - threads available
+ * GRANT (degraded): 10-30% idle - threads available but under pressure
+ * DENY (exhausted): <10% idle - no capacity available
  * </pre>
  *
- * <h3>Baseline Integration:</h3>
- * Uses BaselineService to get contextual thresholds based on:
- * <ul>
- *   <li>Historical idle percentages for this broker/pool</li>
- *   <li>Time-of-day patterns (higher load during peak hours)</li>
- *   <li>Workload characteristics (streaming vs batch)</li>
- * </ul>
+ * <p><b>Note:</b> These are simple fixed thresholds for signal emission. Contextual
+ * assessment using baselines, trends, and recommendations will be added in Epic 2
+ * via Observers (Layer 4 - Semiosphere).
  *
  * <h3>Example Usage:</h3>
  * <pre>{@code
@@ -47,112 +40,112 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  * Circuit circuit = Cortex.circuit(Cortex.name("kafka.broker.resources"));
  * Cell<ResourceSignal, ResourceSignal> cell = circuit.cell(
  *     Cortex.name("thread-pools"),
- *     Composer.pipe()  // ← No Composer needed!
+ *     Composer.pipe()
  * );
  *
- * // Monitor interprets and emits signals
+ * // Monitor emits signals with Serventis vocabulary
  * ThreadPoolResourceMonitor monitor = new ThreadPoolResourceMonitor(
  *     Cortex.name("kafka.broker.resources"),
- *     cell,  // Cell IS-A Pipe<ResourceSignal>
- *     baselineService
+ *     cell  // Cell IS-A Pipe<ResourceSignal>
  * );
  *
- * // Collect raw metrics, interpret, emit signal
- * ThreadPoolMetrics metrics = collector.collect("broker-1", ThreadPoolType.NETWORK);
- * monitor.interpret(metrics);  // ← Emits ResourceSignal with assessment
+ * // Collect metrics and emit signal
+ * ThreadPoolMetrics metrics = collector.collect("broker-1");
+ * monitor.emit(metrics);  // ← Emits ResourceSignal (GRANT or DENY)
  * }</pre>
  *
- * <h3>Signal Payload:</h3>
- * ResourceSignals emitted include:
+ * <h3>Signal Payload (Raw Metrics Only):</h3>
  * <ul>
- *   <li><b>Raw Metrics</b>: poolType, totalThreads, activeThreads, idleThreads, avgIdlePercent</li>
- *   <li><b>Baseline Context</b>: expectedIdlePercent (from BaselineService)</li>
- *   <li><b>Assessment</b>: AVAILABLE/DEGRADED/EXHAUSTED</li>
- *   <li><b>Interpretation</b>: Human-readable explanation (e.g., "Thread pool critically saturated")</li>
- *   <li><b>Recommendation</b>: Actionable guidance (e.g., "Increase thread pool size")</li>
- *   <li><b>Trend</b>: Change from previous observation (e.g., "-0.15" means 15% drop in idle)</li>
+ *   <li><b>brokerId</b>: Broker identifier</li>
+ *   <li><b>poolType</b>: Thread pool type (Network, I/O, Log Cleaner)</li>
+ *   <li><b>totalThreads</b>: Pool capacity</li>
+ *   <li><b>activeThreads</b>: Currently executing</li>
+ *   <li><b>idleThreads</b>: Available for work</li>
+ *   <li><b>avgIdlePercent</b>: Idle percentage (0.0-1.0)</li>
+ *   <li><b>utilizationPercent</b>: Active percentage (0.0-1.0)</li>
  * </ul>
+ *
+ * <p>NO interpretation, NO recommendations in signal payload - that's Layer 4 (Epic 2).
  *
  * @author Fullerstack
  * @see ThreadPoolMetrics
  * @see ResourceSignal
- * @see BaselineService
+ * @see <a href="../../../../../../../docs/architecture/ADR-002-LAYER-SEPARATION-SENSORS-VS-INTERPRETATION.md">ADR-002</a>
  */
 public class ThreadPoolResourceMonitor {
 
     private static final Logger logger = LoggerFactory.getLogger(ThreadPoolResourceMonitor.class);
 
-    // Default baseline if BaselineService doesn't have historical data
-    private static final double DEFAULT_EXPECTED_IDLE_PERCENT = 0.30;  // 30%
+    // Simple fixed thresholds (no baseline - that's Layer 4)
+    private static final double IDLE_HEALTHY_THRESHOLD = 0.30;    // 30% idle = healthy
+    private static final double IDLE_EXHAUSTED_THRESHOLD = 0.10;  // 10% idle = exhausted
 
     private final Name circuitName;
     private final Pipe<ResourceSignal> signalPipe;
-    private final BaselineService baselineService;
 
     /**
      * Creates a ThreadPoolResourceMonitor.
      *
-     * @param circuitName     Circuit name for Subject creation
-     * @param signalPipe      Pipe to emit ResourceSignals (typically a Cell)
-     * @param baselineService Baseline service for contextual assessment
+     * <p><b>Note:</b> BaselineService removed in ADR-002. Contextual assessment
+     * (baselines, trends, interpretation) will be added in Epic 2 via Observers.
+     *
+     * @param circuitName Circuit name for Subject creation
+     * @param signalPipe  Pipe to emit ResourceSignals (typically a Cell)
      * @throws NullPointerException if any parameter is null
      */
     public ThreadPoolResourceMonitor(
         Name circuitName,
-        Pipe<ResourceSignal> signalPipe,
-        BaselineService baselineService
+        Pipe<ResourceSignal> signalPipe
     ) {
         this.circuitName = Objects.requireNonNull(circuitName, "circuitName cannot be null");
         this.signalPipe = Objects.requireNonNull(signalPipe, "signalPipe cannot be null");
-        this.baselineService = Objects.requireNonNull(baselineService, "baselineService cannot be null");
     }
 
     /**
-     * Interprets thread pool metrics and emits ResourceSignal.
+     * Emits ResourceSignal for thread pool metrics.
      *
-     * <p><b>Interpretation Logic:</b>
+     * <p><b>What this does</b> (Layer 2 - Serventis):
      * <ol>
-     *   <li>Get expected idle % from BaselineService</li>
-     *   <li>Compare actual vs expected</li>
-     *   <li>Assess condition: AVAILABLE/DEGRADED/EXHAUSTED</li>
-     *   <li>Add interpretation and recommendation to payload</li>
-     *   <li>Record observation for future baselines</li>
-     *   <li>Emit ResourceSignal with embedded assessment</li>
+     *   <li>Assess resource availability using simple thresholds</li>
+     *   <li>Build payload with raw metrics only</li>
+     *   <li>Emit ResourceSignal (GRANT or DENY)</li>
      * </ol>
+     *
+     * <p><b>What this does NOT do</b> (deferred to Layer 4 - Semiosphere):
+     * <ul>
+     *   <li>❌ Contextual baseline comparison (Epic 2 Observers)</li>
+     *   <li>❌ Trend analysis ("degrading rapidly") (Epic 2 Observers)</li>
+     *   <li>❌ Interpretation text ("Thread pool under pressure") (Epic 2 Observers)</li>
+     *   <li>❌ Recommendations ("Increase num.io.threads") (Epic 3 SituationAssessors)</li>
+     * </ul>
      *
      * @param metrics Thread pool metrics from JMX collector
      * @throws NullPointerException if metrics is null
      */
-    public void interpret(ThreadPoolMetrics metrics) {
+    public void emit(ThreadPoolMetrics metrics) {
         Objects.requireNonNull(metrics, "metrics cannot be null");
 
         try {
             Subject subject = createSubject(metrics.brokerId(), metrics.poolType());
 
-            // Get contextual baseline
-            double expectedIdlePercent = getExpectedIdlePercent(metrics);
+            // Build payload with raw metrics ONLY
+            Map<String, String> payload = buildPayload(metrics);
 
-            // Build payload with raw metrics
-            Map<String, String> payload = buildBasePayload(metrics, expectedIdlePercent);
+            // Simple threshold assessment (no baseline)
+            ResourceSignal signal = assessAvailability(subject, metrics, payload);
 
-            // INTERPRET at observation point
-            ResourceSignal signal = assessCondition(subject, metrics, expectedIdlePercent, payload);
-
-            // Record observation for future baselines
-            recordObservation(metrics);
-
-            // Emit interpreted signal
+            // Emit signal
             signalPipe.emit(signal);
 
             if (logger.isDebugEnabled()) {
-                logger.debug("Emitted ResourceSignal for {}.{}: sign={}, assessment={}",
+                logger.debug("Emitted ResourceSignal for {}.{}: sign={}, idlePercent={}%",
                     metrics.brokerId(),
                     metrics.poolType().name(),
                     signal.sign(),
-                    payload.get("assessment"));
+                    (int)(metrics.avgIdlePercent() * 100));
             }
         } catch (Exception e) {
-            logger.error("Failed to interpret thread pool metrics for {}.{}: {}",
+            logger.error("Failed to emit ResourceSignal for {}.{}: {}",
                 metrics.brokerId(),
                 metrics.poolType().name(),
                 e.getMessage(),
@@ -162,50 +155,54 @@ public class ThreadPoolResourceMonitor {
     }
 
     /**
-     * Gets expected idle percentage from BaselineService.
-     * Falls back to default if no baseline data available or BaselineService fails.
+     * Assesses resource availability using simple fixed thresholds.
+     *
+     * <p><b>Layer 2 Assessment</b> (simple, no context):
+     * <ul>
+     *   <li>≥30% idle → GRANT (healthy)</li>
+     *   <li>10-30% idle → GRANT (degraded)</li>
+     *   <li><10% idle → DENY (exhausted)</li>
+     * </ul>
+     *
+     * <p><b>Note:</b> Contextual assessment (comparing to baseline, detecting trends)
+     * will be added in Epic 2 via Observers.
      */
-    private double getExpectedIdlePercent(ThreadPoolMetrics metrics) {
-        try {
-            String metricKey = "thread_pool_idle_" + metrics.poolType().name().toLowerCase();
+    private ResourceSignal assessAvailability(
+        Subject subject,
+        ThreadPoolMetrics metrics,
+        Map<String, String> payload
+    ) {
+        double idlePercent = metrics.avgIdlePercent();
 
-            if (baselineService.hasBaseline(metrics.brokerId())) {
-                // BaselineService doesn't have thread-pool-specific methods yet,
-                // so we'll use the generic observation system
-                Double recentObservation = getRecentObservation(metrics.brokerId(), metricKey);
-                if (recentObservation != null) {
-                    return recentObservation;
-                }
-            }
-        } catch (Exception e) {
-            // BaselineService failed - fall back to default
-            logger.debug("Failed to get baseline for {}: {}", metrics.brokerId(), e.getMessage());
+        // EXHAUSTED: <10% idle → DENY (no capacity)
+        if (idlePercent < IDLE_EXHAUSTED_THRESHOLD) {
+            return ResourceSignal.deny(subject, 0, payload);
         }
 
-        // Fall back to default baseline
-        return DEFAULT_EXPECTED_IDLE_PERCENT;
+        // DEGRADED or HEALTHY: ≥10% idle → GRANT (capacity available)
+        // Observer in Epic 2 will distinguish DEGRADED vs HEALTHY using baselines
+        return ResourceSignal.grant(subject, metrics.idleThreads(), payload);
     }
 
     /**
-     * Gets recent observation from BaselineService.
-     * This is a workaround until BaselineService has thread-pool-specific methods.
+     * Builds payload with raw metrics only.
+     *
+     * <p><b>What's included</b>:
+     * <ul>
+     *   <li>✅ Raw metrics (threads, percentages)</li>
+     *   <li>✅ Entity identifiers (brokerId, poolType)</li>
+     * </ul>
+     *
+     * <p><b>What's NOT included</b> (removed per ADR-002):
+     * <ul>
+     *   <li>❌ expectedIdlePercent (baseline - Layer 4)</li>
+     *   <li>❌ assessment ("DEGRADED") (interpretation - Layer 4)</li>
+     *   <li>❌ interpretation text (Layer 4)</li>
+     *   <li>❌ recommendation text (Layer 4)</li>
+     *   <li>❌ trend ("degrading rapidly") (Layer 4)</li>
+     * </ul>
      */
-    private Double getRecentObservation(String brokerId, String metricKey) {
-        try {
-            // Use reflection or check if method exists
-            // For now, return null to indicate no historical data
-            // TODO: Once BaselineService has getRecentObservation(), use it
-            return null;
-        } catch (Exception e) {
-            logger.debug("No recent observation for {}: {}", metricKey, e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Builds base payload with raw metrics and baseline context.
-     */
-    private Map<String, String> buildBasePayload(ThreadPoolMetrics metrics, double expectedIdlePercent) {
+    private Map<String, String> buildPayload(ThreadPoolMetrics metrics) {
         Map<String, String> payload = new HashMap<>();
 
         // Identity
@@ -220,7 +217,6 @@ public class ThreadPoolResourceMonitor {
         // Utilization metrics
         payload.put("avgIdlePercent", String.format("%.2f", metrics.avgIdlePercent()));
         payload.put("utilizationPercent", String.format("%.2f", metrics.utilizationPercent()));
-        payload.put("expectedIdlePercent", String.format("%.2f", expectedIdlePercent));
 
         // Optional fields
         if (metrics.queueSize() > 0) {
@@ -231,189 +227,6 @@ public class ThreadPoolResourceMonitor {
         }
 
         return payload;
-    }
-
-    /**
-     * Assesses thread pool condition and creates ResourceSignal with interpretation.
-     */
-    private ResourceSignal assessCondition(
-        Subject subject,
-        ThreadPoolMetrics metrics,
-        double expectedIdlePercent,
-        Map<String, String> payload
-    ) {
-        double actualIdlePercent = metrics.avgIdlePercent();
-
-        // EXHAUSTED: <10% idle OR significantly below baseline
-        if (isExhausted(actualIdlePercent, expectedIdlePercent)) {
-            return assessExhausted(subject, metrics, actualIdlePercent, expectedIdlePercent, payload);
-        }
-
-        // DEGRADED: 10-30% idle OR below baseline
-        else if (isDegraded(actualIdlePercent, expectedIdlePercent)) {
-            return assessDegraded(subject, metrics, actualIdlePercent, expectedIdlePercent, payload);
-        }
-
-        // AVAILABLE: ≥30% idle OR at/above baseline
-        else {
-            return assessAvailable(subject, metrics, actualIdlePercent, expectedIdlePercent, payload);
-        }
-    }
-
-    /**
-     * Checks if thread pool is exhausted.
-     */
-    private boolean isExhausted(double actualIdlePercent, double expectedIdlePercent) {
-        return actualIdlePercent < 0.1 || actualIdlePercent < expectedIdlePercent * 0.5;
-    }
-
-    /**
-     * Checks if thread pool is degraded.
-     */
-    private boolean isDegraded(double actualIdlePercent, double expectedIdlePercent) {
-        return actualIdlePercent < 0.3 || actualIdlePercent < expectedIdlePercent * 0.8;
-    }
-
-    /**
-     * Assesses EXHAUSTED condition with critical interpretation and recommendations.
-     * Maps to DENY signal (no capacity available).
-     */
-    private ResourceSignal assessExhausted(
-        Subject subject,
-        ThreadPoolMetrics metrics,
-        double actualIdlePercent,
-        double expectedIdlePercent,
-        Map<String, String> payload
-    ) {
-        payload.put("assessment", "EXHAUSTED");
-
-        // Interpretation
-        payload.put("interpretation", String.format(
-            "Thread pool critically saturated: %.0f%% idle vs %.0f%% expected (%.0f%% below baseline)",
-            actualIdlePercent * 100,
-            expectedIdlePercent * 100,
-            (expectedIdlePercent - actualIdlePercent) * 100
-        ));
-
-        // Recommendation
-        payload.put("recommendation", String.format(
-            "CRITICAL: Increase %s thread pool size (current: %d threads) or reduce broker load",
-            metrics.poolType().displayName(),
-            metrics.totalThreads()
-        ));
-
-        // Add severity escalation if rejections occurring
-        if (metrics.rejectionCount() > 0) {
-            payload.put("rejections", String.valueOf(metrics.rejectionCount()));
-            payload.put("severity", "CRITICAL - Tasks being rejected!");
-        }
-
-        // Add trend if available
-        addTrendIfAvailable(metrics, actualIdlePercent, payload);
-
-        // EXHAUSTED → DENY signal (0 units available)
-        return ResourceSignal.deny(subject, 0, payload);
-    }
-
-    /**
-     * Assesses DEGRADED condition with pressure interpretation and monitoring guidance.
-     * Maps to GRANT signal but with degraded status in payload.
-     */
-    private ResourceSignal assessDegraded(
-        Subject subject,
-        ThreadPoolMetrics metrics,
-        double actualIdlePercent,
-        double expectedIdlePercent,
-        Map<String, String> payload
-    ) {
-        payload.put("assessment", "DEGRADED");
-
-        // Interpretation
-        payload.put("interpretation", String.format(
-            "Thread pool under pressure: %.0f%% idle vs %.0f%% expected",
-            actualIdlePercent * 100,
-            expectedIdlePercent * 100
-        ));
-
-        // Recommendation
-        payload.put("recommendation", String.format(
-            "Monitor %s thread pool - consider increasing capacity if pressure persists",
-            metrics.poolType().displayName()
-        ));
-
-        // Add trend if available
-        addTrendIfAvailable(metrics, actualIdlePercent, payload);
-
-        // DEGRADED → GRANT signal (threads available but under pressure)
-        return ResourceSignal.grant(subject, metrics.idleThreads(), payload);
-    }
-
-    /**
-     * Assesses AVAILABLE condition with healthy status.
-     * Maps to GRANT signal with healthy capacity.
-     */
-    private ResourceSignal assessAvailable(
-        Subject subject,
-        ThreadPoolMetrics metrics,
-        double actualIdlePercent,
-        double expectedIdlePercent,
-        Map<String, String> payload
-    ) {
-        payload.put("assessment", "AVAILABLE");
-
-        // Interpretation
-        payload.put("interpretation", String.format(
-            "Thread pool healthy: %.0f%% idle (%.0f%% expected)",
-            actualIdlePercent * 100,
-            expectedIdlePercent * 100
-        ));
-
-        // Note if significantly under-utilized
-        if (actualIdlePercent > expectedIdlePercent * 1.2) {
-            payload.put("note", "Pool significantly under-utilized - may be over-provisioned");
-        }
-
-        // AVAILABLE → GRANT signal (threads available)
-        return ResourceSignal.grant(subject, metrics.idleThreads(), payload);
-    }
-
-    /**
-     * Adds trend information to payload if historical data available.
-     */
-    private void addTrendIfAvailable(ThreadPoolMetrics metrics, double actualIdlePercent, Map<String, String> payload) {
-        String metricKey = "thread_pool_idle_" + metrics.poolType().name().toLowerCase();
-        Double previousIdle = getRecentObservation(metrics.brokerId(), metricKey);
-
-        if (previousIdle != null) {
-            double trend = actualIdlePercent - previousIdle;
-            payload.put("trend", String.format("%.2f", trend));
-
-            if (trend < -0.05) {
-                payload.put("trendInterpretation", String.format("Degrading rapidly (%.0f%% idle drop)", Math.abs(trend) * 100));
-            } else if (trend > 0.05) {
-                payload.put("trendInterpretation", String.format("Improving (%.0f%% idle increase)", trend * 100));
-            } else {
-                payload.put("trendInterpretation", "Stable");
-            }
-        }
-    }
-
-    /**
-     * Records observation to BaselineService for future trend analysis.
-     */
-    private void recordObservation(ThreadPoolMetrics metrics) {
-        try {
-            String metricKey = "thread_pool_idle_" + metrics.poolType().name().toLowerCase();
-            baselineService.recordObservation(
-                metrics.brokerId(),
-                metricKey,
-                metrics.avgIdlePercent(),
-                Instant.ofEpochMilli(metrics.timestamp())
-            );
-        } catch (Exception e) {
-            logger.debug("Failed to record observation: {}", e.getMessage());
-            // Non-critical - continue even if recording fails
-        }
     }
 
     /**

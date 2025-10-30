@@ -280,12 +280,12 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
         BrokerSensorConfig sensorConfig = config.brokerSensorConfig();
         Name circuitName = cortex.name("kafka.cluster." + config.clusterName());
 
-        // Signal-first: Pass Pipe, BaselineService, and Circuit Name
-        // ThreadPoolResourceMonitor handles interpretation and emission
+        // Layer 2: Pass Pipe and Circuit Name
+        // ThreadPoolResourceMonitor emits signals with Serventis vocabulary
+        // (BaselineService removed per ADR-002 - interpretation deferred to Epic 2)
         return new ThreadPoolSensor(
             sensorConfig,
             brokerThreadPoolsRootCell,  // Cell IS-A Pipe<ResourceSignal>
-            baselineService,
             circuitName
         );
     }

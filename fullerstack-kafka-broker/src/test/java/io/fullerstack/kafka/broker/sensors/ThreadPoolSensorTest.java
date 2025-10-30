@@ -1,6 +1,5 @@
 package io.fullerstack.kafka.broker.sensors;
 
-import io.fullerstack.kafka.broker.baseline.BaselineService;
 import io.fullerstack.kafka.core.config.BrokerEndpoint;
 import io.fullerstack.kafka.core.config.BrokerSensorConfig;
 import io.fullerstack.serventis.signals.ResourceSignal;
@@ -20,7 +19,10 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for {@link ThreadPoolSensor} (signal-first architecture).
+ * Unit tests for {@link ThreadPoolSensor} (Layer 2 - Signal Emission).
+ * <p>
+ * <b>Per ADR-002:</b> Tests validate lifecycle, scheduling, and signal emission only.
+ * Removed: BaselineService dependency (deferred to Epic 2 Observers).
  * <p>
  * These tests validate lifecycle, scheduling, and signal emission behavior.
  * They do NOT test actual JMX collection (that's tested in ThreadPoolMetricsCollectorTest).
@@ -30,7 +32,6 @@ class ThreadPoolSensorTest {
     private ThreadPoolSensor sensor;
     private List<ResourceSignal> emittedSignals;
     private Pipe<ResourceSignal> mockPipe;
-    private BaselineService mockBaselineService;
     private Name circuitName;
 
     @BeforeEach
@@ -45,10 +46,6 @@ class ThreadPoolSensorTest {
             return null;
         }).when(mockPipe).emit(any(ResourceSignal.class));
 
-        // Mock BaselineService
-        mockBaselineService = mock(BaselineService.class);
-        when(mockBaselineService.hasBaseline(anyString())).thenReturn(false);
-
         // Circuit name for Subject creation
         circuitName = cortex().name("kafka.broker.resources");
     }
@@ -62,7 +59,7 @@ class ThreadPoolSensorTest {
 
     @Test
     void constructorRequiresConfig() {
-        assertThatThrownBy(() -> new ThreadPoolSensor(null, mockPipe, mockBaselineService, circuitName))
+        assertThatThrownBy(() -> new ThreadPoolSensor(null, mockPipe, circuitName))
             .isInstanceOf(NullPointerException.class)
             .hasMessageContaining("config cannot be null");
     }
@@ -71,25 +68,16 @@ class ThreadPoolSensorTest {
     void constructorRequiresPipe() {
         BrokerSensorConfig config = createTestConfig();
 
-        assertThatThrownBy(() -> new ThreadPoolSensor(config, null, mockBaselineService, circuitName))
+        assertThatThrownBy(() -> new ThreadPoolSensor(config, null, circuitName))
             .isInstanceOf(NullPointerException.class)
             .hasMessageContaining("signalPipe cannot be null");
-    }
-
-    @Test
-    void constructorRequiresBaselineService() {
-        BrokerSensorConfig config = createTestConfig();
-
-        assertThatThrownBy(() -> new ThreadPoolSensor(config, mockPipe, null, circuitName))
-            .isInstanceOf(NullPointerException.class)
-            .hasMessageContaining("baselineService cannot be null");
     }
 
     @Test
     void constructorRequiresCircuitName() {
         BrokerSensorConfig config = createTestConfig();
 
-        assertThatThrownBy(() -> new ThreadPoolSensor(config, mockPipe, mockBaselineService, null))
+        assertThatThrownBy(() -> new ThreadPoolSensor(config, mockPipe, null))
             .isInstanceOf(NullPointerException.class)
             .hasMessageContaining("circuitName cannot be null");
     }
@@ -97,7 +85,7 @@ class ThreadPoolSensorTest {
     @Test
     void sensorIsNotStartedInitially() {
         BrokerSensorConfig config = createTestConfig();
-        sensor = new ThreadPoolSensor(config, mockPipe, mockBaselineService, circuitName);
+        sensor = new ThreadPoolSensor(config, mockPipe, circuitName);
 
         assertThat(sensor.isStarted()).isFalse();
     }
@@ -105,7 +93,7 @@ class ThreadPoolSensorTest {
     @Test
     void startSetsSensorToStartedState() {
         BrokerSensorConfig config = createTestConfig();
-        sensor = new ThreadPoolSensor(config, mockPipe, mockBaselineService, circuitName);
+        sensor = new ThreadPoolSensor(config, mockPipe, circuitName);
 
         sensor.start();
 
@@ -115,7 +103,7 @@ class ThreadPoolSensorTest {
     @Test
     void startIsIdempotent() {
         BrokerSensorConfig config = createTestConfig();
-        sensor = new ThreadPoolSensor(config, mockPipe, mockBaselineService, circuitName);
+        sensor = new ThreadPoolSensor(config, mockPipe, circuitName);
 
         sensor.start();
         sensor.start();  // Second call should be safe
@@ -126,7 +114,7 @@ class ThreadPoolSensorTest {
     @Test
     void closeStopsSensor() {
         BrokerSensorConfig config = createTestConfig();
-        sensor = new ThreadPoolSensor(config, mockPipe, mockBaselineService, circuitName);
+        sensor = new ThreadPoolSensor(config, mockPipe, circuitName);
 
         sensor.start();
         assertThat(sensor.isStarted()).isTrue();
@@ -139,7 +127,7 @@ class ThreadPoolSensorTest {
     @Test
     void closeIsIdempotent() {
         BrokerSensorConfig config = createTestConfig();
-        sensor = new ThreadPoolSensor(config, mockPipe, mockBaselineService, circuitName);
+        sensor = new ThreadPoolSensor(config, mockPipe, circuitName);
 
         sensor.start();
         sensor.close();
@@ -151,7 +139,7 @@ class ThreadPoolSensorTest {
     @Test
     void closeBeforeStartIsSafe() {
         BrokerSensorConfig config = createTestConfig();
-        sensor = new ThreadPoolSensor(config, mockPipe, mockBaselineService, circuitName);
+        sensor = new ThreadPoolSensor(config, mockPipe, circuitName);
 
         // Close without starting - should not throw
         assertThatCode(() -> sensor.close()).doesNotThrowAnyException();
@@ -179,7 +167,7 @@ class ThreadPoolSensorTest {
             return null;
         }).when(testPipe).emit(any(ResourceSignal.class));
 
-        sensor = new ThreadPoolSensor(config, testPipe, mockBaselineService, circuitName);
+        sensor = new ThreadPoolSensor(config, testPipe, circuitName);
         sensor.start();
 
         // Wait briefly - sensor will try to collect (and likely fail with no real broker)
@@ -206,7 +194,7 @@ class ThreadPoolSensorTest {
             return null;
         }).when(countingPipe).emit(any(ResourceSignal.class));
 
-        sensor = new ThreadPoolSensor(config, countingPipe, mockBaselineService, circuitName);
+        sensor = new ThreadPoolSensor(config, countingPipe, circuitName);
         sensor.start();
 
         // Wait briefly - may or may not complete without real broker
@@ -225,7 +213,7 @@ class ThreadPoolSensorTest {
         doThrow(new RuntimeException("Simulated emission failure"))
             .when(throwingPipe).emit(any(ResourceSignal.class));
 
-        sensor = new ThreadPoolSensor(config, throwingPipe, mockBaselineService, circuitName);
+        sensor = new ThreadPoolSensor(config, throwingPipe, circuitName);
         sensor.start();
 
         // Wait briefly

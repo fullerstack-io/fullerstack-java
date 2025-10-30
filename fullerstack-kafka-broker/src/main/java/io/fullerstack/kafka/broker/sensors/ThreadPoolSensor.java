@@ -1,6 +1,5 @@
 package io.fullerstack.kafka.broker.sensors;
 
-import io.fullerstack.kafka.broker.baseline.BaselineService;
 import io.fullerstack.kafka.broker.models.ThreadPoolMetrics;
 import io.fullerstack.kafka.broker.monitors.ThreadPoolResourceMonitor;
 import io.fullerstack.kafka.core.config.BrokerEndpoint;
@@ -20,15 +19,18 @@ import java.util.concurrent.TimeUnit;
 /**
  * Sensor for collecting thread pool metrics from Kafka brokers via JMX and emitting ResourceSignals.
  *
- * <p><b>Signal-First Architecture:</b>
- * This sensor collects raw JMX metrics, passes them to {@link ThreadPoolResourceMonitor}
- * for interpretation, and emits ResourceSignals with embedded assessment and recommendations.
+ * <p><b>Layer 2: Serventis Signal Emission</b>
+ * This sensor collects raw JMX metrics and passes them to {@link ThreadPoolResourceMonitor}
+ * which emits ResourceSignals using Serventis vocabulary (GRANT/DENY).
+ *
+ * <p><b>Note:</b> Per ADR-002, interpretation (baselines, trends, recommendations) removed
+ * from sensors. Will be added in Epic 2 via Observers (Layer 4 - Semiosphere).
  *
  * <p><b>Responsibilities:</b>
  * <ul>
  *   <li>Schedule periodic JMX collection from configured brokers</li>
  *   <li>Collect thread pool metrics (network, I/O, log cleaner) via {@link ThreadPoolMetricsCollector}</li>
- *   <li>Pass metrics to {@link ThreadPoolResourceMonitor} for interpretation</li>
+ *   <li>Pass metrics to {@link ThreadPoolResourceMonitor} for signal emission</li>
  *   <li>Monitor emits ResourceSignals directly to Pipe (no Composer needed)</li>
  *   <li>Handle collection failures gracefully (continue with other pools/brokers)</li>
  * </ul>
@@ -49,12 +51,11 @@ import java.util.concurrent.TimeUnit;
  *     Composer.pipe()  // ← No Composer needed!
  * );
  *
- * // Create sensor with signal pipe and baseline service
+ * // Create sensor with signal pipe
  * BrokerSensorConfig config = BrokerSensorConfig.defaults(endpoints);
  * ThreadPoolSensor sensor = new ThreadPoolSensor(
  *     config,
  *     cell,                          // Cell IS-A Pipe<ResourceSignal>
- *     baselineService,
  *     Cortex.name("kafka.broker.resources")
  * );
  *
@@ -66,7 +67,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <p><b>Lifecycle:</b>
  * <ol>
- *   <li>{@link #ThreadPoolSensor(BrokerSensorConfig, Pipe, BaselineService, Name)} - Create sensor</li>
+ *   <li>{@link #ThreadPoolSensor(BrokerSensorConfig, Pipe, Name)} - Create sensor</li>
  *   <li>{@link #start()} - Start scheduled collection</li>
  *   <li>{@link #close()} - Stop collection and cleanup resources</li>
  * </ol>
@@ -86,31 +87,31 @@ public class ThreadPoolSensor implements AutoCloseable {
     private volatile boolean started;
 
     /**
-     * Creates a new ThreadPoolSensor with signal-first architecture.
+     * Creates a new ThreadPoolSensor.
      * <p>
      * <b>Note:</b> This sensor creates its own JmxConnectionPool for thread pool
      * metrics collection. Connection pooling is always enabled for thread pool
      * monitoring as it's a high-frequency operation.
      *
-     * @param config          Sensor configuration with broker endpoints and collection interval
-     * @param signalPipe      Pipe to emit ResourceSignals (typically a Cell)
-     * @param baselineService Baseline service for contextual assessment
-     * @param circuitName     Circuit name for Subject creation
+     * <p><b>ADR-002:</b> BaselineService removed. Contextual assessment deferred to
+     * Epic 2 Observers (Layer 4 - Semiosphere).
+     *
+     * @param config      Sensor configuration with broker endpoints and collection interval
+     * @param signalPipe  Pipe to emit ResourceSignals (typically a Cell)
+     * @param circuitName Circuit name for Subject creation
      * @throws NullPointerException if any parameter is null
      */
     public ThreadPoolSensor(
         BrokerSensorConfig config,
         Pipe<ResourceSignal> signalPipe,
-        BaselineService baselineService,
         Name circuitName
     ) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         Objects.requireNonNull(signalPipe, "signalPipe cannot be null");
-        Objects.requireNonNull(baselineService, "baselineService cannot be null");
         Objects.requireNonNull(circuitName, "circuitName cannot be null");
 
-        // Create monitor for signal interpretation
-        this.monitor = new ThreadPoolResourceMonitor(circuitName, signalPipe, baselineService);
+        // Create monitor for signal emission (Layer 2)
+        this.monitor = new ThreadPoolResourceMonitor(circuitName, signalPipe);
 
         // Always use connection pooling for thread pool metrics (high frequency)
         this.connectionPool = new JmxConnectionPool();
@@ -190,13 +191,13 @@ public class ThreadPoolSensor implements AutoCloseable {
         // Collect metrics for all thread pools
         List<ThreadPoolMetrics> metricsList = collector.collect(endpoint.brokerId());
 
-        // Interpret each pool's metrics and emit ResourceSignal
+        // Emit ResourceSignal for each pool
         for (ThreadPoolMetrics metrics : metricsList) {
-            monitor.interpret(metrics);  // Monitor emits ResourceSignal directly
+            monitor.emit(metrics);  // Monitor emits ResourceSignal with Serventis vocabulary
         }
 
         if (logger.isDebugEnabled()) {
-            logger.debug("Collected and interpreted {} thread pool metrics for broker {}",
+            logger.debug("Collected and emitted {} thread pool signals for broker {}",
                 metricsList.size(), endpoint.brokerId());
         }
     }
