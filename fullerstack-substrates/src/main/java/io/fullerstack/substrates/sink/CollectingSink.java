@@ -29,8 +29,8 @@ import java.util.stream.Stream;
 public class CollectingSink<E> implements Sink<E> {
 
     private final Subject<Sink<E>> sinkSubject;
-    private final Source<E> source;
-    private final List<Capture<E, Channel<E>>> buffer = new CopyOnWriteArrayList<>();
+    private final Source<E, ?> source;
+    private final List<Capture<E>> buffer = new CopyOnWriteArrayList<>();
     private final Subscription subscription;
     private volatile boolean closed = false;
 
@@ -44,7 +44,7 @@ public class CollectingSink<E> implements Sink<E> {
      * @throws NullPointerException if source is null
      */
     @SuppressWarnings("unchecked")
-    public CollectingSink(Source<E> source) {
+    public CollectingSink(Source<E, ?> source) {
         Objects.requireNonNull(source, "Source cannot be null");
 
         // Using HierarchicalName.of() static factory
@@ -90,9 +90,9 @@ public class CollectingSink<E> implements Sink<E> {
     }
 
     @Override
-    public Stream<Capture<E, Channel<E>>> drain() {
+    public Stream<Capture<E>> drain() {
         // Get all accumulated captures and clear the buffer
-        List<Capture<E, Channel<E>>> captured = List.copyOf(buffer);
+        List<Capture<E>> captured = List.copyOf(buffer);
         buffer.clear();
         return captured.stream();
     }

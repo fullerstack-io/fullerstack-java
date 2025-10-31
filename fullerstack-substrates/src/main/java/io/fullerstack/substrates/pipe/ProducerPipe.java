@@ -2,7 +2,7 @@ package io.fullerstack.substrates.pipe;
 
 import io.fullerstack.substrates.capture.SubjectCapture;
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.flow.TransformationPipeline;
+import io.fullerstack.substrates.flow.FlowRegulator;
 import io.fullerstack.substrates.circuit.Scheduler;
 
 import lombok.Getter;
@@ -51,9 +51,9 @@ public class ProducerPipe<E> implements Pipe<E> {
 
     private final Scheduler scheduler; // Circuit's scheduler (retained for potential future use)
     private final Subject<Channel<E>> channelSubject; // WHO this pipe belongs to
-    private final Consumer<Capture<E, Channel<E>>> subscriberNotifier; // Callback to notify subscribers of emissions
+    private final Consumer<Capture<E>> subscriberNotifier; // Callback to notify subscribers of emissions
     private final BooleanSupplier hasSubscribers; // Check for early subscriber optimization
-    private final TransformationPipeline<E> flow; // TransformationPipeline for apply() and hasReachedLimit()
+    private final FlowRegulator<E> flow; // FlowRegulator for apply() and transformation
 
     /**
      * Creates a ProducerPipe without transformations.
@@ -63,7 +63,7 @@ public class ProducerPipe<E> implements Pipe<E> {
      * @param subscriberNotifier callback to notify subscribers of emissions
      * @param hasSubscribers subscriber check for early-exit optimization
      */
-    public ProducerPipe(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E, Channel<E>>> subscriberNotifier, BooleanSupplier hasSubscribers) {
+    public ProducerPipe(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E>> subscriberNotifier, BooleanSupplier hasSubscribers) {
         this(scheduler, channelSubject, subscriberNotifier, hasSubscribers, null);
     }
 
@@ -74,9 +74,9 @@ public class ProducerPipe<E> implements Pipe<E> {
      * @param channelSubject the Subject of the Channel this ProducerPipe belongs to
      * @param subscriberNotifier callback to notify subscribers of emissions
      * @param hasSubscribers subscriber check for early-exit optimization
-     * @param flow the transformation pipeline (null for no transformations)
+     * @param flow the flow regulator (null for no transformations)
      */
-    public ProducerPipe(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E, Channel<E>>> subscriberNotifier, BooleanSupplier hasSubscribers, TransformationPipeline<E> flow) {
+    public ProducerPipe(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E>> subscriberNotifier, BooleanSupplier hasSubscribers, FlowRegulator<E> flow) {
         this.scheduler = Objects.requireNonNull(scheduler, "Scheduler cannot be null");
         this.channelSubject = Objects.requireNonNull(channelSubject, "Channel subject cannot be null");
         this.subscriberNotifier = Objects.requireNonNull(subscriberNotifier, "Subscriber notifier cannot be null");
@@ -122,7 +122,7 @@ public class ProducerPipe<E> implements Pipe<E> {
 
         // Post to Circuit's queue - ensures ordering guarantees
         scheduler.schedule(() -> {
-            Capture<E, Channel<E>> capture = new SubjectCapture<>(channelSubject, value);
+            Capture<E> capture = new SubjectCapture<>(channelSubject, value);
             subscriberNotifier.accept(capture);
         });
     }

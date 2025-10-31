@@ -52,6 +52,6 @@
  *
  * @see io.kafkaobs.broker.models.BrokerMetrics
  * @see io.fullerstack.serventis.signals.MonitorSignal
- * @see io.humainary.modules.serventis.monitors.api.Monitors
+ * @see io.humainary.serventis.monitors.Monitors
  */
 package io.fullerstack.kafka.broker.composers;

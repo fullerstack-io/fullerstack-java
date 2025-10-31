@@ -3,7 +3,7 @@ package io.fullerstack.substrates.channel;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.pipe.ProducerPipe;
-import io.fullerstack.substrates.flow.TransformationPipeline;
+import io.fullerstack.substrates.flow.FlowRegulator;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.subject.HierarchicalSubject;
 import io.fullerstack.substrates.conduit.TransformingConduit;
@@ -97,7 +97,7 @@ public class EmissionChannel<E> implements Channel<E> {
                         cachedPipe = pipe(flowConfigurer);
                     } else {
                         // Otherwise, create a plain ProducerPipe with parent Conduit's capabilities
-                        // Note: Circuit also implements Scheduler in our implementation (SequentialCircuit)
+                        // Note: Circuit also implements Scheduler in our implementation (SingleThreadCircuit)
                         cachedPipe = new ProducerPipe<E>(
                             (Scheduler) conduit.getCircuit(), // Cast Circuit to Scheduler
                             channelSubject,
@@ -115,12 +115,12 @@ public class EmissionChannel<E> implements Channel<E> {
     public Pipe<E> pipe(Consumer<? super Flow<E>> configurer) {
         Objects.requireNonNull(configurer, "Flow configurer cannot be null");
 
-        // Create a Flow and apply the Consumer transformations
-        TransformationPipeline<E> flow = new TransformationPipeline<>();
+        // Create a FlowRegulator and apply the Consumer transformations
+        FlowRegulator<E> flow = new FlowRegulator<>();
         configurer.accept(flow);
 
         // Return a ProducerPipe with parent Conduit's capabilities and Flow transformations
-        // Note: Circuit also implements Scheduler in our implementation (SequentialCircuit)
+        // Note: Circuit also implements Scheduler in our implementation (SingleThreadCircuit)
         return new ProducerPipe<E>(
             (Scheduler) conduit.getCircuit(), // Cast Circuit to Scheduler
             channelSubject,

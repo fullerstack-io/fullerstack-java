@@ -31,10 +31,16 @@
             <artifactId>fullerstack-substrates</artifactId>
         </dependency>
 
-        <!-- Serventis Signals -->
+        <!-- Substrates API (shaded by fullerstack-substrates, needed for compilation) -->
         <dependency>
-            <groupId>io.fullerstack</groupId>
-            <artifactId>fullerstack-serventis</artifactId>
+            <groupId>io.humainary.substrates</groupId>
+            <artifactId>humainary-substrates-api</artifactId>
+        </dependency>
+
+        <!-- Serventis Extension (shaded by fullerstack-substrates, needed for compilation) -->
+        <dependency>
+            <groupId>io.humainary.substrates.ext</groupId>
+            <artifactId>humainary-serventis</artifactId>
         </dependency>
 
         <!-- Logging -->

@@ -4,9 +4,9 @@ import io.fullerstack.kafka.broker.models.ThreadPoolMetrics;
 import io.fullerstack.kafka.broker.monitors.ThreadPoolResourceMonitor;
 import io.fullerstack.kafka.core.config.BrokerEndpoint;
 import io.fullerstack.kafka.core.config.BrokerSensorConfig;
-import io.fullerstack.serventis.signals.ResourceSignal;
+import io.humainary.serventis.resources.Resources;
 import io.humainary.substrates.api.Substrates.Name;
-import io.humainary.substrates.api.Substrates.Pipe;
+import io.humainary.substrates.api.Substrates.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,11 +17,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Sensor for collecting thread pool metrics from Kafka brokers via JMX and emitting ResourceSignals.
+ * Sensor for collecting thread pool metrics from Kafka brokers via JMX and emitting Resources.Signal (RC1).
  *
  * <p><b>Layer 2: Serventis Signal Emission</b>
  * This sensor collects raw JMX metrics and passes them to {@link ThreadPoolResourceMonitor}
- * which emits ResourceSignals using Serventis vocabulary (GRANT/DENY).
+ * which emits Resources.Signal using Serventis vocabulary (GRANT/DENY).
  *
  * <p><b>Note:</b> Per ADR-002, interpretation (baselines, trends, recommendations) removed
  * from sensors. Will be added in Epic 2 via Observers (Layer 4 - Semiosphere).
@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>Schedule periodic JMX collection from configured brokers</li>
  *   <li>Collect thread pool metrics (network, I/O, log cleaner) via {@link ThreadPoolMetricsCollector}</li>
  *   <li>Pass metrics to {@link ThreadPoolResourceMonitor} for signal emission</li>
- *   <li>Monitor emits ResourceSignals directly to Pipe (no Composer needed)</li>
+ *   <li>Monitor emits Resources.Signal directly via Channel (RC1 pattern)</li>
  *   <li>Handle collection failures gracefully (continue with other pools/brokers)</li>
  * </ul>
  *
@@ -42,21 +42,20 @@ import java.util.concurrent.TimeUnit;
  *   <li>Log cleaner threads (optional - only if log compaction enabled)</li>
  * </ul>
  *
- * <h3>Example Usage (Signal-First)</h3>
+ * <h3>Example Usage (RC1 Pattern)</h3>
  * <pre>{@code
- * // Runtime creates Cell with Composer.pipe() (no transformation)
- * Circuit circuit = Cortex.circuit(Cortex.name("kafka.broker.resources"));
- * Cell<ResourceSignal, ResourceSignal> cell = circuit.cell(
- *     Cortex.name("thread-pools"),
- *     Composer.pipe()  // ← No Composer needed!
- * );
+ * // Runtime creates conduit for Resources.Signal
+ * Circuit circuit = Cortex.circuit(name("kafka.broker.resources"));
+ * Channel<Resources.Signal> channel = circuit
+ *     .conduit(Resources::composer)
+ *     .channel(name("thread-pools"));
  *
- * // Create sensor with signal pipe
+ * // Create sensor with channel
  * BrokerSensorConfig config = BrokerSensorConfig.defaults(endpoints);
  * ThreadPoolSensor sensor = new ThreadPoolSensor(
  *     config,
- *     cell,                          // Cell IS-A Pipe<ResourceSignal>
- *     Cortex.name("kafka.broker.resources")
+ *     channel,
+ *     name("kafka.broker.resources")
  * );
  *
  * sensor.start();
@@ -67,7 +66,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <p><b>Lifecycle:</b>
  * <ol>
- *   <li>{@link #ThreadPoolSensor(BrokerSensorConfig, Pipe, Name)} - Create sensor</li>
+ *   <li>{@link #ThreadPoolSensor(BrokerSensorConfig, Channel, Name)} - Create sensor</li>
  *   <li>{@link #start()} - Start scheduled collection</li>
  *   <li>{@link #close()} - Stop collection and cleanup resources</li>
  * </ol>
@@ -75,7 +74,7 @@ import java.util.concurrent.TimeUnit;
  * @see ThreadPoolMetrics
  * @see ThreadPoolMetricsCollector
  * @see ThreadPoolResourceMonitor
- * @see ResourceSignal
+ * @see Resources
  */
 public class ThreadPoolSensor implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(ThreadPoolSensor.class);
@@ -97,34 +96,39 @@ public class ThreadPoolSensor implements AutoCloseable {
      * Epic 2 Observers (Layer 4 - Semiosphere).
      *
      * @param config      Sensor configuration with broker endpoints and collection interval
-     * @param signalPipe  Pipe to emit ResourceSignals (typically a Cell)
-     * @param circuitName Circuit name for Subject creation
+     * @param channel     Channel to emit Resources.Signal (RC1 pattern)
+     * @param circuitName Circuit name for logging
      * @throws NullPointerException if any parameter is null
      */
-    public ThreadPoolSensor(
-        BrokerSensorConfig config,
-        Pipe<ResourceSignal> signalPipe,
-        Name circuitName
+    public ThreadPoolSensor (
+      final BrokerSensorConfig config,
+      final Channel < Resources.Signal > channel,
+      final Name circuitName
     ) {
-        this.config = Objects.requireNonNull(config, "config cannot be null");
-        Objects.requireNonNull(signalPipe, "signalPipe cannot be null");
-        Objects.requireNonNull(circuitName, "circuitName cannot be null");
 
-        // Create monitor for signal emission (Layer 2)
-        this.monitor = new ThreadPoolResourceMonitor(circuitName, signalPipe);
+      this.config = Objects.requireNonNull ( config, "config cannot be null" );
+      Objects.requireNonNull ( channel, "channel cannot be null" );
+      Objects.requireNonNull ( circuitName, "circuitName cannot be null" );
 
-        // Always use connection pooling for thread pool metrics (high frequency)
-        this.connectionPool = new JmxConnectionPool();
-        logger.info("ThreadPoolSensor initialized (signal-first) with connection pooling for {} brokers",
-            config.endpoints().size());
+      // Create monitor for signal emission (Layer 2)
+      this.monitor = new ThreadPoolResourceMonitor ( circuitName, channel );
 
-        // Create scheduler with virtual thread (Java 25)
-        this.scheduler = Executors.newScheduledThreadPool(
-            1,
-            Thread.ofVirtual().name("thread-pool-sensor-", 0).factory()
-        );
+      // Always use connection pooling for thread pool metrics (high frequency)
+      this.connectionPool = new JmxConnectionPool ();
 
-        this.started = false;
+      logger.info (
+        "ThreadPoolSensor initialized (signal-first) with connection pooling for {} brokers",
+        config.endpoints ().size ()
+      );
+
+      // Create scheduler with virtual thread (Java 25)
+      this.scheduler = Executors.newScheduledThreadPool (
+        1,
+        Thread.ofVirtual ().name ( "thread-pool-sensor-", 0 ).factory ()
+      );
+
+      this.started = false;
+
     }
 
     /**

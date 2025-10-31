@@ -2,7 +2,7 @@ package io.fullerstack.substrates;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.capture.SubjectCapture;
-import io.fullerstack.substrates.circuit.SequentialCircuit;
+import io.fullerstack.substrates.circuit.SingleThreadCircuit;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.pool.ConcurrentPool;
 import io.fullerstack.substrates.scope.ManagedScope;
@@ -87,7 +87,7 @@ public class CortexRuntime implements Cortex {
     }
 
     private Circuit createCircuit(Name name) {
-        return new SequentialCircuit(name);
+        return new SingleThreadCircuit(name);
     }
 
     // ========== Name Factory (8 methods) ==========
@@ -190,10 +190,10 @@ public class CortexRuntime implements Cortex {
     // ========== Sink Creation (1 method) ==========
 
     @Override
-    public <E, S extends Context<E, S>> Sink<E> sink(Context<E, S> context) {
-        Objects.requireNonNull(context, "Context cannot be null");
-        // Context extends Source, so we can create CollectingSink directly
-        return new CollectingSink<>(context);
+    public <E, S extends Source<E, S>> Sink<E> sink(Source<E, S> source) {
+        Objects.requireNonNull(source, "Source cannot be null");
+        // Create CollectingSink directly
+        return new CollectingSink<>(source);
     }
 
     // ========== Slot Management (8 methods) ==========

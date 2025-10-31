@@ -1,22 +1,19 @@
 package io.fullerstack.kafka.producer.composers;
 
 import io.fullerstack.kafka.producer.models.ProducerMetrics;
-import io.fullerstack.serventis.signals.MonitorSignal;
-import io.humainary.modules.serventis.monitors.api.Monitors;
+import io.humainary.serventis.monitors.Monitors;
 import io.humainary.substrates.api.Substrates.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
-
 /**
- * Cell Composer that transforms ProducerMetrics into MonitorSignals with health assessment.
+ * Cell Composer that transforms ProducerMetrics into Monitors.Status assessments.
  * <p>
- * Implements M18 Cell Composer pattern by providing Pipe<ProducerMetrics> that accepts
- * producer metrics and emits MonitorSignals with appropriate health conditions based on
- * latency, buffer utilization, and error rates.
+ * Implements Substrates RC1 Composer pattern by providing Pipe<ProducerMetrics> that accepts
+ * producer metrics and emits Monitors.Status (pure semantic assessments: Condition + Confidence).
+ * <p>
+ * In RC1, diagnostic metadata (latency, buffer utilization, etc.) should be stored in Subject.state()
+ * rather than signal payload. The Composer emits only semantic condition assessments.
  *
  * <h3>Health Assessment Thresholds:</h3>
  * <ul>
@@ -34,9 +31,10 @@ import java.util.Map;
  *
  * @author Fullerstack
  * @see io.fullerstack.kafka.producer.models.ProducerMetrics
+ * @see Monitors.Status
  * @see io.humainary.substrates.api.Substrates.Composer
  */
-public class ProducerHealthCellComposer implements Composer<Pipe<ProducerMetrics>, MonitorSignal> {
+public class ProducerHealthCellComposer implements Composer<Monitors.Status, Pipe<ProducerMetrics>> {
 
     private static final Logger logger = LoggerFactory.getLogger(ProducerHealthCellComposer.class);
 
@@ -52,52 +50,72 @@ public class ProducerHealthCellComposer implements Composer<Pipe<ProducerMetrics
     private static final long RECENT_METRICS_MS = 30_000;          // 30 seconds
 
     @Override
-    public Pipe<ProducerMetrics> compose(Channel<MonitorSignal> channel) {
-        // Get infrastructure-provided Subject and output Pipe
-        Subject<Channel<MonitorSignal>> channelSubject = channel.subject();
-        Pipe<MonitorSignal> outputPipe = channel.pipe();
+    public Pipe < ProducerMetrics > compose (
+      final Channel < Monitors.Status > channel
+    ) {
 
-        logger.debug("Creating ProducerHealthCellComposer for subject: {}", channelSubject.name());
+      final var channelSubject = channel.subject ();
+      final var outputPipe     = channel.pipe ();
 
-        // Return input Pipe that transforms ProducerMetrics → MonitorSignal
-        return new Pipe<>() {
-            @Override
-            public void emit(ProducerMetrics metrics) {
-                try {
-                    // Assess producer health condition
-                    Monitors.Condition condition = assessCondition(metrics);
-                    Monitors.Confidence confidence = assessConfidence(metrics);
-                    Map<String, String> context = buildContext(metrics);
+      logger.debug (
+        "Creating ProducerHealthCellComposer for subject: {}",
+        channelSubject.name ()
+      );
 
-                    // Create MonitorSignal with assessed health
-                    MonitorSignal signal = switch (condition) {
-                        case STABLE -> MonitorSignal.stable(channelSubject, context);
-                        case DEGRADED -> MonitorSignal.degraded(channelSubject, confidence, context);
-                        case DOWN -> MonitorSignal.down(channelSubject, confidence, context);
-                        default -> MonitorSignal.create(channelSubject, condition, confidence, context);
-                    };
+      // Return input Pipe that transforms ProducerMetrics → Monitors.Status
+      return new Pipe <> () {
 
-                    // Log signal emission
-                    if (logger.isDebugEnabled()) {
-                        logger.debug(
-                            "Producer {} health: {} ({}), latency: {}ms, buffer: {}%",
-                            metrics.producerId(),
-                            condition,
-                            confidence,
-                            String.format("%.1f", metrics.avgLatencyMs()),
-                            String.format("%.1f", metrics.bufferUtilization() * 100)
-                        );
-                    }
+        @Override
+        public void emit (
+          final ProducerMetrics metrics
+        ) {
 
-                    // Emit transformed signal
-                    outputPipe.emit(signal);
+          try {
 
-                } catch (Exception e) {
-                    logger.error("Failed to transform ProducerMetrics for producer {}",
-                        metrics.producerId(), e);
-                }
+            // Assess producer health condition
+            final var condition  = assessCondition ( metrics );
+            final var confidence = assessConfidence ( metrics );
+
+            // Create pure semantic Status (no payload in RC1)
+            final var status =
+              new Monitors.Status (
+                condition,
+                confidence
+              );
+
+            // Log signal emission
+            if ( logger.isDebugEnabled () ) {
+
+              logger.debug (
+                "Producer {} health: {} ({}), latency: {}ms, buffer: {}%",
+                metrics.producerId (),
+                condition,
+                confidence,
+                String.format ( "%.1f", metrics.avgLatencyMs () ),
+                String.format ( "%.1f", metrics.bufferUtilization () * 100 )
+              );
+
             }
-        };
+
+            // Emit pure semantic assessment
+            outputPipe.emit ( status );
+
+          } catch (
+            final Exception e
+          ) {
+
+            logger.error (
+              "Failed to transform ProducerMetrics for producer {}",
+              metrics.producerId (),
+              e
+            );
+
+          }
+
+        }
+
+      };
+
     }
 
     /**
@@ -109,27 +127,39 @@ public class ProducerHealthCellComposer implements Composer<Pipe<ProducerMetrics
      * @param metrics ProducerMetrics to assess
      * @return Health condition (STABLE, DEGRADED, or DOWN)
      */
-    private Monitors.Condition assessCondition(ProducerMetrics metrics) {
-        double avgLatency = metrics.avgLatencyMs();
-        double bufferUtil = metrics.bufferUtilization();
-        long errorRate = metrics.recordErrorRate();
+    private Monitors.Condition assessCondition (
+      final ProducerMetrics metrics
+    ) {
 
-        // DOWN: Critical issues - producer may be blocking or failing
-        if (avgLatency > LATENCY_DOWN_THRESHOLD_MS
-            || bufferUtil > BUFFER_DOWN_THRESHOLD
-            || errorRate >= ERROR_RATE_DOWN_THRESHOLD) {
-            return Monitors.Condition.DOWN;
-        }
+      final var avgLatency = metrics.avgLatencyMs ();
+      final var bufferUtil = metrics.bufferUtilization ();
+      final var errorRate  = metrics.recordErrorRate ();
 
-        // DEGRADED: Performance degradation - producer under stress
-        if (avgLatency > LATENCY_STABLE_THRESHOLD_MS
-            || bufferUtil > BUFFER_STABLE_THRESHOLD
-            || errorRate > 0) {
-            return Monitors.Condition.DEGRADED;
-        }
+      // DOWN: Critical issues - producer may be blocking or failing
+      if (
+        avgLatency > LATENCY_DOWN_THRESHOLD_MS
+          || bufferUtil > BUFFER_DOWN_THRESHOLD
+          || errorRate >= ERROR_RATE_DOWN_THRESHOLD
+      ) {
 
-        // STABLE: Healthy producer
-        return Monitors.Condition.STABLE;
+        return Monitors.Condition.DOWN;
+
+      }
+
+      // DEGRADED: Performance degradation - producer under stress
+      if (
+        avgLatency > LATENCY_STABLE_THRESHOLD_MS
+          || bufferUtil > BUFFER_STABLE_THRESHOLD
+          || errorRate > 0
+      ) {
+
+        return Monitors.Condition.DEGRADED;
+
+      }
+
+      // STABLE: Healthy producer
+      return Monitors.Condition.STABLE;
+
     }
 
     /**
@@ -140,43 +170,26 @@ public class ProducerHealthCellComposer implements Composer<Pipe<ProducerMetrics
      * @param metrics ProducerMetrics to assess
      * @return Confidence level (CONFIRMED, MEASURED, or TENTATIVE)
      */
-    private Monitors.Confidence assessConfidence(ProducerMetrics metrics) {
-        long ageMs = metrics.ageMs();
+    private Monitors.Confidence assessConfidence (
+      final ProducerMetrics metrics
+    ) {
 
-        if (ageMs < FRESH_METRICS_MS) {
-            return Monitors.Confidence.CONFIRMED;
-        } else if (ageMs < RECENT_METRICS_MS) {
-            return Monitors.Confidence.MEASURED;
-        } else {
-            return Monitors.Confidence.TENTATIVE;
-        }
+      final var ageMs = metrics.ageMs ();
+
+      if ( ageMs < FRESH_METRICS_MS ) {
+
+        return Monitors.Confidence.CONFIRMED;
+
+      } else if ( ageMs < RECENT_METRICS_MS ) {
+
+        return Monitors.Confidence.MEASURED;
+
+      } else {
+
+        return Monitors.Confidence.TENTATIVE;
+
+      }
+
     }
 
-    /**
-     * Build signal context payload with key metrics.
-     * <p>
-     * Includes all relevant metrics for downstream interpretation and debugging.
-     *
-     * @param metrics ProducerMetrics to extract context from
-     * @return Context map with string representations of metrics
-     */
-    private Map<String, String> buildContext(ProducerMetrics metrics) {
-        Map<String, String> context = new HashMap<>();
-
-        context.put("producerId", metrics.producerId());
-        context.put("sendRate", String.valueOf(metrics.sendRate()));
-        context.put("avgLatencyMs", String.format("%.2f", metrics.avgLatencyMs()));
-        context.put("p99LatencyMs", String.format("%.2f", metrics.p99LatencyMs()));
-        context.put("batchSizeAvg", String.valueOf(metrics.batchSizeAvg()));
-        context.put("compressionRatio", String.format("%.2f", metrics.compressionRatio()));
-        context.put("bufferUtilization", String.format("%.2f", metrics.bufferUtilization()));
-        context.put("bufferAvailableBytes", String.valueOf(metrics.bufferAvailableBytes()));
-        context.put("bufferTotalBytes", String.valueOf(metrics.bufferTotalBytes()));
-        context.put("ioWaitRatio", String.valueOf(metrics.ioWaitRatio()));
-        context.put("recordErrorRate", String.valueOf(metrics.recordErrorRate()));
-        context.put("timestamp", Instant.ofEpochMilli(metrics.timestamp()).toString());
-        context.put("ageMs", String.valueOf(metrics.ageMs()));
-
-        return context;
-    }
 }

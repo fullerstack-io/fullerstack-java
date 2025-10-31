@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.integration;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.circuit.SequentialCircuit;
+import io.fullerstack.substrates.circuit.SingleThreadCircuit;
 import io.fullerstack.substrates.name.HierarchicalName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PipeCachingTest {
 
-    private SequentialCircuit circuit;
+    private SingleThreadCircuit circuit;
 
     @AfterEach
     void cleanup() {
@@ -55,7 +55,7 @@ class PipeCachingTest {
 
     @Test
     void shouldReturnSamePipeInstanceOnMultipleCalls() {
-        circuit = new SequentialCircuit(HierarchicalName.of("test-circuit"));
+        circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
         // Create conduit with limit transformation
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
@@ -73,7 +73,7 @@ class PipeCachingTest {
 
     @Test
     void shouldShareSegmentStateAcrossMultiplePipeCalls() throws InterruptedException {
-        circuit = new SequentialCircuit(HierarchicalName.of("test-circuit"));
+        circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(3);
@@ -107,7 +107,7 @@ class PipeCachingTest {
 
     @Test
     void shouldShareReduceAccumulatorState() throws InterruptedException {
-        circuit = new SequentialCircuit(HierarchicalName.of("test-circuit"));
+        circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
         List<Integer> received = new ArrayList<>();
         CountDownLatch latch = new CountDownLatch(4);

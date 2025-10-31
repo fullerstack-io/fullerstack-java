@@ -67,6 +67,13 @@
             <artifactId>humainary-substrates-api</artifactId>
         </dependency>
 
+        <!-- Serventis Extension (ext/serventis) - built locally from substrates-api-java -->
+        <dependency>
+            <groupId>io.humainary.substrates.ext</groupId>
+            <artifactId>humainary-serventis</artifactId>
+            <version>${substrates-api.version}</version>
+        </dependency>
+
         <!-- Logging (SLF4J API only, implementation provided by consumer) -->
         <dependency>
             <groupId>org.slf4j</groupId>

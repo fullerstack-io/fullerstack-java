@@ -1,13 +1,8 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.fullerstack.kafka.broker.baseline.BaselineService;
-import io.fullerstack.serventis.signals.ServiceSignal;
-import io.humainary.substrates.api.Substrates.Cortex;
-import io.humainary.substrates.api.Substrates.Name;
-import io.humainary.substrates.api.Substrates.Pipe;
-import io.humainary.substrates.api.Substrates.State;
-import io.humainary.substrates.api.Substrates.Subject;
-import io.humainary.substrates.api.Substrates.Id;
+import io.humainary.serventis.probes.Probes;
+import io.humainary.serventis.services.Services;
+import io.humainary.substrates.api.Substrates.*;
 import org.apache.kafka.clients.producer.ProducerInterceptor;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -18,55 +13,63 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.*;
 
 /**
- * Kafka ProducerInterceptor that interprets producer-broker interactions as ServiceSignals (signal-first).
+ * Kafka ProducerInterceptor that emits Probes (Layer 1) and Services signals (Layer 2).
  * <p>
- * <b>Signal-First Architecture:</b>
- * This interceptor INTERPRETS send events at the point of observation (where context exists)
- * and emits ServiceSignals with embedded meaning, NOT raw data bags.
- *
- * <h3>Transformed Architecture:</h3>
+ * <b>Semiotic Observability Architecture (Substrates RC1):</b>
  * <pre>
- * ProducerEventInterceptor
- *   → INTERPRET latency vs baseline
- *   → emit(ServiceSignal)  [Signal with meaning]
- *   → Observers (no Composer needed!)
+ * Raw Signals → Conditions → Situations → Actions
+ *     ↓             ↓            ↓
+ *   Probes →    Monitors →   Reporters
+ *
+ * Layer 1 (Probes): Raw communication observations
+ *   → Outcome (SUCCESS/FAILURE) × Origin (CLIENT/SERVER) × Operation (SEND/RECEIVE)
+ *
+ * Layer 2 (Services): Service lifecycle semantics
+ *   → CALL (initiate) → SUCCESS/FAIL (outcome)
+ *   → RELEASE orientation: Self-perspective ("I am calling", "I succeeded")
  * </pre>
  *
- * <h3>Lifecycle Tracking:</h3>
+ * <h3>Signal Flow:</h3>
  * <pre>
- * 1. Application calls producer.send(record)
- *    → onSend() → ServiceSignal.call(subject, metadata)
+ * 1. onSend(record)
+ *    → Probe: send(CLIENT, SUCCESS)       [Layer 1: Attempting send]
+ *    → Service: call()                    [Layer 2: "I am calling"]
  *
- * 2. Broker acknowledges write
- *    → onAcknowledgement(metadata, null)
- *    → INTERPRET latency vs baseline
- *    → ServiceSignal.succeeded(subject, metadata with assessment)
+ * 2. onAcknowledgement(metadata, null)
+ *    → Probe: receive(CLIENT, SUCCESS)    [Layer 1: Got acknowledgement]
+ *    → Service: success()                 [Layer 2: "I succeeded"]
+ *    → Record latency for baseline
  *
- * 3. Send fails (timeout, network error, etc.)
- *    → onAcknowledgement(metadata, exception)
- *    → ServiceSignal.failed(subject, metadata with error details)
+ * 3. onAcknowledgement(metadata, exception)
+ *    → Probe: send(CLIENT, FAILURE)       [Layer 1: Send failed]
+ *    → Service: fail()                    [Layer 2: "I failed"]
  * </pre>
  *
- * <h3>Configuration:</h3>
+ * <h3>Configuration (RC1 Pattern):</h3>
  * <pre>{@code
- * // Create baseline service
- * BaselineService baselineService = new SimpleBaselineService();
+ * // Runtime creates Probes and Services instruments
+ * Circuit circuit = Cortex.circuit(Cortex.name("kafka"));
  *
- * // Runtime creates Cell for ServiceSignals
- * Cell<ServiceSignal, ServiceSignal> producerCell = circuit.cell(
- *     Composer.pipe(),  // No Composer needed - signals already interpreted!
- *     observerPipe
- * );
+ * // Probe for raw observations
+ * Probes.Probe probe = circuit
+ *     .conduit(Probes::composer)
+ *     .channel(Cortex.name("producer.operations"));
  *
- * // Configure producer with interceptor, Pipe, and BaselineService
+ * // Service for lifecycle semantics
+ * Services.Service service = circuit
+ *     .conduit(Services::composer)
+ *     .channel(Cortex.name("producer.calls"));
+ *
+ * // Configure producer with instruments
  * Properties props = new Properties();
  * props.put("bootstrap.servers", "localhost:9092");
  * props.put("client.id", "my-producer");
  * props.put("interceptor.classes", ProducerEventInterceptor.class.getName());
- * props.put(ProducerEventInterceptor.SIGNAL_PIPE_KEY, producerCell);  // Cell IS-A Pipe
+ * props.put(ProducerEventInterceptor.PROBE_KEY, probe);
+ * props.put(ProducerEventInterceptor.SERVICE_KEY, service);
  * props.put(ProducerEventInterceptor.BASELINE_SERVICE_KEY, baselineService);
  *
  * KafkaProducer<String, String> producer = new KafkaProducer<>(props);
@@ -81,43 +84,41 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  * All interceptor logic is wrapped in try-catch to prevent failures from breaking the producer.
  * Errors are logged but do not propagate.
  *
- * <h3>Latency Interpretation:</h3>
- * The interceptor uses BaselineService to interpret latency in context:
+ * <h3>Layer Separation:</h3>
  * <ul>
- *   <li>Normal: latency ≤ baseline * 1.2</li>
- *   <li>Elevated: latency > baseline * 1.2</li>
- *   <li>Degraded: latency > baseline * 1.5</li>
- *   <li>Severely degraded: latency > baseline * 2.0</li>
+ *   <li><b>This interceptor (Layers 1-2):</b> Emits raw observations and service semantics</li>
+ *   <li><b>Monitor aggregators (Layer 3):</b> Analyze patterns, assess conditions (STABLE/DEGRADED/DOWN)</li>
+ *   <li><b>Reporter assessors (Layer 4):</b> Determine situations (NORMAL/ELEVATED/CRITICAL)</li>
  * </ul>
  *
  * @param <K> Producer record key type
  * @param <V> Producer record value type
  *
  * @author Fullerstack
- * @see ServiceSignal
- * @see BaselineService
+ * @see Probes
+ * @see Services
  */
 public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V> {
 
     private static final Logger logger = LoggerFactory.getLogger(ProducerEventInterceptor.class);
 
     /**
-     * Configuration key for injecting the signal Pipe (typically a Cell).
+     * Configuration key for injecting the Probe instrument.
      * <p>
-     * Value must be a {@link Pipe}{@code <ServiceSignal>} instance.
+     * Value must be a {@link Probes.Probe} instance.
      */
-    public static final String SIGNAL_PIPE_KEY = "fullerstack.signal.pipe";
+    public static final String PROBE_KEY = "fullerstack.probe";
 
     /**
-     * Configuration key for injecting the BaselineService.
+     * Configuration key for injecting the Service instrument.
      * <p>
-     * Value must be a {@link BaselineService} instance.
+     * Value must be a {@link Services.Service} instance.
      */
-    public static final String BASELINE_SERVICE_KEY = "fullerstack.baseline.service";
+    public static final String SERVICE_KEY = "fullerstack.service";
 
     private String producerId;
-    private Pipe<ServiceSignal> signalPipe;
-    private BaselineService baselineService;
+    private Probes.Probe probe;
+    private Services.Service service;
 
     /**
      * Tracks in-flight requests for latency measurement.
@@ -134,73 +135,75 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
      * <ul>
      *   <li>{@code client.id} → producerId</li>
      *   <li>{@code fullerstack.signal.pipe} → Pipe instance for signals</li>
-     *   <li>{@code fullerstack.baseline.service} → BaselineService for interpretation</li>
      * </ul>
      *
      * @param configs Producer configuration map
      */
     @Override
-    @SuppressWarnings("unchecked")
-    public void configure(Map<String, ?> configs) {
-        // Extract producer ID from client.id config
-        Object clientIdObj = configs.get("client.id");
-        this.producerId = clientIdObj != null ? clientIdObj.toString() : "unknown-producer";
+    public void configure ( Map < String, ? > configs ) {
+      // Extract producer ID from client.id config
+      Object clientIdObj = configs.get ( "client.id" );
+      this.producerId = clientIdObj != null ? clientIdObj.toString () : "unknown-producer";
 
-        // Extract Pipe<ServiceSignal> from config
-        Object pipeObj = configs.get(SIGNAL_PIPE_KEY);
-        if (pipeObj instanceof Pipe) {
-            this.signalPipe = (Pipe<ServiceSignal>) pipeObj;
-            logger.info("ProducerEventInterceptor configured for producer: {} with signal pipe",
-                producerId);
-        } else {
-            logger.warn("ProducerEventInterceptor configured without signal pipe for producer: {}. " +
-                "Signals will not be emitted. Set '{}' in producer config.",
-                producerId, SIGNAL_PIPE_KEY);
-        }
+      // Extract Probe from config
+      Object probeObj = configs.get ( PROBE_KEY );
+      if ( probeObj instanceof Probes.Probe ) {
+        this.probe = (Probes.Probe) probeObj;
+        logger.info (
+          "ProducerEventInterceptor configured for producer: {} with Probe",
+          producerId
+        );
+      } else {
+        logger.warn (
+          "ProducerEventInterceptor configured without Probe for producer: {}. " +
+          "Layer 1 observations will not be emitted. Set '{}' in producer config.",
+          producerId,
+          PROBE_KEY
+        );
+      }
 
-        // Extract BaselineService from config
-        Object baselineObj = configs.get(BASELINE_SERVICE_KEY);
-        if (baselineObj instanceof BaselineService) {
-            this.baselineService = (BaselineService) baselineObj;
-            logger.info("ProducerEventInterceptor configured for producer: {} with baseline service",
-                producerId);
-        } else {
-            logger.warn("ProducerEventInterceptor configured without baseline service for producer: {}. " +
-                "Latency interpretation will be limited. Set '{}' in producer config.",
-                producerId, BASELINE_SERVICE_KEY);
-        }
+      // Extract Service from config
+      Object serviceObj = configs.get ( SERVICE_KEY );
+      if ( serviceObj instanceof Services.Service ) {
+        this.service = (Services.Service) serviceObj;
+        logger.info (
+          "ProducerEventInterceptor configured for producer: {} with Service",
+          producerId
+        );
+      } else {
+        logger.warn (
+          "ProducerEventInterceptor configured without Service for producer: {}. " +
+          "Layer 2 signals will not be emitted. Set '{}' in producer config.",
+          producerId,
+          SERVICE_KEY
+        );
+      }
     }
 
     /**
      * Called when producer initiates a send operation (before network transmission).
      * <p>
-     * Emits ServiceSignal.CALL and records send time for latency tracking.
+     * Emits Layer 1 Probe (SEND, CLIENT, SUCCESS) and Layer 2 Service (CALL) signals.
      *
      * @param record Producer record being sent
      * @return Original record (unmodified - this interceptor is read-only)
      */
     @Override
     public ProducerRecord<K, V> onSend(ProducerRecord<K, V> record) {
-        if (signalPipe == null) {
-            return record;  // Not configured, pass through
-        }
-
         try {
             // Record send time for latency tracking
             String key = requestKey(record.topic(), record.partition());
             inFlightRequests.put(key, System.nanoTime());
 
-            // Create Subject for producer->topic interaction
-            Subject subject = createSubject(producerId, record.topic(), record.partition());
+            // Layer 1 (Probes): Raw observation - attempting to send
+            if (probe != null) {
+                probe.send(Probes.Origin.CLIENT, Probes.Outcome.SUCCESS);
+            }
 
-            // Emit ServiceSignal.CALL
-            Map<String, String> metadata = new HashMap<>();
-            metadata.put("producer_id", producerId);
-            metadata.put("topic", record.topic());
-            metadata.put("partition", String.valueOf(record.partition() != null ? record.partition() : -1));
-
-            ServiceSignal signal = ServiceSignal.call(subject, metadata);
-            signalPipe.emit(signal);
+            // Layer 2 (Services): Service-level semantics - calling broker
+            if (service != null) {
+                service.call();  // RELEASE orientation: "I am calling"
+            }
 
             logger.trace("Producer {} CALL for topic {} partition {}",
                 producerId, record.topic(), record.partition());
@@ -217,18 +220,16 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
     /**
      * Called after broker responds (either acknowledgement or failure).
      * <p>
-     * Emits ServiceSignal.SUCCEEDED (exception == null) or ServiceSignal.FAILED (exception != null).
-     * INTERPRETS latency vs baseline to add assessment to signal payload.
+     * Emits Layer 1 Probe (RECEIVE SUCCESS/FAILURE) and Layer 2 Service (SUCCESS/FAIL) signals.
+     * <p>
+     * NOTE: Latency interpretation and baseline tracking remain for future Layer 3 Monitor aggregation.
+     * In RC1, diagnostic metadata would be stored in Subject.state() rather than signal payload.
      *
      * @param metadata Record metadata (topic, partition, offset)
      * @param exception Null for successful ack, non-null for failures
      */
     @Override
     public void onAcknowledgement(RecordMetadata metadata, Exception exception) {
-        if (signalPipe == null) {
-            return;  // Not configured
-        }
-
         try {
             // Calculate latency
             String key = requestKey(metadata.topic(), metadata.partition());
@@ -237,62 +238,36 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
                 ? (System.nanoTime() - sendTime) / 1_000_000
                 : 0L;
 
-            // Create Subject for producer->topic interaction
-            Subject subject = createSubject(producerId, metadata.topic(), metadata.partition());
-
-            // Build metadata with interpretation
-            Map<String, String> signalMetadata = new HashMap<>();
-            signalMetadata.put("producer_id", producerId);
-            signalMetadata.put("topic", metadata.topic());
-            signalMetadata.put("partition", String.valueOf(metadata.partition()));
-            signalMetadata.put("latency_ms", String.valueOf(latencyMs));
-
             if (exception == null) {
-                // ACK received - SUCCEEDED
-                signalMetadata.put("offset", String.valueOf(metadata.offset()));
+                // ACK received - SUCCESS
 
-                // INTERPRET latency vs baseline (where context exists)
-                if (baselineService != null) {
-                    long expectedLatency = baselineService.getExpectedProducerLatency(producerId, metadata.topic());
-                    String trend = baselineService.getTrend(producerId + ":" + metadata.topic(), "latency", java.time.Duration.ofMinutes(5));
-
-                    signalMetadata.put("expected_latency_ms", String.valueOf(expectedLatency));
-                    signalMetadata.put("latency_trend", trend);
-
-                    // Add interpretation
-                    if (latencyMs > expectedLatency * 2.0) {
-                        signalMetadata.put("assessment", "Severely degraded performance: " + latencyMs + "ms vs " + expectedLatency + "ms baseline");
-                    } else if (latencyMs > expectedLatency * 1.5) {
-                        signalMetadata.put("assessment", "Degraded performance: " + latencyMs + "ms vs " + expectedLatency + "ms baseline");
-                    } else if (latencyMs > expectedLatency * 1.2) {
-                        signalMetadata.put("assessment", "Elevated latency: " + latencyMs + "ms vs " + expectedLatency + "ms baseline");
-                    } else {
-                        signalMetadata.put("assessment", "Normal performance");
-                    }
-
-                    // Record observation for future baselines
-                    baselineService.recordObservation(producerId + ":" + metadata.topic(), "latency", latencyMs, java.time.Instant.now());
-                } else {
-                    // No baseline - just note the latency
-                    signalMetadata.put("assessment", "Latency: " + latencyMs + "ms (no baseline available)");
+                // Layer 1 (Probes): Raw observation - received acknowledgement
+                if (probe != null) {
+                    probe.receive(Probes.Origin.CLIENT, Probes.Outcome.SUCCESS);
                 }
 
-                ServiceSignal signal = ServiceSignal.succeeded(subject, signalMetadata);
-                signalPipe.emit(signal);
+                // Layer 2 (Services): Service-level semantics - call succeeded
+                if (service != null) {
+                    service.success();  // RELEASE orientation: "I succeeded"
+                }
 
-                logger.trace("Producer {} SUCCEEDED for topic {} partition {} offset {} latency={}ms",
-                    producerId, metadata.topic(), metadata.partition(), metadata.offset(), latencyMs);
+                logger.trace ( "Producer {} SUCCESS for topic {} partition {} offset {} latency={}ms",
+                  producerId, metadata.topic (), metadata.partition (), metadata.offset (), latencyMs );
 
             } else {
-                // Send failed - FAILED
-                signalMetadata.put("error_type", exception.getClass().getSimpleName());
-                signalMetadata.put("error_message", exception.getMessage() != null ? exception.getMessage() : "No message");
-                signalMetadata.put("assessment", "Send failed: " + exception.getClass().getSimpleName());
+                // Send failed - FAILURE
 
-                ServiceSignal signal = ServiceSignal.failed(subject, signalMetadata);
-                signalPipe.emit(signal);
+                // Layer 1 (Probes): Raw observation - send failed
+                if (probe != null) {
+                    probe.send(Probes.Origin.CLIENT, Probes.Outcome.FAILURE);
+                }
 
-                logger.debug("Producer {} FAILED for topic {} partition {} latency={}ms error={}",
+                // Layer 2 (Services): Service-level semantics - call failed
+                if (service != null) {
+                    service.fail();  // RELEASE orientation: "I failed"
+                }
+
+                logger.debug("Producer {} FAIL for topic {} partition {} latency={}ms error={}",
                     producerId, metadata.topic(), metadata.partition(), latencyMs,
                     exception.getClass().getSimpleName());
             }
@@ -323,52 +298,5 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
     private String requestKey(String topic, Integer partition) {
         int p = partition != null ? partition : -1;
         return topic + ":" + p;
-    }
-
-    /**
-     * Create a Subject for producer->topic signal emission.
-     * <p>
-     * In full Circuit context, Subject would come from Cell.subject().
-     * This is a simplified version for standalone sensor usage.
-     *
-     * @param producerId Producer identifier
-     * @param topic Topic name
-     * @param partition Partition number (may be null)
-     * @return Subject wrapping the producer->topic interaction
-     */
-    @SuppressWarnings("unchecked")
-    private Subject createSubject(final String producerId, final String topic, final Integer partition) {
-        // Create a unique name for this producer->topic->partition interaction
-        int p = partition != null ? partition : -1;
-        final String entityName = producerId + ".topic." + topic + ".partition." + p;
-
-        return new Subject() {
-            @Override
-            public Id id() {
-                return null; // No specific ID
-            }
-
-            @Override
-            public Name name() {
-                // Use cortex().name() per M18 API
-                return cortex().name(entityName);
-            }
-
-            @Override
-            public Class<ServiceSignal> type() {
-                return ServiceSignal.class;
-            }
-
-            @Override
-            public State state() {
-                return null; // No state - Subject is used for signal identity only
-            }
-
-            @Override
-            public int compareTo(Object o) {
-                if (!(o instanceof Subject)) return -1;
-                return name().toString().compareTo(((Subject) o).name().toString());
-            }
-        };
     }
 }

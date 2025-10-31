@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.core.config;
 
-import io.humainary.substrates.api.Substrates.Cortex;
-import io.humainary.substrates.api.Substrates.Name;
+import static io.humainary.substrates.api.Substrates.Cortex;
+import static io.humainary.substrates.api.Substrates.Name;
 
 import java.util.List;
 import java.util.Objects;

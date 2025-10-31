@@ -1,8 +1,8 @@
 package io.fullerstack.substrates.capture;
 
 import io.humainary.substrates.api.Substrates.Capture;
+import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Subject;
-import io.humainary.substrates.api.Substrates.Substrate;
 
 import java.util.Objects;
 
@@ -26,7 +26,7 @@ import java.util.Objects;
  * <pre>
  * Channel("sensor1") creates SubjectCapture(channelSubject, value)
  *   ↓
- * Queue&lt;Capture&lt;E, S&gt;&gt; stores both Subject and value
+ * Queue&lt;Capture&lt;E&gt;&gt; stores both Subject and value
  *   ↓
  * QueueProcessor takes Capture
  *   ↓
@@ -36,11 +36,10 @@ import java.util.Objects;
  * </pre>
  *
  * @param <E> the emission type
- * @param <S> the substrate type that emitted the value
  * @see Capture
  * @see Subject
  */
-public record SubjectCapture<E, S extends Substrate<S>>(Subject<S> subject, E emission) implements Capture<E, S> {
+public record SubjectCapture<E>(Subject<Channel<E>> subject, E emission) implements Capture<E> {
 
     /**
      * Creates a SubjectCapture pairing Subject with emission.

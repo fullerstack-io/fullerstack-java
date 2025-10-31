@@ -10,13 +10,17 @@ import java.util.Objects;
 import java.util.function.*;
 
 /**
- * Implementation of Substrates.Flow for emission transformation pipelines.
+ * Implementation of Substrates.Flow that regulates emission flow characteristics.
+ *
+ * <p><b>Metaphor:</b> Like a flow regulator in hydraulics, this class controls the
+ * characteristics of emissions flowing through a Pipe - adjusting rate (limit, skip, sample),
+ * filtering content (guard, diff, sift), and transforming values (replace, reduce).
  *
  * <p><b>Note:</b> Flow is the latest name in the API evolution: Path → Segment → Flow.
  * The API evolved to use "Flow" to better represent the continuous data stream concept
  * with Consumer<Flow> replacing the Sequencer pattern.
  *
- * <p>Flow provides a fluent API for building transformation pipelines that are applied
+ * <p>FlowRegulator provides a fluent API for configuring transformation rules that are applied
  * to emissions flowing through a Pipe. Transformations include filtering, mapping, reducing,
  * sampling, and comparison-based sifting.
  *
@@ -29,14 +33,14 @@ import java.util.function.*;
  *   <li>Optimized - fuses adjacent transformations like JVM hot loop optimization</li>
  * </ul>
  *
- * <p><b>Pipeline Optimization:</b>
+ * <p><b>Regulation Optimizations:</b>
  * <ul>
  *   <li>Adjacent skip() calls are fused: skip(3).skip(2) → skip(5)</li>
  *   <li>Adjacent limit() calls are minimized: limit(10).limit(5) → limit(5)</li>
  *   <li>Reduces transformation overhead in hot paths</li>
  * </ul>
  *
- * <p>Usage (M15+ with Consumer):
+ * <p>Usage (RC1 with Consumer):
  * <pre>
  * channel.pipe(
  *   flow -> flow
@@ -50,7 +54,7 @@ import java.util.function.*;
  * @see <a href="https://humainary.io/blog/observability-x-channels/">Observability X - Channels</a>
  * @see <a href="https://humainary.io/blog/observability-x-staging-state/">Observability X - Staging State</a>
  */
-public class TransformationPipeline<E> implements Flow<E> {
+public class FlowRegulator<E> implements Flow<E> {
 
     /**
      * Transformation operations that can be applied to emissions.
@@ -76,7 +80,7 @@ public class TransformationPipeline<E> implements Flow<E> {
 
     private final List<TransformMetadata> metadata = new ArrayList<>();
 
-    public TransformationPipeline() {
+    public FlowRegulator() {
     }
 
     @Override

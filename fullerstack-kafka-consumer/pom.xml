@@ -23,14 +23,21 @@
         </dependency>
         <dependency>
             <groupId>io.fullerstack</groupId>
-            <artifactId>fullerstack-serventis</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.fullerstack</groupId>
             <artifactId>fullerstack-substrates</artifactId>
             <version>${project.version}</version>
             <!-- NOTE: ONLY composers package uses Substrates. Sensors remain dependency-free. -->
+        </dependency>
+
+        <!-- Substrates API (shaded by fullerstack-substrates, needed for compilation) -->
+        <dependency>
+            <groupId>io.humainary.substrates</groupId>
+            <artifactId>humainary-substrates-api</artifactId>
+        </dependency>
+
+        <!-- Serventis Extension (shaded by fullerstack-substrates, needed for compilation) -->
+        <dependency>
+            <groupId>io.humainary.substrates.ext</groupId>
+            <artifactId>humainary-serventis</artifactId>
         </dependency>
 
         <!-- Kafka Client API -->

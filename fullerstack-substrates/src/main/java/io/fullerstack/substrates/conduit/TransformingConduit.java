@@ -70,7 +70,7 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
 
     private final Circuit circuit; // Parent Circuit in hierarchy (provides scheduling + Subject)
     private final Subject conduitSubject;
-    private final Composer<? extends P, E> perceptComposer;
+    private final Composer<E, ? extends P> perceptComposer;
     private final Map<Name, P> percepts;
     private final Consumer<Flow<E>> flowConfigurer; // Optional transformation pipeline (nullable)
 
@@ -88,7 +88,7 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
      * @param perceptComposer composer for creating percepts from channels
      * @param circuit parent Circuit (provides scheduling + Subject hierarchy)
      */
-    public TransformingConduit(Name conduitName, Composer<? extends P, E> perceptComposer, Circuit circuit) {
+    public TransformingConduit(Name conduitName, Composer<E, ? extends P> perceptComposer, Circuit circuit) {
         this(conduitName, perceptComposer, circuit, null);
     }
 
@@ -100,7 +100,7 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
      * @param circuit parent Circuit (provides scheduling + Subject hierarchy)
      * @param flowConfigurer optional transformation pipeline (null if no transformations)
      */
-    public TransformingConduit(Name conduitName, Composer<? extends P, E> perceptComposer, Circuit circuit, Consumer<Flow<E>> flowConfigurer) {
+    public TransformingConduit(Name conduitName, Composer<E, ? extends P> perceptComposer, Circuit circuit, Consumer<Flow<E>> flowConfigurer) {
         this.circuit = Objects.requireNonNull(circuit, "Circuit cannot be null");
         this.conduitSubject = new HierarchicalSubject<>(
             UuidIdentifier.generate(),
@@ -204,20 +204,13 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
         }
     }
 
-    @Override
-    public Conduit<P, E> tap(Consumer<? super Conduit<P, E>> consumer) {
-        Objects.requireNonNull(consumer, "Consumer cannot be null");
-        consumer.accept(this);
-        return this;
-    }
-
     /**
      * Provides an emission handler callback for Channel/Pipe creation.
      * Channels pass this callback to Pipes, allowing Pipes to notify subscribers.
      *
      * @return callback that routes emissions to subscribers
      */
-    public Consumer<Capture<E, Channel<E>>> emissionHandler() {
+    public Consumer<Capture<E>> emissionHandler() {
         return this::notifySubscribers;
     }
 
@@ -256,7 +249,7 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
      *
      * @param capture the emission capture (Subject + value)
      */
-    private void notifySubscribers(Capture<E, Channel<E>> capture) {
+    private void notifySubscribers(Capture<E> capture) {
         Subject<Channel<E>> emittingSubject = capture.subject();
         Name subjectName = emittingSubject.name();
 

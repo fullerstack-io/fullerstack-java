@@ -3,7 +3,6 @@ package io.fullerstack.substrates.circuit;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.cell.SimpleCell;
 import io.fullerstack.substrates.channel.EmissionChannel;
-import io.fullerstack.substrates.clock.ScheduledClock;
 import io.fullerstack.substrates.conduit.TransformingConduit;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.pool.ConcurrentPool;
@@ -18,9 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -41,7 +38,6 @@ import java.util.function.Function;
  *
  * <p><b>Component Management:</b>
  * <ul>
- *   <li>Clock caching by name (shared ScheduledExecutorService)</li>
  *   <li>Conduit caching by (name, composer type) - different composers create different conduits</li>
  *   <li>Cell creation with hierarchical structure</li>
  *   <li>State subscriber management (Circuit IS-A Source&lt;State&gt;)</li>
@@ -54,16 +50,12 @@ import java.util.function.Function;
  * @see Circuit
  * @see Scheduler
  */
-public class SequentialCircuit implements Circuit, Scheduler {
+public class SingleThreadCircuit implements Circuit, Scheduler {
     private final Subject circuitSubject;
 
     // Valve (William's pattern: BlockingQueue + Virtual Thread)
     private final Valve valve;
 
-    // Shared scheduler for all Clocks in this Circuit
-    private final ScheduledExecutorService clockScheduler;
-
-    private final Map<Name, Clock> clocks;
     private final Map<Name, ConduitSlot> conduits;
     private volatile boolean closed = false;
 
@@ -127,9 +119,8 @@ public class SequentialCircuit implements Circuit, Scheduler {
      *
      * @param name circuit name (hierarchical, e.g., "account.region.cluster")
      */
-    public SequentialCircuit(Name name) {
+    public SingleThreadCircuit(Name name) {
         Objects.requireNonNull(name, "Circuit name cannot be null");
-        this.clocks = new ConcurrentHashMap<>();
         this.conduits = new ConcurrentHashMap<>();
         Id id = UuidIdentifier.generate();
         this.circuitSubject = new HierarchicalSubject<>(
@@ -138,14 +129,6 @@ public class SequentialCircuit implements Circuit, Scheduler {
             LinkedState.empty(),
             Circuit.class
         );
-
-        // Shared scheduler for all Clocks in this Circuit
-        this.clockScheduler = Executors.newScheduledThreadPool(1, r -> {
-            Thread thread = new Thread(r);
-            thread.setDaemon(true);
-            thread.setName("circuit-clock-" + name.part());
-            return thread;
-        });
 
         // Create valve for task execution (William's pattern)
         this.valve = new Valve("circuit-" + name.part());
@@ -185,86 +168,87 @@ public class SequentialCircuit implements Circuit, Scheduler {
     }
 
     @Override
-    public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer, Pipe<E> pipe) {
-        Objects.requireNonNull(composer, "Composer cannot be null");
-        Objects.requireNonNull(pipe, "Pipe cannot be null");
-        return cell(HierarchicalName.of("cell"), composer, null, pipe);
+    public <I, E> Cell<I, E> cell(
+            BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<I>> transformer,
+            BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<E>> aggregator,
+            Pipe<E> pipe) {
+        return cell(HierarchicalName.of("cell"), transformer, aggregator, pipe);
     }
 
     @Override
-    public <I, E> Cell<I, E> cell(Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer, Pipe<E> pipe) {
-        Objects.requireNonNull(composer, "Composer cannot be null");
-        Objects.requireNonNull(configurer, "Flow configurer cannot be null");
-        Objects.requireNonNull(pipe, "Pipe cannot be null");
-        return cell(HierarchicalName.of("cell"), composer, configurer, pipe);
-    }
-
-    /**
-     * Internal method to create a Cell with all parameters (M18 API).
-     *
-     * Per the M18 API contract:
-     * 1. Create a Conduit to provide Channel infrastructure
-     * 2. Invoke the Composer with a Channel to get the input Pipe<I>
-     * 3. Create a SimpleCell wrapping the input pipe and output pipe
-     *
-     * The Cell:
-     * - Receives I values via Cell.emit(I) → delegates to input Pipe<I>
-     * - Emits E values via the output Pipe<E> parameter
-     * - Uses Conduit for Source<E> subscription infrastructure
-     *
-     * @param name Cell name
-     * @param composer Creates the input Pipe<I> from a Channel<E>
-     * @param configurer Optional Flow<E> configuration
-     * @param outputPipe Output pipe for E emissions (M18 API requirement)
-     */
-    private <I, E> Cell<I, E> cell(Name name, Composer<Pipe<I>, E> composer, Consumer<Flow<E>> configurer, Pipe<E> outputPipe) {
-        checkClosed();
+    public <I, E> Cell<I, E> cell(
+            Name name,
+            BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<I>> transformer,
+            BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<E>> aggregator,
+            Pipe<E> pipe) {
         Objects.requireNonNull(name, "Cell name cannot be null");
-        Objects.requireNonNull(composer, "Composer cannot be null");
-        Objects.requireNonNull(outputPipe, "Output pipe cannot be null");
+        Objects.requireNonNull(transformer, "Transformer cannot be null");
+        Objects.requireNonNull(aggregator, "Aggregator cannot be null");
+        Objects.requireNonNull(pipe, "Pipe cannot be null");
 
-        // Create a Conduit to provide Channel and Source infrastructure
-        // The Conduit manages the Circuit queue and Subject hierarchy
-        Conduit<Pipe<I>, E> conduit = configurer == null
-            ? new TransformingConduit<>(name, composer, this)
-            : new TransformingConduit<>(name, composer, this, configurer);
+        // Create a Conduit for this Cell to manage subscriptions
+        // The conduit type must be Conduit<Pipe<I>, E> to match SimpleCell constructor
+        // We'll cast later after applying transformer
+        Conduit<Pipe<E>, E> tempConduit = conduit(name, Composer.pipe());
 
-        // Get the input pipe by invoking the conduit
-        // This creates a Channel and invokes the composer to create Pipe<I>
-        Pipe<I> inputPipe = conduit.get(name);
+        // Get the channel from conduit
+        Pipe<E> channelPipe = tempConduit.get(name);
 
-        // Create a SimpleCell with both input and output pipes (M18 API)
-        return new SimpleCell<>(
-            null,           // No parent - this is a root Cell
-            name,           // Cell name
-            inputPipe,      // Input: Pipe<I> created by composer
-            outputPipe,     // Output: Pipe<E> provided by caller (M18 API)
-            conduit,        // Conduit for Source<E> subscriptions and children
-            circuitSubject  // Parent Subject for hierarchy
+        // Create Cell Subject
+        Subject<Cell<I, E>> cellSubject = new HierarchicalSubject<>(
+            UuidIdentifier.generate(),
+            name,
+            LinkedState.empty(),
+            (Class<Cell<I, E>>) (Class<?>) Cell.class,
+            circuitSubject
+        );
+
+        // Apply transformer to create input pipe
+        Pipe<I> inputPipe = transformer.apply(cellSubject, channelPipe);
+
+        // Apply aggregator to output pipe
+        Pipe<E> outputPipe = aggregator.apply(cellSubject, pipe);
+
+        // Cast conduit to the correct type for SimpleCell
+        // This is safe because the transformer creates Pipe<I> from the channel's Pipe<E>
+        @SuppressWarnings("unchecked")
+        Conduit<Pipe<I>, E> cellConduit = (Conduit<Pipe<I>, E>) (Conduit<?, E>) tempConduit;
+
+        // Create SimpleCell with explicit type parameters
+        return new SimpleCell<I, E>(
+            null,
+            name,
+            inputPipe,
+            outputPipe,
+            cellConduit,
+            circuitSubject
         );
     }
 
     @Override
-    public Clock clock() {
-        // Generate unique name for unnamed clocks to avoid caching collisions
-        return clock(HierarchicalName.of("clock-" + UuidIdentifier.generate().toString()));
+    public <E> Pipe<E> pipe(Pipe<E> target) {
+        Objects.requireNonNull(target, "Target pipe cannot be null");
+        // Return a pipe that routes emissions through the valve to the target
+        return value -> schedule(() -> target.emit(value));
     }
 
     @Override
-    public Clock clock(Name name) {
-        checkClosed();
-        Objects.requireNonNull(name, "Clock name cannot be null");
-        return clocks.computeIfAbsent(name, n -> new ScheduledClock(n, clockScheduler));
+    public <E> Pipe<E> pipe(Pipe<E> target, Consumer<? super Flow<E>> configurer) {
+        Objects.requireNonNull(target, "Target pipe cannot be null");
+        Objects.requireNonNull(configurer, "Flow configurer cannot be null");
+        // TODO: Implement Flow transformations before dispatching to target
+        // For now, just delegate to the simpler version
+        return pipe(target);
     }
 
     @Override
-    public <P, E> Conduit<P, E> conduit(Composer<? extends P, E> composer) {
+    public <P, E> Conduit<P, E> conduit(Composer<E, ? extends P> composer) {
         // Generate unique name for unnamed conduits to avoid caching collisions
         return conduit(HierarchicalName.of("conduit-" + UuidIdentifier.generate().toString()), composer);
     }
 
     @Override
-    public <P, E> Conduit<P, E> conduit(Name name, Composer<? extends P, E> composer) {
+    public <P, E> Conduit<P, E> conduit(Name name, Composer<E, ? extends P> composer) {
         checkClosed();
         Objects.requireNonNull(name, "Conduit name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");
@@ -304,7 +288,7 @@ public class SequentialCircuit implements Circuit, Scheduler {
     }
 
     @Override
-    public <P, E> Conduit<P, E> conduit(Name name, Composer<? extends P, E> composer, Consumer<Flow<E>> configurer) {
+    public <P, E> Conduit<P, E> conduit(Name name, Composer<E, ? extends P> composer, Consumer<Flow<E>> configurer) {
         checkClosed();
         Objects.requireNonNull(name, "Conduit name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");
@@ -342,42 +326,13 @@ public class SequentialCircuit implements Circuit, Scheduler {
     }
 
     @Override
-    public Circuit tap(Consumer<? super Circuit> consumer) {
-        checkClosed();
-        Objects.requireNonNull(consumer, "Consumer cannot be null");
-        consumer.accept(this);
-        return this;
-    }
-
-    @Override
     public void close() {
         if (!closed) {
             closed = true;
 
-            // Close all clocks
-            clocks.values().forEach(clock -> {
-                try {
-                    clock.close();
-                } catch (Exception e) {
-                    // Log but continue
-                }
-            });
-
-            // Stop clock scheduler
-            clockScheduler.shutdown();
-            try {
-                if (!clockScheduler.awaitTermination(1, TimeUnit.SECONDS)) {
-                    clockScheduler.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                clockScheduler.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-
             // Close valve
             valve.close();
 
-            clocks.clear();
             conduits.clear();
         }
     }

@@ -9,7 +9,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for pipeline fusion optimization in TransformationPipeline.
+ * Tests for pipeline fusion optimization in FlowRegulator.
  *
  * <p><b>Pipeline Fusion (JVM-style Optimization):</b>
  * <ul>
@@ -27,7 +27,7 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Adjacent skip() calls are fused into a single skip")
     void testSkipFusion() {
-        TransformationPipeline<Integer> flow = new TransformationPipeline<>();
+        FlowRegulator<Integer> flow = new FlowRegulator<>();
 
         // Chain multiple skip() calls
         flow.skip(3).skip(2).skip(1);
@@ -50,7 +50,7 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Adjacent limit() calls are minimized to smallest limit")
     void testLimitFusion() {
-        TransformationPipeline<Integer> flow = new TransformationPipeline<>();
+        FlowRegulator<Integer> flow = new FlowRegulator<>();
 
         // Chain multiple limit() calls - should take the minimum
         flow.limit(10).limit(5).limit(7);
@@ -72,7 +72,7 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Combined skip().limit() fusion works correctly")
     void testSkipLimitCombination() {
-        TransformationPipeline<Integer> flow = new TransformationPipeline<>();
+        FlowRegulator<Integer> flow = new FlowRegulator<>();
 
         // skip(3).skip(2) → skip(5)
         // limit(10).limit(8) → limit(8)
@@ -94,7 +94,7 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Fusion doesn't affect non-adjacent transformations")
     void testNonAdjacentTransformationsNotFused() {
-        TransformationPipeline<Integer> flow = new TransformationPipeline<>();
+        FlowRegulator<Integer> flow = new FlowRegulator<>();
 
         // skip() separated by guard() - should NOT be fused
         flow.skip(2).guard(x -> x > 0).skip(1);
@@ -118,7 +118,7 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Single skip() without fusion works correctly")
     void testSingleSkipNoFusion() {
-        TransformationPipeline<Integer> flow = new TransformationPipeline<>();
+        FlowRegulator<Integer> flow = new FlowRegulator<>();
 
         flow.skip(3);
 
@@ -137,7 +137,7 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Single limit() without fusion works correctly")
     void testSingleLimitNoFusion() {
-        TransformationPipeline<Integer> flow = new TransformationPipeline<>();
+        FlowRegulator<Integer> flow = new FlowRegulator<>();
 
         flow.limit(5);
 
@@ -156,7 +156,7 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Multiple skip() fusions in sequence")
     void testMultipleSkipFusions() {
-        TransformationPipeline<Integer> flow = new TransformationPipeline<>();
+        FlowRegulator<Integer> flow = new FlowRegulator<>();
 
         // Each pair should fuse: skip(1).skip(1) → skip(2)
         // Then skip(2).skip(1) → skip(3)
@@ -179,7 +179,7 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Multiple limit() fusions in sequence")
     void testMultipleLimitFusions() {
-        TransformationPipeline<Integer> flow = new TransformationPipeline<>();
+        FlowRegulator<Integer> flow = new FlowRegulator<>();
 
         // Each fusion should take minimum
         // limit(10).limit(8) → limit(8)
@@ -203,10 +203,10 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Fusion reduces internal transformation count")
     void testFusionReducesTransformationCount() {
-        TransformationPipeline<Integer> unfused = new TransformationPipeline<>();
+        FlowRegulator<Integer> unfused = new FlowRegulator<>();
         unfused.skip(5);
 
-        TransformationPipeline<Integer> fused = new TransformationPipeline<>();
+        FlowRegulator<Integer> fused = new FlowRegulator<>();
         fused.skip(3).skip(2);  // Should fuse to skip(5)
 
         // Both should produce same results
@@ -230,7 +230,7 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Zero skip() fuses correctly")
     void testZeroSkipFusion() {
-        TransformationPipeline<Integer> flow = new TransformationPipeline<>();
+        FlowRegulator<Integer> flow = new FlowRegulator<>();
 
         flow.skip(0).skip(3);  // skip(0) is no-op, but should still fuse
 
@@ -250,7 +250,7 @@ class TransformationFusionTest {
     @Test
     @DisplayName("Large skip() values fuse correctly")
     void testLargeSkipFusion() {
-        TransformationPipeline<Integer> flow = new TransformationPipeline<>();
+        FlowRegulator<Integer> flow = new FlowRegulator<>();
 
         flow.skip(1000).skip(500).skip(250);  // Should fuse to skip(1750)
 

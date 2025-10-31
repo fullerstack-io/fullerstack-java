@@ -53,13 +53,15 @@ public class Composers {
     /**
      * Taps into a Circuit for side effects without breaking the chain.
      *
-     * <p>Alias for circuit.tap() to support functional style.
+     * <p>Executes consumer on circuit and returns the same circuit for chaining.
+     * This method provides functional style chaining since Circuit no longer has a tap() method in RC1.
      *
      * @param circuit the circuit
      * @param consumer the side effect
      * @return the same circuit for chaining
      */
     public static Circuit tap(Circuit circuit, Consumer<Circuit> consumer) {
-        return circuit.tap(consumer);
+        consumer.accept(circuit);
+        return circuit;
     }
 }

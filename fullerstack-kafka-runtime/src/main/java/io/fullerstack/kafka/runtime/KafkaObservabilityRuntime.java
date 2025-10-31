@@ -1,6 +1,5 @@
 package io.fullerstack.kafka.runtime;
 
-import io.fullerstack.kafka.broker.baseline.BaselineService;
 import io.fullerstack.kafka.broker.composers.BrokerHealthCellComposer;
 import io.fullerstack.kafka.broker.models.BrokerMetrics;
 import io.fullerstack.kafka.broker.sensors.BrokerSensor;
@@ -14,18 +13,23 @@ import io.fullerstack.kafka.core.config.ProducerSensorConfig;
 import io.fullerstack.kafka.producer.composers.ProducerHealthCellComposer;
 import io.fullerstack.kafka.producer.models.ProducerMetrics;
 import io.fullerstack.kafka.producer.sensors.ProducerSensor;
-import io.fullerstack.serventis.signals.MonitorSignal;
-import io.fullerstack.serventis.signals.ResourceSignal;
+import io.humainary.serventis.monitors.Monitors;
+import io.humainary.serventis.resources.Resources;
 import io.humainary.substrates.api.Substrates.Cell;
+import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Composer;
 import io.humainary.substrates.api.Substrates.Cortex;
+import io.humainary.substrates.api.Substrates.Flow;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pipe;
+import io.humainary.substrates.api.Substrates.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
 
 import static io.fullerstack.substrates.CortexRuntime.cortex;
 
@@ -94,13 +98,12 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
     private final KafkaObsConfig config;
     private final Cortex cortex;
     private final Circuit circuit;
-    private final BaselineService baselineService;
 
-    // Cell hierarchy roots
-    private final Cell<BrokerMetrics, MonitorSignal> brokersRootCell;
-    private final Cell<ResourceSignal, ResourceSignal> brokerThreadPoolsRootCell;  // Signal-first: ResourceSignal → ResourceSignal
-    private final Cell<ProducerMetrics, MonitorSignal> producersRootCell;
-    private final Cell<ConsumerMetrics, MonitorSignal> consumersRootCell;
+    // Cell hierarchy roots (RC1: using Monitors.Status and Resources.Signal)
+    private final Cell<BrokerMetrics, Monitors.Status> brokersRootCell;
+    private final Cell<Resources.Signal, Resources.Signal> brokerThreadPoolsRootCell;  // Signal-first: Resources.Signal → Resources.Signal
+    private final Cell<ProducerMetrics, Monitors.Status> producersRootCell;
+    private final Cell<ConsumerMetrics, Monitors.Status> consumersRootCell;
 
     // Sensors (just collect)
     private final BrokerSensor brokerSensor;
@@ -127,16 +130,11 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
         logger.info("Cortex created for runtime");
 
         // Create ONE Circuit per cluster
-        Name circuitName = cortex.name("kafka.cluster." + config.clusterName());
-        this.circuit = cortex.circuit(circuitName);
-        logger.info("Circuit created: {}", circuitName);
+        Name circuitName = cortex.name ( "kafka.cluster." + config.clusterName () );
+        this.circuit = cortex.circuit ( circuitName );
+        logger.info ( "Circuit created: {}", circuitName );
 
-        // Create BaselineService for contextual assessment
-        // TODO: Use configured BaselineService implementation (SimpleBaselineService for now)
-        this.baselineService = new io.fullerstack.kafka.broker.baseline.SimpleBaselineService();
-        logger.info("BaselineService created");
-
-        // Create Cell hierarchy
+        // Create Cell hierarchy (RC1: Composers have hardcoded thresholds)
         this.brokersRootCell = createBrokersRootCell();
         this.brokerThreadPoolsRootCell = createBrokerThreadPoolsRootCell();
         this.producersRootCell = createProducersRootCell();
@@ -156,16 +154,55 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
      *
      * @return Root Cell for broker health monitoring
      */
-    private Cell<BrokerMetrics, MonitorSignal> createBrokersRootCell() {
-        BrokerHealthCellComposer composer = new BrokerHealthCellComposer(config.healthThresholds());
-        Cell<BrokerMetrics, MonitorSignal> rootCell = circuit.cell(composer, Pipe.empty());
+    private Cell<BrokerMetrics, Monitors.Status> createBrokersRootCell() {
+        BrokerHealthCellComposer composer = new BrokerHealthCellComposer ();
+
+        // Cell API requires BiFunctions, but we have a Composer
+        // Create adapter BiFunction: (Subject, Pipe<E>) → Pipe<I>
+        // The Composer needs a Channel, so we create an adapter Channel from the Pipe
+        BiFunction < Subject < Cell < BrokerMetrics, Monitors.Status >>, Pipe < Monitors.Status >, Pipe < BrokerMetrics >> transformer =
+          ( subject, outputPipe ) -> {
+            // Create an adapter Channel that wraps the output Pipe
+            Channel < Monitors.Status > channel = new Channel < Monitors.Status > () {
+              @Override
+              public Subject subject () {
+                return subject;
+              }
+
+              @Override
+              public Pipe < Monitors.Status > pipe () {
+                return outputPipe;
+              }
+
+              @Override
+              public Pipe < Monitors.Status > pipe (
+                final Consumer <? super Flow < Monitors.Status >> configurer
+              ) {
+                throw new UnsupportedOperationException ( "Flow configuration not supported in Cell adapter" );
+              }
+            };
+
+            // Call the Composer with the adapter Channel
+            return composer.compose ( channel );
+          };
+
+        // Aggregator and downstream: identity pass-through
+        // downstream needs to be a Pipe<Monitors.Status> - use a no-op pipe
+        Pipe < Monitors.Status > noopPipe = status -> {};
+
+        Cell < BrokerMetrics, Monitors.Status > rootCell = circuit.cell (
+          transformer,
+          ( subject, pipe ) -> pipe,  // aggregator: identity
+          noopPipe                     // downstream: no-op
+        );
+
         logger.info("Created brokers/ root Cell in circuit");
 
         // Pre-create broker child Cells from config
         for (var endpoint : config.brokerSensorConfig().endpoints()) {
             String brokerId = endpoint.brokerId();
             Name brokerName = cortex.name(brokerId);
-            Cell<BrokerMetrics, MonitorSignal> brokerCell = rootCell.get(brokerName);
+            Cell<BrokerMetrics, Monitors.Status> brokerCell = rootCell.get(brokerName);
             logger.debug("Pre-created broker Cell: {}", brokerId);
         }
 
@@ -181,16 +218,28 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
      *
      * @return Root Cell for thread pool resource monitoring
      */
-    private Cell<ResourceSignal, ResourceSignal> createBrokerThreadPoolsRootCell() {
-        // Signal-first: No Composer needed - signals already interpreted by ThreadPoolResourceMonitor
-        Cell<ResourceSignal, ResourceSignal> rootCell = circuit.cell(Composer.pipe(), Pipe.empty());
-        logger.info("Created broker-thread-pools/ root Cell in circuit (signal-first with Composer.pipe())");
+    private Cell < Resources.Signal, Resources.Signal > createBrokerThreadPoolsRootCell () {
+      // Signal-first: No Composer needed - signals already interpreted by ThreadPoolResourceMonitor
+      // RC1 Cell API: cell(transformer, aggregator, downstream)
+      // Identity BiFunctions since input = output = Resources.Signal
+      BiFunction < Subject < Cell < Resources.Signal, Resources.Signal >>, Pipe < Resources.Signal >, Pipe < Resources.Signal >> identity =
+        ( subject, pipe ) -> pipe;
 
-        // Note: We don't pre-create Cells in signal-first architecture
-        // Cells are created dynamically when signals are emitted
-        // This reduces complexity and memory footprint
+      Pipe < Resources.Signal > noopPipe = signal -> {};
 
-        return rootCell;
+      Cell < Resources.Signal, Resources.Signal > rootCell = circuit.cell (
+        identity,    // transformer: identity
+        identity,    // aggregator: identity
+        noopPipe     // downstream: no-op
+      );
+
+      logger.info ( "Created broker-thread-pools/ root Cell in circuit (signal-first with identity)" );
+
+      // Note: We don't pre-create Cells in signal-first architecture
+      // Cells are created dynamically when signals are emitted
+      // This reduces complexity and memory footprint
+
+      return rootCell;
     }
 
     /**
@@ -198,16 +247,49 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
      *
      * @return Root Cell for producer health monitoring
      */
-    private Cell<ProducerMetrics, MonitorSignal> createProducersRootCell() {
-        ProducerHealthCellComposer composer = new ProducerHealthCellComposer();
-        Cell<ProducerMetrics, MonitorSignal> rootCell = circuit.cell(composer, Pipe.empty());
-        logger.info("Created producers/ root Cell in circuit");
+    private Cell < ProducerMetrics, Monitors.Status > createProducersRootCell () {
+      ProducerHealthCellComposer composer = new ProducerHealthCellComposer ();
+
+      // Create adapter BiFunction for Composer → Cell API
+      BiFunction < Subject < Cell < ProducerMetrics, Monitors.Status >>, Pipe < Monitors.Status >, Pipe < ProducerMetrics >> transformer =
+        ( subject, outputPipe ) -> {
+          Channel < Monitors.Status > channel = new Channel < Monitors.Status > () {
+            @Override
+            public Subject subject () {
+              return subject;
+            }
+
+            @Override
+            public Pipe < Monitors.Status > pipe () {
+              return outputPipe;
+            }
+
+            @Override
+            public Pipe < Monitors.Status > pipe (
+              final Consumer <? super Flow < Monitors.Status >> configurer
+            ) {
+              throw new UnsupportedOperationException ( "Flow configuration not supported in Cell adapter" );
+            }
+          };
+
+          return composer.compose ( channel );
+        };
+
+      Pipe < Monitors.Status > noopPipe = status -> {};
+
+      Cell < ProducerMetrics, Monitors.Status > rootCell = circuit.cell (
+        transformer,
+        ( subject, pipe ) -> pipe,  // aggregator: identity
+        noopPipe
+      );
+
+      logger.info ( "Created producers/ root Cell in circuit" );
 
         // Pre-create producer child Cells from config
         for (var endpoint : config.producerSensorConfig().endpoints()) {
             String producerId = endpoint.producerId();
             Name producerName = cortex.name(producerId);
-            Cell<ProducerMetrics, MonitorSignal> producerCell = rootCell.get(producerName);
+            Cell<ProducerMetrics, Monitors.Status> producerCell = rootCell.get(producerName);
             logger.debug("Pre-created producer Cell: {}", producerId);
         }
 
@@ -221,10 +303,43 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
      *
      * @return Root Cell for consumer health monitoring
      */
-    private Cell<ConsumerMetrics, MonitorSignal> createConsumersRootCell() {
-        ConsumerHealthCellComposer composer = new ConsumerHealthCellComposer();
-        Cell<ConsumerMetrics, MonitorSignal> rootCell = circuit.cell(composer, Pipe.empty());
-        logger.info("Created consumers/ root Cell in circuit");
+    private Cell < ConsumerMetrics, Monitors.Status > createConsumersRootCell () {
+      ConsumerHealthCellComposer composer = new ConsumerHealthCellComposer ();
+
+      // Create adapter BiFunction for Composer → Cell API
+      BiFunction < Subject < Cell < ConsumerMetrics, Monitors.Status >>, Pipe < Monitors.Status >, Pipe < ConsumerMetrics >> transformer =
+        ( subject, outputPipe ) -> {
+          Channel < Monitors.Status > channel = new Channel < Monitors.Status > () {
+            @Override
+            public Subject subject () {
+              return subject;
+            }
+
+            @Override
+            public Pipe < Monitors.Status > pipe () {
+              return outputPipe;
+            }
+
+            @Override
+            public Pipe < Monitors.Status > pipe (
+              final Consumer <? super Flow < Monitors.Status >> configurer
+            ) {
+              throw new UnsupportedOperationException ( "Flow configuration not supported in Cell adapter" );
+            }
+          };
+
+          return composer.compose ( channel );
+        };
+
+      Pipe < Monitors.Status > noopPipe = status -> {};
+
+      Cell < ConsumerMetrics, Monitors.Status > rootCell = circuit.cell (
+        transformer,
+        ( subject, pipe ) -> pipe,  // aggregator: identity
+        noopPipe
+      );
+
+      logger.info ( "Created consumers/ root Cell in circuit" );
 
         // Pre-create consumer child Cells from config (group → member hierarchy)
         for (var endpoint : config.consumerSensorConfig().endpoints()) {
@@ -233,11 +348,11 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
 
             // Create group Cell if not exists
             Name groupCellName = cortex.name(groupName);
-            Cell<ConsumerMetrics, MonitorSignal> groupCell = rootCell.get(groupCellName);
+            Cell<ConsumerMetrics, Monitors.Status> groupCell = rootCell.get(groupCellName);
 
             // Create member Cell under group
             Name memberCellName = cortex.name(consumerId);
-            Cell<ConsumerMetrics, MonitorSignal> memberCell = groupCell.get(memberCellName);
+            Cell<ConsumerMetrics, Monitors.Status> memberCell = groupCell.get(memberCellName);
 
             logger.debug("Pre-created consumer Cell: {}/{}", groupName, consumerId);
         }
@@ -256,7 +371,7 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
         // Callback: route emissions to correct broker Cell
         return new BrokerSensor(sensorConfig, (brokerId, metrics) -> {
             Name brokerName = cortex.name(brokerId);
-            Cell<BrokerMetrics, MonitorSignal> brokerCell = brokersRootCell.get(brokerName);
+            Cell<BrokerMetrics, Monitors.Status> brokerCell = brokersRootCell.get(brokerName);
 
             if (brokerCell != null) {
                 brokerCell.emit(metrics);
@@ -280,13 +395,18 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
         BrokerSensorConfig sensorConfig = config.brokerSensorConfig();
         Name circuitName = cortex.name("kafka.cluster." + config.clusterName());
 
-        // Layer 2: Pass Pipe and Circuit Name
-        // ThreadPoolResourceMonitor emits signals with Serventis vocabulary
-        // (BaselineService removed per ADR-002 - interpretation deferred to Epic 2)
-        return new ThreadPoolSensor(
-            sensorConfig,
-            brokerThreadPoolsRootCell,  // Cell IS-A Pipe<ResourceSignal>
-            circuitName
+        // TODO: RC1 refactoring needed - ThreadPoolSensor now requires Channel<Resources.Signal>
+        // instead of Cell. This requires creating a Conduit with Resources composer.
+        // For now, creating a minimal ThreadPoolSensor to unblock compilation.
+        // Full refactoring: Replace Cell API with Conduit/Channel pattern.
+
+        // Create a channel for thread pool signals
+        // NOTE: This is a temporary workaround - proper RC1 pattern would be:
+        // Conduit<Resources.Signal> conduit = circuit.conduit(Resources::composer);
+        // Channel<Resources.Signal> channel = conduit.channel(cortex.name("thread-pools"));
+
+        throw new UnsupportedOperationException(
+            "ThreadPoolSensor requires RC1 Conduit/Channel refactoring - Cell API no longer compatible"
         );
     }
 
@@ -301,7 +421,7 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
         // Callback: route emissions to correct producer Cell
         return new ProducerSensor(sensorConfig, (producerId, metrics) -> {
             Name producerName = cortex.name(producerId);
-            Cell<ProducerMetrics, MonitorSignal> producerCell = producersRootCell.get(producerName);
+            Cell<ProducerMetrics, Monitors.Status> producerCell = producersRootCell.get(producerName);
 
             if (producerCell != null) {
                 producerCell.emit(metrics);
@@ -332,9 +452,9 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
             Name groupName = cortex.name(consumerGroup);
             Name memberName = cortex.name(consumerId);
 
-            Cell<ConsumerMetrics, MonitorSignal> groupCell = consumersRootCell.get(groupName);
+            Cell<ConsumerMetrics, Monitors.Status> groupCell = consumersRootCell.get(groupName);
             if (groupCell != null) {
-                Cell<ConsumerMetrics, MonitorSignal> memberCell = groupCell.get(memberName);
+                Cell<ConsumerMetrics, Monitors.Status> memberCell = groupCell.get(memberName);
                 if (memberCell != null) {
                     memberCell.emit(metrics);
                     logger.trace("Emitted ConsumerMetrics to Cell: {}/{}", consumerGroup, consumerId);
@@ -391,48 +511,48 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
     /**
      * Get brokers/ root Cell for Epic 2 subscriptions.
      * <p>
-     * Subscribers will receive MonitorSignal emissions from ALL broker Cells.
+     * Subscribers will receive Monitors.Status emissions from ALL broker Cells.
      *
      * @return Brokers root Cell
      */
-    public Cell<BrokerMetrics, MonitorSignal> getBrokersRootCell() {
+    public Cell<BrokerMetrics, Monitors.Status> getBrokersRootCell() {
         return brokersRootCell;
     }
 
     /**
      * Get producers/ root Cell for Epic 2 subscriptions.
      * <p>
-     * Subscribers will receive MonitorSignal emissions from ALL producer Cells.
+     * Subscribers will receive Monitors.Status emissions from ALL producer Cells.
      *
      * @return Producers root Cell
      */
-    public Cell<ProducerMetrics, MonitorSignal> getProducersRootCell() {
+    public Cell<ProducerMetrics, Monitors.Status> getProducersRootCell() {
         return producersRootCell;
     }
 
     /**
      * Get consumers/ root Cell for Epic 2 subscriptions.
      * <p>
-     * Subscribers will receive MonitorSignal emissions from ALL consumer Cells
+     * Subscribers will receive Monitors.Status emissions from ALL consumer Cells
      * across all groups.
      *
      * @return Consumers root Cell
      */
-    public Cell<ConsumerMetrics, MonitorSignal> getConsumersRootCell() {
+    public Cell<ConsumerMetrics, Monitors.Status> getConsumersRootCell() {
         return consumersRootCell;
     }
 
     /**
      * Get broker-thread-pools/ root Cell for Epic 2 subscriptions.
      * <p>
-     * Subscribers will receive ResourceSignal emissions from ALL thread pool Cells
+     * Subscribers will receive Resources.Signal emissions from ALL thread pool Cells
      * across all brokers and pool types (network, io, log-cleaner).
      * <p>
-     * Signal-first: Returns Cell&lt;ResourceSignal, ResourceSignal&gt; (signals already interpreted)
+     * Signal-first: Returns Cell&lt;Resources.Signal, Resources.Signal&gt; (signals already interpreted)
      *
      * @return Broker thread pools root Cell
      */
-    public Cell<ResourceSignal, ResourceSignal> getBrokerThreadPoolsRootCell() {
+    public Cell<Resources.Signal, Resources.Signal> getBrokerThreadPoolsRootCell() {
         return brokerThreadPoolsRootCell;
     }
 
