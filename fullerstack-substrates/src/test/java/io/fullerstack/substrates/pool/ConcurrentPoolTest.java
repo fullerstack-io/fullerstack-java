@@ -11,96 +11,96 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ConcurrentPoolTest {
 
-    @Test
-    void shouldReturnSameInstanceForSameName() {
-        Pool<String> pool = new ConcurrentPool<>(name -> "value-" + name.value());
+  @Test
+  void shouldReturnSameInstanceForSameName() {
+    Pool<String> pool = new ConcurrentPool<>(name -> "value-" + name.value());
 
-        Name name = HierarchicalName.of("test");
-        String value1 = pool.get(name);
-        String value2 = pool.get(name);
+    Name name = HierarchicalName.of("test");
+    String value1 = pool.get(name);
+    String value2 = pool.get(name);
 
-        assertThat(value1).isSameAs(value2);
+    assertThat(value1).isSameAs(value2);
+  }
+
+  @Test
+  void shouldReturnDifferentInstancesForDifferentNames() {
+    Pool<String> pool = new ConcurrentPool<>(name -> "value-" + name.value());
+
+    String value1 = pool.get(HierarchicalName.of("test1"));
+    String value2 = pool.get(HierarchicalName.of("test2"));
+
+    assertThat(value1).isNotEqualTo(value2);
+    assertThat(value1).isEqualTo("value-test1");
+    assertThat(value2).isEqualTo("value-test2");
+  }
+
+  @Test
+  void shouldCallFactoryOnlyOnce() {
+    AtomicInteger factoryCalls = new AtomicInteger(0);
+    Pool<String> pool = new ConcurrentPool<>(name -> {
+      factoryCalls.incrementAndGet();
+      return "value";
+    });
+
+    Name name = HierarchicalName.of("test");
+    pool.get(name);
+    pool.get(name);
+    pool.get(name);
+
+    assertThat(factoryCalls.get()).isEqualTo(1);
+  }
+
+  @Test
+  void shouldSupportComplexObjects() {
+    // Use path() to get full hierarchical name, not just value() which returns the last segment
+    Pool<ComplexObject> pool = new ConcurrentPool<>(name -> new ComplexObject(name.path().toString()));
+
+    Name name = HierarchicalName.of("kafka.broker.1");
+    ComplexObject obj = pool.get(name);
+
+    assertThat(obj.value).isEqualTo("kafka.broker.1");
+  }
+
+  @Test
+  void shouldHandleNullFactory() {
+    Pool<String> pool = new ConcurrentPool<>(name -> null);
+
+    String value = pool.get(HierarchicalName.of("test"));
+
+    assertThat(value).isNull();
+  }
+
+  @Test
+  void shouldSupportConcurrentAccess() throws Exception {
+    Pool<String> pool = new ConcurrentPool<>(name -> "value-" + name.value());
+    Name name = HierarchicalName.of("concurrent");
+
+    Thread[] threads = new Thread[10];
+    String[] results = new String[10];
+
+    for (int i = 0; i < threads.length; i++) {
+      final int index = i;
+      threads[i] = new Thread(() -> {
+        results[index] = pool.get(name);
+      });
+      threads[i].start();
     }
 
-    @Test
-    void shouldReturnDifferentInstancesForDifferentNames() {
-        Pool<String> pool = new ConcurrentPool<>(name -> "value-" + name.value());
-
-        String value1 = pool.get(HierarchicalName.of("test1"));
-        String value2 = pool.get(HierarchicalName.of("test2"));
-
-        assertThat(value1).isNotEqualTo(value2);
-        assertThat(value1).isEqualTo("value-test1");
-        assertThat(value2).isEqualTo("value-test2");
+    for (Thread thread : threads) {
+      thread.join();
     }
 
-    @Test
-    void shouldCallFactoryOnlyOnce() {
-        AtomicInteger factoryCalls = new AtomicInteger(0);
-        Pool<String> pool = new ConcurrentPool<>(name -> {
-            factoryCalls.incrementAndGet();
-            return "value";
-        });
-
-        Name name = HierarchicalName.of("test");
-        pool.get(name);
-        pool.get(name);
-        pool.get(name);
-
-        assertThat(factoryCalls.get()).isEqualTo(1);
+    // All threads should get the same instance
+    for (int i = 1; i < results.length; i++) {
+      assertThat(results[i]).isSameAs(results[0]);
     }
+  }
 
-    @Test
-    void shouldSupportComplexObjects() {
-        // Use path() to get full hierarchical name, not just value() which returns the last segment
-        Pool<ComplexObject> pool = new ConcurrentPool<>(name -> new ComplexObject(name.path().toString()));
+  private static class ComplexObject {
+    final String value;
 
-        Name name = HierarchicalName.of("kafka.broker.1");
-        ComplexObject obj = pool.get(name);
-
-        assertThat(obj.value).isEqualTo("kafka.broker.1");
+    ComplexObject(String value) {
+      this.value = value;
     }
-
-    @Test
-    void shouldHandleNullFactory() {
-        Pool<String> pool = new ConcurrentPool<>(name -> null);
-
-        String value = pool.get(HierarchicalName.of("test"));
-
-        assertThat(value).isNull();
-    }
-
-    @Test
-    void shouldSupportConcurrentAccess() throws Exception {
-        Pool<String> pool = new ConcurrentPool<>(name -> "value-" + name.value());
-        Name name = HierarchicalName.of("concurrent");
-
-        Thread[] threads = new Thread[10];
-        String[] results = new String[10];
-
-        for (int i = 0; i < threads.length; i++) {
-            final int index = i;
-            threads[i] = new Thread(() -> {
-                results[index] = pool.get(name);
-            });
-            threads[i].start();
-        }
-
-        for (Thread thread : threads) {
-            thread.join();
-        }
-
-        // All threads should get the same instance
-        for (int i = 1; i < results.length; i++) {
-            assertThat(results[i]).isSameAs(results[0]);
-        }
-    }
-
-    private static class ComplexObject {
-        final String value;
-
-        ComplexObject(String value) {
-            this.value = value;
-        }
-    }
+  }
 }

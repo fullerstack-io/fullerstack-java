@@ -49,93 +49,93 @@ import java.util.function.BooleanSupplier;
  */
 public class ProducerPipe<E> implements Pipe<E> {
 
-    private final Scheduler scheduler; // Circuit's scheduler (retained for potential future use)
-    private final Subject<Channel<E>> channelSubject; // WHO this pipe belongs to
-    private final Consumer<Capture<E>> subscriberNotifier; // Callback to notify subscribers of emissions
-    private final BooleanSupplier hasSubscribers; // Check for early subscriber optimization
-    private final FlowRegulator<E> flow; // FlowRegulator for apply() and transformation
+  private final Scheduler scheduler; // Circuit's scheduler (retained for potential future use)
+  private final Subject<Channel<E>> channelSubject; // WHO this pipe belongs to
+  private final Consumer<Capture<E>> subscriberNotifier; // Callback to notify subscribers of emissions
+  private final BooleanSupplier hasSubscribers; // Check for early subscriber optimization
+  private final FlowRegulator<E> flow; // FlowRegulator for apply() and transformation
 
-    /**
-     * Creates a ProducerPipe without transformations.
-     *
-     * @param scheduler the Circuit's scheduler
-     * @param channelSubject the Subject of the Channel this ProducerPipe belongs to
-     * @param subscriberNotifier callback to notify subscribers of emissions
-     * @param hasSubscribers subscriber check for early-exit optimization
-     */
-    public ProducerPipe(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E>> subscriberNotifier, BooleanSupplier hasSubscribers) {
-        this(scheduler, channelSubject, subscriberNotifier, hasSubscribers, null);
+  /**
+   * Creates a ProducerPipe without transformations.
+   *
+   * @param scheduler the Circuit's scheduler
+   * @param channelSubject the Subject of the Channel this ProducerPipe belongs to
+   * @param subscriberNotifier callback to notify subscribers of emissions
+   * @param hasSubscribers subscriber check for early-exit optimization
+   */
+  public ProducerPipe(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E>> subscriberNotifier, BooleanSupplier hasSubscribers) {
+    this(scheduler, channelSubject, subscriberNotifier, hasSubscribers, null);
+  }
+
+  /**
+   * Creates a ProducerPipe with transformations defined by a Flow.
+   *
+   * @param scheduler the Circuit's scheduler
+   * @param channelSubject the Subject of the Channel this ProducerPipe belongs to
+   * @param subscriberNotifier callback to notify subscribers of emissions
+   * @param hasSubscribers subscriber check for early-exit optimization
+   * @param flow the flow regulator (null for no transformations)
+   */
+  public ProducerPipe(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E>> subscriberNotifier, BooleanSupplier hasSubscribers, FlowRegulator<E> flow) {
+    this.scheduler = Objects.requireNonNull(scheduler, "Scheduler cannot be null");
+    this.channelSubject = Objects.requireNonNull(channelSubject, "Channel subject cannot be null");
+    this.subscriberNotifier = Objects.requireNonNull(subscriberNotifier, "Subscriber notifier cannot be null");
+    this.hasSubscribers = Objects.requireNonNull(hasSubscribers, "Subscriber check cannot be null");
+    this.flow = flow;
+  }
+
+  @Override
+  public void emit(E value) {
+    if (flow == null) {
+      // No transformations - post Script directly
+      postScript(value);
+    } else {
+      // Apply transformations before posting
+      E transformed = flow.apply(value);
+      if (transformed != null) {
+        // Transformation passed - post Script with result
+        postScript(transformed);
+      }
+      // If null, emission was filtered out (by guard, diff, limit, etc.)
+    }
+  }
+
+  /**
+   * Flushes any buffered emissions.
+   *
+   * <p>ProducerPipe has no buffering - emissions are posted immediately to the Circuit's queue.
+   * This is a no-op implementation as required by RC3 Pipe interface.
+   */
+  @Override
+  public void flush() {
+    // No-op: ProducerPipe has no buffering - emissions posted immediately
+  }
+
+  /**
+   * Posts emission to Circuit's queue for ordered processing.
+   *
+   * <p><b>Architecture:</b> Emissions are posted as Scripts to the Circuit's queue.
+   * Each Script creates a Capture and invokes subscriber callbacks in the Circuit's
+   * single-threaded execution context. This ensures ordering guarantees as specified
+   * by the Substrates API.
+   *
+   * <p><b>OPTIMIZATION:</b> Early exit if no subscribers - avoids allocating Capture
+   * and posting to queue when no subscribers are registered.
+   *
+   * @param value the emission value (after transformations, if any)
+   */
+  private void postScript(E value) {
+    // OPTIMIZATION: Early exit if no subscribers
+    // Avoids: Capture allocation + queue posting when nothing is listening
+    if (!hasSubscribers.getAsBoolean()) {
+      return;
     }
 
-    /**
-     * Creates a ProducerPipe with transformations defined by a Flow.
-     *
-     * @param scheduler the Circuit's scheduler
-     * @param channelSubject the Subject of the Channel this ProducerPipe belongs to
-     * @param subscriberNotifier callback to notify subscribers of emissions
-     * @param hasSubscribers subscriber check for early-exit optimization
-     * @param flow the flow regulator (null for no transformations)
-     */
-    public ProducerPipe(Scheduler scheduler, Subject<Channel<E>> channelSubject, Consumer<Capture<E>> subscriberNotifier, BooleanSupplier hasSubscribers, FlowRegulator<E> flow) {
-        this.scheduler = Objects.requireNonNull(scheduler, "Scheduler cannot be null");
-        this.channelSubject = Objects.requireNonNull(channelSubject, "Channel subject cannot be null");
-        this.subscriberNotifier = Objects.requireNonNull(subscriberNotifier, "Subscriber notifier cannot be null");
-        this.hasSubscribers = Objects.requireNonNull(hasSubscribers, "Subscriber check cannot be null");
-        this.flow = flow;
-    }
-
-    @Override
-    public void emit(E value) {
-        if (flow == null) {
-            // No transformations - post Script directly
-            postScript(value);
-        } else {
-            // Apply transformations before posting
-            E transformed = flow.apply(value);
-            if (transformed != null) {
-                // Transformation passed - post Script with result
-                postScript(transformed);
-            }
-            // If null, emission was filtered out (by guard, diff, limit, etc.)
-        }
-    }
-
-    /**
-     * Flushes any buffered emissions.
-     *
-     * <p>ProducerPipe has no buffering - emissions are posted immediately to the Circuit's queue.
-     * This is a no-op implementation as required by RC3 Pipe interface.
-     */
-    @Override
-    public void flush() {
-        // No-op: ProducerPipe has no buffering - emissions posted immediately
-    }
-
-    /**
-     * Posts emission to Circuit's queue for ordered processing.
-     *
-     * <p><b>Architecture:</b> Emissions are posted as Scripts to the Circuit's queue.
-     * Each Script creates a Capture and invokes subscriber callbacks in the Circuit's
-     * single-threaded execution context. This ensures ordering guarantees as specified
-     * by the Substrates API.
-     *
-     * <p><b>OPTIMIZATION:</b> Early exit if no subscribers - avoids allocating Capture
-     * and posting to queue when no subscribers are registered.
-     *
-     * @param value the emission value (after transformations, if any)
-     */
-    private void postScript(E value) {
-        // OPTIMIZATION: Early exit if no subscribers
-        // Avoids: Capture allocation + queue posting when nothing is listening
-        if (!hasSubscribers.getAsBoolean()) {
-            return;
-        }
-
-        // Post to Circuit's queue - ensures ordering guarantees
-        scheduler.schedule(() -> {
-            Capture<E> capture = new SubjectCapture<>(channelSubject, value);
-            subscriberNotifier.accept(capture);
-        });
-    }
+    // Post to Circuit's queue - ensures ordering guarantees
+    scheduler.schedule(() -> {
+      Capture<E> capture = new SubjectCapture<>(channelSubject, value);
+      subscriberNotifier.accept(capture);
+    });
+  }
 
 }

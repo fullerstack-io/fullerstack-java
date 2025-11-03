@@ -28,225 +28,225 @@ final class SubscriberTest
   @BeforeEach
   void setup () {
 
-    cortex = cortex ();
+  cortex = cortex ();
 
-    circuit = cortex.circuit ();
+  circuit = cortex.circuit ();
 
   }
 
   @AfterEach
   void teardown () {
 
-    circuit.close ();
+  circuit.close ();
 
   }
 
   @Test
   void testDynamicSubscription () {
 
-    final var conduit =
-      circuit.conduit (
-        Composer.pipe ( Long.class )
-      );
-
-    final var counter = new AtomicInteger ( 0 );
-
-    final var pipe =
-      conduit.get (
-        cortex.name ( "test" )
-      );
-
-    // Emit before subscription
-    for ( int i = 0; i < 50; i++ ) {
-      pipe.emit ( (long) i );
-    }
-
-    circuit.await ();
-
-    assertEquals ( 0, counter.get () );
-
-    // Add subscription
-    conduit.subscribe (
-      cortex.subscriber (
-        cortex.name ( "counter" ),
-        ( _, registrar ) ->
-          registrar.register (
-            _ -> counter.incrementAndGet ()
-          )
-      )
+  final var conduit =
+    circuit.conduit (
+    Composer.pipe ( Long.class )
     );
 
-    // Emit after subscription
-    for ( int i = 0; i < 50; i++ ) {
-      pipe.emit ( (long) i );
-    }
+  final var counter = new AtomicInteger ( 0 );
 
-    circuit.await ();
+  final var pipe =
+    conduit.get (
+    cortex.name ( "test" )
+    );
 
-    assertEquals ( 50, counter.get () );
+  // Emit before subscription
+  for ( int i = 0; i < 50; i++ ) {
+    pipe.emit ( (long) i );
+  }
+
+  circuit.await ();
+
+  assertEquals ( 0, counter.get () );
+
+  // Add subscription
+  conduit.subscribe (
+    cortex.subscriber (
+    cortex.name ( "counter" ),
+    ( _, registrar ) ->
+      registrar.register (
+      _ -> counter.incrementAndGet ()
+      )
+    )
+  );
+
+  // Emit after subscription
+  for ( int i = 0; i < 50; i++ ) {
+    pipe.emit ( (long) i );
+  }
+
+  circuit.await ();
+
+  assertEquals ( 50, counter.get () );
 
   }
 
   @Test
   void testEmissionAfterSubscriberRemoved () {
 
-    final var conduit =
-      circuit.conduit (
-        Composer.pipe ( Long.class )
-      );
+  final var conduit =
+    circuit.conduit (
+    Composer.pipe ( Long.class )
+    );
 
-    final var counter = new AtomicInteger ( 0 );
+  final var counter = new AtomicInteger ( 0 );
 
-    final var subscription =
-      conduit.subscribe (
-        cortex.subscriber (
-          cortex.name ( "counter" ),
-          ( _, registrar ) ->
-            registrar.register (
-              _ -> counter.incrementAndGet ()
-            )
-        )
-      );
+  final var subscription =
+    conduit.subscribe (
+    cortex.subscriber (
+      cortex.name ( "counter" ),
+      ( _, registrar ) ->
+      registrar.register (
+        _ -> counter.incrementAndGet ()
+      )
+    )
+    );
 
-    final var pipe =
-      conduit.get (
-        cortex.name ( "test" )
-      );
+  final var pipe =
+    conduit.get (
+    cortex.name ( "test" )
+    );
 
-    // Emit with subscriber
-    for ( int i = 0; i < 50; i++ ) {
-      pipe.emit ( (long) i );
-    }
+  // Emit with subscriber
+  for ( int i = 0; i < 50; i++ ) {
+    pipe.emit ( (long) i );
+  }
 
-    circuit.await ();
+  circuit.await ();
 
-    assertEquals ( 50, counter.get () );
+  assertEquals ( 50, counter.get () );
 
-    // Remove subscription
-    subscription.close ();
+  // Remove subscription
+  subscription.close ();
 
-    circuit.await ();
+  circuit.await ();
 
-    // Emit after subscriber removed
-    for ( int i = 0; i < 50; i++ ) {
-      pipe.emit ( (long) i );
-    }
+  // Emit after subscriber removed
+  for ( int i = 0; i < 50; i++ ) {
+    pipe.emit ( (long) i );
+  }
 
-    circuit.await ();
+  circuit.await ();
 
-    // Counter should not have changed
-    assertEquals ( 50, counter.get () );
+  // Counter should not have changed
+  assertEquals ( 50, counter.get () );
 
   }
 
   @Test
   void testEmissionWithSubscriber () {
 
-    final var conduit =
-      circuit.conduit (
-        Composer.pipe ( Long.class )
-      );
+  final var conduit =
+    circuit.conduit (
+    Composer.pipe ( Long.class )
+    );
 
-    final var counter = new AtomicInteger ( 0 );
+  final var counter = new AtomicInteger ( 0 );
 
-    final var subscription =
-      conduit.subscribe (
-        cortex.subscriber (
-          cortex.name ( "counter" ),
-          ( _, registrar ) ->
-            registrar.register (
-              _ -> counter.incrementAndGet ()
-            )
-        )
-      );
+  final var subscription =
+    conduit.subscribe (
+    cortex.subscriber (
+      cortex.name ( "counter" ),
+      ( _, registrar ) ->
+      registrar.register (
+        _ -> counter.incrementAndGet ()
+      )
+    )
+    );
 
-    final var pipe =
-      conduit.get (
-        cortex.name ( "test" )
-      );
+  final var pipe =
+    conduit.get (
+    cortex.name ( "test" )
+    );
 
-    // Emit values with subscriber registered
-    for ( int i = 0; i < 100; i++ ) {
-      pipe.emit ( (long) i );
-    }
+  // Emit values with subscriber registered
+  for ( int i = 0; i < 100; i++ ) {
+    pipe.emit ( (long) i );
+  }
 
-    circuit.await ();
+  circuit.await ();
 
-    assertEquals ( 100, counter.get () );
+  assertEquals ( 100, counter.get () );
 
-    subscription.close ();
+  subscription.close ();
 
   }
 
   @Test
   void testEmissionWithoutSubscribers () {
 
-    final var conduit =
-      circuit.conduit (
-        Composer.pipe ( Long.class )
-      );
+  final var conduit =
+    circuit.conduit (
+    Composer.pipe ( Long.class )
+    );
 
-    final var pipe =
-      conduit.get (
-        cortex.name ( "test" )
-      );
+  final var pipe =
+    conduit.get (
+    cortex.name ( "test" )
+    );
 
-    // Emit many values without any subscribers
-    for ( int i = 0; i < 1000; i++ ) {
-      pipe.emit ( (long) i );
-    }
+  // Emit many values without any subscribers
+  for ( int i = 0; i < 1000; i++ ) {
+    pipe.emit ( (long) i );
+  }
 
-    circuit.await ();
+  circuit.await ();
 
-    // No assertions needed - just verify no exceptions
+  // No assertions needed - just verify no exceptions
 
   }
 
   @Test
   void testMultipleSubscribers () {
 
-    final var conduit =
-      circuit.conduit (
-        Composer.pipe ( Long.class )
-      );
-
-    final var counter1 = new AtomicInteger ( 0 );
-    final var counter2 = new AtomicInteger ( 0 );
-
-    conduit.subscribe (
-      cortex.subscriber (
-        cortex.name ( "counter1" ),
-        ( _, registrar ) ->
-          registrar.register (
-            _ -> counter1.incrementAndGet ()
-          )
-      )
+  final var conduit =
+    circuit.conduit (
+    Composer.pipe ( Long.class )
     );
 
-    conduit.subscribe (
-      cortex.subscriber (
-        cortex.name ( "counter2" ),
-        ( _, registrar ) ->
-          registrar.register (
-            _ -> counter2.incrementAndGet ()
-          )
+  final var counter1 = new AtomicInteger ( 0 );
+  final var counter2 = new AtomicInteger ( 0 );
+
+  conduit.subscribe (
+    cortex.subscriber (
+    cortex.name ( "counter1" ),
+    ( _, registrar ) ->
+      registrar.register (
+      _ -> counter1.incrementAndGet ()
       )
+    )
+  );
+
+  conduit.subscribe (
+    cortex.subscriber (
+    cortex.name ( "counter2" ),
+    ( _, registrar ) ->
+      registrar.register (
+      _ -> counter2.incrementAndGet ()
+      )
+    )
+  );
+
+  final var pipe =
+    conduit.get (
+    cortex.name ( "test" )
     );
 
-    final var pipe =
-      conduit.get (
-        cortex.name ( "test" )
-      );
+  // Emit values - both subscribers should receive
+  for ( int i = 0; i < 100; i++ ) {
+    pipe.emit ( (long) i );
+  }
 
-    // Emit values - both subscribers should receive
-    for ( int i = 0; i < 100; i++ ) {
-      pipe.emit ( (long) i );
-    }
+  circuit.await ();
 
-    circuit.await ();
-
-    assertEquals ( 100, counter1.get () );
-    assertEquals ( 100, counter2.get () );
+  assertEquals ( 100, counter1.get () );
+  assertEquals ( 100, counter2.get () );
 
   }
 

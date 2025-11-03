@@ -156,6 +156,24 @@
                 <artifactId>maven-jar-plugin</artifactId>
             </plugin>
 
+            <!-- Spotless Code Formatter -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>2.43.0</version>
+                <configuration>
+                    <java>
+                        <googleJavaFormat>
+                            <version>1.19.2</version>
+                            <style>AOSP</style> <!-- AOSP uses 2-space indentation -->
+                        </googleJavaFormat>
+                        <removeUnusedImports/>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                    </java>
+                </configuration>
+            </plugin>
+
             <!-- JMH Benchmark Execution -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

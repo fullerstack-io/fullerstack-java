@@ -41,15 +41,15 @@ import java.util.Objects;
  */
 public record SubjectCapture<E>(Subject<Channel<E>> subject, E emission) implements Capture<E> {
 
-    /**
-     * Creates a SubjectCapture pairing Subject with emission.
-     *
-     * @param subject the Subject that emitted (Channel's subject)
-     * @param emission the value emitted
-     * @throws NullPointerException if subject is null
-     */
-    public SubjectCapture {
-        Objects.requireNonNull(subject, "Capture subject cannot be null");
-        // emission can be null (nullable emissions are allowed)
-    }
+  /**
+   * Creates a SubjectCapture pairing Subject with emission.
+   *
+   * @param subject the Subject that emitted (Channel's subject)
+   * @param emission the value emitted
+   * @throws NullPointerException if subject is null
+   */
+  public SubjectCapture {
+    Objects.requireNonNull(subject, "Capture subject cannot be null");
+    // emission can be null (nullable emissions are allowed)
+  }
 }

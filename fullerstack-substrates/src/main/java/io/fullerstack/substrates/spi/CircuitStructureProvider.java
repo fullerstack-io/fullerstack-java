@@ -76,32 +76,32 @@ import io.humainary.substrates.api.Substrates.Cortex;
  */
 public interface CircuitStructureProvider {
 
-    /**
-     * Build structure for a circuit.
-     * <p>
-     * Called by the framework after circuit creation. Application creates
-     * containers, conduits, and cells with proper signal types.
-     * <p>
-     * <strong>Implementation Guidelines:</strong>
-     * <ul>
-     *   <li>Read structure from config ({@code circuit.containers}, {@code circuit.conduits}, {@code circuit.cells})</li>
-     *   <li>Create typed components using the provided circuit and cortex</li>
-     *   <li>Build hierarchical cell structures as needed</li>
-     *   <li><b>Register components</b> in context for SensorProvider access (e.g., {@code context.register("brokers-cell", cell)})</li>
-     *   <li>Handle unknown circuit names gracefully (return without action)</li>
-     * </ul>
-     *
-     * @param circuitName Circuit name (e.g., "broker-health", "partition-flow")
-     * @param circuit Empty circuit to build structure in
-     * @param cortex Cortex instance for creating names
-     * @param config Circuit-specific hierarchical configuration
-     * @param context Bootstrap context for registering components (Service Registry pattern)
-     */
-    void buildStructure(
-        String circuitName,
-        Circuit circuit,
-        Cortex cortex,
-        HierarchicalConfig config,
-        BootstrapContext context
-    );
+  /**
+   * Build structure for a circuit.
+   * <p>
+   * Called by the framework after circuit creation. Application creates
+   * containers, conduits, and cells with proper signal types.
+   * <p>
+   * <strong>Implementation Guidelines:</strong>
+   * <ul>
+   *   <li>Read structure from config ({@code circuit.containers}, {@code circuit.conduits}, {@code circuit.cells})</li>
+   *   <li>Create typed components using the provided circuit and cortex</li>
+   *   <li>Build hierarchical cell structures as needed</li>
+   *   <li><b>Register components</b> in context for SensorProvider access (e.g., {@code context.register("brokers-cell", cell)})</li>
+   *   <li>Handle unknown circuit names gracefully (return without action)</li>
+   * </ul>
+   *
+   * @param circuitName Circuit name (e.g., "broker-health", "partition-flow")
+   * @param circuit Empty circuit to build structure in
+   * @param cortex Cortex instance for creating names
+   * @param config Circuit-specific hierarchical configuration
+   * @param context Bootstrap context for registering components (Service Registry pattern)
+   */
+  void buildStructure(
+    String circuitName,
+    Circuit circuit,
+    Cortex cortex,
+    HierarchicalConfig config,
+    BootstrapContext context
+  );
 }

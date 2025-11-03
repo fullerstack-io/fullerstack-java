@@ -49,77 +49,77 @@ import java.util.function.BiConsumer;
  */
 public class FunctionalSubscriber<E> implements Subscriber<E> {
 
-    private final Subject<Subscriber<E>> subscriberSubject;
-    private final SubscriberStrategy<E> strategy;
+  private final Subject<Subscriber<E>> subscriberSubject;
+  private final SubscriberStrategy<E> strategy;
 
-    // RC3: Store the callback internally since Subscriber interface has no methods
-    private final BiConsumer<Subject<Channel<E>>, Registrar<E>> callback;
+  // RC3: Store the callback internally since Subscriber interface has no methods
+  private final BiConsumer<Subject<Channel<E>>, Registrar<E>> callback;
 
-    /**
-     * Creates a function-based Subscriber (RC3).
-     *
-     * @param name the name to be used by the subject assigned to the subscriber
-     * @param handler the callback function that receives (Subject, Registrar)
-     * @throws NullPointerException if name or handler is null
-     */
-    public FunctionalSubscriber(Name name, BiConsumer<Subject<Channel<E>>, Registrar<E>> handler) {
-        Objects.requireNonNull(name, "Subscriber name cannot be null");
-        Objects.requireNonNull(handler, "Callback handler cannot be null");
-        this.subscriberSubject = createSubject(name);
-        this.strategy = new FunctionStrategy<>(handler);
-        this.callback = handler;  // RC3: Store callback for runtime retrieval
-    }
+  /**
+   * Creates a function-based Subscriber (RC3).
+   *
+   * @param name the name to be used by the subject assigned to the subscriber
+   * @param handler the callback function that receives (Subject, Registrar)
+   * @throws NullPointerException if name or handler is null
+   */
+  public FunctionalSubscriber(Name name, BiConsumer<Subject<Channel<E>>, Registrar<E>> handler) {
+    Objects.requireNonNull(name, "Subscriber name cannot be null");
+    Objects.requireNonNull(handler, "Callback handler cannot be null");
+    this.subscriberSubject = createSubject(name);
+    this.strategy = new FunctionStrategy<>(handler);
+    this.callback = handler;  // RC3: Store callback for runtime retrieval
+  }
 
-    /**
-     * Creates a pool-based Subscriber (RC3).
-     *
-     * <p>When a Subject emits, this Subscriber retrieves a Pipe from the pool
-     * using the Subject's name and registers it to receive the emission.
-     *
-     * @param name the name to be used by the subject assigned to the subscriber
-     * @param pool the pool of Pipes keyed by Subject name
-     * @throws NullPointerException if name or pool is null
-     */
-    public FunctionalSubscriber(Name name, Pool<? extends Pipe<E>> pool) {
-        Objects.requireNonNull(name, "Subscriber name cannot be null");
-        Objects.requireNonNull(pool, "Pipe pool cannot be null");
-        this.subscriberSubject = createSubject(name);
-        PoolStrategy<E> poolStrategy = new PoolStrategy<>(pool);
-        this.strategy = poolStrategy;
-        // RC3: Create callback from pool strategy
-        this.callback = (subject, registrar) -> poolStrategy.apply(subject, registrar);
-    }
+  /**
+   * Creates a pool-based Subscriber (RC3).
+   *
+   * <p>When a Subject emits, this Subscriber retrieves a Pipe from the pool
+   * using the Subject's name and registers it to receive the emission.
+   *
+   * @param name the name to be used by the subject assigned to the subscriber
+   * @param pool the pool of Pipes keyed by Subject name
+   * @throws NullPointerException if name or pool is null
+   */
+  public FunctionalSubscriber(Name name, Pool<? extends Pipe<E>> pool) {
+    Objects.requireNonNull(name, "Subscriber name cannot be null");
+    Objects.requireNonNull(pool, "Pipe pool cannot be null");
+    this.subscriberSubject = createSubject(name);
+    PoolStrategy<E> poolStrategy = new PoolStrategy<>(pool);
+    this.strategy = poolStrategy;
+    // RC3: Create callback from pool strategy
+    this.callback = (subject, registrar) -> poolStrategy.apply(subject, registrar);
+  }
 
-    @SuppressWarnings("unchecked")
-    private Subject<Subscriber<E>> createSubject(Name name) {
-        return new HierarchicalSubject<>(
-            UuidIdentifier.generate(),
-            name,
-            LinkedState.empty(),
-            (Class<Subscriber<E>>) (Class<?>) Subscriber.class
-        );
-    }
+  @SuppressWarnings("unchecked")
+  private Subject<Subscriber<E>> createSubject(Name name) {
+    return new HierarchicalSubject<>(
+      UuidIdentifier.generate(),
+      name,
+      LinkedState.empty(),
+      (Class<Subscriber<E>>) (Class<?>) Subscriber.class
+    );
+  }
 
-    @Override
-    public Subject<Subscriber<E>> subject() {
-        return subscriberSubject;
-    }
+  @Override
+  public Subject<Subscriber<E>> subject() {
+    return subscriberSubject;
+  }
 
-    /**
-     * Returns the callback for this subscriber (RC3 pattern).
-     *
-     * <p>In RC3, the Subscriber interface is a marker with no methods. The runtime
-     * (TransformingConduit) retrieves the callback via this method and invokes it
-     * when new Channels are created.
-     *
-     * @return the BiConsumer callback that handles (Subject, Registrar) notifications
-     */
-    public BiConsumer<Subject<Channel<E>>, Registrar<E>> getCallback() {
-        return callback;
-    }
+  /**
+   * Returns the callback for this subscriber (RC3 pattern).
+   *
+   * <p>In RC3, the Subscriber interface is a marker with no methods. The runtime
+   * (TransformingConduit) retrieves the callback via this method and invokes it
+   * when new Channels are created.
+   *
+   * @return the BiConsumer callback that handles (Subject, Registrar) notifications
+   */
+  public BiConsumer<Subject<Channel<E>>, Registrar<E>> getCallback() {
+    return callback;
+  }
 
-    @Override
-    public void close() {
-        // No resources to close in this implementation
-    }
+  @Override
+  public void close() {
+    // No resources to close in this implementation
+  }
 }

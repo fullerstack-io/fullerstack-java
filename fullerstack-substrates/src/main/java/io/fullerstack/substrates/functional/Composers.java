@@ -28,40 +28,40 @@ import java.util.function.Consumer;
 @UtilityClass
 public class Composers {
 
-    // ========== Circuit Configuration Helpers ==========
+  // ========== Circuit Configuration Helpers ==========
 
-    /**
-     * Configures a Circuit with a consumer and returns it for chaining.
-     *
-     * <h3>Example:</h3>
-     * <pre>{@code
-     * Circuit circuit = Composers.configure(
-     *     cortex.circuit(cortex.name("metrics")),
-     *     c -> c.clock().start()
-     * );
-     * }</pre>
-     *
-     * @param circuit the circuit to configure
-     * @param configurator the configuration function
-     * @return the configured circuit
-     */
-    public static Circuit configure(Circuit circuit, Consumer<Circuit> configurator) {
-        configurator.accept(circuit);
-        return circuit;
-    }
+  /**
+   * Configures a Circuit with a consumer and returns it for chaining.
+   *
+   * <h3>Example:</h3>
+   * <pre>{@code
+   * Circuit circuit = Composers.configure(
+   *     cortex.circuit(cortex.name("metrics")),
+   *     c -> c.clock().start()
+   * );
+   * }</pre>
+   *
+   * @param circuit the circuit to configure
+   * @param configurator the configuration function
+   * @return the configured circuit
+   */
+  public static Circuit configure(Circuit circuit, Consumer<Circuit> configurator) {
+    configurator.accept(circuit);
+    return circuit;
+  }
 
-    /**
-     * Taps into a Circuit for side effects without breaking the chain.
-     *
-     * <p>Executes consumer on circuit and returns the same circuit for chaining.
-     * This method provides functional style chaining since Circuit no longer has a tap() method in RC1.
-     *
-     * @param circuit the circuit
-     * @param consumer the side effect
-     * @return the same circuit for chaining
-     */
-    public static Circuit tap(Circuit circuit, Consumer<Circuit> consumer) {
-        consumer.accept(circuit);
-        return circuit;
-    }
+  /**
+   * Taps into a Circuit for side effects without breaking the chain.
+   *
+   * <p>Executes consumer on circuit and returns the same circuit for chaining.
+   * This method provides functional style chaining since Circuit no longer has a tap() method in RC1.
+   *
+   * @param circuit the circuit
+   * @param consumer the side effect
+   * @return the same circuit for chaining
+   */
+  public static Circuit tap(Circuit circuit, Consumer<Circuit> consumer) {
+    consumer.accept(circuit);
+    return circuit;
+  }
 }

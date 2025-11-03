@@ -12,8 +12,8 @@ abstract class TestSupport {
   @NotNull
   protected static Cortex cortex () {
 
-    return
-      Substrates.CORTEX;
+  return
+    Substrates.CORTEX;
 
   }
 

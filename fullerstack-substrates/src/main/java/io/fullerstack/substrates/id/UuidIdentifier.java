@@ -27,65 +27,65 @@ import java.util.UUID;
  */
 @Getter
 public class UuidIdentifier implements Id {
-    /**
-     * The underlying UUID providing uniqueness.
-     */
-    private final UUID uuid;
+  /**
+   * The underlying UUID providing uniqueness.
+   */
+  private final UUID uuid;
 
-    /**
-     * Creates an ID with the specified UUID.
-     *
-     * @param uuid the UUID
-     * @throws NullPointerException if uuid is null
-     */
-    public UuidIdentifier(@NonNull UUID uuid) {
-        this.uuid = uuid;
-    }
+  /**
+   * Creates an ID with the specified UUID.
+   *
+   * @param uuid the UUID
+   * @throws NullPointerException if uuid is null
+   */
+  public UuidIdentifier(@NonNull UUID uuid) {
+    this.uuid = uuid;
+  }
 
-    /**
-     * Returns the underlying UUID.
-     *
-     * @return the UUID
-     */
-    public UUID uuid() {
-        return uuid;
-    }
+  /**
+   * Returns the underlying UUID.
+   *
+   * @return the UUID
+   */
+  public UUID uuid() {
+    return uuid;
+  }
 
-    /**
-     * Generates a new random ID.
-     *
-     * @return new unique ID with random UUID
-     */
-    public static Id generate() {
-        return new UuidIdentifier(UUID.randomUUID());
-    }
+  /**
+   * Generates a new random ID.
+   *
+   * @return new unique ID with random UUID
+   */
+  public static Id generate() {
+    return new UuidIdentifier(UUID.randomUUID());
+  }
 
-    /**
-     * Creates an ID from existing UUID.
-     *
-     * @param uuid the UUID
-     * @return ID wrapping the UUID
-     * @throws NullPointerException if uuid is null
-     */
-    public static Id of(UUID uuid) {
-        return new UuidIdentifier(uuid);
-    }
+  /**
+   * Creates an ID from existing UUID.
+   *
+   * @param uuid the UUID
+   * @return ID wrapping the UUID
+   * @throws NullPointerException if uuid is null
+   */
+  public static Id of(UUID uuid) {
+    return new UuidIdentifier(uuid);
+  }
 
-    @Override
-    public String toString() {
-        return uuid.toString();
-    }
+  @Override
+  public String toString() {
+    return uuid.toString();
+  }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof UuidIdentifier)) return false;
-        UuidIdentifier id = (UuidIdentifier) o;
-        return uuid.equals(id.uuid);
-    }
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (!(o instanceof UuidIdentifier)) return false;
+    UuidIdentifier id = (UuidIdentifier) o;
+    return uuid.equals(id.uuid);
+  }
 
-    @Override
-    public int hashCode() {
-        return uuid.hashCode();
-    }
+  @Override
+  public int hashCode() {
+    return uuid.hashCode();
+  }
 }

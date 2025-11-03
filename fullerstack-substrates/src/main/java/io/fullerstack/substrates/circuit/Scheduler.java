@@ -11,15 +11,15 @@ package io.fullerstack.substrates.circuit;
  */
 public interface Scheduler {
 
-    /**
-     * Schedules a runnable to execute on the Circuit's queue.
-     *
-     * @param task the task to schedule
-     */
-    void schedule(Runnable task);
+  /**
+   * Schedules a runnable to execute on the Circuit's queue.
+   *
+   * @param task the task to schedule
+   */
+  void schedule(Runnable task);
 
-    /**
-     * Blocks until all scheduled tasks complete.
-     */
-    void await();
+  /**
+   * Blocks until all scheduled tasks complete.
+   */
+  void await();
 }
