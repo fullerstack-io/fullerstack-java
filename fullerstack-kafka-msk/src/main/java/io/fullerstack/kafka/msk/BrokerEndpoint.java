@@ -8,6 +8,6 @@ package io.fullerstack.kafka.msk;
 public record BrokerEndpoint(
     String brokerId,
     String brokerArn,
-    String endpoint,  // broker-1.cluster.kafka.us-east-1.amazonaws.com:9092
-    int jmxPort
-) {}
+    String endpoint, // broker-1.cluster.kafka.us-east-1.amazonaws.com:9092
+    int jmxPort) {
+}

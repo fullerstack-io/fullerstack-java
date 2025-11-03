@@ -34,6 +34,18 @@
             <artifactId>sts</artifactId>
             <version>${aws-sdk.version}</version>
         </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>cloudwatch</artifactId>
+            <version>${aws-sdk.version}</version>
+        </dependency>
+
+        <!-- Apache Kafka AdminClient for consumer group discovery -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>3.8.0</version>
+        </dependency>
 
         <!-- Fullerstack Kafka - Epic 1 Integration -->
         <dependency>
@@ -44,6 +56,16 @@
         <dependency>
             <groupId>io.fullerstack</groupId>
             <artifactId>fullerstack-kafka-broker</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.fullerstack</groupId>
+            <artifactId>fullerstack-kafka-producer</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.fullerstack</groupId>
+            <artifactId>fullerstack-kafka-consumer</artifactId>
             <version>${project.version}</version>
         </dependency>
 

@@ -8,9 +8,8 @@ package io.fullerstack.kafka.msk;
 public record ClusterConfiguration(
     long segmentBytes,
     long bufferMemory,
-    int numPartitions
-) {
-    public static ClusterConfiguration defaults() {
-        return new ClusterConfiguration(1073741824L, 33554432L, 1);
-    }
+    int numPartitions) {
+  public static ClusterConfiguration defaults() {
+    return new ClusterConfiguration(1073741824L, 33554432L, 1);
+  }
 }

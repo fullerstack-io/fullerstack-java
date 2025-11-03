@@ -11,11 +11,10 @@ public record ClusterMetadata(
     String clusterArn,
     String clusterName,
     String kafkaVersion,
-    String state,  // ACTIVE, CREATING, DELETING, etc.
+    String state, // ACTIVE, CREATING, DELETING, etc.
     List<BrokerEndpoint> brokers,
-    ClusterConfiguration configuration
-) {
-    public boolean isActive() {
-        return "ACTIVE".equals(state);
-    }
+    ClusterConfiguration configuration) {
+  public boolean isActive() {
+    return "ACTIVE".equals(state);
+  }
 }

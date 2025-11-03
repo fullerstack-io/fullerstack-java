@@ -36,6 +36,10 @@
             <groupId>io.fullerstack</groupId>
             <artifactId>fullerstack-kafka-consumer</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.fullerstack</groupId>
+            <artifactId>fullerstack-kafka-msk</artifactId>
+        </dependency>
 
         <!-- Substrates Framework -->
         <dependency>
@@ -53,6 +57,22 @@
         <dependency>
             <groupId>io.humainary.substrates.ext</groupId>
             <artifactId>humainary-serventis</artifactId>
+        </dependency>
+
+        <!-- AWS SDK (for MSKClusterConfig) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>cloudwatch</artifactId>
+        </dependency>
+
+        <!-- Kafka AdminClient (for MSKClusterConfig) -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
         </dependency>
 
         <!-- Logging -->

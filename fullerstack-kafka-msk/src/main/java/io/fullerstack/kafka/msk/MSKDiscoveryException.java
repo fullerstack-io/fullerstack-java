@@ -5,11 +5,11 @@ package io.fullerstack.kafka.msk;
  */
 public class MSKDiscoveryException extends RuntimeException {
 
-    public MSKDiscoveryException(String message) {
-        super(message);
-    }
+  public MSKDiscoveryException(String message) {
+    super(message);
+  }
 
-    public MSKDiscoveryException(String message, Throwable cause) {
-        super(message, cause);
-    }
+  public MSKDiscoveryException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }
