@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static io.humainary.substrates.api.Substrates.CORTEX;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -35,22 +36,13 @@ class PipeCachingTest {
     /**
      * Helper to create a simple subscriber that collects emissions.
      */
-    @SuppressWarnings("unchecked")
-    private <E> Subscriber<E> subscriber(Subject<Subscriber<E>> subject, List<E> collector, CountDownLatch latch) {
-        return new Subscriber<E>() {
-            @Override
-            public void accept(Subject<Channel<E>> s, Registrar<E> registrar) {
-                registrar.register(emission -> {
-                    collector.add(emission);
-                    latch.countDown();
-                });
-            }
-
-            @Override
-            public Subject<Subscriber<E>> subject() {
-                return subject;
-            }
-        };
+    private <E> Subscriber<E> subscriber(Name name, List<E> collector, CountDownLatch latch) {
+        return CORTEX.subscriber(name, (subject, registrar) -> {
+            registrar.register(emission -> {
+                collector.add(emission);
+                latch.countDown();
+            });
+        });
     }
 
     @Test
@@ -84,9 +76,7 @@ class PipeCachingTest {
             Composer.pipe(path -> path.limit(3))
         );
 
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         // Get pipe and verify it's the same instance on multiple calls
         Pipe<Integer> pipe1 = conduit.get(HierarchicalName.of("channel-1"));
@@ -118,9 +108,7 @@ class PipeCachingTest {
             Composer.pipe(path -> path.reduce(0, Integer::sum))
         );
 
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         // Get pipe twice - should be same instance
         Pipe<Integer> pipe1 = conduit.get(HierarchicalName.of("accumulator"));

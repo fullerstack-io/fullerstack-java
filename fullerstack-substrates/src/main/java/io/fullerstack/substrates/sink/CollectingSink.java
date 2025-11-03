@@ -66,22 +66,20 @@ public class CollectingSink<E> implements Sink<E> {
         );
 
         // Subscribe to source and buffer all emissions
-        this.subscription = source.subscribe(new Subscriber<E>() {
-            @Override
-            public Subject subject() {
-                return internalSubscriberSubject;
-            }
-
-            @Override
-            public void accept(Subject<Channel<E>> subject, Registrar<E> registrar) {
-                // Register a pipe that captures emissions into the buffer
-                registrar.register(emission -> {
-                    if (!closed) {
-                        buffer.add(new SubjectCapture<>(subject, emission));
-                    }
-                });
-            }
-        });
+        // RC3: Use FunctionalSubscriber with callback
+        this.subscription = source.subscribe(
+            new io.fullerstack.substrates.subscriber.FunctionalSubscriber<E>(
+                HierarchicalName.of("sink-subscriber"),
+                (subject, registrar) -> {
+                    // Register a pipe that captures emissions into the buffer
+                    registrar.register(emission -> {
+                        if (!closed) {
+                            buffer.add(new SubjectCapture<>(subject, emission));
+                        }
+                    });
+                }
+            )
+        );
     }
 
     @Override

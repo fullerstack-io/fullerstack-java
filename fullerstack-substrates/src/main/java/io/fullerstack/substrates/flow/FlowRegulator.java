@@ -112,7 +112,7 @@ public class FlowRegulator<E> implements Flow<E> {
     }
 
     @Override
-    public Flow<E> forward(Pipe<E> pipe) {
+    public Flow<E> forward(Pipe<? super E> pipe) {
         Objects.requireNonNull(pipe, "Pipe cannot be null");
         return addTransformation(value -> {
             pipe.emit(value);
@@ -222,7 +222,7 @@ public class FlowRegulator<E> implements Flow<E> {
     }
 
     @Override
-    public Flow<E> peek(Consumer<E> consumer) {
+    public Flow<E> peek(Consumer<? super E> consumer) {
         Objects.requireNonNull(consumer, "Consumer cannot be null");
         return addTransformation(value -> {
             consumer.accept(value);
@@ -269,7 +269,7 @@ public class FlowRegulator<E> implements Flow<E> {
     }
 
     @Override
-    public Flow<E> sift(Comparator<E> comparator, Consumer<? super Sift<E>> configurer) {
+    public Flow<E> sift(Comparator<? super E> comparator, Consumer<? super Sift<E>> configurer) {
         Objects.requireNonNull(comparator, "Comparator cannot be null");
         Objects.requireNonNull(configurer, "Configurer cannot be null");
 

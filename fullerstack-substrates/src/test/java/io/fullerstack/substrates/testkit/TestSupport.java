@@ -13,7 +13,7 @@ abstract class TestSupport {
   protected static Cortex cortex () {
 
     return
-      Substrates.cortex ();
+      Substrates.CORTEX;
 
   }
 

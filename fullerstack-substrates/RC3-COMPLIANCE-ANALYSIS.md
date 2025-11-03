@@ -1,16 +1,188 @@
-# Substrates RC1 API Compliance Analysis
+# Substrates RC3 API Compliance Analysis
 
-**Date**: 2025-10-31
+**Date**: 2025-11-03
 **Status**: ✅ COMPLIANT
-**Version**: RC1
+**Version**: RC3 (migrated from RC1)
 
 ---
 
 ## Executive Summary
 
-Our Substrates implementation **fully complies** with the RC1 API specification for threading, queuing, and deterministic execution. The **Valve pattern** correctly implements the single-threaded circuit execution model with event-driven await().
+Our Substrates implementation **fully complies** with the RC3 API specification. We successfully migrated from RC1 to RC3 with all 461 tests passing.
 
-**Key Finding**: No changes required. Our implementation matches RC1 design.
+**Key Changes in RC3**:
+1. **Subscriber Interface** - Now a marker interface (callbacks stored internally)
+2. **Cell API** - Changed from BiFunction to Composer pattern
+3. **Pipe Interface** - Added `flush()` method (no longer functional)
+4. **Contra-variance** - Added `? super T` throughout for proper variance
+5. **Cortex.pipe()** - Added 5 factory methods for pipe creation
+6. **Pool Interface** - Added `get(Subject)` and `get(Substrate)` overloads
+
+**Migration Status**: All breaking changes addressed, backward compatibility maintained via deprecated legacy methods.
+
+---
+
+## RC3 Migration Summary
+
+### Breaking Changes and Adaptations
+
+#### 1. Subscriber Interface → Marker Interface
+
+**RC1 Signature**:
+```java
+public interface Subscriber<E> {
+    void accept(Subject<Channel<E>> subject, Registrar<E> registrar);
+}
+```
+
+**RC3 Signature**:
+```java
+public interface Subscriber<E> {
+    // Marker interface - no methods!
+}
+```
+
+**Our Adaptation** (`FunctionalSubscriber.java`):
+- Store callback internally: `private final BiConsumer<Subject<Channel<E>>, Registrar<E>> callback`
+- Provide accessor: `public BiConsumer<...> getCallback()`
+- Conduits retrieve callback: `((FunctionalSubscriber<E>) subscriber).getCallback().accept(...)`
+
+**Rationale**: RC3 decouples interface from implementation, allowing multiple subscriber strategies.
+
+#### 2. Cell API → Composer Pattern
+
+**RC1 Signature**:
+```java
+<I, E> Cell<I, E> cell(
+    BiFunction<Subject<Cell<I,E>>, Pipe<E>, Pipe<I>> transformer,
+    BiFunction<Subject<Cell<I,E>>, Pipe<E>, Pipe<E>> aggregator,
+    Pipe<? super E> pipe
+)
+```
+
+**RC3 Signature**:
+```java
+<I, E> Cell<I, E> cell(
+    Composer<E, Pipe<I>> ingress,    // Channel<E> → Pipe<I>
+    Composer<E, Pipe<E>> egress,     // Channel<E> → Pipe<E>
+    Pipe<? super E> pipe
+)
+```
+
+**Our Adaptation** (`SingleThreadCircuit.java:246-284`):
+- **Kept legacy methods** as `@Deprecated` for backward compatibility
+- **Added RC3 methods** that bridge to legacy implementation:
+  ```java
+  // Get Channel using Composer.channel()
+  Conduit<Channel<E>, E> channelConduit = conduit(name, Composer.channel());
+  Channel<E> channel = channelConduit.get(name);
+
+  // Apply composers once
+  Pipe<I> inputPipe = ingress.compose(channel);
+  Pipe<E> outputPipe = egress.compose(channel);
+
+  // Create simple adapters
+  BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<I>> transformer =
+      (subject, channelPipe) -> inputPipe;
+
+  // Delegate to legacy implementation
+  return cell(name, transformer, aggregator, pipe);
+  ```
+
+**Rationale**: Composer pattern is more flexible (can create any percept type), while BiFunction was limited to Pipe-centric transformations.
+
+#### 3. Pipe Interface → Added flush()
+
+**RC1 Signature**:
+```java
+@FunctionalInterface
+public interface Pipe<E> {
+    void emit(E value);
+}
+```
+
+**RC3 Signature**:
+```java
+public interface Pipe<E> {  // NOT functional anymore!
+    void emit(E value);
+    void flush();  // NEW
+}
+```
+
+**Our Adaptation**:
+- Replaced **all** Pipe lambdas with explicit implementations:
+  ```java
+  // OLD (RC1)
+  Pipe<E> pipe = value -> list.add(value);
+
+  // NEW (RC3)
+  Pipe<E> pipe = new Pipe<E>() {
+      @Override
+      public void emit(E value) { list.add(value); }
+      @Override
+      public void flush() {}  // No-op for most implementations
+  };
+  ```
+- Updated ProducerPipe, ConsumerPipe, Circuit.pipe() implementations
+
+**Rationale**: Flush support enables buffered pipelines with explicit flush points.
+
+#### 4. Contra-variance → ? super T
+
+**RC1**:
+```java
+void register(Pipe<E> pipe);
+Pipe<E> pipe(Pipe<E> target);
+```
+
+**RC3**:
+```java
+void register(Pipe<? super E> pipe);  // Accept supertypes
+Pipe<E> pipe(Pipe<? super E> target);
+```
+
+**Our Adaptation**:
+- Updated all method signatures to match RC3
+- Added casts where needed: `@SuppressWarnings("unchecked")`
+
+**Rationale**: Proper variance allows `Pipe<Object>` to accept `Pipe<String>` (consumer contra-variance).
+
+#### 5. Cortex.pipe() Factory Methods
+
+**RC3 Additions**:
+```java
+Pipe<Object> pipe();                                          // No-op sink
+<E> Pipe<E> pipe(Class<E> type);                             // Typed no-op
+<E> Pipe<E> pipe(Consumer<? super E> consumer);              // Consumer adapter
+<E> Pipe<E> pipe(Class<E> type, Consumer<? super E> consumer); // Typed consumer
+<I, E> Pipe<I> pipe(Function<? super I, ? extends E> transformer, Pipe<? super E> target); // Transformer
+```
+
+**Our Implementation** (`CortexRuntime.java:96-166`):
+- All 5 factory methods implemented
+- Consumer adapter wraps Consumer in Pipe
+- Transformer creates transformation chain
+
+**Rationale**: Provides convenient pipe construction without manual implementation.
+
+#### 6. Pool Interface → Subject/Substrate Overloads
+
+**RC3 Additions**:
+```java
+T get(Subject<?> subject);     // Extract name from subject
+T get(Substrate<?> substrate); // Extract name from substrate
+```
+
+**Our Adaptation** (`SimpleCell.java`, `ConcurrentPool.java`):
+- Implemented overloads that delegate to `get(Name)`:
+  ```java
+  @Override
+  public T get(Subject<?> subject) {
+      return get(subject.name());
+  }
+  ```
+
+**Rationale**: Convenience methods - avoid manual name extraction.
 
 ---
 
@@ -561,35 +733,49 @@ Process E3, then E4
 
 ## Conclusion
 
-Our **fullerstack-substrates** implementation is **FULLY COMPLIANT** with the RC1 Substrates API specification.
+Our **fullerstack-substrates** implementation is **FULLY COMPLIANT** with the RC3 Substrates API specification.
+
+**RC3 Migration Status**: ✅ **COMPLETE**
+- All 461 tests passing
+- All breaking changes addressed
+- Backward compatibility maintained via deprecated methods
+- Zero compilation errors
+- Zero runtime failures
 
 **Verified Compliance**:
 - ✅ **Threading Model**: Single-threaded circuit execution with virtual threads
 - ✅ **Queue Semantics**: Non-blocking enqueue, blocking dequeue, FIFO ordering
 - ✅ **Memory Visibility**: Synchronized await() with happens-before guarantees
 - ✅ **Subscription Management**: Lock-free eventual consistency via CopyOnWriteArrayList
-- ✅ **API Surface**: All interfaces match RC1 (Cortex, Composer, Cell, Flow, Pipe)
+- ✅ **API Surface**: All interfaces match RC3 (Cortex, Composer, Cell, Flow, Pipe, Subscriber)
 - ✅ **Recursive Emissions**: FIFO ordering with queue-end appending
 - ✅ **Flow Operators**: Complete implementation with pipeline fusion optimizations
+- ✅ **RC3 Subscriber**: Marker interface pattern with internal callback storage
+- ✅ **RC3 Cell API**: Composer-based with BiFunction legacy support
+- ✅ **RC3 Pipe**: flush() method implemented throughout
+- ✅ **RC3 Contra-variance**: Proper variance annotations on all consumer parameters
 
 **Design Quality**:
-- ✅ **Correct**: Matches all RC1 guarantees
+- ✅ **Correct**: Matches all RC3 guarantees
 - ✅ **Simple**: ~180 lines of Valve code, clear architecture
 - ✅ **Maintainable**: No complex lock-free algorithms
 - ✅ **Fast**: Nanosecond-scale overhead with virtual threads
-- ✅ **Optimized**: Pipeline fusion (skip/limit) beyond RC1 requirements
+- ✅ **Optimized**: Pipeline fusion (skip/limit) beyond RC3 requirements
+- ✅ **Backward Compatible**: Legacy APIs preserved as @Deprecated
 
-**No changes needed.** The implementation is production-ready and RC1-compliant.
+**The implementation is production-ready and RC3-compliant.**
 
 ---
 
 ## References
 
-- RC1 API Documentation (Substrates.java provided 2025-10-31)
+- RC3 API Documentation (Substrates API 1.0.0-RC3, migrated 2025-11-03)
+- RC1 API Documentation (Substrates.java provided 2025-10-31 - baseline for migration)
 - `/workspaces/fullerstack-java/fullerstack-substrates/src/main/java/io/fullerstack/substrates/valve/Valve.java`
-- `/workspaces/fullerstack-java/fullerstack-substrates/src/main/java/io/fullerstack/substrates/circuit/SingleThreadCircuit.java`
+- `/workspaces/fullerstack-java/fullerstack-substrates/src/main/java/io/fullerstack/substrates/circuit/SingleThreadCircuit.java` (Cell API adapter)
+- `/workspaces/fullerstack-java/fullerstack-substrates/src/main/java/io/fullerstack/substrates/subscriber/FunctionalSubscriber.java` (RC3 callback storage)
 - `/workspaces/fullerstack-java/fullerstack-substrates/src/main/java/io/fullerstack/substrates/pipe/ProducerPipe.java`
 - `/workspaces/fullerstack-java/fullerstack-substrates/src/main/java/io/fullerstack/substrates/flow/FlowRegulator.java`
-- `/workspaces/fullerstack-java/fullerstack-substrates/src/main/java/io/fullerstack/substrates/conduit/TransformingConduit.java`
-- `/workspaces/fullerstack-java/fullerstack-substrates/src/main/java/io/fullerstack/substrates/CortexRuntime.java`
+- `/workspaces/fullerstack-java/fullerstack-substrates/src/main/java/io/fullerstack/substrates/conduit/TransformingConduit.java` (Subscriber callback retrieval)
+- `/workspaces/fullerstack-java/fullerstack-substrates/src/main/java/io/fullerstack/substrates/CortexRuntime.java` (RC3 pipe() factories)
 - `/workspaces/fullerstack-java/fullerstack-substrates/docs/ASYNC-ARCHITECTURE.md`

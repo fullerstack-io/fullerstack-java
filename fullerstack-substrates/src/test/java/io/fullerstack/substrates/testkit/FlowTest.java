@@ -34,6 +34,16 @@ final class FlowTest
 
       final List < Integer > forwarded = new ArrayList <> ();
 
+      // RC3: Flow.forward() takes Pipe<? super E>, not Consumer<E>
+      final Pipe<Integer> forwardPipe = new Pipe<>() {
+        @Override
+        public void emit(Integer value) {
+          forwarded.add(value);
+        }
+        @Override
+        public void flush() {}
+      };
+
       final Conduit < Pipe < Integer >, Integer > conduit =
         circuit.conduit (
           cortex.name ( "flow.diff.conduit" ),
@@ -43,7 +53,7 @@ final class FlowTest
               .diff ( 0 )
               .guard ( value -> ( value & 1 ) == 0 )
               .guard ( 0, ( previous, next ) -> next > previous )
-              .forward ( forwarded::add )
+              .forward ( forwardPipe )
           )
         );
 
@@ -100,6 +110,16 @@ final class FlowTest
 
       final List < Integer > forwarded = new ArrayList <> ();
 
+      // RC3: Flow.forward() takes Pipe<? super E>, not Consumer<E>
+      final Pipe<Integer> forwardPipe = new Pipe<>() {
+        @Override
+        public void emit(Integer value) {
+          forwarded.add(value);
+        }
+        @Override
+        public void flush() {}
+      };
+
       final Conduit < Pipe < Integer >, Integer > conduit =
         circuit.conduit (
           cortex.name ( "flow.limit.conduit" ),
@@ -109,7 +129,7 @@ final class FlowTest
               .peek ( ignored -> frequencyCount.incrementAndGet () )
               .sample ( 0.5 )
               .peek ( ignored -> rateCount.incrementAndGet () )
-              .forward ( forwarded::add )
+              .forward ( forwardPipe )
               .limit ( 10 )
               .limit ( 3L )
               .reduce ( 0, Integer::sum )
@@ -269,13 +289,23 @@ final class FlowTest
 
       final List < Integer > captured = new ArrayList <> ();
 
+      // RC3: Flow.forward() takes Pipe<? super E>, not Consumer<E>
+      final Pipe<Integer> forwardPipe = new Pipe<>() {
+        @Override
+        public void emit(Integer value) {
+          captured.add(value);
+        }
+        @Override
+        public void flush() {}
+      };
+
       final Conduit < Pipe < Integer >, Integer > conduit =
         circuit.conduit (
           cortex.name ( "flow.skip.conduit" ),
           channel -> channel.pipe (
             flow -> flow
               .skip ( 3L )
-              .forward ( captured::add )
+              .forward ( forwardPipe )
           )
         );
 
@@ -325,13 +355,23 @@ final class FlowTest
 
       final List < Integer > captured = new ArrayList <> ();
 
+      // RC3: Flow.forward() takes Pipe<? super E>, not Consumer<E>
+      final Pipe<Integer> forwardPipe = new Pipe<>() {
+        @Override
+        public void emit(Integer value) {
+          captured.add(value);
+        }
+        @Override
+        public void flush() {}
+      };
+
       final Conduit < Pipe < Integer >, Integer > conduit =
         circuit.conduit (
           cortex.name ( "flow.skip.zero.conduit" ),
           channel -> channel.pipe (
             flow -> flow
               .skip ( 0L )
-              .forward ( captured::add )
+              .forward ( forwardPipe )
           )
         );
 

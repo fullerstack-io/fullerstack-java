@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static io.humainary.substrates.api.Substrates.CORTEX;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -33,22 +34,13 @@ class SequencerIntegrationTest {
     /**
      * Helper to create a simple subscriber that collects emissions.
      */
-    @SuppressWarnings("unchecked")
-    private <E> Subscriber<E> subscriber(Subject<Subscriber<E>> subject, List<E> collector, CountDownLatch latch) {
-        return new Subscriber<E>() {
-            @Override
-            public void accept(Subject<Channel<E>> s, Registrar<E> registrar) {
-                registrar.register(emission -> {
-                    collector.add(emission);
-                    latch.countDown();
-                });
-            }
-
-            @Override
-            public Subject<Subscriber<E>> subject() {
-                return subject;
-            }
-        };
+    private <E> Subscriber<E> subscriber(Name name, List<E> collector, CountDownLatch latch) {
+        return CORTEX.subscriber(name, (subject, registrar) -> {
+            registrar.register(emission -> {
+                collector.add(emission);
+                latch.countDown();
+            });
+        });
     }
 
     @Test
@@ -69,9 +61,7 @@ class SequencerIntegrationTest {
         );
 
         // Subscribe to conduit's source
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         // Get pipe and emit values
         Pipe<Integer> pipe = conduit.get(HierarchicalName.of("sensor-1"));
@@ -103,9 +93,7 @@ class SequencerIntegrationTest {
             )
         );
 
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         Pipe<Integer> pipe = conduit.get(HierarchicalName.of("accumulator-1"));
         pipe.emit(1);  // 0 + 1 = 1
@@ -133,9 +121,7 @@ class SequencerIntegrationTest {
             )
         );
 
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         Pipe<Integer> pipe = conduit.get(HierarchicalName.of("mapper-1"));
         pipe.emit(1);
@@ -162,9 +148,7 @@ class SequencerIntegrationTest {
             )
         );
 
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         Pipe<Integer> pipe = conduit.get(HierarchicalName.of("differ-1"));
         pipe.emit(1);  // First value - passes
@@ -193,9 +177,7 @@ class SequencerIntegrationTest {
             )
         );
 
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         Pipe<Integer> pipe = conduit.get(HierarchicalName.of("sampler-1"));
         pipe.emit(1);  // 1st - filtered
@@ -225,9 +207,7 @@ class SequencerIntegrationTest {
             )
         );
 
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         Pipe<Integer> pipe = conduit.get(HierarchicalName.of("sifter-1"));
         pipe.emit(3);   // Below 5 - filtered
@@ -261,9 +241,7 @@ class SequencerIntegrationTest {
             )
         );
 
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         Pipe<Integer> pipe = conduit.get(HierarchicalName.of("complex-1"));
         pipe.emit(-1);  // Filtered by first guard
@@ -293,9 +271,7 @@ class SequencerIntegrationTest {
             )
         );
 
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         // Multiple pipes from same conduit, each with own Segment instance
         Pipe<Integer> pipe1 = conduit.get(HierarchicalName.of("pipe-1"));
@@ -328,9 +304,7 @@ class SequencerIntegrationTest {
                 .replace(value -> value * 2)      // Double the value
         );
 
-        @SuppressWarnings("unchecked")
-        Subject<Subscriber<Integer>> subscriberSubject = (Subject<Subscriber<Integer>>) (Subject<?>) conduit.subject();
-        conduit.subscribe(subscriber(subscriberSubject, received, latch));
+        conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
         // Create multiple channels - all should apply the same transformations
         Pipe<Integer> channel1 = conduit.get(HierarchicalName.of("channel-1"));

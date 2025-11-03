@@ -25,10 +25,10 @@ import java.util.function.Predicate;
  */
 public class FilteringSegment<E> implements Sift<E> {
 
-    private final Comparator<E> comparator;
+    private final Comparator<? super E> comparator;
     private Predicate<E> predicate = value -> true; // Default: pass all
 
-    public FilteringSegment(Comparator<E> comparator) {
+    public FilteringSegment(Comparator<? super E> comparator) {
         this.comparator = Objects.requireNonNull(comparator, "Comparator cannot be null");
     }
 

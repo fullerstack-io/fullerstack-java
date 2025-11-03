@@ -101,6 +101,17 @@ public class ProducerPipe<E> implements Pipe<E> {
     }
 
     /**
+     * Flushes any buffered emissions.
+     *
+     * <p>ProducerPipe has no buffering - emissions are posted immediately to the Circuit's queue.
+     * This is a no-op implementation as required by RC3 Pipe interface.
+     */
+    @Override
+    public void flush() {
+        // No-op: ProducerPipe has no buffering - emissions posted immediately
+    }
+
+    /**
      * Posts emission to Circuit's queue for ordered processing.
      *
      * <p><b>Architecture:</b> Emissions are posted as Scripts to the Circuit's queue.

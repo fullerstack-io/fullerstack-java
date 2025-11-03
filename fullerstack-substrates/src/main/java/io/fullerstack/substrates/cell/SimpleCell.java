@@ -78,13 +78,13 @@ public class SimpleCell<I, E> implements Cell<I, E> {
         );
     }
 
-    // ========== Pipe<I> implementation (input) ==========
+    // ========== Pipe<I> accessor (RC3) ==========
 
     @Override
-    public void emit(I input) {
-        // Delegate to the input pipe created by the Composer
-        // The Composer handles I→E transformation and emits to outputPipe
-        inputPipe.emit(input);
+    public Pipe<I> pipe() {
+        // Return the input pipe (Cell no longer implements Pipe directly in RC3)
+        // RC3 change: Cell.pipe() method instead of implementing Pipe interface
+        return inputPipe;
     }
 
     // ========== Source<E> implementation (output) ==========
@@ -118,6 +118,16 @@ public class SimpleCell<I, E> implements Cell<I, E> {
             // (all cells in the hierarchy emit to the same output)
             return new SimpleCell<>(this, n, childInputPipe, outputPipe, conduit, this.subject);
         });
+    }
+
+    @Override
+    public Cell<I, E> get(Subject<?> subject) {
+        return get(subject.name());
+    }
+
+    @Override
+    public Cell<I, E> get(Substrate<?> substrate) {
+        return get(substrate.subject().name());
     }
 
     // ========== Container implementation ==========

@@ -2,6 +2,8 @@ package io.fullerstack.substrates.pool;
 
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pool;
+import io.humainary.substrates.api.Substrates.Subject;
+import io.humainary.substrates.api.Substrates.Substrate;
 
 import java.util.Map;
 import java.util.Objects;
@@ -19,21 +21,33 @@ import java.util.function.Function;
  */
 public class ConcurrentPool<T> implements Pool<T> {
     private final Map<Name, T> percepts = new ConcurrentHashMap<>();
-    private final Function<Name, T> factory;
+    private final Function<? super Name, ? extends T> factory;
 
     /**
      * Creates a new Pool with the given factory.
      *
      * @param factory function to create percepts for given names
      */
-    public ConcurrentPool(Function<Name, T> factory) {
+    public ConcurrentPool(Function<? super Name, ? extends T> factory) {
         this.factory = Objects.requireNonNull(factory, "Pool factory cannot be null");
     }
 
     @Override
     public T get(Name name) {
         Objects.requireNonNull(name, "Name cannot be null");
-        return percepts.computeIfAbsent(name, factory);
+        return percepts.computeIfAbsent(name, factory::apply);
+    }
+
+    @Override
+    public T get(Substrate<?> substrate) {
+        Objects.requireNonNull(substrate, "Substrate cannot be null");
+        return get(substrate.subject().name());
+    }
+
+    @Override
+    public T get(Subject<?> subject) {
+        Objects.requireNonNull(subject, "Subject cannot be null");
+        return get(subject.name());
     }
 
     /**

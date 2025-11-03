@@ -20,6 +20,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -90,6 +91,80 @@ public class CortexRuntime implements Cortex {
         return new SingleThreadCircuit(name);
     }
 
+    // ========== Pipe Factory (5 methods) ==========
+
+    @Override
+    public Pipe<Object> pipe() {
+        // Factory method for creating a simple no-op pipe (Object type)
+        // RC3 addition - returns a sink pipe that discards emissions
+        return new Pipe<Object>() {
+            @Override
+            public void emit(Object value) {
+                // No-op: discard emissions
+            }
+
+            @Override
+            public void flush() {
+                // No-op: no buffering
+            }
+        };
+    }
+
+    @Override
+    public <E> Pipe<E> pipe(Class<E> type) {
+        // Factory method for creating a typed no-op pipe
+        return new Pipe<E>() {
+            @Override
+            public void emit(E value) {
+                // No-op: discard emissions
+            }
+
+            @Override
+            public void flush() {
+                // No-op: no buffering
+            }
+        };
+    }
+
+    @Override
+    public <E> Pipe<E> pipe(Consumer<? super E> consumer) {
+        // Factory method for creating a pipe that routes to a consumer
+        return new Pipe<E>() {
+            @Override
+            public void emit(E value) {
+                consumer.accept(value);
+            }
+
+            @Override
+            public void flush() {
+                // No-op: consumer has no buffering
+            }
+        };
+    }
+
+    @Override
+    public <E> Pipe<E> pipe(Class<E> type, Consumer<? super E> consumer) {
+        // Factory method for creating a typed pipe that routes to a consumer
+        return pipe(consumer);  // Type is just for compile-time safety
+    }
+
+    @Override
+    public <I, E> Pipe<I> pipe(Function<? super I, ? extends E> transformer, Pipe<? super E> target) {
+        // Factory method for creating a transforming pipe
+        return new Pipe<I>() {
+            @Override
+            public void emit(I value) {
+                E transformed = transformer.apply(value);
+                target.emit(transformed);
+            }
+
+            @Override
+            public void flush() {
+                target.flush();
+            }
+        };
+    }
+
     // ========== Name Factory (8 methods) ==========
     // All delegate directly to HierarchicalName.of() overloaded methods
 
@@ -156,13 +231,21 @@ public class CortexRuntime implements Cortex {
         return HierarchicalName.of(member.getDeclaringClass().getName()).name(member);
     }
 
-    // ========== Pool Management (1 method) ==========
+    // ========== Pool Management (2 methods) ==========
 
     @Override
     public <T> Pool<T> pool(T value) {
         Objects.requireNonNull(value, "Pool value cannot be null");
         // Create pool that returns the same value for any name
         return new ConcurrentPool<>(name -> value);
+    }
+
+    @Override
+    public <T> Pool<T> pool(Function<? super Name, ? extends T> factory) {
+        Objects.requireNonNull(factory, "Pool factory cannot be null");
+        // Create pool with the provided factory function
+        // RC3 API addition - direct factory function support
+        return new ConcurrentPool<>(factory);
     }
 
     // ========== Scope Management (2 methods) ==========

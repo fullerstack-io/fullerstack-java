@@ -167,20 +167,35 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
         }
     }
 
-    @Override
+    // ========== Legacy Cell API (BiFunction-based, pre-RC3) ==========
+    // These methods are retained for backward compatibility but don't override Circuit interface
+
+    /**
+     * Legacy Cell creation using BiFunction transformers (pre-RC3).
+     * Retained for backward compatibility with existing code.
+     *
+     * @deprecated Use {@link #cell(Composer, Composer, Pipe)} instead (RC3 API)
+     */
+    @Deprecated
     public <I, E> Cell<I, E> cell(
             BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<I>> transformer,
             BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<E>> aggregator,
-            Pipe<E> pipe) {
+            Pipe<? super E> pipe) {
         return cell(HierarchicalName.of("cell"), transformer, aggregator, pipe);
     }
 
-    @Override
+    /**
+     * Legacy Cell creation with name using BiFunction transformers (pre-RC3).
+     * Retained for backward compatibility with existing code.
+     *
+     * @deprecated Use {@link #cell(Name, Composer, Composer, Pipe)} instead (RC3 API)
+     */
+    @Deprecated
     public <I, E> Cell<I, E> cell(
             Name name,
             BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<I>> transformer,
             BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<E>> aggregator,
-            Pipe<E> pipe) {
+            Pipe<? super E> pipe) {
         Objects.requireNonNull(name, "Cell name cannot be null");
         Objects.requireNonNull(transformer, "Transformer cannot be null");
         Objects.requireNonNull(aggregator, "Aggregator cannot be null");
@@ -207,7 +222,9 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
         Pipe<I> inputPipe = transformer.apply(cellSubject, channelPipe);
 
         // Apply aggregator to output pipe
-        Pipe<E> outputPipe = aggregator.apply(cellSubject, pipe);
+        // RC3: Cast needed for contra-variance (Pipe<? super E> -> Pipe<E>)
+        @SuppressWarnings("unchecked")
+        Pipe<E> outputPipe = aggregator.apply(cellSubject, (Pipe<E>) pipe);
 
         // Cast conduit to the correct type for SimpleCell
         // This is safe because the transformer creates Pipe<I> from the channel's Pipe<E>
@@ -225,15 +242,67 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
         );
     }
 
+    // ========== RC3 Cell API (Composer-based) ==========
+
     @Override
-    public <E> Pipe<E> pipe(Pipe<E> target) {
-        Objects.requireNonNull(target, "Target pipe cannot be null");
-        // Return a pipe that routes emissions through the valve to the target
-        return value -> schedule(() -> target.emit(value));
+    public <I, E> Cell<I, E> cell(
+            Composer<E, Pipe<I>> ingress,
+            Composer<E, Pipe<E>> egress,
+            Pipe<? super E> pipe) {
+        return cell(HierarchicalName.of("cell"), ingress, egress, pipe);
     }
 
     @Override
-    public <E> Pipe<E> pipe(Pipe<E> target, Consumer<? super Flow<E>> configurer) {
+    public <I, E> Cell<I, E> cell(
+            Name name,
+            Composer<E, Pipe<I>> ingress,
+            Composer<E, Pipe<E>> egress,
+            Pipe<? super E> pipe) {
+        // Bridge RC3 Composer API to our existing BiFunction implementation
+        // Composer<E, Pipe<I>> = Channel<E> -> Pipe<I>
+        // BiFunction = (Subject<Cell>, Pipe<E>) -> Pipe<I>
+
+        // Create a conduit with Channel<E> as the percept
+        Conduit<Channel<E>, E> channelConduit = conduit(name, Composer.channel());
+
+        // Get the channel for this cell
+        Channel<E> channel = channelConduit.get(name);
+
+        // Apply the composers to get the input and output pipes
+        Pipe<I> inputPipe = ingress.compose(channel);
+        Pipe<E> outputPipe = egress.compose(channel);
+
+        // Create adapters that just return the pre-composed pipes
+        BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<I>> transformer =
+            (subject, channelPipe) -> inputPipe;
+
+        BiFunction<Subject<Cell<I, E>>, Pipe<E>, Pipe<E>> aggregator =
+            (subject, channelPipe) -> outputPipe;
+
+        // Delegate to existing BiFunction implementation
+        return cell(name, transformer, aggregator, pipe);
+    }
+
+    @Override
+    public <E> Pipe<E> pipe(Pipe<? super E> target) {
+        Objects.requireNonNull(target, "Target pipe cannot be null");
+        // Return a pipe that routes emissions through the valve to the target
+        // RC3: Pipe is no longer functional (has emit + flush), so use explicit implementation
+        return new Pipe<E>() {
+            @Override
+            public void emit(E value) {
+                schedule(() -> target.emit(value));
+            }
+
+            @Override
+            public void flush() {
+                schedule(target::flush);
+            }
+        };
+    }
+
+    @Override
+    public <E> Pipe<E> pipe(Pipe<? super E> target, Consumer<? super Flow<E>> configurer) {
         Objects.requireNonNull(target, "Target pipe cannot be null");
         Objects.requireNonNull(configurer, "Flow configurer cannot be null");
         // TODO: Implement Flow transformations before dispatching to target
@@ -288,7 +357,7 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
     }
 
     @Override
-    public <P, E> Conduit<P, E> conduit(Name name, Composer<E, ? extends P> composer, Consumer<Flow<E>> configurer) {
+    public <P, E> Conduit<P, E> conduit(Name name, Composer<E, ? extends P> composer, Consumer<? super Flow<E>> configurer) {
         checkClosed();
         Objects.requireNonNull(name, "Conduit name cannot be null");
         Objects.requireNonNull(composer, "Composer cannot be null");
@@ -309,8 +378,10 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
 
         // COLD PATH: Create new conduit with flow configurer
         // Use simple name - hierarchy is implicit through parent Subject references
-        Conduit<P, E> newConduit = new TransformingConduit<>(
-            name, composer, this, configurer
+        // RC3: Cast needed for contra-variance (Consumer<? super Flow<E>> -> Consumer<Flow<E>>)
+        @SuppressWarnings("unchecked")
+        Conduit<P, E> newConduit = new TransformingConduit<P, E>(
+            name, composer, this, (Consumer<Flow<E>>) configurer
         );
 
         // Add to slot structure

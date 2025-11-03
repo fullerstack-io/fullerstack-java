@@ -5,6 +5,7 @@ import io.fullerstack.substrates.channel.EmissionChannel;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subscriber.FunctionalSubscriber;
 import io.fullerstack.substrates.subscription.CallbackSubscription;
 import io.fullerstack.substrates.circuit.Scheduler;
 
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -79,7 +81,8 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
 
     // Cache: Subject Name -> Subscriber -> List of registered Pipes
     // Pipes are registered only once per Subject per Subscriber (on first emission)
-    private final Map<Name, Map<Subscriber<E>, List<Pipe<E>>>> pipeCache = new ConcurrentHashMap<>();
+    // RC3: Pipes now use ? super E for contra-variance
+    private final Map<Name, Map<Subscriber<E>, List<Pipe<? super E>>>> pipeCache = new ConcurrentHashMap<>();
 
     /**
      * Creates a Conduit without transformations.
@@ -204,6 +207,16 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
         }
     }
 
+    @Override
+    public P get(Subject<?> subject) {
+        return get(subject.name());
+    }
+
+    @Override
+    public P get(Substrate<?> substrate) {
+        return get(substrate.subject().name());
+    }
+
     /**
      * Provides an emission handler callback for Channel/Pipe creation.
      * Channels pass this callback to Pipes, allowing Pipes to notify subscribers.
@@ -228,16 +241,36 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
      */
     private void notifySubscribersOfNewSubject(Subject<Channel<E>> subject) {
         for (Subscriber<E> subscriber : subscribers) {
-            // Call subscriber.accept() to let it register pipes
-            subscriber.accept(subject, new Registrar<E>() {
+            // RC3: Get callback from subscriber (stored internally)
+            BiConsumer<Subject<Channel<E>>, Registrar<E>> callback =
+                ((FunctionalSubscriber<E>) subscriber).getCallback();
+
+            callback.accept(subject, new Registrar<E>() {
                 @Override
-                public void register(Pipe<E> pipe) {
+                public void register(Pipe<? super E> pipe) {
                     // Cache the registered pipe for this (subscriber, subject) pair
                     Name subjectName = subject.name();
                     pipeCache
                         .computeIfAbsent(subjectName, k -> new ConcurrentHashMap<>())
                         .computeIfAbsent(subscriber, k -> new CopyOnWriteArrayList<>())
                         .add(pipe);
+                }
+
+                @Override
+                public void register(Consumer<? super E> consumer) {
+                    // RC3: Convenience method for Consumer registration
+                    // Convert Consumer to anonymous Pipe and register it
+                    register(new Pipe<E>() {
+                        @Override
+                        public void emit(E emission) {
+                            consumer.accept(emission);
+                        }
+
+                        @Override
+                        public void flush() {
+                            // No-op: Consumer has no buffering
+                        }
+                    });
                 }
             });
         }
@@ -254,7 +287,7 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
         Name subjectName = emittingSubject.name();
 
         // Get or create the subscriber->pipes map for this Subject
-        Map<Subscriber<E>, List<Pipe<E>>> subscriberPipes = pipeCache.computeIfAbsent(
+        Map<Subscriber<E>, List<Pipe<? super E>>> subscriberPipes = pipeCache.computeIfAbsent(
             subjectName,
             name -> new ConcurrentHashMap<>()
         );
@@ -275,19 +308,39 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
      * @param subscriberPipes cache of subscriber->pipes
      * @return list of pipes for this subscriber
      */
-    private List<Pipe<E>> resolvePipes(
+    private List<Pipe<? super E>> resolvePipes(
         Subscriber<E> subscriber,
         Subject emittingSubject,
-        Map<Subscriber<E>, List<Pipe<E>>> subscriberPipes
+        Map<Subscriber<E>, List<Pipe<? super E>>> subscriberPipes
     ) {
         return subscriberPipes.computeIfAbsent(subscriber, sub -> {
-            // First emission from this Subject - call subscriber.accept() to register pipes
-            List<Pipe<E>> registeredPipes = new CopyOnWriteArrayList<>();
+            // First emission from this Subject - retrieve callback and invoke
+            List<Pipe<? super E>> registeredPipes = new CopyOnWriteArrayList<>();
 
-            sub.accept(emittingSubject, new Registrar<E>() {
+            // RC3: Get callback from subscriber
+            BiConsumer<Subject<Channel<E>>, Registrar<E>> callback =
+                ((FunctionalSubscriber<E>) sub).getCallback();
+
+            callback.accept(emittingSubject, new Registrar<E>() {
                 @Override
-                public void register(Pipe<E> pipe) {
-                    registeredPipes.add(pipe);
+                public void register(Pipe<? super E> pipe) {
+                    registeredPipes.add(pipe);  // Direct add - contra-variance allows this
+                }
+
+                @Override
+                public void register(Consumer<? super E> consumer) {
+                    // RC3: Convert Consumer to Pipe (can't use lambda - Pipe not functional)
+                    register(new Pipe<E>() {
+                        @Override
+                        public void emit(E emission) {
+                            consumer.accept(emission);
+                        }
+
+                        @Override
+                        public void flush() {
+                            // No-op: Consumer has no buffering
+                        }
+                    });
                 }
             });
 
