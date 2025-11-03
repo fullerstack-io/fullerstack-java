@@ -4,7 +4,7 @@ import io.fullerstack.kafka.broker.models.ThreadPoolMetrics;
 import io.fullerstack.kafka.broker.monitors.ThreadPoolResourceMonitor;
 import io.fullerstack.kafka.core.config.BrokerEndpoint;
 import io.fullerstack.kafka.core.config.BrokerSensorConfig;
-import io.humainary.serventis.resources.Resources;
+import io.humainary.substrates.ext.serventis.Resources;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import org.slf4j.Logger;

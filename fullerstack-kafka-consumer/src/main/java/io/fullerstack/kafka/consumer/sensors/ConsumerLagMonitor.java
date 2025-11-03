@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.consumer.sensors;
 
-import io.humainary.serventis.queues.Queues.Queue;
+import io.humainary.substrates.ext.serventis.Queues.Queue;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.OffsetSpec;

@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.runtime.integration;
 
 import io.fullerstack.kafka.runtime.queue.QueueFlowCircuit;
-import io.humainary.serventis.queues.Queues.Queue;
-import io.humainary.serventis.queues.Queues.Signal;
+import io.humainary.substrates.ext.serventis.Queues.Queue;
+import io.humainary.substrates.ext.serventis.Queues.Signal;
 import io.humainary.substrates.api.Substrates.Pipe;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

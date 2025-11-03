@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.broker.composers;
 
-import io.fullerstack.serventis.signals.MonitorSignal;
-import io.humainary.modules.serventis.monitors.api.Monitors;
+import io.humainary.substrates.ext.serventis.MonitorSignal;
+import io.humainary.substrates.ext.serventis.Monitors.Monitors;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.kafka.broker.models.BrokerMetrics;
 import org.junit.jupiter.api.AfterEach;

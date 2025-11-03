@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.runtime.queue;
 
-import io.humainary.serventis.queues.Queues;
-import io.humainary.serventis.queues.Queues.Queue;
+import io.humainary.substrates.ext.serventis.Queues;
+import io.humainary.substrates.ext.serventis.Queues.Queue;
 import io.humainary.substrates.api.Substrates.*;
 
 import static io.fullerstack.substrates.CortexRuntime.cortex;

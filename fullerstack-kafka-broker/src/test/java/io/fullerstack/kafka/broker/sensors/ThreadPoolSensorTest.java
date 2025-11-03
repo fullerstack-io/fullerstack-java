@@ -2,7 +2,7 @@ package io.fullerstack.kafka.broker.sensors;
 
 import io.fullerstack.kafka.core.config.BrokerEndpoint;
 import io.fullerstack.kafka.core.config.BrokerSensorConfig;
-import io.fullerstack.serventis.signals.ResourceSignal;
+import io.humainary.substrates.ext.serventis.ResourceSignal;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pipe;
 import org.junit.jupiter.api.AfterEach;

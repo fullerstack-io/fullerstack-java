@@ -13,8 +13,8 @@ import io.fullerstack.kafka.core.config.ProducerSensorConfig;
 import io.fullerstack.kafka.producer.composers.ProducerHealthCellComposer;
 import io.fullerstack.kafka.producer.models.ProducerMetrics;
 import io.fullerstack.kafka.producer.sensors.ProducerSensor;
-import io.humainary.serventis.monitors.Monitors;
-import io.humainary.serventis.resources.Resources;
+import io.humainary.substrates.ext.serventis.Monitors;
+import io.humainary.substrates.ext.serventis.Resources;
 import io.humainary.substrates.api.Substrates.Cell;
 import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Circuit;
@@ -155,45 +155,29 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
      * @return Root Cell for broker health monitoring
      */
     private Cell<BrokerMetrics, Monitors.Status> createBrokersRootCell() {
-        BrokerHealthCellComposer composer = new BrokerHealthCellComposer ();
+        // Use BrokerHealthCellComposer as transformer
+        Composer<Monitors.Status, Pipe<BrokerMetrics>> transformerComposer = new BrokerHealthCellComposer();
 
-        // Cell API requires BiFunctions, but we have a Composer
-        // Create adapter BiFunction: (Subject, Pipe<E>) → Pipe<I>
-        // The Composer needs a Channel, so we create an adapter Channel from the Pipe
-        BiFunction < Subject < Cell < BrokerMetrics, Monitors.Status >>, Pipe < Monitors.Status >, Pipe < BrokerMetrics >> transformer =
-          ( subject, outputPipe ) -> {
-            // Create an adapter Channel that wraps the output Pipe
-            Channel < Monitors.Status > channel = new Channel < Monitors.Status > () {
-              @Override
-              public Subject subject () {
-                return subject;
-              }
+        // Identity aggregator composer
+        Composer<Monitors.Status, Pipe<Monitors.Status>> aggregatorComposer = channel -> channel.pipe();
 
-              @Override
-              public Pipe < Monitors.Status > pipe () {
-                return outputPipe;
-              }
+        // No-op downstream pipe
+        Pipe<Monitors.Status> noopPipe = new Pipe<>() {
+            @Override
+            public void emit(Monitors.Status status) {
+                // No-op
+            }
 
-              @Override
-              public Pipe < Monitors.Status > pipe (
-                final Consumer <? super Flow < Monitors.Status >> configurer
-              ) {
-                throw new UnsupportedOperationException ( "Flow configuration not supported in Cell adapter" );
-              }
-            };
+            @Override
+            public void flush() {
+                // No-op
+            }
+        };
 
-            // Call the Composer with the adapter Channel
-            return composer.compose ( channel );
-          };
-
-        // Aggregator and downstream: identity pass-through
-        // downstream needs to be a Pipe<Monitors.Status> - use a no-op pipe
-        Pipe < Monitors.Status > noopPipe = status -> {};
-
-        Cell < BrokerMetrics, Monitors.Status > rootCell = circuit.cell (
-          transformer,
-          ( subject, pipe ) -> pipe,  // aggregator: identity
-          noopPipe                     // downstream: no-op
+        Cell<BrokerMetrics, Monitors.Status> rootCell = circuit.cell(
+            transformerComposer,
+            aggregatorComposer,
+            noopPipe
         );
 
         logger.info("Created brokers/ root Cell in circuit");
@@ -220,17 +204,26 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
      */
     private Cell < Resources.Signal, Resources.Signal > createBrokerThreadPoolsRootCell () {
       // Signal-first: No Composer needed - signals already interpreted by ThreadPoolResourceMonitor
-      // RC1 Cell API: cell(transformer, aggregator, downstream)
-      // Identity BiFunctions since input = output = Resources.Signal
-      BiFunction < Subject < Cell < Resources.Signal, Resources.Signal >>, Pipe < Resources.Signal >, Pipe < Resources.Signal >> identity =
-        ( subject, pipe ) -> pipe;
+      // RC3 Cell API: cell(transformer, aggregator, downstream)
+      // Identity Composers since input = output = Resources.Signal
+      Composer < Resources.Signal, Pipe < Resources.Signal >> identityComposer = channel -> channel.pipe();
 
-      Pipe < Resources.Signal > noopPipe = signal -> {};
+      Pipe < Resources.Signal > noopPipe = new Pipe<>() {
+          @Override
+          public void emit(Resources.Signal signal) {
+              // No-op
+          }
+
+          @Override
+          public void flush() {
+              // No-op
+          }
+      };
 
       Cell < Resources.Signal, Resources.Signal > rootCell = circuit.cell (
-        identity,    // transformer: identity
-        identity,    // aggregator: identity
-        noopPipe     // downstream: no-op
+        identityComposer,    // transformer: identity
+        identityComposer,    // aggregator: identity
+        noopPipe             // downstream: no-op
       );
 
       logger.info ( "Created broker-thread-pools/ root Cell in circuit (signal-first with identity)" );
@@ -248,39 +241,29 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
      * @return Root Cell for producer health monitoring
      */
     private Cell < ProducerMetrics, Monitors.Status > createProducersRootCell () {
-      ProducerHealthCellComposer composer = new ProducerHealthCellComposer ();
+      // Use ProducerHealthCellComposer as transformer
+      Composer<Monitors.Status, Pipe<ProducerMetrics>> transformerComposer = new ProducerHealthCellComposer();
 
-      // Create adapter BiFunction for Composer → Cell API
-      BiFunction < Subject < Cell < ProducerMetrics, Monitors.Status >>, Pipe < Monitors.Status >, Pipe < ProducerMetrics >> transformer =
-        ( subject, outputPipe ) -> {
-          Channel < Monitors.Status > channel = new Channel < Monitors.Status > () {
-            @Override
-            public Subject subject () {
-              return subject;
-            }
+      // Identity aggregator composer
+      Composer<Monitors.Status, Pipe<Monitors.Status>> aggregatorComposer = channel -> channel.pipe();
 
-            @Override
-            public Pipe < Monitors.Status > pipe () {
-              return outputPipe;
-            }
+      // No-op downstream pipe
+      Pipe<Monitors.Status> noopPipe = new Pipe<>() {
+          @Override
+          public void emit(Monitors.Status status) {
+              // No-op
+          }
 
-            @Override
-            public Pipe < Monitors.Status > pipe (
-              final Consumer <? super Flow < Monitors.Status >> configurer
-            ) {
-              throw new UnsupportedOperationException ( "Flow configuration not supported in Cell adapter" );
-            }
-          };
+          @Override
+          public void flush() {
+              // No-op
+          }
+      };
 
-          return composer.compose ( channel );
-        };
-
-      Pipe < Monitors.Status > noopPipe = status -> {};
-
-      Cell < ProducerMetrics, Monitors.Status > rootCell = circuit.cell (
-        transformer,
-        ( subject, pipe ) -> pipe,  // aggregator: identity
-        noopPipe
+      Cell<ProducerMetrics, Monitors.Status> rootCell = circuit.cell(
+          transformerComposer,
+          aggregatorComposer,
+          noopPipe
       );
 
       logger.info ( "Created producers/ root Cell in circuit" );
@@ -304,39 +287,29 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
      * @return Root Cell for consumer health monitoring
      */
     private Cell < ConsumerMetrics, Monitors.Status > createConsumersRootCell () {
-      ConsumerHealthCellComposer composer = new ConsumerHealthCellComposer ();
+      // Use ConsumerHealthCellComposer as transformer
+      Composer<Monitors.Status, Pipe<ConsumerMetrics>> transformerComposer = new ConsumerHealthCellComposer();
 
-      // Create adapter BiFunction for Composer → Cell API
-      BiFunction < Subject < Cell < ConsumerMetrics, Monitors.Status >>, Pipe < Monitors.Status >, Pipe < ConsumerMetrics >> transformer =
-        ( subject, outputPipe ) -> {
-          Channel < Monitors.Status > channel = new Channel < Monitors.Status > () {
-            @Override
-            public Subject subject () {
-              return subject;
-            }
+      // Identity aggregator composer
+      Composer<Monitors.Status, Pipe<Monitors.Status>> aggregatorComposer = channel -> channel.pipe();
 
-            @Override
-            public Pipe < Monitors.Status > pipe () {
-              return outputPipe;
-            }
+      // No-op downstream pipe
+      Pipe<Monitors.Status> noopPipe = new Pipe<>() {
+          @Override
+          public void emit(Monitors.Status status) {
+              // No-op
+          }
 
-            @Override
-            public Pipe < Monitors.Status > pipe (
-              final Consumer <? super Flow < Monitors.Status >> configurer
-            ) {
-              throw new UnsupportedOperationException ( "Flow configuration not supported in Cell adapter" );
-            }
-          };
+          @Override
+          public void flush() {
+              // No-op
+          }
+      };
 
-          return composer.compose ( channel );
-        };
-
-      Pipe < Monitors.Status > noopPipe = status -> {};
-
-      Cell < ConsumerMetrics, Monitors.Status > rootCell = circuit.cell (
-        transformer,
-        ( subject, pipe ) -> pipe,  // aggregator: identity
-        noopPipe
+      Cell<ConsumerMetrics, Monitors.Status> rootCell = circuit.cell(
+          transformerComposer,
+          aggregatorComposer,
+          noopPipe
       );
 
       logger.info ( "Created consumers/ root Cell in circuit" );
@@ -374,7 +347,7 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
             Cell<BrokerMetrics, Monitors.Status> brokerCell = brokersRootCell.get(brokerName);
 
             if (brokerCell != null) {
-                brokerCell.emit(metrics);
+                brokerCell.pipe().emit(metrics);
                 logger.trace("Emitted BrokerMetrics to Cell: {}", brokerId);
             } else {
                 logger.warn("No Cell found for broker: {}", brokerId);
@@ -424,7 +397,7 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
             Cell<ProducerMetrics, Monitors.Status> producerCell = producersRootCell.get(producerName);
 
             if (producerCell != null) {
-                producerCell.emit(metrics);
+                producerCell.pipe().emit(metrics);
                 logger.trace("Emitted ProducerMetrics to Cell: {}", producerId);
             } else {
                 logger.warn("No Cell found for producer: {}", producerId);
@@ -456,7 +429,7 @@ public class KafkaObservabilityRuntime implements AutoCloseable {
             if (groupCell != null) {
                 Cell<ConsumerMetrics, Monitors.Status> memberCell = groupCell.get(memberName);
                 if (memberCell != null) {
-                    memberCell.emit(metrics);
+                    memberCell.pipe().emit(metrics);
                     logger.trace("Emitted ConsumerMetrics to Cell: {}/{}", consumerGroup, consumerId);
                 } else {
                     logger.warn("No member Cell found for consumer: {}/{}", consumerGroup, consumerId);

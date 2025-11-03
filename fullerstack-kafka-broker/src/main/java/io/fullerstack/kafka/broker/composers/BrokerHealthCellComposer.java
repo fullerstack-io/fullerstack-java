@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.broker.composers;
 
-import io.humainary.serventis.monitors.Monitors;
+import io.humainary.substrates.ext.serventis.Monitors;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.kafka.broker.models.BrokerMetrics;
 import io.fullerstack.kafka.core.config.ClusterConfig;
@@ -87,6 +87,11 @@ public class BrokerHealthCellComposer implements Composer<Monitors.Status, Pipe<
                     // Emit error signal
                     monitor.status(Monitors.Condition.DOWN, Monitors.Confidence.TENTATIVE);
                 }
+            }
+
+            @Override
+            public void flush() {
+                // No-op: Monitor instrument handles its own flushing
             }
         };
     }

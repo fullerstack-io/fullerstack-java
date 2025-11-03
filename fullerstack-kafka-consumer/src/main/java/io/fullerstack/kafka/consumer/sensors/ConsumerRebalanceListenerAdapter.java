@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.consumer.sensors;
 
-import io.humainary.serventis.services.Services;
+import io.humainary.substrates.ext.serventis.Services;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;

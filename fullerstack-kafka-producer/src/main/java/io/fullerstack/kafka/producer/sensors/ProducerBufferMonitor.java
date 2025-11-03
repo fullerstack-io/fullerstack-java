@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.serventis.queues.Queues.Queue;
+import io.humainary.substrates.ext.serventis.Queues.Queue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

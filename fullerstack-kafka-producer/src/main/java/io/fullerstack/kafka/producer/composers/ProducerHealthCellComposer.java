@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.producer.composers;
 
 import io.fullerstack.kafka.producer.models.ProducerMetrics;
-import io.humainary.serventis.monitors.Monitors;
+import io.humainary.substrates.ext.serventis.Monitors;
 import io.humainary.substrates.api.Substrates.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,6 +114,10 @@ public class ProducerHealthCellComposer implements Composer<Monitors.Status, Pip
 
         }
 
+            @Override
+            public void flush() {
+                // No-op: Instrument handles its own flushing
+            }
       };
 
     }

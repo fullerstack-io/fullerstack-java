@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.serventis.probes.Probes;
-import io.humainary.serventis.services.Services;
+import io.humainary.substrates.ext.serventis.Probes;
+import io.humainary.substrates.ext.serventis.Services;
 import io.humainary.substrates.api.Substrates.*;
 import org.apache.kafka.clients.producer.ProducerInterceptor;
 import org.apache.kafka.clients.producer.ProducerRecord;

@@ -2,8 +2,8 @@ package io.fullerstack.kafka.broker.monitors;
 
 import io.fullerstack.kafka.broker.models.ThreadPoolMetrics;
 import io.fullerstack.kafka.broker.models.ThreadPoolType;
-import io.fullerstack.serventis.signals.ResourceSignal;
-import io.humainary.modules.serventis.resources.api.Resources;
+import io.humainary.substrates.ext.serventis.ResourceSignal;
+import io.humainary.substrates.ext.serventis.Resources.Resources;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pipe;
 import org.junit.jupiter.api.BeforeEach;

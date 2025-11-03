@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.consumer.sensors;
 
-import io.humainary.serventis.services.Services;
+import io.humainary.substrates.ext.serventis.Services;
 import io.humainary.substrates.api.Substrates.*;
 import org.apache.kafka.clients.consumer.ConsumerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerRecords;

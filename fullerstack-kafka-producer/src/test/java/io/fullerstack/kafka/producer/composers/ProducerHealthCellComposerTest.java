@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.producer.composers;
 
 import io.fullerstack.kafka.producer.models.ProducerMetrics;
-import io.fullerstack.serventis.signals.MonitorSignal;
-import io.humainary.modules.serventis.monitors.api.Monitors;
+import io.humainary.substrates.ext.serventis.MonitorSignal;
+import io.humainary.substrates.ext.serventis.Monitors.Monitors;
 import io.humainary.substrates.api.Substrates.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.consumer.composers;
 
 import io.fullerstack.kafka.consumer.models.ConsumerMetrics;
-import io.humainary.serventis.monitors.Monitors;
+import io.humainary.substrates.ext.serventis.Monitors;
 import io.humainary.substrates.api.Substrates.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,6 +92,10 @@ public class ConsumerHealthCellComposer implements Composer<Monitors.Status, Pip
 
         }
 
+            @Override
+            public void flush() {
+                // No-op: Instrument handles its own flushing
+            }
       };
 
     }
