@@ -10,18 +10,18 @@ import java.util.UUID;
 /**
  * UUID-based implementation of Substrates.Id using Lombok for boilerplate reduction.
  *
- * <p>Provides unique identifiers for Substrates subjects.
+ * < p >Provides unique identifiers for Substrates subjects.
  *
- * <p>This class uses Lombok annotations to auto-generate:
- * <ul>
- *   <li>Public constructor via {@code @AllArgsConstructor}</li>
- *   <li>Null checks via {@code @NonNull}</li>
- *   <li>Getter method for uuid field via {@code @Getter}</li>
- *   <li>equals() and hashCode() based on uuid via {@code @EqualsAndHashCode}</li>
- *   <li>toString() returning uuid.toString() via {@code @ToString}</li>
- * </ul>
+ * < p >This class uses Lombok annotations to auto-generate:
+ * < ul >
+ *   < li >Public constructor via {@code @AllArgsConstructor}</li >
+ *   < li >Null checks via {@code @NonNull}</li >
+ *   < li >Getter method for uuid field via {@code @Getter}</li >
+ *   < li >equals() and hashCode() based on uuid via {@code @EqualsAndHashCode}</li >
+ *   < li >toString() returning uuid.toString() via {@code @ToString}</li >
+ * </ul >
  *
- * <p>Use static factory methods {@link #generate()} or {@link #of(UUID)} to create instances.
+ * < p >Use static factory methods {@link #generate()} or {@link #of(UUID)} to create instances.
  *
  * @see Id
  */

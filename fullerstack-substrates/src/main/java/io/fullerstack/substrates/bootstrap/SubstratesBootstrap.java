@@ -22,22 +22,22 @@ import static io.humainary.substrates.api.Substrates.Composer.pipe;
 
 /**
  * Convention-based bootstrap for Substrates framework.
- * <p>
+ * < p >
  * Automatically discovers and creates circuits from configuration files,
  * wiring them with application-provided composers and sensors via SPI.
- * <p>
- * <strong>Bootstrap Flow:</strong>
- * <ol>
- *   <li>Discover circuits from {@code config_{circuit}.properties} files</li>
- *   <li>Read circuit structure from {@code circuit.containers}, {@code circuit.conduits}, {@code circuit.cells}</li>
- *   <li>Load {@link ComposerProvider} implementations via {@link ServiceLoader}</li>
- *   <li>Load {@link SensorProvider} implementations via {@link ServiceLoader}</li>
- *   <li>Create circuits with containers, conduits, cells using provided composers</li>
- *   <li>Start sensors for each circuit</li>
- * </ol>
- * <p>
- * <strong>Usage (Zero Configuration):</strong>
- * <pre>
+ * < p >
+ * < strong >Bootstrap Flow:</strong >
+ * < ol >
+ *   < li >Discover circuits from {@code config_{circuit}.properties} files</li >
+ *   < li >Read circuit structure from {@code circuit.containers}, {@code circuit.conduits}, {@code circuit.cells}</li >
+ *   < li >Load {@link ComposerProvider} implementations via {@link ServiceLoader}</li >
+ *   < li >Load {@link SensorProvider} implementations via {@link ServiceLoader}</li >
+ *   < li >Create circuits with containers, conduits, cells using provided composers</li >
+ *   < li >Start sensors for each circuit</li >
+ * </ol >
+ * < p >
+ * < strong >Usage (Zero Configuration):</strong >
+ * < pre >
  * // Single line bootstrap - discovers everything automatically
  * BootstrapResult result = SubstratesBootstrap.bootstrap();
  *
@@ -46,10 +46,10 @@ import static io.humainary.substrates.api.Substrates.Composer.pipe;
  *
  * // Shutdown
  * result.close();
- * </pre>
- * <p>
- * <strong>Usage (Custom Configuration):</strong>
- * <pre>
+ * </pre >
+ * < p >
+ * < strong >Usage (Custom Configuration):</strong >
+ * < pre >
  * BootstrapResult result = SubstratesBootstrap.builder()
  *     .onCircuitCreated((name, circuit) -&gt; {
  *         System.out.println("Created: " + name);
@@ -58,7 +58,7 @@ import static io.humainary.substrates.api.Substrates.Composer.pipe;
  *         System.out.println("Started sensor: " + sensor.name());
  *     })
  *     .bootstrap();
- * </pre>
+ * </pre >
  *
  * @see ComposerProvider
  * @see SensorProvider
@@ -70,7 +70,7 @@ public class SubstratesBootstrap {
 
   /**
    * Bootstrap all circuits with default configuration.
-   * <p>
+   * < p >
    * Discovers circuits, creates infrastructure, and starts sensors.
    *
    * @return Bootstrap result with circuits and sensors
@@ -93,9 +93,9 @@ public class SubstratesBootstrap {
    */
   public static class Builder {
 
-    private BiConsumer<String, Circuit> onCircuitCreated = (name, circuit) -> {};
-    private BiConsumer<String, Sensor> onSensorStarted = (circuit, sensor) -> {};
-    private BiConsumer<String, Exception> onError = (name, error) -> {
+    private BiConsumer< String, Circuit > onCircuitCreated = (name, circuit) -> {};
+    private BiConsumer< String, Sensor > onSensorStarted = (circuit, sensor) -> {};
+    private BiConsumer< String, Exception > onError = (name, error) -> {
       logger.error("Bootstrap error for circuit: {}", name, error);
     };
 
@@ -105,7 +105,7 @@ public class SubstratesBootstrap {
      * @param callback Callback (circuitName, circuit) → void
      * @return This builder
      */
-    public Builder onCircuitCreated(BiConsumer<String, Circuit> callback) {
+    public Builder onCircuitCreated(BiConsumer< String, Circuit > callback) {
       this.onCircuitCreated = Objects.requireNonNull(callback);
       return this;
     }
@@ -116,7 +116,7 @@ public class SubstratesBootstrap {
      * @param callback Callback (circuitName, sensor) → void
      * @return This builder
      */
-    public Builder onSensorStarted(BiConsumer<String, Sensor> callback) {
+    public Builder onSensorStarted(BiConsumer< String, Sensor > callback) {
       this.onSensorStarted = Objects.requireNonNull(callback);
       return this;
     }
@@ -127,7 +127,7 @@ public class SubstratesBootstrap {
      * @param callback Callback (circuitName, exception) → void
      * @return This builder
      */
-    public Builder onError(BiConsumer<String, Exception> callback) {
+    public Builder onError(BiConsumer< String, Exception > callback) {
       this.onError = Objects.requireNonNull(callback);
       return this;
     }
@@ -141,19 +141,19 @@ public class SubstratesBootstrap {
       logger.info("Starting Substrates bootstrap...");
 
       // Phase 1: Discover circuits from configuration
-      Set<String> circuitNames = CircuitDiscovery.discoverCircuits();
+      Set< String > circuitNames = CircuitDiscovery.discoverCircuits();
       logger.info("Discovered {} circuits: {}", circuitNames.size(), circuitNames);
 
       // Phase 2: Load application providers via SPI
-      ServiceLoader<CircuitStructureProvider> structureProviders = ServiceLoader.load(CircuitStructureProvider.class);
-      ServiceLoader<SensorProvider> sensorProviders = ServiceLoader.load(SensorProvider.class);
+      ServiceLoader< CircuitStructureProvider > structureProviders = ServiceLoader.load(CircuitStructureProvider.class);
+      ServiceLoader< SensorProvider > sensorProviders = ServiceLoader.load(SensorProvider.class);
 
       logger.debug("Loaded structure providers: {}", countProviders(structureProviders));
       logger.debug("Loaded sensor providers: {}", countProviders(sensorProviders));
 
       // Phase 3: Create circuits
-      Map<String, Circuit> circuits = new LinkedHashMap<>();
-      List<Sensor> allSensors = new ArrayList<>();
+      Map< String, Circuit > circuits = new LinkedHashMap<>();
+      List< Sensor > allSensors = new ArrayList<>();
 
       for (String circuitName : circuitNames) {
         try {
@@ -165,7 +165,7 @@ public class SubstratesBootstrap {
           // Get sensors for this circuit
           HierarchicalConfig config = HierarchicalConfig.forCircuit(circuitName);
           Cortex cortex = cortex();
-          List<Sensor> sensors = getSensorsForCircuit(
+          List< Sensor > sensors = getSensorsForCircuit(
             circuitName,
             circuitContext.circuit(),
             cortex,
@@ -192,7 +192,7 @@ public class SubstratesBootstrap {
       return new BootstrapResult(circuits, allSensors);
     }
 
-    private CircuitContext createCircuit(String circuitName, ServiceLoader<CircuitStructureProvider> providers) {
+    private CircuitContext createCircuit(String circuitName, ServiceLoader< CircuitStructureProvider > providers) {
       logger.debug("Creating circuit: {}", circuitName);
 
       HierarchicalConfig config = HierarchicalConfig.forCircuit(circuitName);
@@ -225,18 +225,18 @@ public class SubstratesBootstrap {
     // Helper record to return both circuit and context
     private record CircuitContext(Circuit circuit, BootstrapContext context) {}
 
-    private List<Sensor> getSensorsForCircuit(
+    private List< Sensor > getSensorsForCircuit(
         String circuitName,
         Circuit circuit,
         Cortex cortex,
         HierarchicalConfig config,
         BootstrapContext context,
-        ServiceLoader<SensorProvider> providers
+        ServiceLoader< SensorProvider > providers
     ) {
-      List<Sensor> sensors = new ArrayList<>();
+      List< Sensor > sensors = new ArrayList<>();
 
       for (SensorProvider provider : providers) {
-        List<Sensor> providerSensors = provider.getSensors(circuitName, circuit, cortex, config, context);
+        List< Sensor > providerSensors = provider.getSensors(circuitName, circuit, cortex, config, context);
         sensors.addAll(providerSensors);
         logger.debug("Provider {} provided {} sensors for circuit '{}'",
           provider.getClass().getSimpleName(), providerSensors.size(), circuitName);
@@ -245,7 +245,7 @@ public class SubstratesBootstrap {
       return sensors;
     }
 
-    private List<String> parseComponentList(String value) {
+    private List< String > parseComponentList(String value) {
       if (value == null || value.isBlank()) {
         return Collections.emptyList();
       }
@@ -267,16 +267,16 @@ public class SubstratesBootstrap {
 
   /**
    * Result of bootstrap process.
-   * <p>
+   * < p >
    * Contains all created circuits and started sensors.
    * Implements {@link AutoCloseable} to shut down all resources.
    */
   public static class BootstrapResult implements AutoCloseable {
 
-    private final Map<String, Circuit> circuits;
-    private final List<Sensor> sensors;
+    private final Map< String, Circuit > circuits;
+    private final List< Sensor > sensors;
 
-    public BootstrapResult(Map<String, Circuit> circuits, List<Sensor> sensors) {
+    public BootstrapResult(Map< String, Circuit > circuits, List< Sensor > sensors) {
       this.circuits = Map.copyOf(circuits);
       this.sensors = List.copyOf(sensors);
     }
@@ -286,7 +286,7 @@ public class SubstratesBootstrap {
      *
      * @return Unmodifiable map of circuit name → circuit
      */
-    public Map<String, Circuit> getCircuits() {
+    public Map< String, Circuit > getCircuits() {
       return circuits;
     }
 
@@ -305,7 +305,7 @@ public class SubstratesBootstrap {
      *
      * @return Unmodifiable list of sensors
      */
-    public List<Sensor> getSensors() {
+    public List< Sensor > getSensors() {
       return sensors;
     }
 
@@ -314,13 +314,13 @@ public class SubstratesBootstrap {
      *
      * @return Set of circuit names
      */
-    public Set<String> getCircuitNames() {
+    public Set< String > getCircuitNames() {
       return circuits.keySet();
     }
 
     /**
      * Close all circuits and sensors.
-     * <p>
+     * < p >
      * Stops all sensors and closes all circuits.
      */
     @Override
@@ -338,7 +338,7 @@ public class SubstratesBootstrap {
       }
 
       // Close circuits
-      for (Map.Entry<String, Circuit> entry : circuits.entrySet()) {
+      for (Map.Entry< String, Circuit > entry : circuits.entrySet()) {
         try {
           entry.getValue().close();
           logger.debug("Closed circuit: {}", entry.getKey());

@@ -5,23 +5,23 @@ import java.util.*;
 /**
  * Hierarchical configuration using ResourceBundle (zero dependencies).
  *
- * <p>Supports fallback chain:
- * <ol>
- *   <li>config_{circuit}_{container}.properties (container-specific)</li>
- *   <li>config_{circuit}.properties (circuit-specific)</li>
- *   <li>config.properties (global defaults)</li>
- * </ol>
+ * < p >Supports fallback chain:
+ * < ol >
+ *   < li >config_{circuit}_{container}.properties (container-specific)</li >
+ *   < li >config_{circuit}.properties (circuit-specific)</li >
+ *   < li >config.properties (global defaults)</li >
+ * </ol >
  *
- * <p><strong>How ResourceBundle Fallback Works:</strong>
- * <p>ResourceBundle uses {@link Locale} for fallback. We cleverly use locale
+ * < p >< strong >How ResourceBundle Fallback Works:</strong >
+ * < p >ResourceBundle uses {@link Locale} for fallback. We cleverly use locale
  * language tags to represent circuit/container hierarchy:
- * <ul>
- *   <li>Locale "broker-health" → config_broker-health.properties → config.properties</li>
- *   <li>Locale "broker-health-brokers" → config_broker-health-brokers.properties → config_broker-health.properties → config.properties</li>
- * </ul>
+ * < ul >
+ *   < li >Locale "broker-health" → config_broker-health.properties → config.properties</li >
+ *   < li >Locale "broker-health-brokers" → config_broker-health-brokers.properties → config_broker-health.properties → config.properties</li >
+ * </ul >
  *
- * <p><strong>Example Property Files:</strong>
- * <pre>
+ * < p >< strong >Example Property Files:</strong >
+ * < pre >
  * # config.properties (global defaults)
  * valve.queue-size=1000
  * valve.shutdown-timeout-ms=5000
@@ -31,10 +31,10 @@ import java.util.*;
  *
  * # config_broker-health-brokers.properties (container override)
  * valve.queue-size=10000  # Broker container needs even larger queue
- * </pre>
+ * </pre >
  *
- * <p><strong>Usage:</strong>
- * <pre>
+ * < p >< strong >Usage:</strong >
+ * < pre >
  * // Global config
  * HierarchicalConfig global = HierarchicalConfig.global();
  * int queueSize = global.getInt("valve.queue-size");
@@ -49,13 +49,13 @@ import java.util.*;
  * HierarchicalConfig brokers = HierarchicalConfig.forContainer("broker-health", "brokers");
  * int queueSize = brokers.getInt("valve.queue-size");
  * // → 10000 (from config_broker-health-brokers.properties)
- * </pre>
+ * </pre >
  *
- * <p><strong>System Property Overrides:</strong>
- * <p>System properties take precedence over all property files:
- * <pre>
+ * < p >< strong >System Property Overrides:</strong >
+ * < p >System properties take precedence over all property files:
+ * < pre >
  * java -Dvalve.queue-size=20000 -jar app.jar
- * </pre>
+ * </pre >
  */
 public class HierarchicalConfig {
 
@@ -80,11 +80,11 @@ public class HierarchicalConfig {
   /**
    * Get circuit-specific configuration.
    *
-   * <p>Fallback chain:
-   * <ol>
-   *   <li>config_{circuitName}.properties</li>
-   *   <li>config.properties (global)</li>
-   * </ol>
+   * < p >Fallback chain:
+   * < ol >
+   *   < li >config_{circuitName}.properties</li >
+   *   < li >config.properties (global)</li >
+   * </ol >
    *
    * @param circuitName Circuit name (e.g., "broker-health", "partition-flow")
    * @return Circuit-specific configuration
@@ -104,12 +104,12 @@ public class HierarchicalConfig {
   /**
    * Get container-specific configuration.
    *
-   * <p>Fallback chain:
-   * <ol>
-   *   <li>config_{circuitName}-{containerName}.properties</li>
-   *   <li>config_{circuitName}.properties (circuit default)</li>
-   *   <li>config.properties (global)</li>
-   * </ol>
+   * < p >Fallback chain:
+   * < ol >
+   *   < li >config_{circuitName}-{containerName}.properties</li >
+   *   < li >config_{circuitName}.properties (circuit default)</li >
+   *   < li >config.properties (global)</li >
+   * </ol >
    *
    * @param circuitName Circuit name (e.g., "broker-health")
    * @param containerName Container name (e.g., "brokers", "partitions")
@@ -139,7 +139,7 @@ public class HierarchicalConfig {
   /**
    * Get string value.
    *
-   * <p>Checks system properties first, then ResourceBundle.
+   * < p >Checks system properties first, then ResourceBundle.
    *
    * @param key Property key
    * @return Property value
@@ -342,7 +342,7 @@ public class HierarchicalConfig {
    *
    * @return Set of all keys
    */
-  public Set<String> keys() {
+  public Set< String > keys() {
     return bundle.keySet();
   }
 

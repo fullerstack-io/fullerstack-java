@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.*;
 
 /**
  * Tests for {@link SubstratesBootstrap}.
- * <p>
+ * < p >
  * Demonstrates convention-based circuit discovery and bootstrap.
  */
 class SubstratesBootstrapTest {
@@ -104,7 +104,7 @@ class SubstratesBootstrapTest {
   public static class TestSensorProvider implements SensorProvider {
 
     @Override
-    public List<Sensor> getSensors(
+    public List< Sensor > getSensors(
         String circuitName,
         Circuit circuit,
         Cortex cortex,

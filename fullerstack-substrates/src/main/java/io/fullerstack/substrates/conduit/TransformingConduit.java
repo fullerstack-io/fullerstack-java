@@ -22,67 +22,67 @@ import java.util.function.Consumer;
 /**
  * Generic implementation of Substrates.Conduit interface with Lombok for getters.
  *
- * <p><b>Type System Foundation:</b>
+ * < p >< b >Type System Foundation:</b >
  * Conduit&lt;P, E&gt; IS-A Subject&lt;Conduit&lt;P, E&gt;&gt; (via sealed hierarchy: Component → Context → Source → Conduit).
  * This means every Conduit is itself a Subject that can be subscribed to, and it emits values of type E
  * via its internal Channels. Subscribers receive Subject&lt;Channel&lt;E&gt;&gt; and can dynamically
  * register Pipes to receive emissions from specific subjects.
  *
- * <p>Routes emitted values from Channels (producers) to Pipes (consumers) via Circuit's shared queue.
+ * < p >Routes emitted values from Channels (producers) to Pipes (consumers) via Circuit's shared queue.
  * Manages percepts created from channels via a Composer. Each percept corresponds to a subject
  * and shares the Circuit's queue for signal processing (single-threaded execution model).
  *
- * <p><b>Data Flow (Circuit Queue Architecture):</b>
- * <ol>
- *   <li>Channel (producer) emits value → posts Script to Circuit Queue</li>
- *   <li>Circuit Queue processor executes Script → calls processEmission()</li>
- *   <li>processEmission() invokes subscribers (on channel creation + first emission)</li>
- *   <li>Subscribers register Pipes via Registrar → Pipes receive emissions</li>
- * </ol>
+ * < p >< b >Data Flow (Circuit Queue Architecture):</b >
+ * < ol >
+ *   < li >Channel (producer) emits value → posts Script to Circuit Queue</li >
+ *   < li >Circuit Queue processor executes Script → calls processEmission()</li >
+ *   < li >processEmission() invokes subscribers (on channel creation + first emission)</li >
+ *   < li >Subscribers register Pipes via Registrar → Pipes receive emissions</li >
+ * </ol >
  *
- * <p><b>Single-Threaded Execution Model:</b>
+ * < p >< b >Single-Threaded Execution Model:</b >
  * All Conduits within a Circuit share the Circuit's single Queue. This ensures:
- * <ul>
- *   <li>Ordered delivery within Circuit domain</li>
- *   <li>QoS control (can prioritize certain Conduits)</li>
- *   <li>Prevents queue saturation</li>
- *   <li>Matches "Virtual CPU Core" design principle</li>
- * </ul>
+ * < ul >
+ *   < li >Ordered delivery within Circuit domain</li >
+ *   < li >QoS control (can prioritize certain Conduits)</li >
+ *   < li >Prevents queue saturation</li >
+ *   < li >Matches "Virtual CPU Core" design principle</li >
+ * </ul >
  *
- * <p><b>Subscriber Invocation (Two-Phase Notification):</b>
- * <ul>
- *   <li><b>Phase 1 (Channel creation):</b> subscriber.accept() called when new Channel created via get()</li>
- *   <li><b>Phase 2 (First emission):</b> subscriber.accept() called on first emission from a Subject (lazy registration)</li>
- *   <li>Registered pipes are cached per Subject per Subscriber</li>
- *   <li>Subsequent emissions reuse cached pipes (efficient multi-dispatch)</li>
- *   <li>Example: Hierarchical routing where pipes register parent pipes once</li>
- * </ul>
+ * < p >< b >Subscriber Invocation (Two-Phase Notification):</b >
+ * < ul >
+ *   < li >< b >Phase 1 (Channel creation):</b > subscriber.accept() called when new Channel created via get()</li >
+ *   < li >< b >Phase 2 (First emission):</b > subscriber.accept() called on first emission from a Subject (lazy registration)</li >
+ *   < li >Registered pipes are cached per Subject per Subscriber</li >
+ *   < li >Subsequent emissions reuse cached pipes (efficient multi-dispatch)</li >
+ *   < li >Example: Hierarchical routing where pipes register parent pipes once</li >
+ * </ul >
  *
- * <p><b>Simple Name Model:</b>
+ * < p >< b >Simple Name Model:</b >
  * Percepts are keyed by the Name passed to get(). Each container (Circuit, Conduit, Cell) maintains
  * its own namespace using simple names as keys. Hierarchy is implicit through container relationships,
  * not through manual name construction. A Name is just a Name - whether it contains dots or not,
  * it's treated as an opaque key for lookup.
  *
- * @param <P> the percept type (e.g., Pipe<E>)
- * @param <E> the emission type (e.g., MonitorSignal)
+ * @param < P > the percept type (e.g., Pipe< E >)
+ * @param < E > the emission type (e.g., MonitorSignal)
  */
 @Getter
-public class TransformingConduit<P, E> implements Conduit<P, E> {
+public class TransformingConduit< P, E > implements Conduit< P, E > {
 
   private final Circuit circuit; // Parent Circuit in hierarchy (provides scheduling + Subject)
   private final Subject conduitSubject;
-  private final Composer<E, ? extends P> perceptComposer;
-  private final Map<Name, P> percepts;
-  private final Consumer<Flow<E>> flowConfigurer; // Optional transformation pipeline (nullable)
+  private final Composer< E, ? extends P > perceptComposer;
+  private final Map< Name, P > percepts;
+  private final Consumer< Flow< E >> flowConfigurer; // Optional transformation pipeline (nullable)
 
   // Direct subscriber management (moved from SourceImpl)
-  private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
+  private final List< Subscriber< E >> subscribers = new CopyOnWriteArrayList<>();
 
   // Cache: Subject Name -> Subscriber -> List of registered Pipes
   // Pipes are registered only once per Subject per Subscriber (on first emission)
   // RC3: Pipes now use ? super E for contra-variance
-  private final Map<Name, Map<Subscriber<E>, List<Pipe<? super E>>>> pipeCache = new ConcurrentHashMap<>();
+  private final Map< Name, Map< Subscriber< E >, List< Pipe<? super E >>>> pipeCache = new ConcurrentHashMap<>();
 
   /**
    * Creates a Conduit without transformations.
@@ -91,7 +91,7 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
    * @param perceptComposer composer for creating percepts from channels
    * @param circuit parent Circuit (provides scheduling + Subject hierarchy)
    */
-  public TransformingConduit(Name conduitName, Composer<E, ? extends P> perceptComposer, Circuit circuit) {
+  public TransformingConduit(Name conduitName, Composer< E, ? extends P > perceptComposer, Circuit circuit) {
     this(conduitName, perceptComposer, circuit, null);
   }
 
@@ -103,7 +103,7 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
    * @param circuit parent Circuit (provides scheduling + Subject hierarchy)
    * @param flowConfigurer optional transformation pipeline (null if no transformations)
    */
-  public TransformingConduit(Name conduitName, Composer<E, ? extends P> perceptComposer, Circuit circuit, Consumer<Flow<E>> flowConfigurer) {
+  public TransformingConduit(Name conduitName, Composer< E, ? extends P > perceptComposer, Circuit circuit, Consumer< Flow< E >> flowConfigurer) {
     this.circuit = Objects.requireNonNull(circuit, "Circuit cannot be null");
     this.conduitSubject = new HierarchicalSubject<>(
       UuidIdentifier.generate(),
@@ -135,35 +135,35 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
   /**
    * Subscribes a subscriber to receive emissions from this Conduit.
    *
-   * <p><b>Type System Insight:</b>
+   * < p >< b >Type System Insight:</b >
    * Conduit&lt;P, E&gt; IS-A Subject&lt;Conduit&lt;P, E&gt;&gt; (via Component → Context → Source → Conduit hierarchy).
    * This means:
-   * <ul>
-   *   <li>Conduit emits {@code E} values via its internal Channels</li>
-   *   <li>Conduit can be subscribed to by {@code Subscriber<E>} instances</li>
-   *   <li>Subscriber receives {@code Subject<Channel<E>>} (the subject of each Channel created within this Conduit)</li>
-   * </ul>
+   * < ul >
+   *   < li >Conduit emits {@code E} values via its internal Channels</li >
+   *   < li >Conduit can be subscribed to by {@code Subscriber< E >} instances</li >
+   *   < li >Subscriber receives {@code Subject< Channel< E >>} (the subject of each Channel created within this Conduit)</li >
+   * </ul >
    *
-   * <p><b>Subscriber Behavior:</b>
-   * The subscriber's {@code accept(Subject<Channel<E>>, Registrar<E>)} method is invoked:
-   * <ol>
-   *   <li><b>On Channel creation</b>: When a new Channel is created via {@link #get(Name)}</li>
-   *   <li><b>On first emission</b>: Lazy registration when a Subject emits for the first time</li>
-   * </ol>
+   * < p >< b >Subscriber Behavior:</b >
+   * The subscriber's {@code accept(Subject< Channel< E >>, Registrar< E >)} method is invoked:
+   * < ol >
+   *   < li >< b >On Channel creation</b >: When a new Channel is created via {@link #get(Name)}</li >
+   *   < li >< b >On first emission</b >: Lazy registration when a Subject emits for the first time</li >
+   * </ol >
    *
-   * <p>The subscriber can:
-   * <ul>
-   *   <li>Inspect the {@code Subject<Channel<E>>} to determine routing logic</li>
-   *   <li>Call {@code conduit.get(subject.name())} to retrieve the percept (cached, no recursion)</li>
-   *   <li>Register one or more {@code Pipe<E>} instances via the {@code Registrar<E>}</li>
-   *   <li>Registered pipes receive all future emissions from that Subject</li>
-   * </ul>
+   * < p >The subscriber can:
+   * < ul >
+   *   < li >Inspect the {@code Subject< Channel< E >>} to determine routing logic</li >
+   *   < li >Call {@code conduit.get(subject.name())} to retrieve the percept (cached, no recursion)</li >
+   *   < li >Register one or more {@code Pipe< E >} instances via the {@code Registrar< E >}</li >
+   *   < li >Registered pipes receive all future emissions from that Subject</li >
+   * </ul >
    *
    * @param subscriber the subscriber to register
    * @return a Subscription to control the subscription lifecycle
    */
   @Override
-  public Subscription subscribe(Subscriber<E> subscriber) {
+  public Subscription subscribe(Subscriber< E > subscriber) {
     Objects.requireNonNull(subscriber, "Subscriber cannot be null");
     subscribers.add(subscriber);
     return new CallbackSubscription(() -> subscribers.remove(subscriber), conduitSubject);
@@ -190,7 +190,7 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
     // Slow path: create new Channel and percept
     // Use simple name - hierarchy is implicit through container relationships
     // Pass 'this' (Conduit) as parent for hierarchy
-    Channel<E> channel = new EmissionChannel<>(subject, this, flowConfigurer);
+    Channel< E > channel = new EmissionChannel<>(subject, this, flowConfigurer);
     P newPercept = perceptComposer.compose(channel);
 
     // Cache under simple name
@@ -223,7 +223,7 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
    *
    * @return callback that routes emissions to subscribers
    */
-  public Consumer<Capture<E>> emissionHandler() {
+  public Consumer< Capture< E >> emissionHandler() {
     return this::notifySubscribers;
   }
 
@@ -231,23 +231,23 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
    * Notifies all subscribers that a new Subject (Channel) has become available.
    * Called AFTER the Channel is cached in percepts map.
    *
-   * <p>Per the Substrates API contract: "the subscriber's behavior is invoked each time
+   * < p >Per the Substrates API contract: "the subscriber's behavior is invoked each time
    * a new channel or emitting subject is created within that source."
    *
-   * <p>The subscriber can safely call {@code conduit.get(subject.name())} to retrieve
+   * < p >The subscriber can safely call {@code conduit.get(subject.name())} to retrieve
    * the percept, as it's already cached.
    *
    * @param subject the Subject of the newly created Channel
    */
-  private void notifySubscribersOfNewSubject(Subject<Channel<E>> subject) {
-    for (Subscriber<E> subscriber : subscribers) {
+  private void notifySubscribersOfNewSubject(Subject< Channel< E >> subject) {
+    for (Subscriber< E > subscriber : subscribers) {
       // RC3: Get callback from subscriber (stored internally)
-      BiConsumer<Subject<Channel<E>>, Registrar<E>> callback =
-        ((FunctionalSubscriber<E>) subscriber).getCallback();
+      BiConsumer< Subject< Channel< E >>, Registrar< E >> callback =
+        ((FunctionalSubscriber< E >) subscriber).getCallback();
 
-      callback.accept(subject, new Registrar<E>() {
+      callback.accept(subject, new Registrar< E >() {
         @Override
-        public void register(Pipe<? super E> pipe) {
+        public void register(Pipe<? super E > pipe) {
           // Cache the registered pipe for this (subscriber, subject) pair
           Name subjectName = subject.name();
           pipeCache
@@ -257,10 +257,10 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
         }
 
         @Override
-        public void register(Consumer<? super E> consumer) {
+        public void register(Consumer<? super E > consumer) {
           // RC3: Convenience method for Consumer registration
           // Convert Consumer to anonymous Pipe and register it
-          register(new Pipe<E>() {
+          register(new Pipe< E >() {
             @Override
             public void emit(E emission) {
               consumer.accept(emission);
@@ -282,12 +282,12 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
    *
    * @param capture the emission capture (Subject + value)
    */
-  private void notifySubscribers(Capture<E> capture) {
-    Subject<Channel<E>> emittingSubject = capture.subject();
+  private void notifySubscribers(Capture< E > capture) {
+    Subject< Channel< E >> emittingSubject = capture.subject();
     Name subjectName = emittingSubject.name();
 
     // Get or create the subscriber->pipes map for this Subject
-    Map<Subscriber<E>, List<Pipe<? super E>>> subscriberPipes = pipeCache.computeIfAbsent(
+    Map< Subscriber< E >, List< Pipe<? super E >>> subscriberPipes = pipeCache.computeIfAbsent(
       subjectName,
       name -> new ConcurrentHashMap<>()
     );
@@ -308,29 +308,29 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
    * @param subscriberPipes cache of subscriber->pipes
    * @return list of pipes for this subscriber
    */
-  private List<Pipe<? super E>> resolvePipes(
-    Subscriber<E> subscriber,
+  private List< Pipe<? super E >> resolvePipes(
+    Subscriber< E > subscriber,
     Subject emittingSubject,
-    Map<Subscriber<E>, List<Pipe<? super E>>> subscriberPipes
+    Map< Subscriber< E >, List< Pipe<? super E >>> subscriberPipes
   ) {
     return subscriberPipes.computeIfAbsent(subscriber, sub -> {
       // First emission from this Subject - retrieve callback and invoke
-      List<Pipe<? super E>> registeredPipes = new CopyOnWriteArrayList<>();
+      List< Pipe<? super E >> registeredPipes = new CopyOnWriteArrayList<>();
 
       // RC3: Get callback from subscriber
-      BiConsumer<Subject<Channel<E>>, Registrar<E>> callback =
-        ((FunctionalSubscriber<E>) sub).getCallback();
+      BiConsumer< Subject< Channel< E >>, Registrar< E >> callback =
+        ((FunctionalSubscriber< E >) sub).getCallback();
 
-      callback.accept(emittingSubject, new Registrar<E>() {
+      callback.accept(emittingSubject, new Registrar< E >() {
         @Override
-        public void register(Pipe<? super E> pipe) {
+        public void register(Pipe<? super E > pipe) {
           registeredPipes.add(pipe);  // Direct add - contra-variance allows this
         }
 
         @Override
-        public void register(Consumer<? super E> consumer) {
+        public void register(Consumer<? super E > consumer) {
           // RC3: Convert Consumer to Pipe (can't use lambda - Pipe not functional)
-          register(new Pipe<E>() {
+          register(new Pipe< E >() {
             @Override
             public void emit(E emission) {
               consumer.accept(emission);

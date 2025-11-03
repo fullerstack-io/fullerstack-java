@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Tests to verify that Channel.pipe() caches and returns the same Pipe instance.
  *
- * <p>These tests ensure that Segment state (emission counters, limit tracking,
+ * < p >These tests ensure that Segment state (emission counters, limit tracking,
  * reduce accumulators, diff last values) is shared across all emissions from
  * a Channel, preventing incorrect behavior where multiple Pipe instances would
  * have separate state.
@@ -36,7 +36,7 @@ class PipeCachingTest {
   /**
    * Helper to create a simple subscriber that collects emissions.
    */
-  private <E> Subscriber<E> subscriber(Name name, List<E> collector, CountDownLatch latch) {
+  private < E > Subscriber< E > subscriber(Name name, List< E > collector, CountDownLatch latch) {
     return CORTEX.subscriber(name, (subject, registrar) -> {
       registrar.register(emission -> {
         collector.add(emission);
@@ -50,14 +50,14 @@ class PipeCachingTest {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
     // Create conduit with limit transformation
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("test-conduit"),
       Composer.pipe(path -> path.limit(3))
     );
 
     // Get the same channel twice - should be same instance (cached by Conduit)
-    Pipe<Integer> pipe1 = conduit.get(HierarchicalName.of("channel-1"));
-    Pipe<Integer> pipe2 = conduit.get(HierarchicalName.of("channel-1"));
+    Pipe< Integer > pipe1 = conduit.get(HierarchicalName.of("channel-1"));
+    Pipe< Integer > pipe2 = conduit.get(HierarchicalName.of("channel-1"));
 
     // Should return the SAME Pipe instance (cached by Conduit)
     assertThat(pipe1).isSameAs(pipe2);
@@ -67,11 +67,11 @@ class PipeCachingTest {
   void shouldShareSegmentStateAcrossMultiplePipeCalls() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(3);
 
     // Create conduit with limit(3)
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("test-conduit"),
       Composer.pipe(path -> path.limit(3))
     );
@@ -79,8 +79,8 @@ class PipeCachingTest {
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
     // Get pipe and verify it's the same instance on multiple calls
-    Pipe<Integer> pipe1 = conduit.get(HierarchicalName.of("channel-1"));
-    Pipe<Integer> pipe2 = conduit.get(HierarchicalName.of("channel-1"));
+    Pipe< Integer > pipe1 = conduit.get(HierarchicalName.of("channel-1"));
+    Pipe< Integer > pipe2 = conduit.get(HierarchicalName.of("channel-1"));
 
     assertThat(pipe1).isSameAs(pipe2);
 
@@ -99,11 +99,11 @@ class PipeCachingTest {
   void shouldShareReduceAccumulatorState() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(4);
 
     // Create conduit with reduce (accumulating sum)
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("test-conduit"),
       Composer.pipe(path -> path.reduce(0, Integer::sum))
     );
@@ -111,8 +111,8 @@ class PipeCachingTest {
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
     // Get pipe twice - should be same instance
-    Pipe<Integer> pipe1 = conduit.get(HierarchicalName.of("accumulator"));
-    Pipe<Integer> pipe2 = conduit.get(HierarchicalName.of("accumulator"));
+    Pipe< Integer > pipe1 = conduit.get(HierarchicalName.of("accumulator"));
+    Pipe< Integer > pipe2 = conduit.get(HierarchicalName.of("accumulator"));
 
     assertThat(pipe1).isSameAs(pipe2);
 

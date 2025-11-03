@@ -8,24 +8,24 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Performance demonstration for event-driven Valve.await() vs polling.
  *
- * <p>This test demonstrates the benefits of the event-driven synchronization:
- * <ul>
- *   <li>Zero latency - await() wakes immediately when valve is idle</li>
- *   <li>Zero CPU waste - no polling loop consuming cycles</li>
- *   <li>Scalable - 1000 valves don't create 1000 polling threads</li>
- * </ul>
+ * < p >This test demonstrates the benefits of the event-driven synchronization:
+ * < ul >
+ *   < li >Zero latency - await() wakes immediately when valve is idle</li >
+ *   < li >Zero CPU waste - no polling loop consuming cycles</li >
+ *   < li >Scalable - 1000 valves don't create 1000 polling threads</li >
+ * </ul >
  *
- * <p><b>Previous polling approach:</b>
- * <pre>
+ * < p >< b >Previous polling approach:</b >
+ * < pre >
  * while (running && (executing || !queue.isEmpty())) {
  *     Thread.sleep(10);  // Poll every 10ms
  * }
  * // Latency: 0-10ms wake-up delay
  * // CPU: 100 checks/second per waiting thread
- * </pre>
+ * </pre >
  *
- * <p><b>Current event-driven approach:</b>
- * <pre>
+ * < p >< b >Current event-driven approach:</b >
+ * < pre >
  * synchronized (idleLock) {
  *     while (running && (executing || !queue.isEmpty())) {
  *         idleLock.wait();  // Block until notified
@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * }
  * // Latency: ~0ms (immediate notification)
  * // CPU: 0 cycles (parked thread)
- * </pre>
+ * </pre >
  */
 class ValvePerformanceTest {
 

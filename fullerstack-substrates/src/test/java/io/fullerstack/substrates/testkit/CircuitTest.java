@@ -756,8 +756,8 @@ final class CircuitTest
 
   try {
 
-    // RC3: Cell takes Composer<E, Pipe<I>>, Composer<E, Pipe<E>>, Pipe<? super E>
-    final Pipe<Integer> emptyPipe = new Pipe<>() {
+    // RC3: Cell takes Composer< E, Pipe< I >>, Composer< E, Pipe< E >>, Pipe<? super E >
+    final Pipe< Integer > emptyPipe = new Pipe<>() {
     @Override
     public void emit(Integer value) {}
     @Override
@@ -795,7 +795,7 @@ final class CircuitTest
   try {
 
     // RC3: Cell with identity transformer and aggregator (using Composer.pipe())
-    final Pipe<Integer> emptyPipe = new Pipe<>() {
+    final Pipe< Integer > emptyPipe = new Pipe<>() {
     @Override
     public void emit(Integer value) {}
     @Override
@@ -830,7 +830,7 @@ final class CircuitTest
 
     final var cellName = cortex.name ( "circuit.test.cell" );
 
-    final Pipe<String> emptyPipe = new Pipe<>() {
+    final Pipe< String > emptyPipe = new Pipe<>() {
     @Override
     public void emit(String value) {}
     @Override
@@ -868,7 +868,7 @@ final class CircuitTest
 
     // RC3: Cell with identity transformer and aggregator (using Composer.pipe())
     // Simplified test - just verify Cell creation and get() work
-    final Pipe<String> emptyPipe = new Pipe<>() {
+    final Pipe< String > emptyPipe = new Pipe<>() {
     @Override
     public void emit(String value) {}
     @Override

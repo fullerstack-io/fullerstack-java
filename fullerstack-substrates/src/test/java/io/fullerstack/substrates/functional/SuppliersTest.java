@@ -16,7 +16,7 @@ class SuppliersTest {
   void memoized_computesOnlyOnce() {
     // Given: A supplier that increments a counter
     AtomicInteger callCount = new AtomicInteger(0);
-    Supplier<Integer> supplier = Suppliers.memoized(() -> callCount.incrementAndGet());
+    Supplier< Integer > supplier = Suppliers.memoized(() -> callCount.incrementAndGet());
 
     // When: Called multiple times
     int first = supplier.get();
@@ -34,7 +34,7 @@ class SuppliersTest {
   void memoized_isThreadSafe() throws InterruptedException {
     // Given: A memoized supplier
     AtomicInteger callCount = new AtomicInteger(0);
-    Supplier<Integer> supplier = Suppliers.memoized(() -> {
+    Supplier< Integer > supplier = Suppliers.memoized(() -> {
       try {
         Thread.sleep(10); // Simulate expensive computation
       } catch (InterruptedException e) {
@@ -64,10 +64,10 @@ class SuppliersTest {
   @Test
   void lazy_returnsSupplierIdentity() {
     // Given: A supplier
-    Supplier<String> original = () -> "test";
+    Supplier< String > original = () -> "test";
 
     // When: Wrapped with lazy()
-    Supplier<String> lazy = Suppliers.lazy(original);
+    Supplier< String > lazy = Suppliers.lazy(original);
 
     // Then: Returns the same supplier
     assertThat(lazy).isSameAs(original);
@@ -79,7 +79,7 @@ class SuppliersTest {
     String value = "constant";
 
     // When: Creating a supplier with of()
-    Supplier<String> supplier = Suppliers.of(value);
+    Supplier< String > supplier = Suppliers.of(value);
 
     // Then: Always returns the same value
     assertThat(supplier.get()).isEqualTo(value);
@@ -89,11 +89,11 @@ class SuppliersTest {
   @Test
   void compose_appliesFunctionsSequentially() {
     // Given: Two functions
-    Supplier<Integer> first = () -> 5;
-    java.util.function.Function<Integer, String> second = n -> "Number: " + n;
+    Supplier< Integer > first = () -> 5;
+    java.util.function.Function< Integer, String > second = n -> "Number: " + n;
 
     // When: Composing them
-    Supplier<String> composed = Suppliers.compose(first, second);
+    Supplier< String > composed = Suppliers.compose(first, second);
 
     // Then: Functions applied sequentially
     assertThat(composed.get()).isEqualTo("Number: 5");
@@ -103,8 +103,8 @@ class SuppliersTest {
   void compose_withMemoization() {
     // Given: A memoized supplier and a transformation
     AtomicInteger callCount = new AtomicInteger(0);
-    Supplier<Integer> memoized = Suppliers.memoized(() -> callCount.incrementAndGet());
-    Supplier<String> composed = Suppliers.compose(memoized, n -> "Value: " + n);
+    Supplier< Integer > memoized = Suppliers.memoized(() -> callCount.incrementAndGet());
+    Supplier< String > composed = Suppliers.compose(memoized, n -> "Value: " + n);
 
     // When: Called multiple times
     String first = composed.get();

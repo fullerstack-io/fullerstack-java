@@ -14,21 +14,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Tests for RC3 dual-queue depth-first recursive emission ordering.
  *
- * <p><b>RC3 Requirement</b>:
- * <pre>
+ * < p >< b >RC3 Requirement</b >:
+ * < pre >
  * External thread emits: [A, B, C] → Ingress queue
  * Circuit processes A, which emits: [A1, A2] → Transit queue
  *
  * Execution order: A, A1, A2, B, C (depth-first)
  * NOT: A, B, C, A1, A2 (breadth-first)
- * </pre>
+ * </pre >
  *
- * <p><b>Dual-Queue Architecture</b>:
- * <ul>
- *   <li>Ingress Queue - Emissions from external threads</li>
- *   <li>Transit Queue - Emissions from within circuit thread (recursive)</li>
- *   <li>Transit queue has priority - processed before next ingress item</li>
- * </ul>
+ * < p >< b >Dual-Queue Architecture</b >:
+ * < ul >
+ *   < li >Ingress Queue - Emissions from external threads</li >
+ *   < li >Transit Queue - Emissions from within circuit thread (recursive)</li >
+ *   < li >Transit queue has priority - processed before next ingress item</li >
+ * </ul >
  */
 class RecursiveEmissionOrderingTest {
 
@@ -46,10 +46,10 @@ class RecursiveEmissionOrderingTest {
     circuit = CORTEX.circuit(CORTEX.name("test"));
 
     // Create execution log
-    List<String> executionOrder = new ArrayList<>();
+    List< String > executionOrder = new ArrayList<>();
 
     // Create conduit with subscriber that emits recursively
-    Conduit<Pipe<String>, String> conduit = circuit.conduit(
+    Conduit< Pipe< String >, String > conduit = circuit.conduit(
       CORTEX.name("events"),
       Composer.pipe()
     );
@@ -62,7 +62,7 @@ class RecursiveEmissionOrderingTest {
 
           // Recursive emissions when processing "A"
           if (value.equals("A")) {
-            Pipe<String> pipe = conduit.get(subject.name());
+            Pipe< String > pipe = conduit.get(subject.name());
             pipe.emit("A1");
             pipe.emit("A2");
           }
@@ -71,7 +71,7 @@ class RecursiveEmissionOrderingTest {
     ));
 
     // Get pipe for emissions
-    Pipe<String> pipe = conduit.get(CORTEX.name("events"));
+    Pipe< String > pipe = conduit.get(CORTEX.name("events"));
 
     // Emit A, B, C from external thread
     pipe.emit("A");
@@ -96,9 +96,9 @@ class RecursiveEmissionOrderingTest {
   void testNestedRecursiveEmissions() {
     circuit = CORTEX.circuit(CORTEX.name("test"));
 
-    List<String> executionOrder = new ArrayList<>();
+    List< String > executionOrder = new ArrayList<>();
 
-    Conduit<Pipe<String>, String> conduit = circuit.conduit(
+    Conduit< Pipe< String >, String > conduit = circuit.conduit(
       CORTEX.name("events"),
       Composer.pipe()
     );
@@ -109,7 +109,7 @@ class RecursiveEmissionOrderingTest {
         registrar.register(value -> {
           executionOrder.add(value);
 
-          Pipe<String> pipe = conduit.get(subject.name());
+          Pipe< String > pipe = conduit.get(subject.name());
 
           // A → A1, A2
           if (value.equals("A")) {
@@ -125,7 +125,7 @@ class RecursiveEmissionOrderingTest {
       }
     ));
 
-    Pipe<String> pipe = conduit.get(CORTEX.name("events"));
+    Pipe< String > pipe = conduit.get(CORTEX.name("events"));
 
     // Emit A, B
     pipe.emit("A");
@@ -145,9 +145,9 @@ class RecursiveEmissionOrderingTest {
   void testConcurrentExternalEmissionsWithRecursion() {
     circuit = CORTEX.circuit(CORTEX.name("test"));
 
-    List<String> executionOrder = new ArrayList<>();
+    List< String > executionOrder = new ArrayList<>();
 
-    Conduit<Pipe<String>, String> conduit = circuit.conduit(
+    Conduit< Pipe< String >, String > conduit = circuit.conduit(
       CORTEX.name("events"),
       Composer.pipe()
     );
@@ -159,7 +159,7 @@ class RecursiveEmissionOrderingTest {
           executionOrder.add(value);
 
           if (value.equals("A")) {
-            Pipe<String> pipe = conduit.get(subject.name());
+            Pipe< String > pipe = conduit.get(subject.name());
             pipe.emit("A1");
             pipe.emit("A2");
           }
@@ -167,7 +167,7 @@ class RecursiveEmissionOrderingTest {
       }
     ));
 
-    Pipe<String> pipe = conduit.get(CORTEX.name("events"));
+    Pipe< String > pipe = conduit.get(CORTEX.name("events"));
 
     // Emit from multiple threads simultaneously
     Thread t1 = new Thread(() -> pipe.emit("A"));

@@ -13,22 +13,22 @@ import java.util.function.Function;
 /**
  * Implementation of Substrates.Pool for percept instance management.
  *
- * <p>Pools cache percept instances by name, creating them on-demand using a factory function.
+ * < p >Pools cache percept instances by name, creating them on-demand using a factory function.
  * Instances are cached and reused for the same name.
  *
- * @param <T> the percept type
+ * @param < T > the percept type
  * @see Pool
  */
-public class ConcurrentPool<T> implements Pool<T> {
-  private final Map<Name, T> percepts = new ConcurrentHashMap<>();
-  private final Function<? super Name, ? extends T> factory;
+public class ConcurrentPool< T > implements Pool< T > {
+  private final Map< Name, T > percepts = new ConcurrentHashMap<>();
+  private final Function<? super Name, ? extends T > factory;
 
   /**
    * Creates a new Pool with the given factory.
    *
    * @param factory function to create percepts for given names
    */
-  public ConcurrentPool(Function<? super Name, ? extends T> factory) {
+  public ConcurrentPool(Function<? super Name, ? extends T > factory) {
     this.factory = Objects.requireNonNull(factory, "Pool factory cannot be null");
   }
 

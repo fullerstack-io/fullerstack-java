@@ -8,25 +8,25 @@ import java.util.function.Consumer;
 /**
  * Implementation of Substrates.Closure for automatic resource management (ARM).
  *
- * <p>Closure provides a try-with-resources pattern wrapper that ensures
+ * < p >Closure provides a try-with-resources pattern wrapper that ensures
  * the resource is properly closed after the consumer completes (or throws).
  *
- * <p>Example usage:
- * <pre>
+ * < p >Example usage:
+ * < pre >
  * Closure&lt;Sink&lt;String&gt;&gt; closure = scope.closure(sink);
  * closure.consume(s -> {
  *     // Use sink here
  *     s.drain().forEach(System.out::println);
  * });
  * // sink.close() is called automatically
- * </pre>
+ * </pre >
  *
- * @param <R> the resource type
+ * @param < R > the resource type
  * @see Closure
  * @see Resource
  * @see Scope
  */
-public class AutoClosingResource<R extends Resource> implements Closure<R> {
+public class AutoClosingResource< R extends Resource > implements Closure< R > {
 
   private final R resource;
   private final Runnable onConsume;
@@ -68,7 +68,7 @@ public class AutoClosingResource<R extends Resource> implements Closure<R> {
   }
 
   @Override
-  public void consume(Consumer<? super R> consumer) {
+  public void consume(Consumer<? super R > consumer) {
     Objects.requireNonNull(consumer, "Consumer cannot be null");
 
     // Check if already consumed - idempotent guard

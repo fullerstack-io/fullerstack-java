@@ -9,45 +9,45 @@ import java.util.function.Predicate;
 /**
  * Implementation of Substrates.Sift for comparator-based filtering.
  *
- * <p>Sift provides comparison-based filtering operations (above, below, range, min, max, high, low)
+ * < p >Sift provides comparison-based filtering operations (above, below, range, min, max, high, low)
  * using a Comparator. It's used in combination with Segment.sift() to create sophisticated
  * filtering logic based on ordering.
  *
- * <p>Usage (from blog example):
- * <pre>
+ * < p >Usage (from blog example):
+ * < pre >
  * path.sift(
  *   Integer::compareTo,
  *   sift -> sift.above(0)
  * )
- * </pre>
+ * </pre >
  *
- * @param <E> emission type
+ * @param < E > emission type
  */
-public class FilteringSegment<E> implements Sift<E> {
+public class FilteringSegment< E > implements Sift< E > {
 
-  private final Comparator<? super E> comparator;
-  private Predicate<E> predicate = value -> true; // Default: pass all
+  private final Comparator<? super E > comparator;
+  private Predicate< E > predicate = value -> true; // Default: pass all
 
-  public FilteringSegment(Comparator<? super E> comparator) {
+  public FilteringSegment(Comparator<? super E > comparator) {
     this.comparator = Objects.requireNonNull(comparator, "Comparator cannot be null");
   }
 
   @Override
-  public Sift<E> above(E threshold) {
+  public Sift< E > above(E threshold) {
     Objects.requireNonNull(threshold, "Threshold cannot be null");
     predicate = predicate.and(value -> comparator.compare(value, threshold) > 0);
     return this;
   }
 
   @Override
-  public Sift<E> below(E threshold) {
+  public Sift< E > below(E threshold) {
     Objects.requireNonNull(threshold, "Threshold cannot be null");
     predicate = predicate.and(value -> comparator.compare(value, threshold) < 0);
     return this;
   }
 
   @Override
-  public Sift<E> high() {
+  public Sift< E > high() {
     // Track highest value seen
     E[] highest = (E[]) new Object[1];
     predicate = predicate.and(value -> {
@@ -61,7 +61,7 @@ public class FilteringSegment<E> implements Sift<E> {
   }
 
   @Override
-  public Sift<E> low() {
+  public Sift< E > low() {
     // Track lowest value seen
     E[] lowest = (E[]) new Object[1];
     predicate = predicate.and(value -> {
@@ -75,21 +75,21 @@ public class FilteringSegment<E> implements Sift<E> {
   }
 
   @Override
-  public Sift<E> max(E maximum) {
+  public Sift< E > max(E maximum) {
     Objects.requireNonNull(maximum, "Maximum cannot be null");
     predicate = predicate.and(value -> comparator.compare(value, maximum) <= 0);
     return this;
   }
 
   @Override
-  public Sift<E> min(E minimum) {
+  public Sift< E > min(E minimum) {
     Objects.requireNonNull(minimum, "Minimum cannot be null");
     predicate = predicate.and(value -> comparator.compare(value, minimum) >= 0);
     return this;
   }
 
   @Override
-  public Sift<E> range(E lower, E upper) {
+  public Sift< E > range(E lower, E upper) {
     Objects.requireNonNull(lower, "Lower bound cannot be null");
     Objects.requireNonNull(upper, "Upper bound cannot be null");
     predicate = predicate.and(value ->

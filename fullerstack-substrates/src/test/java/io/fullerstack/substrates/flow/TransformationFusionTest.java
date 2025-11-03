@@ -11,14 +11,14 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Tests for pipeline fusion optimization in FlowRegulator.
  *
- * <p><b>Pipeline Fusion (JVM-style Optimization):</b>
- * <ul>
- *   <li>Adjacent skip() calls are fused: skip(3).skip(2) → skip(5)</li>
- *   <li>Adjacent limit() calls are minimized: limit(10).limit(5) → limit(5)</li>
- *   <li>Reduces transformation overhead in hot paths</li>
- * </ul>
+ * < p >< b >Pipeline Fusion (JVM-style Optimization):</b >
+ * < ul >
+ *   < li >Adjacent skip() calls are fused: skip(3).skip(2) → skip(5)</li >
+ *   < li >Adjacent limit() calls are minimized: limit(10).limit(5) → limit(5)</li >
+ *   < li >Reduces transformation overhead in hot paths</li >
+ * </ul >
  *
- * <p>This optimization is inspired by William's comment:
+ * < p >This optimization is inspired by William's comment:
  * "I decorate pipes and connect pipes as well as optimise them like the JVM
  * when I detect in the pipeline the same operations is being performed."
  */
@@ -27,14 +27,14 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Adjacent skip() calls are fused into a single skip")
   void testSkipFusion() {
-    FlowRegulator<Integer> flow = new FlowRegulator<>();
+    FlowRegulator< Integer > flow = new FlowRegulator<>();
 
     // Chain multiple skip() calls
     flow.skip(3).skip(2).skip(1);
 
     // Should be fused to skip(6)
     // Apply to values 0-9
-    List<Integer> results = new ArrayList<>();
+    List< Integer > results = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       Integer result = flow.apply(i);
       if (result != null) {
@@ -50,13 +50,13 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Adjacent limit() calls are minimized to smallest limit")
   void testLimitFusion() {
-    FlowRegulator<Integer> flow = new FlowRegulator<>();
+    FlowRegulator< Integer > flow = new FlowRegulator<>();
 
     // Chain multiple limit() calls - should take the minimum
     flow.limit(10).limit(5).limit(7);
 
     // Should be fused to limit(5) (smallest)
-    List<Integer> results = new ArrayList<>();
+    List< Integer > results = new ArrayList<>();
     for (int i = 0; i < 20; i++) {
       Integer result = flow.apply(i);
       if (result != null) {
@@ -72,13 +72,13 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Combined skip().limit() fusion works correctly")
   void testSkipLimitCombination() {
-    FlowRegulator<Integer> flow = new FlowRegulator<>();
+    FlowRegulator< Integer > flow = new FlowRegulator<>();
 
     // skip(3).skip(2) → skip(5)
     // limit(10).limit(8) → limit(8)
     flow.skip(3).skip(2).limit(10).limit(8);
 
-    List<Integer> results = new ArrayList<>();
+    List< Integer > results = new ArrayList<>();
     for (int i = 0; i < 20; i++) {
       Integer result = flow.apply(i);
       if (result != null) {
@@ -94,12 +94,12 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Fusion doesn't affect non-adjacent transformations")
   void testNonAdjacentTransformationsNotFused() {
-    FlowRegulator<Integer> flow = new FlowRegulator<>();
+    FlowRegulator< Integer > flow = new FlowRegulator<>();
 
     // skip() separated by guard() - should NOT be fused
     flow.skip(2).guard(x -> x > 0).skip(1);
 
-    List<Integer> results = new ArrayList<>();
+    List< Integer > results = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       Integer result = flow.apply(i);
       if (result != null) {
@@ -109,7 +109,7 @@ class TransformationFusionTest {
 
     // First skip(2): removes 0,1
     // guard(x > 0): removes 2 (but 2 already skipped, so this filters nothing extra)
-    // Actually: 0,1 skipped, then 2 passes guard (2>0), then skip(1) removes 2
+    // Actually: 0,1 skipped, then 2 passes guard (2 >0), then skip(1) removes 2
     // So: 0,1 skipped, 2 skipped by second skip, 3,4,5,6,7,8,9 pass
     assertEquals(List.of(3, 4, 5, 6, 7, 8, 9), results,
       "Non-adjacent skips should not be fused");
@@ -118,11 +118,11 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Single skip() without fusion works correctly")
   void testSingleSkipNoFusion() {
-    FlowRegulator<Integer> flow = new FlowRegulator<>();
+    FlowRegulator< Integer > flow = new FlowRegulator<>();
 
     flow.skip(3);
 
-    List<Integer> results = new ArrayList<>();
+    List< Integer > results = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       Integer result = flow.apply(i);
       if (result != null) {
@@ -137,11 +137,11 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Single limit() without fusion works correctly")
   void testSingleLimitNoFusion() {
-    FlowRegulator<Integer> flow = new FlowRegulator<>();
+    FlowRegulator< Integer > flow = new FlowRegulator<>();
 
     flow.limit(5);
 
-    List<Integer> results = new ArrayList<>();
+    List< Integer > results = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       Integer result = flow.apply(i);
       if (result != null) {
@@ -156,14 +156,14 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Multiple skip() fusions in sequence")
   void testMultipleSkipFusions() {
-    FlowRegulator<Integer> flow = new FlowRegulator<>();
+    FlowRegulator< Integer > flow = new FlowRegulator<>();
 
     // Each pair should fuse: skip(1).skip(1) → skip(2)
     // Then skip(2).skip(1) → skip(3)
     // Then skip(3).skip(1) → skip(4)
     flow.skip(1).skip(1).skip(1).skip(1);
 
-    List<Integer> results = new ArrayList<>();
+    List< Integer > results = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       Integer result = flow.apply(i);
       if (result != null) {
@@ -179,7 +179,7 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Multiple limit() fusions in sequence")
   void testMultipleLimitFusions() {
-    FlowRegulator<Integer> flow = new FlowRegulator<>();
+    FlowRegulator< Integer > flow = new FlowRegulator<>();
 
     // Each fusion should take minimum
     // limit(10).limit(8) → limit(8)
@@ -187,7 +187,7 @@ class TransformationFusionTest {
     // limit(6).limit(9) → limit(6) (9 is larger, keep 6)
     flow.limit(10).limit(8).limit(6).limit(9);
 
-    List<Integer> results = new ArrayList<>();
+    List< Integer > results = new ArrayList<>();
     for (int i = 0; i < 20; i++) {
       Integer result = flow.apply(i);
       if (result != null) {
@@ -203,15 +203,15 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Fusion reduces internal transformation count")
   void testFusionReducesTransformationCount() {
-    FlowRegulator<Integer> unfused = new FlowRegulator<>();
+    FlowRegulator< Integer > unfused = new FlowRegulator<>();
     unfused.skip(5);
 
-    FlowRegulator<Integer> fused = new FlowRegulator<>();
+    FlowRegulator< Integer > fused = new FlowRegulator<>();
     fused.skip(3).skip(2);  // Should fuse to skip(5)
 
     // Both should produce same results
-    List<Integer> unfusedResults = new ArrayList<>();
-    List<Integer> fusedResults = new ArrayList<>();
+    List< Integer > unfusedResults = new ArrayList<>();
+    List< Integer > fusedResults = new ArrayList<>();
 
     for (int i = 0; i < 10; i++) {
       Integer result1 = unfused.apply(i);
@@ -230,11 +230,11 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Zero skip() fuses correctly")
   void testZeroSkipFusion() {
-    FlowRegulator<Integer> flow = new FlowRegulator<>();
+    FlowRegulator< Integer > flow = new FlowRegulator<>();
 
     flow.skip(0).skip(3);  // skip(0) is no-op, but should still fuse
 
-    List<Integer> results = new ArrayList<>();
+    List< Integer > results = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       Integer result = flow.apply(i);
       if (result != null) {
@@ -250,11 +250,11 @@ class TransformationFusionTest {
   @Test
   @DisplayName("Large skip() values fuse correctly")
   void testLargeSkipFusion() {
-    FlowRegulator<Integer> flow = new FlowRegulator<>();
+    FlowRegulator< Integer > flow = new FlowRegulator<>();
 
     flow.skip(1000).skip(500).skip(250);  // Should fuse to skip(1750)
 
-    List<Integer> results = new ArrayList<>();
+    List< Integer > results = new ArrayList<>();
     for (int i = 0; i < 2000; i++) {
       Integer result = flow.apply(i);
       if (result != null) {

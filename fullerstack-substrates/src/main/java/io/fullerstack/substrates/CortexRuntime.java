@@ -27,27 +27,27 @@ import java.util.stream.Stream;
 /**
  * Complete implementation of Substrates.Cortex interface.
  *
- * <p>This class implements ALL 38 methods of the Cortex interface,
+ * < p >This class implements ALL 38 methods of the Cortex interface,
  * providing full Humainary Substrates API compliance.
  *
- * <p>Methods include:
- * <ul>
- *   <li>Circuit management (2 methods)</li>
- *   <li>Name factory (8 methods)</li>
- *   <li>Pool management (1 method)</li>
- *   <li>Scope management (2 methods)</li>
- *   <li>State factory (9 methods)</li>
- *   <li>Sink creation (2 methods)</li>
- *   <li>Slot management (8 methods)</li>
- *   <li>Subscriber management (2 methods)</li>
- *   <li>Capture creation (1 method)</li>
- * </ul>
+ * < p >Methods include:
+ * < ul >
+ *   < li >Circuit management (2 methods)</li >
+ *   < li >Name factory (8 methods)</li >
+ *   < li >Pool management (1 method)</li >
+ *   < li >Scope management (2 methods)</li >
+ *   < li >State factory (9 methods)</li >
+ *   < li >Sink creation (2 methods)</li >
+ *   < li >Slot management (8 methods)</li >
+ *   < li >Subscriber management (2 methods)</li >
+ *   < li >Capture creation (1 method)</li >
+ * </ul >
  *
  * @see Cortex
  */
 public class CortexRuntime implements Cortex {
 
-  private final Map<Name, Scope> scopes;
+  private final Map< Name, Scope > scopes;
 
   // Singleton instance for SPI provider pattern
   private static final Cortex INSTANCE = new CortexRuntime();
@@ -94,10 +94,10 @@ public class CortexRuntime implements Cortex {
   // ========== Pipe Factory (5 methods) ==========
 
   @Override
-  public Pipe<Object> pipe() {
+  public Pipe< Object > pipe() {
     // Factory method for creating a simple no-op pipe (Object type)
     // RC3 addition - returns a sink pipe that discards emissions
-    return new Pipe<Object>() {
+    return new Pipe< Object >() {
       @Override
       public void emit(Object value) {
         // No-op: discard emissions
@@ -111,9 +111,9 @@ public class CortexRuntime implements Cortex {
   }
 
   @Override
-  public <E> Pipe<E> pipe(Class<E> type) {
+  public < E > Pipe< E > pipe(Class< E > type) {
     // Factory method for creating a typed no-op pipe
-    return new Pipe<E>() {
+    return new Pipe< E >() {
       @Override
       public void emit(E value) {
         // No-op: discard emissions
@@ -127,9 +127,9 @@ public class CortexRuntime implements Cortex {
   }
 
   @Override
-  public <E> Pipe<E> pipe(Consumer<? super E> consumer) {
+  public < E > Pipe< E > pipe(Consumer<? super E > consumer) {
     // Factory method for creating a pipe that routes to a consumer
-    return new Pipe<E>() {
+    return new Pipe< E >() {
       @Override
       public void emit(E value) {
         consumer.accept(value);
@@ -143,15 +143,15 @@ public class CortexRuntime implements Cortex {
   }
 
   @Override
-  public <E> Pipe<E> pipe(Class<E> type, Consumer<? super E> consumer) {
+  public < E > Pipe< E > pipe(Class< E > type, Consumer<? super E > consumer) {
     // Factory method for creating a typed pipe that routes to a consumer
     return pipe(consumer);  // Type is just for compile-time safety
   }
 
   @Override
-  public <I, E> Pipe<I> pipe(Function<? super I, ? extends E> transformer, Pipe<? super E> target) {
+  public < I, E > Pipe< I > pipe(Function<? super I, ? extends E > transformer, Pipe<? super E > target) {
     // Factory method for creating a transforming pipe
-    return new Pipe<I>() {
+    return new Pipe< I >() {
       @Override
       public void emit(I value) {
         E transformed = transformer.apply(value);
@@ -182,9 +182,9 @@ public class CortexRuntime implements Cortex {
   }
 
   @Override
-  public Name name(Iterable<String> parts) {
+  public Name name(Iterable< String > parts) {
     // Get first element as root, let Name.name() build the rest
-    Iterator<String> it = parts.iterator();
+    Iterator< String > it = parts.iterator();
     if (!it.hasNext()) {
       throw new IllegalArgumentException("parts cannot be empty");
     }
@@ -192,9 +192,9 @@ public class CortexRuntime implements Cortex {
   }
 
   @Override
-  public <T> Name name(Iterable<? extends T> items, Function<T, String> mapper) {
+  public < T > Name name(Iterable<? extends T > items, Function< T, String > mapper) {
     // Get first element as root, let Name.name() build the rest
-    Iterator<? extends T> it = items.iterator();
+    Iterator<? extends T > it = items.iterator();
     if (!it.hasNext()) {
       throw new IllegalArgumentException("items cannot be empty");
     }
@@ -202,7 +202,7 @@ public class CortexRuntime implements Cortex {
   }
 
   @Override
-  public Name name(Iterator<String> parts) {
+  public Name name(Iterator< String > parts) {
     // Get first element as root, let Name.name() build the rest
     if (!parts.hasNext()) {
       throw new IllegalArgumentException("parts cannot be empty");
@@ -211,7 +211,7 @@ public class CortexRuntime implements Cortex {
   }
 
   @Override
-  public <T> Name name(Iterator<? extends T> items, Function<T, String> mapper) {
+  public < T > Name name(Iterator<? extends T > items, Function< T, String > mapper) {
     // Get first element as root, let Name.name() build the rest
     if (!items.hasNext()) {
       throw new IllegalArgumentException("items cannot be empty");
@@ -234,14 +234,14 @@ public class CortexRuntime implements Cortex {
   // ========== Pool Management (2 methods) ==========
 
   @Override
-  public <T> Pool<T> pool(T value) {
+  public < T > Pool< T > pool(T value) {
     Objects.requireNonNull(value, "Pool value cannot be null");
     // Create pool that returns the same value for any name
     return new ConcurrentPool<>(name -> value);
   }
 
   @Override
-  public <T> Pool<T> pool(Function<? super Name, ? extends T> factory) {
+  public < T > Pool< T > pool(Function<? super Name, ? extends T > factory) {
     Objects.requireNonNull(factory, "Pool factory cannot be null");
     // Create pool with the provided factory function
     // RC3 API addition - direct factory function support
@@ -273,7 +273,7 @@ public class CortexRuntime implements Cortex {
   // ========== Sink Creation (1 method) ==========
 
   @Override
-  public <E, S extends Source<E, S>> Sink<E> sink(Source<E, S> source) {
+  public < E, S extends Source< E, S >> Sink< E > sink(Source< E, S > source) {
     Objects.requireNonNull(source, "Source cannot be null");
     // Create CollectingSink directly
     return new CollectingSink<>(source);
@@ -282,47 +282,47 @@ public class CortexRuntime implements Cortex {
   // ========== Slot Management (8 methods) ==========
 
   @Override
-  public Slot<Boolean> slot(Name name, boolean value) {
+  public Slot< Boolean > slot(Name name, boolean value) {
     return TypedSlot.of(name, value);
   }
 
   @Override
-  public Slot<Integer> slot(Name name, int value) {
+  public Slot< Integer > slot(Name name, int value) {
     return TypedSlot.of(name, value);
   }
 
   @Override
-  public Slot<Long> slot(Name name, long value) {
+  public Slot< Long > slot(Name name, long value) {
     return TypedSlot.of(name, value);
   }
 
   @Override
-  public Slot<Double> slot(Name name, double value) {
+  public Slot< Double > slot(Name name, double value) {
     return TypedSlot.of(name, value);
   }
 
   @Override
-  public Slot<Float> slot(Name name, float value) {
+  public Slot< Float > slot(Name name, float value) {
     return TypedSlot.of(name, value);
   }
 
   @Override
-  public Slot<String> slot(Name name, String value) {
+  public Slot< String > slot(Name name, String value) {
     return TypedSlot.of(name, value);
   }
 
   @Override
-  public Slot<Name> slot(Name name, Name value) {
+  public Slot< Name > slot(Name name, Name value) {
     return TypedSlot.of(name, value);
   }
 
   @Override
-  public Slot<State> slot(Name name, State value) {
+  public Slot< State > slot(Name name, State value) {
     return TypedSlot.of(name, value);
   }
 
   @Override
-  public Slot<Name> slot(Enum<?> value) {
+  public Slot< Name > slot(Enum<?> value) {
     Objects.requireNonNull(value, "Enum value cannot be null");
     // Slot name = fully qualified enum class name
     // Slot value = fully qualified enum class + class name again + constant
@@ -336,12 +336,12 @@ public class CortexRuntime implements Cortex {
   // ========== Subscriber Management (2 methods) ==========
 
   @Override
-  public <E> Subscriber<E> subscriber(Name name, BiConsumer<Subject<Channel<E>>, Registrar<E>> fn) {
+  public < E > Subscriber< E > subscriber(Name name, BiConsumer< Subject< Channel< E >>, Registrar< E >> fn) {
     return new FunctionalSubscriber<>(name, fn);
   }
 
   @Override
-  public <E> Subscriber<E> subscriber(Name name, Pool<? extends Pipe<E>> pool) {
+  public < E > Subscriber< E > subscriber(Name name, Pool<? extends Pipe< E >> pool) {
     return new FunctionalSubscriber<>(name, pool);
   }
 }

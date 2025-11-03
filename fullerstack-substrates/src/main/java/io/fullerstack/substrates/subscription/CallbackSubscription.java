@@ -11,7 +11,7 @@ import java.util.Objects;
 /**
  * Implementation of Substrates.Subscription for managing subscriber lifecycle.
  *
- * <p>Subscription is returned from Source.subscribe() and allows unsubscribing
+ * < p >Subscription is returned from Source.subscribe() and allows unsubscribing
  * by calling close(). Each subscription has a unique ID and subject.
  *
  * @see Subscription
@@ -21,7 +21,7 @@ import java.util.Objects;
 public class CallbackSubscription implements Subscription {
 
   private final Id subscriptionId;
-  private final Subject<Subscription> subscriptionSubject;
+  private final Subject< Subscription > subscriptionSubject;
   private final Runnable onClose;
   private volatile boolean closed = false;
 

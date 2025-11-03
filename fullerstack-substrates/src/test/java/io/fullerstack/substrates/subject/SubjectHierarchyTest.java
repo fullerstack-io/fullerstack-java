@@ -26,7 +26,7 @@ class SubjectHierarchyTest {
     Circuit circuit = cortex.circuit(cortex.name("Redis"));
 
     // Create Conduit
-    Conduit<Pipe<Integer>, Integer> counters = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > counters = circuit.conduit(
       cortex.name("Counters"),
       Composer.pipe()
     );
@@ -34,7 +34,7 @@ class SubjectHierarchyTest {
     // Capture Channel Subject via subscriber
     final Subject<?>[] channelSubjectHolder = new Subject<?>[1];
 
-    Subscriber<Integer> subscriber = cortex.subscriber(
+    Subscriber< Integer > subscriber = cortex.subscriber(
       cortex.name("test-subscriber"),
       (subject, registrar) -> {
         // Store the Channel Subject
@@ -45,7 +45,7 @@ class SubjectHierarchyTest {
     counters.subscribe(subscriber);
 
     // Create Channel (triggers subscriber)
-    Pipe<Integer> cacheHit = counters.get(cortex.name("cache.hit"));
+    Pipe< Integer > cacheHit = counters.get(cortex.name("cache.hit"));
 
     Subject<?> channelSubject = channelSubjectHolder[0];
     assertThat((Object) channelSubject).isNotNull();
@@ -79,7 +79,7 @@ class SubjectHierarchyTest {
 
     // Create Circuit → Conduit → Channel hierarchy
     Circuit circuit = cortex.circuit(cortex.name("Redis"));
-    Conduit<Pipe<Integer>, Integer> counters = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > counters = circuit.conduit(
       cortex.name("Counters"),
       Composer.pipe()
     );
@@ -87,7 +87,7 @@ class SubjectHierarchyTest {
     // Capture Channel Subject via subscriber
     final Subject<?>[] channelSubjectHolder = new Subject<?>[1];
 
-    Subscriber<Integer> subscriber = cortex.subscriber(
+    Subscriber< Integer > subscriber = cortex.subscriber(
       cortex.name("path-test-subscriber"),
       (subject, registrar) -> {
         channelSubjectHolder[0] = subject;

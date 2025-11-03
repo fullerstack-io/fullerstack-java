@@ -9,21 +9,21 @@ import java.util.stream.Collectors;
 
 /**
  * Discovers circuits by scanning for configuration files.
- * <p>
+ * < p >
  * Convention: Any file matching {@code config_{circuit-name}.properties} defines a circuit.
- * <p>
+ * < p >
  * Example files:
- * <ul>
- *   <li>config_broker-health.properties → circuit "broker-health"</li>
- *   <li>config_partition-flow.properties → circuit "partition-flow"</li>
- *   <li>config_consumer-lag.properties → circuit "consumer-lag"</li>
- * </ul>
- * <p>
+ * < ul >
+ *   < li >config_broker-health.properties → circuit "broker-health"</li >
+ *   < li >config_partition-flow.properties → circuit "partition-flow"</li >
+ *   < li >config_consumer-lag.properties → circuit "consumer-lag"</li >
+ * </ul >
+ * < p >
  * Container files (config_{circuit}_{container}.properties) are ignored - containers
  * are discovered separately within their circuit context.
- * <p>
+ * < p >
  * Usage:
- * <pre>
+ * < pre >
  * // Discover all configured circuits
  * Set&lt;String&gt; circuitNames = CircuitDiscovery.discoverCircuits();
  * // → ["broker-health", "partition-flow", "consumer-lag"]
@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  *     HierarchicalConfig config = HierarchicalConfig.forCircuit(name);
  *     // Use config to configure circuit...
  * }
- * </pre>
+ * </pre >
  */
 public class CircuitDiscovery {
 
@@ -47,26 +47,26 @@ public class CircuitDiscovery {
 
   /**
    * Discover all circuits by scanning classpath for config files.
-   * <p>
+   * < p >
    * Searches for files matching pattern: {@code config_{circuit-name}.properties}
-   * <p>
+   * < p >
    * Circuits are included if:
-   * <ul>
-   *   <li>Config file exists: {@code config_{circuit-name}.properties}</li>
-   *   <li>{@code circuit.enabled=true} (or property not present, defaults to true)</li>
-   * </ul>
-   * <p>
+   * < ul >
+   *   < li >Config file exists: {@code config_{circuit-name}.properties}</li >
+   *   < li >{@code circuit.enabled=true} (or property not present, defaults to true)</li >
+   * </ul >
+   * < p >
    * Container files (with hyphens in the name after the first hyphen) are excluded.
    *
    * @return Set of enabled circuit names (e.g., ["broker-health", "partition-flow"])
    */
-  public static Set<String> discoverCircuits() {
-    Set<String> candidateNames = new HashSet<>();
+  public static Set< String > discoverCircuits() {
+    Set< String > candidateNames = new HashSet<>();
 
     try {
       // Get all resources from classpath that might be config files
       ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-      Enumeration<URL> resources = classLoader.getResources("");
+      Enumeration< URL > resources = classLoader.getResources("");
 
       while (resources.hasMoreElements()) {
         URL resource = resources.nextElement();
@@ -79,7 +79,7 @@ public class CircuitDiscovery {
     }
 
     // Filter by circuit.enabled property
-    Set<String> enabledCircuits = candidateNames.stream()
+    Set< String > enabledCircuits = candidateNames.stream()
       .filter(CircuitDiscovery::isCircuitEnabled)
       .collect(Collectors.toSet());
 
@@ -88,7 +88,7 @@ public class CircuitDiscovery {
 
   /**
    * Check if a circuit is enabled.
-   * <p>
+   * < p >
    * A circuit is enabled if {@code circuit.enabled=true} in its config file,
    * or if the property is not present (defaults to true).
    *
@@ -108,17 +108,17 @@ public class CircuitDiscovery {
 
   /**
    * Discover circuits by trying to load specific known files.
-   * <p>
+   * < p >
    * This is a simpler alternative that doesn't scan the filesystem,
    * but instead tries to load ResourceBundles for known circuit names.
-   * <p>
+   * < p >
    * Note: This approach requires you to know potential circuit names,
    * defeating the purpose of discovery. Use {@link #discoverCircuits()} instead.
    *
    * @param potentialNames Potential circuit names to check
    * @return Set of circuit names that have config files
    */
-  public static Set<String> discoverCircuits(Set<String> potentialNames) {
+  public static Set< String > discoverCircuits(Set< String > potentialNames) {
     return potentialNames.stream()
       .filter(CircuitDiscovery::hasCircuitConfig)
       .collect(Collectors.toSet());
@@ -144,20 +144,20 @@ public class CircuitDiscovery {
 
   /**
    * Discover containers within a circuit.
-   * <p>
+   * < p >
    * Searches for files matching: {@code config_{circuitName}-{containerName}.properties}
-   * <p>
+   * < p >
    * Example: For circuit "broker-health", finds:
-   * <ul>
-   *   <li>config_broker-health-brokers.properties → container "brokers"</li>
-   *   <li>config_broker-health-partitions.properties → container "partitions"</li>
-   * </ul>
+   * < ul >
+   *   < li >config_broker-health-brokers.properties → container "brokers"</li >
+   *   < li >config_broker-health-partitions.properties → container "partitions"</li >
+   * </ul >
    *
    * @param circuitName Circuit name
    * @return Set of container names within this circuit
    */
-  public static Set<String> discoverContainers(String circuitName) {
-    Set<String> containerNames = new HashSet<>();
+  public static Set< String > discoverContainers(String circuitName) {
+    Set< String > containerNames = new HashSet<>();
 
     // Pattern: config_{circuitName}-{containerName}.properties
     Pattern containerPattern = Pattern.compile(
@@ -166,7 +166,7 @@ public class CircuitDiscovery {
 
     try {
       ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-      Enumeration<URL> resources = classLoader.getResources("");
+      Enumeration< URL > resources = classLoader.getResources("");
 
       while (resources.hasMoreElements()) {
         URL resource = resources.nextElement();
@@ -186,7 +186,7 @@ public class CircuitDiscovery {
   // Internal Helpers
   // =========================================================================
 
-  private static void scanForCircuitConfigs(URL resource, Set<String> circuitNames) {
+  private static void scanForCircuitConfigs(URL resource, Set< String > circuitNames) {
     // Get directory path from URL
     String path = resource.getPath();
     java.io.File dir = new java.io.File(path);
@@ -222,7 +222,7 @@ public class CircuitDiscovery {
     URL resource,
     String circuitName,
     Pattern containerPattern,
-    Set<String> containerNames
+    Set< String > containerNames
   ) {
     String path = resource.getPath();
     java.io.File dir = new java.io.File(path);
@@ -250,7 +250,7 @@ public class CircuitDiscovery {
   /**
    * Heuristic: If the circuit name contains hyphens beyond what might be
    * a circuit name, it's likely a container.
-   * <p>
+   * < p >
    * This is imperfect - we'll refine the discovery logic.
    * Better approach: Check if there's a parent circuit config file.
    */
@@ -262,13 +262,13 @@ public class CircuitDiscovery {
 
   /**
    * Get all property keys defined in a circuit's configuration.
-   * <p>
+   * < p >
    * Useful for introspection and validation.
    *
    * @param circuitName Circuit name
    * @return Set of all property keys (including inherited from global)
    */
-  public static Set<String> getCircuitConfigKeys(String circuitName) {
+  public static Set< String > getCircuitConfigKeys(String circuitName) {
     HierarchicalConfig config = HierarchicalConfig.forCircuit(circuitName);
     return config.keys();
   }
@@ -280,7 +280,7 @@ public class CircuitDiscovery {
    * @param containerName Container name
    * @return Set of all property keys (including inherited from circuit/global)
    */
-  public static Set<String> getContainerConfigKeys(String circuitName, String containerName) {
+  public static Set< String > getContainerConfigKeys(String circuitName, String containerName) {
     HierarchicalConfig config = HierarchicalConfig.forContainer(circuitName, containerName);
     return config.keys();
   }

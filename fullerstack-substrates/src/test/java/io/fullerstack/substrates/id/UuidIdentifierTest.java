@@ -13,7 +13,7 @@ class UuidIdentifierTest {
 
   @Test
   void shouldGenerateUniqueIds() {
-    Set<Id> ids = new HashSet<>();
+    Set< Id > ids = new HashSet<>();
     for (int i = 0; i < 1000; i++) {
       ids.add(UuidIdentifier.generate());
     }

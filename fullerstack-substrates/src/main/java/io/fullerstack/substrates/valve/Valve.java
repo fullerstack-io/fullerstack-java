@@ -8,40 +8,40 @@ import java.util.concurrent.LinkedBlockingQueue;
 /**
  * Valve - Controls the flow of tasks through a virtual thread processor.
  *
- * <p><b>RC3 Dual-Queue Architecture:</b>
- * <ul>
- *   <li><b>Ingress Queue (FIFO)</b>: Emissions from external threads (outside circuit)</li>
- *   <li><b>Transit Deque (LIFO)</b>: Emissions from circuit thread (recursive, stack-like)</li>
- *   <li><b>Priority</b>: Transit deque processed FIRST (true depth-first execution)</li>
- * </ul>
+ * < p >< b >RC3 Dual-Queue Architecture:</b >
+ * < ul >
+ *   < li >< b >Ingress Queue (FIFO)</b >: Emissions from external threads (outside circuit)</li >
+ *   < li >< b >Transit Deque (LIFO)</b >: Emissions from circuit thread (recursive, stack-like)</li >
+ *   < li >< b >Priority</b >: Transit deque processed FIRST (true depth-first execution)</li >
+ * </ul >
  *
- * <p><b>Depth-First Execution Example:</b>
- * <pre>
+ * < p >< b >Depth-First Execution Example:</b >
+ * < pre >
  * External thread emits: [A, B, C] → Ingress queue
  * Circuit processes A, which emits: [A1, A2] → Transit deque (pushed to front)
  * Circuit processes A1, which emits: [A1a, A1b] → Transit deque (pushed to front)
  *
  * Execution order: A, A1, A1a, A1b, A2, B, C (true depth-first)
  * Transit uses LIFO (stack) so nested emissions are processed immediately.
- * </pre>
+ * </pre >
  *
- * <p><b>Design Pattern:</b>
- * <ul>
- *   <li>Valve = Dual BlockingQueue + Virtual Thread processor</li>
- *   <li>Emissions → Tasks (via submit, routed to appropriate queue)</li>
- *   <li>Virtual thread parks when both queues empty (BlockingQueue.take())</li>
- *   <li>Virtual thread unparks and executes when task arrives</li>
- *   <li>Transit queue has priority - fully drained before next ingress item</li>
- * </ul>
+ * < p >< b >Design Pattern:</b >
+ * < ul >
+ *   < li >Valve = Dual BlockingQueue + Virtual Thread processor</li >
+ *   < li >Emissions → Tasks (via submit, routed to appropriate queue)</li >
+ *   < li >Virtual thread parks when both queues empty (BlockingQueue.take())</li >
+ *   < li >Virtual thread unparks and executes when task arrives</li >
+ *   < li >Transit queue has priority - fully drained before next ingress item</li >
+ * </ul >
  *
- * <p><b>Usage:</b>
- * <pre>
+ * < p >< b >Usage:</b >
+ * < pre >
  * Valve valve = new Valve("circuit-main");
  * valve.submit(() -> System.out.println("Task 1")); // External thread → Ingress
  * valve.close(); // Shutdown when done
- * </pre>
+ * </pre >
  *
- * <p>This abstraction makes William's "valve" pattern explicit in the codebase,
+ * < p >This abstraction makes William's "valve" pattern explicit in the codebase,
  * aligning terminology with the reference implementation.
  */
 public class Valve implements AutoCloseable {
@@ -49,8 +49,8 @@ public class Valve implements AutoCloseable {
   private final String name;
 
   // RC3 Dual-Queue Architecture
-  private final BlockingQueue<Runnable> ingressQueue;  // External emissions (FIFO)
-  private final BlockingDeque<Runnable> transitDeque;  // Recursive emissions (LIFO for depth-first)
+  private final BlockingQueue< Runnable > ingressQueue;  // External emissions (FIFO)
+  private final BlockingDeque< Runnable > transitDeque;  // Recursive emissions (LIFO for depth-first)
 
   private final Thread processor;
   private volatile boolean running = true;
@@ -74,13 +74,13 @@ public class Valve implements AutoCloseable {
   /**
    * Submits a task to the valve for execution.
    *
-   * <p><b>RC3 Dual-Queue Routing:</b>
-   * <ul>
-   *   <li>If called from circuit thread (recursive): <b>Pushes to front of Transit deque</b> (LIFO stack)</li>
-   *   <li>If called from external thread: <b>Appends to Ingress queue</b> (FIFO)</li>
-   * </ul>
+   * < p >< b >RC3 Dual-Queue Routing:</b >
+   * < ul >
+   *   < li >If called from circuit thread (recursive): < b >Pushes to front of Transit deque</b > (LIFO stack)</li >
+   *   < li >If called from external thread: < b >Appends to Ingress queue</b > (FIFO)</li >
+   * </ul >
    *
-   * <p>This ensures true depth-first execution: nested recursive emissions are processed
+   * < p >This ensures true depth-first execution: nested recursive emissions are processed
    * immediately (stack behavior), before siblings or external emissions.
    *
    * @param task the task to execute
@@ -105,7 +105,7 @@ public class Valve implements AutoCloseable {
    * Blocks until all queued tasks are executed and the valve is idle.
    * Cannot be called from the valve's own thread.
    *
-   * <p><b>Event-Driven Design:</b>
+   * < p >< b >Event-Driven Design:</b >
    * Uses wait/notify mechanism instead of polling. The valve processor notifies
    * waiting threads immediately when it becomes idle, eliminating polling overhead
    * and providing zero-latency wake-up.
@@ -149,22 +149,22 @@ public class Valve implements AutoCloseable {
    * Background processor that executes tasks using RC3 dual-queue depth-first execution.
    * Runs in a virtual thread (parks when both queues empty, unparks when task arrives).
    *
-   * <p><b>RC3 True Depth-First Algorithm:</b>
-   * <ol>
-   *   <li>Check Transit deque first (pop from front - LIFO stack behavior)</li>
-   *   <li>If Transit empty, take from Ingress queue (FIFO)</li>
-   *   <li>Execute task (may push to front of Transit deque recursively)</li>
-   *   <li>Repeat from step 1 (Transit deque gets priority, newest items first)</li>
-   * </ol>
+   * < p >< b >RC3 True Depth-First Algorithm:</b >
+   * < ol >
+   *   < li >Check Transit deque first (pop from front - LIFO stack behavior)</li >
+   *   < li >If Transit empty, take from Ingress queue (FIFO)</li >
+   *   < li >Execute task (may push to front of Transit deque recursively)</li >
+   *   < li >Repeat from step 1 (Transit deque gets priority, newest items first)</li >
+   * </ol >
    *
-   * <p>Using LIFO for Transit ensures nested recursive emissions are processed immediately:
-   * <pre>
+   * < p >Using LIFO for Transit ensures nested recursive emissions are processed immediately:
+   * < pre >
    * A emits [A1, A2] → Transit: [A1, A2]
    * Process A1, emits [A1a, A1b] → Transit: [A1a, A1b, A2] (pushed to front)
    * Next process A1a (from front) - true depth-first!
-   * </pre>
+   * </pre >
    *
-   * <p>Notifies waiting threads when the valve becomes idle (both queues empty and no task executing).
+   * < p >Notifies waiting threads when the valve becomes idle (both queues empty and no task executing).
    */
   private void processQueue() {
     while (running && !Thread.interrupted()) {

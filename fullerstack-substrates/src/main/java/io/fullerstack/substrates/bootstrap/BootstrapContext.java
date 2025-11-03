@@ -7,32 +7,32 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Registry for sharing objects between SPI providers during bootstrap.
- * <p>
+ * < p >
  * Implements the Service Registry pattern to allow CircuitStructureProvider
  * and SensorProvider to share references to cells, conduits, and other components.
- * <p>
- * <b>Pattern: Publish-Find-Bind</b>
- * <ol>
- *   <li><b>Publish</b>: CircuitStructureProvider creates components and registers them</li>
- *   <li><b>Find</b>: SensorProvider queries registry for components</li>
- *   <li><b>Bind</b>: SensorProvider uses retrieved components to emit signals</li>
- * </ol>
- * <p>
- * <b>Example Usage:</b>
- * <pre>{@code
+ * < p >
+ * < b >Pattern: Publish-Find-Bind</b >
+ * < ol >
+ *   < li >< b >Publish</b >: CircuitStructureProvider creates components and registers them</li >
+ *   < li >< b >Find</b >: SensorProvider queries registry for components</li >
+ *   < li >< b >Bind</b >: SensorProvider uses retrieved components to emit signals</li >
+ * </ol >
+ * < p >
+ * < b >Example Usage:</b >
+ * < pre >{@code
  * // CircuitStructureProvider: Publish
- * Cell<BrokerMetrics, MonitorSignal> brokerCell = circuit.cell(...);
+ * Cell< BrokerMetrics, MonitorSignal > brokerCell = circuit.cell(...);
  * context.register("brokers-cell", brokerCell);
  *
  * // SensorProvider: Find and Bind
- * Cell<BrokerMetrics, MonitorSignal> brokerCell =
+ * Cell< BrokerMetrics, MonitorSignal > brokerCell =
  *     context.get("brokers-cell", Cell.class)
  *            .orElseThrow();
  *
  * BrokerSensor sensor = new BrokerSensor(brokerCell);
- * }</pre>
- * <p>
- * <b>Thread Safety:</b> All operations are thread-safe using ConcurrentHashMap.
+ * }</pre >
+ * < p >
+ * < b >Thread Safety:</b > All operations are thread-safe using ConcurrentHashMap.
  *
  * @see CircuitStructureProvider
  * @see io.fullerstack.substrates.spi.SensorProvider
@@ -40,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BootstrapContext {
 
   private final String circuitName;
-  private final Map<String, Object> registry;
+  private final Map< String, Object > registry;
 
   /**
    * Creates a new BootstrapContext for a circuit.
@@ -54,7 +54,7 @@ public class BootstrapContext {
 
   /**
    * Register a component in the registry.
-   * <p>
+   * < p >
    * Used by CircuitStructureProvider to publish components for later retrieval.
    *
    * @param name component name (e.g., "brokers-cell", "metrics-conduit")
@@ -76,17 +76,17 @@ public class BootstrapContext {
 
   /**
    * Retrieve a component from the registry.
-   * <p>
+   * < p >
    * Used by SensorProvider to find components published by CircuitStructureProvider.
    *
    * @param name component name
    * @param type expected component type
-   * @param <T> the component type
+   * @param < T > the component type
    * @return Optional containing the component if found and type matches, empty otherwise
    * @throws NullPointerException if name or type is null
    * @throws ClassCastException if component exists but type doesn't match
    */
-  public <T> Optional<T> get(String name, Class<T> type) {
+  public < T > Optional< T > get(String name, Class< T > type) {
     Objects.requireNonNull(name, "name cannot be null");
     Objects.requireNonNull(type, "type cannot be null");
 
@@ -100,18 +100,18 @@ public class BootstrapContext {
 
   /**
    * Retrieve a required component from the registry.
-   * <p>
+   * < p >
    * Convenience method that throws if component is not found.
    *
    * @param name component name
    * @param type expected component type
-   * @param <T> the component type
+   * @param < T > the component type
    * @return the component
    * @throws NullPointerException if name or type is null
    * @throws IllegalStateException if component not found
    * @throws ClassCastException if component exists but type doesn't match
    */
-  public <T> T getRequired(String name, Class<T> type) {
+  public < T > T getRequired(String name, Class< T > type) {
     return get(name, type).orElseThrow(() ->
       new IllegalStateException(
         "Required component '" + name + "' not found in circuit '" + circuitName + "'"
@@ -140,12 +140,12 @@ public class BootstrapContext {
 
   /**
    * Get all registered component names.
-   * <p>
+   * < p >
    * Useful for debugging and logging.
    *
    * @return set of registered component names
    */
-  public java.util.Set<String> getRegisteredNames() {
+  public java.util.Set< String > getRegisteredNames() {
     return java.util.Collections.unmodifiableSet(registry.keySet());
   }
 }

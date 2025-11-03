@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Implementation of Substrates.Scope for hierarchical context management.
  *
- * <p>Scopes support hierarchical resource management and can be nested.
+ * < p >Scopes support hierarchical resource management and can be nested.
  * Resources are closed in LIFO (Last In, First Out) order, matching Java's
  * try-with-resources semantics.
  *
@@ -25,15 +25,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ManagedScope implements Scope {
   private final Name name;
   private final Scope parent;
-  private final Map<Name, Scope> childScopes;
-  private final Deque<Resource> resources = new ConcurrentLinkedDeque<>();
+  private final Map< Name, Scope > childScopes;
+  private final Deque< Resource > resources = new ConcurrentLinkedDeque<>();
   private volatile boolean closed = false;
 
   // Cache Subject - each Scope has a persistent identity
   private final Subject scopeSubject;
 
   // Cache Closures per resource - cleared when closure is consumed
-  private final Map<Resource, Closure<?>> closureCache = new ConcurrentHashMap<>();
+  private final Map< Resource, Closure<?>> closureCache = new ConcurrentHashMap<>();
 
   /**
    * Creates a root scope.
@@ -86,7 +86,7 @@ public class ManagedScope implements Scope {
   }
 
   @Override
-  public <R extends Resource> R register(R resource) {
+  public < R extends Resource > R register(R resource) {
     checkClosed();
     Objects.requireNonNull(resource, "Resource cannot be null");
     resources.addFirst(resource);  // Add to front for LIFO closure ordering
@@ -95,19 +95,19 @@ public class ManagedScope implements Scope {
 
   @Override
   @SuppressWarnings("unchecked")
-  public <R extends Resource> Closure<R> closure(R resource) {
+  public < R extends Resource > Closure< R > closure(R resource) {
     checkClosed();
     Objects.requireNonNull(resource, "Resource cannot be null");
 
     // Return cached closure if exists and not yet consumed
-    Closure<R> cached = (Closure<R>) closureCache.get(resource);
+    Closure< R > cached = (Closure< R >) closureCache.get(resource);
     if (cached != null) {
       return cached;
     }
 
     // Register resource and create new closure with validity check
     register(resource);
-    Closure<R> closure = new AutoClosingResource<>(
+    Closure< R > closure = new AutoClosingResource<>(
       resource,
       () -> closureCache.remove(resource),
       () -> !closed  // Valid only if scope is not closed
@@ -152,7 +152,7 @@ public class ManagedScope implements Scope {
   }
 
   @Override
-  public Optional<Scope> enclosure() {
+  public Optional< Scope > enclosure() {
     return Optional.ofNullable(parent);
   }
 

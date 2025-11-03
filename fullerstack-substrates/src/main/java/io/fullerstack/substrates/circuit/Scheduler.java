@@ -3,10 +3,10 @@ package io.fullerstack.substrates.circuit;
 /**
  * Internal interface for scheduling work within a Circuit's execution context.
  *
- * <p>This abstraction allows components (Conduit, Cell, Pipe, etc.) to schedule
+ * < p >This abstraction allows components (Conduit, Cell, Pipe, etc.) to schedule
  * work on the Circuit's queue without directly depending on Queue implementation details.
  *
- * <p>Circuit implements this interface and passes itself to components, maintaining
+ * < p >Circuit implements this interface and passes itself to components, maintaining
  * proper encapsulation and following the "use this circuit" pattern from the API.
  */
 public interface Scheduler {

@@ -38,7 +38,7 @@ class HumainaryBlogExampleTest {
     final Subject<?>[] capturedSubject = new Subject<?>[1];
     final Integer[] capturedEmission = new Integer[1];
 
-    Subscriber<Integer> subscriber = cortex.subscriber(
+    Subscriber< Integer > subscriber = cortex.subscriber(
       cortex.name("test-subscriber"),
       (subject, registrar) -> {
         // Register pipe to capture emissions
@@ -110,9 +110,9 @@ class HumainaryBlogExampleTest {
 
     // Capture the Channel Subject
     final Subject<?>[] capturedSubject = new Subject<?>[1];
-    final CopyOnWriteArrayList<Integer> emissions = new CopyOnWriteArrayList<>();
+    final CopyOnWriteArrayList< Integer > emissions = new CopyOnWriteArrayList<>();
 
-    Subscriber<Object> subscriber = cortex.subscriber(
+    Subscriber< Object > subscriber = cortex.subscriber(
       cortex.name("valve-subscriber"),
       (subject, registrar) -> {
         capturedSubject[0] = subject;

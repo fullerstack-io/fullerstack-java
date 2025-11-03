@@ -12,25 +12,25 @@ import lombok.experimental.FieldDefaults;
 /**
  * Node-based Subject implementation - hierarchical parent-child structure.
  *
- * <p><b>Design Principles:</b>
- * <ul>
- *   <li>Subjects form hierarchical trees via parent references</li>
- *   <li>Circuit → Conduit → Channel hierarchy mirrors container relationships</li>
- *   <li>Each Subject has: Id (unique), Name (label), State (data), Type (class), Parent (optional)</li>
- *   <li>Subject.enclosure() returns parent Subject in hierarchy</li>
- *   <li>Subject.path() walks hierarchy via enclosure(), showing all ancestors</li>
- * </ul>
+ * < p >< b >Design Principles:</b >
+ * < ul >
+ *   < li >Subjects form hierarchical trees via parent references</li >
+ *   < li >Circuit → Conduit → Channel hierarchy mirrors container relationships</li >
+ *   < li >Each Subject has: Id (unique), Name (label), State (data), Type (class), Parent (optional)</li >
+ *   < li >Subject.enclosure() returns parent Subject in hierarchy</li >
+ *   < li >Subject.path() walks hierarchy via enclosure(), showing all ancestors</li >
+ * </ul >
  *
- * <p><b>Name vs Subject (William's Architecture):</b>
- * <ul>
- *   <li><b>Name</b> = Linguistic referent (like "Miles" the identifier)</li>
- *   <li><b>Subject</b> = Temporal/contextual instantiation (Miles-at-time-T-in-context-C)</li>
- *   <li>Same Name can have multiple Subjects across different Circuits or contexts</li>
- *   <li>Each Subject has a unique Id but shares the same Name reference</li>
- * </ul>
+ * < p >< b >Name vs Subject (William's Architecture):</b >
+ * < ul >
+ *   < li >< b >Name</b > = Linguistic referent (like "Miles" the identifier)</li >
+ *   < li >< b >Subject</b > = Temporal/contextual instantiation (Miles-at-time-T-in-context-C)</li >
+ *   < li >Same Name can have multiple Subjects across different Circuits or contexts</li >
+ *   < li >Each Subject has a unique Id but shares the same Name reference</li >
+ * </ul >
  *
- * <p><b>Example - Multiple Temporal Subjects:</b>
- * <pre>
+ * < p >< b >Example - Multiple Temporal Subjects:</b >
+ * < pre >
  * Cortex cortex = Cortex.of();
  * Name milesName = cortex.name("Miles");  // Referent
  *
@@ -58,17 +58,17 @@ import lombok.experimental.FieldDefaults;
  * // milesInCircuitA.id() != milesInCircuitB.id()  // Different IDs
  * // milesInCircuitA.name() == milesInCircuitB.name()  // Same Name
  * // milesInCircuitA.state() != milesInCircuitB.state()  // Different states
- * </pre>
+ * </pre >
  *
- * <p><b>Comparison with HierarchicalName:</b>
- * <ul>
- *   <li>HierarchicalName: Hierarchical identifiers (strings)</li>
- *   <li>HierarchicalSubject: Hierarchical runtime entities (identity + state)</li>
- *   <li>Both use parent-child links for hierarchy</li>
- *   <li>Both implement Extent interface with enclosure()</li>
- * </ul>
+ * < p >< b >Comparison with HierarchicalName:</b >
+ * < ul >
+ *   < li >HierarchicalName: Hierarchical identifiers (strings)</li >
+ *   < li >HierarchicalSubject: Hierarchical runtime entities (identity + state)</li >
+ *   < li >Both use parent-child links for hierarchy</li >
+ *   < li >Both implement Extent interface with enclosure()</li >
+ * </ul >
  *
- * @param <S> The substrate type this subject represents
+ * @param < S > The substrate type this subject represents
  * @see Subject
  * @see HierarchicalName
  * @see SimpleCell
@@ -76,7 +76,7 @@ import lombok.experimental.FieldDefaults;
 @Getter
 @EqualsAndHashCode
 @Builder(toBuilder = true)
-public class HierarchicalSubject<S extends Substrate<S>> implements Subject<S>, Comparable<Subject<?>> {
+public class HierarchicalSubject< S extends Substrate< S >> implements Subject< S >, Comparable< Subject<?>> {
   /**
    * Unique identifier for this subject.
    */
@@ -95,7 +95,7 @@ public class HierarchicalSubject<S extends Substrate<S>> implements Subject<S>, 
   /**
    * Subject type class (e.g., Channel.class, Circuit.class).
    */
-  private final Class<S> type;
+  private final Class< S > type;
 
   /**
    * Parent subject in the hierarchy (nullable - root subjects have no parent).
@@ -105,14 +105,14 @@ public class HierarchicalSubject<S extends Substrate<S>> implements Subject<S>, 
   /**
    * Creates a Subject node with all fields (no parent - root node).
    */
-  public HierarchicalSubject(@NonNull Id id, @NonNull Name name, State state, @NonNull Class<S> type) {
+  public HierarchicalSubject(@NonNull Id id, @NonNull Name name, State state, @NonNull Class< S > type) {
     this(id, name, state, type, null);
   }
 
   /**
    * Creates a Subject node with parent reference for hierarchy.
    */
-  public HierarchicalSubject(@NonNull Id id, @NonNull Name name, State state, @NonNull Class<S> type, Subject<?> parent) {
+  public HierarchicalSubject(@NonNull Id id, @NonNull Name name, State state, @NonNull Class< S > type, Subject<?> parent) {
     this.id = id;
     this.name = name;
     this.state = state;
@@ -137,13 +137,13 @@ public class HierarchicalSubject<S extends Substrate<S>> implements Subject<S>, 
   }
 
   @Override
-  public Class<S> type() {
+  public Class< S > type() {
     return type;
   }
 
   // Override Extent.enclosure() to return parent Subject
   @Override
-  public java.util.Optional<Subject<?>> enclosure() {
+  public java.util.Optional< Subject<?>> enclosure() {
     return java.util.Optional.ofNullable(parent);
   }
 

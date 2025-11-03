@@ -33,7 +33,7 @@ class SingleThreadCircuitTest {
     assertThat(circuit.subject().type()).isEqualTo(Circuit.class);
   }
 
-  // RC1: Circuit no longer extends Source<State> - test removed
+  // RC1: Circuit no longer extends Source< State > - test removed
 
   // RC1: Clock API removed - tests deleted
 
@@ -79,11 +79,11 @@ class SingleThreadCircuitTest {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test"));
 
     // Same name, different composers should create DIFFERENT Conduits
-    Composer<String, Pipe<String>> composer1 = pipe();
-    Composer<String, Pipe<String>> composer2 = channel -> channel.pipe();
+    Composer< String, Pipe< String >> composer1 = pipe();
+    Composer< String, Pipe< String >> composer2 = channel -> channel.pipe();
 
-    Conduit<Pipe<String>, String> conduit1 = circuit.conduit(HierarchicalName.of("shared"), composer1);
-    Conduit<Pipe<String>, String> conduit2 = circuit.conduit(HierarchicalName.of("shared"), composer2);
+    Conduit< Pipe< String >, String > conduit1 = circuit.conduit(HierarchicalName.of("shared"), composer1);
+    Conduit< Pipe< String >, String > conduit2 = circuit.conduit(HierarchicalName.of("shared"), composer2);
 
     assertThat((Object) conduit1).isNotSameAs(conduit2);
   }
@@ -92,10 +92,10 @@ class SingleThreadCircuitTest {
   void shouldCacheConduitsWithSameNameAndComposer() {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test"));
 
-    Composer<String, Pipe<String>> composer = pipe();
+    Composer< String, Pipe< String >> composer = pipe();
 
-    Conduit<Pipe<String>, String> conduit1 = circuit.conduit(HierarchicalName.of("cached"), composer);
-    Conduit<Pipe<String>, String> conduit2 = circuit.conduit(HierarchicalName.of("cached"), composer);
+    Conduit< Pipe< String >, String > conduit1 = circuit.conduit(HierarchicalName.of("cached"), composer);
+    Conduit< Pipe< String >, String > conduit2 = circuit.conduit(HierarchicalName.of("cached"), composer);
 
     assertThat((Object) conduit1).isSameAs(conduit2);
   }

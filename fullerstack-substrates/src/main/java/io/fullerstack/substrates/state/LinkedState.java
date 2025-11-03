@@ -16,38 +16,38 @@ import java.util.stream.Stream;
 /**
  * Implementation of Substrates.State for storing typed values.
  *
- * <p><b>Immutable Design:</b> State objects are immutable. Each call to {@code state()}
+ * < p >< b >Immutable Design:</b > State objects are immutable. Each call to {@code state()}
  * returns a NEW State instance with the slot appended. This allows duplicate names
  * to exist in the slot list.
  *
- * <p><b>Type Matching:</b> Per William Louth's design, "A State stores the type with
+ * < p >< b >Type Matching:</b > Per William Louth's design, "A State stores the type with
  * the name, only matching when both are exact matches." This allows the same name to
  * hold different types simultaneously:
- * <pre>
+ * < pre >
  * State state = cortex.state()
  *     .state(name("port"), 8080)        // Integer
  *     .state(name("port"), "HTTP/1.1"); // String (does NOT override Integer!)
  *
  * Integer port = state.value(slot(name("port"), 0));     // 8080
  * String protocol = state.value(slot(name("port"), "")); // "HTTP/1.1"
- * </pre>
+ * </pre >
  *
- * <p><b>Duplicate Handling:</b> Uses a List internally, which allows multiple slots
+ * < p >< b >Duplicate Handling:</b > Uses a List internally, which allows multiple slots
  * with the same (name, type) pair. Call {@code compact()} to remove duplicates, keeping
  * the last occurrence of each (name, type) pair.
  *
- * <p><b>Pattern:</b> Builder pattern with override support:
- * <pre>
+ * < p >< b >Pattern:</b > Builder pattern with override support:
+ * < pre >
  * State config = cortex.state()
  *     .state(name("timeout"), 30)   // Default value
  *     .state(name("timeout"), 60)   // Override (both exist until compact)
  *     .compact();                   // Deduplicate (keeps last: 60)
- * </pre>
+ * </pre >
  *
  * @see State
  */
 public class LinkedState implements State {
-  private final List<Slot<?>> slots;
+  private final List< Slot<?>> slots;
 
   /**
    * Creates an empty State.
@@ -59,7 +59,7 @@ public class LinkedState implements State {
   /**
    * Private constructor for creating new State with slots.
    */
-  private LinkedState(List<Slot<?>> slots) {
+  private LinkedState(List< Slot<?>> slots) {
     this.slots = new ArrayList<>(slots);
   }
 
@@ -67,10 +67,10 @@ public class LinkedState implements State {
   public State compact() {
     // Remove duplicates, keeping last occurrence of each (name, type) pair
     // Result must be in reverse chronological order (most recent first)
-    Map<NameTypePair, Slot<?>> latest = new LinkedHashMap<>();
+    Map< NameTypePair, Slot<?>> latest = new LinkedHashMap<>();
 
     // Iterate from end to start, only keeping first seen (which is latest occurrence)
-    java.util.ListIterator<Slot<?>> it = slots.listIterator(slots.size());
+    java.util.ListIterator< Slot<?>> it = slots.listIterator(slots.size());
     while (it.hasPrevious()) {
       Slot<?> slot = it.previous();
       latest.putIfAbsent(new NameTypePair(slot.name(), slot.type()), slot);
@@ -196,15 +196,15 @@ public class LinkedState implements State {
   }
 
   @Override
-  public Stream<Slot<?>> stream() {
+  public Stream< Slot<?>> stream() {
     // Return slots in reverse chronological order (most recent first)
-    List<Slot<?>> reversed = new ArrayList<>(slots);
+    List< Slot<?>> reversed = new ArrayList<>(slots);
     java.util.Collections.reverse(reversed);
     return reversed.stream();
   }
 
   @Override
-  public <T> T value(Slot<T> slot) {
+  public < T > T value(Slot< T > slot) {
     // API: "Returns the value of a slot matching the specified slot
     //      or the value of the specified slot when not found"
     // Start with fallback value from query slot
@@ -215,7 +215,7 @@ public class LinkedState implements State {
     for (Slot<?> s : slots) {
       if (s.name().equals(slot.name()) && typesMatch(slot.type(), s.type())) {
         @SuppressWarnings("unchecked")
-        T value = ((Slot<T>) s).value();
+        T value = ((Slot< T >) s).value();
         result = value;  // Keep updating (last occurrence wins)
       }
     }
@@ -225,15 +225,15 @@ public class LinkedState implements State {
   }
 
   @Override
-  public <T> Stream<T> values(Slot<? extends T> slot) {
+  public < T > Stream< T > values(Slot<? extends T > slot) {
     // Return ALL values with this name AND type in reverse chronological order (most recent first)
     // Per article: "A State stores the type with the name, only matching when both are exact matches"
     // Collect matching values, then reverse to get most recent first
-    List<T> values = new ArrayList<>();
+    List< T > values = new ArrayList<>();
     for (Slot<?> s : slots) {
       if (s.name().equals(slot.name()) && typesMatch(slot.type(), s.type())) {
         @SuppressWarnings("unchecked")
-        Slot<T> typed = (Slot<T>) s;
+        Slot< T > typed = (Slot< T >) s;
         values.add(typed.value());
       }
     }
@@ -255,17 +255,17 @@ public class LinkedState implements State {
   }
 
   @Override
-  public Iterator<Slot<?>> iterator() {
+  public Iterator< Slot<?>> iterator() {
     // Return slots in reverse chronological order (most recent first)
-    List<Slot<?>> reversed = new ArrayList<>(slots);
+    List< Slot<?>> reversed = new ArrayList<>(slots);
     java.util.Collections.reverse(reversed);
     return reversed.iterator();
   }
 
   @Override
-  public java.util.Spliterator<Slot<?>> spliterator() {
+  public java.util.Spliterator< Slot<?>> spliterator() {
     // Return slots in reverse chronological order with exact size
-    List<Slot<?>> reversed = new ArrayList<>(slots);
+    List< Slot<?>> reversed = new ArrayList<>(slots);
     java.util.Collections.reverse(reversed);
     return reversed.spliterator();
   }

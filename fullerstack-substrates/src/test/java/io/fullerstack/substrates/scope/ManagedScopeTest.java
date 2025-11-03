@@ -127,7 +127,7 @@ class ManagedScopeTest {
 
     @Override
     @SuppressWarnings("unchecked")
-    public Subject<Subscription> subject() {
+    public Subject< Subscription > subject() {
       return new HierarchicalSubject<>(
         UuidIdentifier.generate(),
         HierarchicalName.of("test-resource"),

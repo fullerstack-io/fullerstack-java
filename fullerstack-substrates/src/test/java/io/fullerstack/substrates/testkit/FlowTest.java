@@ -34,8 +34,8 @@ final class FlowTest
 
     final List < Integer > forwarded = new ArrayList <> ();
 
-    // RC3: Flow.forward() takes Pipe<? super E>, not Consumer<E>
-    final Pipe<Integer> forwardPipe = new Pipe<>() {
+    // RC3: Flow.forward() takes Pipe<? super E >, not Consumer< E >
+    final Pipe< Integer > forwardPipe = new Pipe<>() {
     @Override
     public void emit(Integer value) {
       forwarded.add(value);
@@ -110,8 +110,8 @@ final class FlowTest
 
     final List < Integer > forwarded = new ArrayList <> ();
 
-    // RC3: Flow.forward() takes Pipe<? super E>, not Consumer<E>
-    final Pipe<Integer> forwardPipe = new Pipe<>() {
+    // RC3: Flow.forward() takes Pipe<? super E >, not Consumer< E >
+    final Pipe< Integer > forwardPipe = new Pipe<>() {
     @Override
     public void emit(Integer value) {
       forwarded.add(value);
@@ -289,8 +289,8 @@ final class FlowTest
 
     final List < Integer > captured = new ArrayList <> ();
 
-    // RC3: Flow.forward() takes Pipe<? super E>, not Consumer<E>
-    final Pipe<Integer> forwardPipe = new Pipe<>() {
+    // RC3: Flow.forward() takes Pipe<? super E >, not Consumer< E >
+    final Pipe< Integer > forwardPipe = new Pipe<>() {
     @Override
     public void emit(Integer value) {
       captured.add(value);
@@ -355,8 +355,8 @@ final class FlowTest
 
     final List < Integer > captured = new ArrayList <> ();
 
-    // RC3: Flow.forward() takes Pipe<? super E>, not Consumer<E>
-    final Pipe<Integer> forwardPipe = new Pipe<>() {
+    // RC3: Flow.forward() takes Pipe<? super E >, not Consumer< E >
+    final Pipe< Integer > forwardPipe = new Pipe<>() {
     @Override
     public void emit(Integer value) {
       captured.add(value);

@@ -12,21 +12,21 @@ import java.util.function.Function;
 /**
  * Node-based Name implementation - hierarchical parent-child structure.
  *
- * <p><b>Design Principles:</b>
- * <ul>
- *   <li>Cortex creates root names only: new HierarchicalName(null, "root")</li>
- *   <li>Hierarchy built by name() methods: parent.name("child")</li>
- *   <li>Parent-child links via constructor (node structure)</li>
- *   <li>All Extent methods use defaults (path, depth, iterator)</li>
- *   <li><b>Name Interning:</b> Names with identical paths return same instance (like String.intern())</li>
- * </ul>
+ * < p >< b >Design Principles:</b >
+ * < ul >
+ *   < li >Cortex creates root names only: new HierarchicalName(null, "root")</li >
+ *   < li >Hierarchy built by name() methods: parent.name("child")</li >
+ *   < li >Parent-child links via constructor (node structure)</li >
+ *   < li >All Extent methods use defaults (path, depth, iterator)</li >
+ *   < li >< b >Name Interning:</b > Names with identical paths return same instance (like String.intern())</li >
+ * </ul >
  *
- * <p><b>Required implementations:</b>
- * <ul>
- *   <li>part() - returns this segment</li>
- *   <li>enclosure() - returns parent</li>
- *   <li>name() methods - create children with parent reference</li>
- * </ul>
+ * < p >< b >Required implementations:</b >
+ * < ul >
+ *   < li >part() - returns this segment</li >
+ *   < li >enclosure() - returns parent</li >
+ *   < li >name() methods - create children with parent reference</li >
+ * </ul >
  */
 public final class HierarchicalName implements Name {
 
@@ -35,7 +35,7 @@ public final class HierarchicalName implements Name {
    * Key: (parent, segment), Value: HierarchicalName instance
    * Ensures identical paths return same instance across entire JVM.
    */
-  private static final ConcurrentHashMap<NameKey, HierarchicalName> INTERN_CACHE = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap< NameKey, HierarchicalName > INTERN_CACHE = new ConcurrentHashMap<>();
 
   private final HierarchicalName parent;
   private final String segment;
@@ -102,7 +102,7 @@ public final class HierarchicalName implements Name {
   }
 
   @Override
-  public Optional<Name> enclosure() {
+  public Optional< Name > enclosure() {
     return Optional.ofNullable(parent);
   }
 
@@ -114,7 +114,7 @@ public final class HierarchicalName implements Name {
     Objects.requireNonNull(suffix, "suffix");
     // Iterate from ROOT to LEAF by collecting in reverse order
     // suffix iterator goes LEAF→ROOT, so we need to reverse it
-    java.util.List<String> parts = new java.util.ArrayList<>();
+    java.util.List< String > parts = new java.util.ArrayList<>();
     for (Name part : suffix) {
       parts.add(part.part().toString());
     }
@@ -179,7 +179,7 @@ public final class HierarchicalName implements Name {
   }
 
   @Override
-  public Name name(Iterable<String> parts) {
+  public Name name(Iterable< String > parts) {
     Objects.requireNonNull(parts, "parts");
     // Delegate to name(String) - don't force HierarchicalName
     Name current = this;
@@ -190,7 +190,7 @@ public final class HierarchicalName implements Name {
   }
 
   @Override
-  public <T> Name name(Iterable<? extends T> parts, Function<T, String> mapper) {
+  public < T > Name name(Iterable<? extends T > parts, Function< T, String > mapper) {
     Objects.requireNonNull(parts, "parts");
     Objects.requireNonNull(mapper, "mapper");
     // Delegate to name(String) - don't force HierarchicalName
@@ -202,7 +202,7 @@ public final class HierarchicalName implements Name {
   }
 
   @Override
-  public Name name(Iterator<String> parts) {
+  public Name name(Iterator< String > parts) {
     Objects.requireNonNull(parts, "parts");
     // Delegate to name(String) - don't force HierarchicalName
     Name current = this;
@@ -213,7 +213,7 @@ public final class HierarchicalName implements Name {
   }
 
   @Override
-  public <T> Name name(Iterator<? extends T> parts, Function<T, String> mapper) {
+  public < T > Name name(Iterator<? extends T > parts, Function< T, String > mapper) {
     Objects.requireNonNull(parts, "parts");
     Objects.requireNonNull(mapper, "mapper");
     // Delegate to name(String) - don't force HierarchicalName
@@ -240,9 +240,9 @@ public final class HierarchicalName implements Name {
   // Required: path(Function) is abstract in Name
   // Use "." as separator for hierarchical names (not "/" like filesystem paths)
   @Override
-  public CharSequence path(Function<? super String, ? extends CharSequence> mapper) {
+  public CharSequence path(Function<? super String, ? extends CharSequence > mapper) {
     Objects.requireNonNull(mapper, "mapper");
-    // Adapt Function<String, CharSequence> to Function<Name, CharSequence>
+    // Adapt Function< String, CharSequence > to Function< Name, CharSequence >
     // by extracting part() from each Name, then delegate to Extent's default
     // Use "." separator for dot-notation hierarchical names
     return path(name -> mapper.apply(name.part().toString()), '.');

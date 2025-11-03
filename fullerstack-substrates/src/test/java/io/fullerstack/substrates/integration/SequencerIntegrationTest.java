@@ -17,8 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Integration tests for Flow transformation functionality showing end-to-end transformation pipelines.
  *
- * <p>These tests validate the complete flow from Circuit → Conduit → Channel → Pipe with Flow
- * transformations → Source emissions. (M15+ API: Sequencer/Segment renamed to Consumer<Flow>/Flow)
+ * < p >These tests validate the complete flow from Circuit → Conduit → Channel → Pipe with Flow
+ * transformations → Source emissions. (M15+ API: Sequencer/Segment renamed to Consumer< Flow >/Flow)
  */
 class SequencerIntegrationTest {
 
@@ -34,7 +34,7 @@ class SequencerIntegrationTest {
   /**
    * Helper to create a simple subscriber that collects emissions.
    */
-  private <E> Subscriber<E> subscriber(Name name, List<E> collector, CountDownLatch latch) {
+  private < E > Subscriber< E > subscriber(Name name, List< E > collector, CountDownLatch latch) {
     return CORTEX.subscriber(name, (subject, registrar) -> {
       registrar.register(emission -> {
         collector.add(emission);
@@ -47,11 +47,11 @@ class SequencerIntegrationTest {
   void shouldApplySequencerTransformationsToEmissions() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(3);
 
     // Create conduit using API's Composer.pipe(sequencer) factory
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("sensors"),
       Composer.pipe(
         path -> path
@@ -64,7 +64,7 @@ class SequencerIntegrationTest {
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
     // Get pipe and emit values
-    Pipe<Integer> pipe = conduit.get(HierarchicalName.of("sensor-1"));
+    Pipe< Integer > pipe = conduit.get(HierarchicalName.of("sensor-1"));
     pipe.emit(-5);   // Filtered by guard
     pipe.emit(10);   // Passes
     pipe.emit(0);    // Filtered by guard
@@ -82,11 +82,11 @@ class SequencerIntegrationTest {
   void shouldApplyReduceTransformation() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(4);
 
     // Create conduit with reduce (accumulating sum)
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("accumulators"),
       Composer.pipe(
         path -> path.reduce(0, Integer::sum)
@@ -95,7 +95,7 @@ class SequencerIntegrationTest {
 
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
-    Pipe<Integer> pipe = conduit.get(HierarchicalName.of("accumulator-1"));
+    Pipe< Integer > pipe = conduit.get(HierarchicalName.of("accumulator-1"));
     pipe.emit(1);  // 0 + 1 = 1
     pipe.emit(2);  // 1 + 2 = 3
     pipe.emit(3);  // 3 + 3 = 6
@@ -110,11 +110,11 @@ class SequencerIntegrationTest {
   void shouldApplyReplaceTransformation() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(3);
 
     // Create conduit with replace (multiply by 2)
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("mappers"),
       Composer.pipe(
         path -> path.replace(value -> value * 2)
@@ -123,7 +123,7 @@ class SequencerIntegrationTest {
 
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
-    Pipe<Integer> pipe = conduit.get(HierarchicalName.of("mapper-1"));
+    Pipe< Integer > pipe = conduit.get(HierarchicalName.of("mapper-1"));
     pipe.emit(1);
     pipe.emit(5);
     pipe.emit(10);
@@ -137,11 +137,11 @@ class SequencerIntegrationTest {
   void shouldApplyDiffTransformation() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(3);
 
     // Create conduit with diff (only pass changed values)
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("differs"),
       Composer.pipe(
         path -> path.diff()
@@ -150,7 +150,7 @@ class SequencerIntegrationTest {
 
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
-    Pipe<Integer> pipe = conduit.get(HierarchicalName.of("differ-1"));
+    Pipe< Integer > pipe = conduit.get(HierarchicalName.of("differ-1"));
     pipe.emit(1);  // First value - passes
     pipe.emit(1);  // Duplicate - filtered
     pipe.emit(2);  // Changed - passes
@@ -166,11 +166,11 @@ class SequencerIntegrationTest {
   void shouldApplySampleTransformation() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(2);
 
     // Create conduit with sample (every 3rd value)
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("samplers"),
       Composer.pipe(
         path -> path.sample(3)
@@ -179,7 +179,7 @@ class SequencerIntegrationTest {
 
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
-    Pipe<Integer> pipe = conduit.get(HierarchicalName.of("sampler-1"));
+    Pipe< Integer > pipe = conduit.get(HierarchicalName.of("sampler-1"));
     pipe.emit(1);  // 1st - filtered
     pipe.emit(2);  // 2nd - filtered
     pipe.emit(3);  // 3rd - passes
@@ -196,11 +196,11 @@ class SequencerIntegrationTest {
   void shouldApplySiftTransformation() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(3);
 
     // Create conduit with sift (values above 5)
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("sifters"),
       Composer.pipe(
         path -> path.sift(Integer::compareTo, sift -> sift.above(5))
@@ -209,7 +209,7 @@ class SequencerIntegrationTest {
 
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
-    Pipe<Integer> pipe = conduit.get(HierarchicalName.of("sifter-1"));
+    Pipe< Integer > pipe = conduit.get(HierarchicalName.of("sifter-1"));
     pipe.emit(3);   // Below 5 - filtered
     pipe.emit(5);   // Equal to 5 - filtered
     pipe.emit(6);   // Above 5 - passes
@@ -226,11 +226,11 @@ class SequencerIntegrationTest {
   void shouldChainMultipleTransformations() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(3);
 
     // Create conduit with chained transformations
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("complex"),
       Composer.pipe(
         path -> path
@@ -243,7 +243,7 @@ class SequencerIntegrationTest {
 
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
-    Pipe<Integer> pipe = conduit.get(HierarchicalName.of("complex-1"));
+    Pipe< Integer > pipe = conduit.get(HierarchicalName.of("complex-1"));
     pipe.emit(-1);  // Filtered by first guard
     pipe.emit(1);   // 1 * 2 = 2, passes
     pipe.emit(5);   // 5 * 2 = 10, passes
@@ -260,11 +260,11 @@ class SequencerIntegrationTest {
   void shouldSupportMultiplePipesWithDifferentSequencers() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(4);
 
     // Create conduit
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("multi"),
       Composer.pipe(
         path -> path.guard(value -> value > 0)
@@ -274,8 +274,8 @@ class SequencerIntegrationTest {
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
     // Multiple pipes from same conduit, each with own Segment instance
-    Pipe<Integer> pipe1 = conduit.get(HierarchicalName.of("pipe-1"));
-    Pipe<Integer> pipe2 = conduit.get(HierarchicalName.of("pipe-2"));
+    Pipe< Integer > pipe1 = conduit.get(HierarchicalName.of("pipe-1"));
+    Pipe< Integer > pipe2 = conduit.get(HierarchicalName.of("pipe-2"));
 
     pipe1.emit(10);
     pipe2.emit(20);
@@ -291,12 +291,12 @@ class SequencerIntegrationTest {
   void shouldApplyFlowTransformationsAtConduitLevelToAllChannels() throws InterruptedException {
     circuit = new SingleThreadCircuit(HierarchicalName.of("test-circuit"));
 
-    List<Integer> received = new ArrayList<>();
+    List< Integer > received = new ArrayList<>();
     CountDownLatch latch = new CountDownLatch(6);
 
-    // M15+ API: Consumer<Flow> that filters negatives and doubles values
+    // M15+ API: Consumer< Flow > that filters negatives and doubles values
     // Applied at Conduit level means ALL channels/pipes created from this Conduit will apply these transformations
-    Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
+    Conduit< Pipe< Integer >, Integer > conduit = circuit.conduit(
       HierarchicalName.of("conduit-flow"),
       Composer.pipe(),  // Plain composer
       flow -> flow
@@ -307,9 +307,9 @@ class SequencerIntegrationTest {
     conduit.subscribe(subscriber(HierarchicalName.of("subscriber"), received, latch));
 
     // Create multiple channels - all should apply the same transformations
-    Pipe<Integer> channel1 = conduit.get(HierarchicalName.of("channel-1"));
-    Pipe<Integer> channel2 = conduit.get(HierarchicalName.of("channel-2"));
-    Pipe<Integer> channel3 = conduit.get(HierarchicalName.of("channel-3"));
+    Pipe< Integer > channel1 = conduit.get(HierarchicalName.of("channel-1"));
+    Pipe< Integer > channel2 = conduit.get(HierarchicalName.of("channel-2"));
+    Pipe< Integer > channel3 = conduit.get(HierarchicalName.of("channel-3"));
 
     // Emit from channel 1
     channel1.emit(-5);  // Filtered by guard

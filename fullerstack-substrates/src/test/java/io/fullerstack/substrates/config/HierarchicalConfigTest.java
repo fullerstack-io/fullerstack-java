@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.*;
 
 /**
  * Tests for {@link HierarchicalConfig}.
- * <p>
+ * < p >
  * Coverage:
  * - Global configuration (config.properties)
  * - Circuit-specific configuration (fallback to global)

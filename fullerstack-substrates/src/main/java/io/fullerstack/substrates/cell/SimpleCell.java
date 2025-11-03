@@ -18,33 +18,33 @@ import java.util.function.Function;
 /**
  * Simple Cell implementation for Circuit.cell() support (M18 API).
  *
- * <p>Cell<I, E> provides bidirectional signal transformation:
- * <ul>
- *   <li>Accepts input type I via emit() - delegates to input Pipe<I></li>
- *   <li>Emits type E to output Pipe<E> (M18 API)</li>
- *   <li>Supports hierarchical children via get(Name)</li>
- * </ul>
+ * < p >Cell< I, E > provides bidirectional signal transformation:
+ * < ul >
+ *   < li >Accepts input type I via emit() - delegates to input Pipe< I ></li >
+ *   < li >Emits type E to output Pipe< E > (M18 API)</li >
+ *   < li >Supports hierarchical children via get(Name)</li >
+ * </ul >
  *
- * <p><b>M18 API Design:</b>
- * - Input: Pipe<I> created by Composer (receives I values)
- * - Output: Pipe<E> provided by caller (emits E values)
- * - The Conduit provides the Source<E> subscription infrastructure
- * - Implements Pipe<I> by delegating to input pipe
- * - Implements Source<E> by delegating to conduit
+ * < p >< b >M18 API Design:</b >
+ * - Input: Pipe< I > created by Composer (receives I values)
+ * - Output: Pipe< E > provided by caller (emits E values)
+ * - The Conduit provides the Source< E > subscription infrastructure
+ * - Implements Pipe< I > by delegating to input pipe
+ * - Implements Source< E > by delegating to conduit
  * - Implements Extent for hierarchy (get, enclosure)
  *
- * @param <I> input type (what Cell receives)
- * @param <E> emission type (what Cell emits to output pipe)
+ * @param < I > input type (what Cell receives)
+ * @param < E > emission type (what Cell emits to output pipe)
  */
-public class SimpleCell<I, E> implements Cell<I, E> {
+public class SimpleCell< I, E > implements Cell< I, E > {
 
-  private final SimpleCell<I, E> parent;
+  private final SimpleCell< I, E > parent;
   private final String segment;
-  private final Pipe<I> inputPipe;                 // Input: created by Composer
-  private final Pipe<E> outputPipe;                // Output: provided by M18 API
-  private final Conduit<Pipe<I>, E> conduit;       // Provides subscription infrastructure
+  private final Pipe< I > inputPipe;                 // Input: created by Composer
+  private final Pipe< E > outputPipe;                // Output: provided by M18 API
+  private final Conduit< Pipe< I >, E > conduit;       // Provides subscription infrastructure
   private final Subject subject;
-  private final Map<Name, Cell<I, E>> children = new ConcurrentHashMap<>();
+  private final Map< Name, Cell< I, E >> children = new ConcurrentHashMap<>();
 
   /**
    * Creates a new Cell with input and output pipes (M18 API).
@@ -57,11 +57,11 @@ public class SimpleCell<I, E> implements Cell<I, E> {
    * @param parentSubject parent Subject for hierarchy (null for root)
    */
   public SimpleCell(
-    SimpleCell<I, E> parent,
+    SimpleCell< I, E > parent,
     Name name,
-    Pipe<I> inputPipe,
-    Pipe<E> outputPipe,
-    Conduit<Pipe<I>, E> conduit,
+    Pipe< I > inputPipe,
+    Pipe< E > outputPipe,
+    Conduit< Pipe< I >, E > conduit,
     Subject<?> parentSubject
   ) {
     this.parent = parent;
@@ -78,19 +78,19 @@ public class SimpleCell<I, E> implements Cell<I, E> {
     );
   }
 
-  // ========== Pipe<I> accessor (RC3) ==========
+  // ========== Pipe< I > accessor (RC3) ==========
 
   @Override
-  public Pipe<I> pipe() {
+  public Pipe< I > pipe() {
     // Return the input pipe (Cell no longer implements Pipe directly in RC3)
     // RC3 change: Cell.pipe() method instead of implementing Pipe interface
     return inputPipe;
   }
 
-  // ========== Source<E> implementation (output) ==========
+  // ========== Source< E > implementation (output) ==========
 
   @Override
-  public Subscription subscribe(Subscriber<E> subscriber) {
+  public Subscription subscribe(Subscriber< E > subscriber) {
     // Delegate to the conduit's subscription mechanism
     return conduit.subscribe(subscriber);
   }
@@ -103,16 +103,16 @@ public class SimpleCell<I, E> implements Cell<I, E> {
   }
 
   @Override
-  public Optional<Cell<I, E>> enclosure() {
+  public Optional< Cell< I, E >> enclosure() {
     return Optional.ofNullable(parent);
   }
 
   @Override
-  public Cell<I, E> get(Name name) {
+  public Cell< I, E > get(Name name) {
     return children.computeIfAbsent(name, n -> {
       // Get the child input pipe from the conduit
       // This creates a new Channel and invokes the composer
-      Pipe<I> childInputPipe = conduit.get(n);
+      Pipe< I > childInputPipe = conduit.get(n);
 
       // Child cells share the same output pipe as the parent
       // (all cells in the hierarchy emit to the same output)
@@ -121,12 +121,12 @@ public class SimpleCell<I, E> implements Cell<I, E> {
   }
 
   @Override
-  public Cell<I, E> get(Subject<?> subject) {
+  public Cell< I, E > get(Subject<?> subject) {
     return get(subject.name());
   }
 
   @Override
-  public Cell<I, E> get(Substrate<?> substrate) {
+  public Cell< I, E > get(Substrate<?> substrate) {
     return get(substrate.subject().name());
   }
 

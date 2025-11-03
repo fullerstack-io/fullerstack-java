@@ -55,8 +55,8 @@ class StateSlotArticleTest {
     assertThat(state.stream().count()).isEqualTo(2);
 
     // Verify both values are present
-    Slot<Integer> xyzSlot = cortex.slot(XYZ, -1);
-    Slot<Integer> abcSlot = cortex.slot(ABC, -1);
+    Slot< Integer > xyzSlot = cortex.slot(XYZ, -1);
+    Slot< Integer > abcSlot = cortex.slot(ABC, -1);
 
     assertThat(state.value(xyzSlot)).isEqualTo(1);
     assertThat(state.value(abcSlot)).isEqualTo(2);
@@ -73,7 +73,7 @@ class StateSlotArticleTest {
   void scenario2_slotValueResolutionWithFallback() {
     State state = cortex.state().state(XYZ, 1);
 
-    Slot<Integer> xyz = cortex.slot(XYZ, -1);
+    Slot< Integer > xyz = cortex.slot(XYZ, -1);
 
     // Should find value in state
     assertThat(state.value(xyz)).isEqualTo(1);
@@ -89,7 +89,7 @@ class StateSlotArticleTest {
     State state = cortex.state().state(ABC, 100);
 
     // Query for XYZ (not in state) with fallback -1
-    Slot<Integer> xyz = cortex.slot(XYZ, -1);
+    Slot< Integer > xyz = cortex.slot(XYZ, -1);
 
     // Should return fallback value
     assertThat(state.value(xyz)).isEqualTo(-1);
@@ -106,7 +106,7 @@ class StateSlotArticleTest {
   void scenario3_stateModificationImmutability() {
     State state = cortex.state().state(XYZ, 1);
 
-    Slot<Integer> xyz = cortex.slot(XYZ, -1);
+    Slot< Integer > xyz = cortex.slot(XYZ, -1);
     assertThat(state.value(xyz)).isEqualTo(1);
 
     // "Modify" by creating new state
@@ -129,7 +129,7 @@ class StateSlotArticleTest {
    */
   @Test
   void scenario4_typeMatchingSameNameDifferentTypes() {
-    Slot<Integer> xyz = cortex.slot(XYZ, -1);
+    Slot< Integer > xyz = cortex.slot(XYZ, -1);
 
     State state = cortex.state()
       .state(XYZ, 3)      // Integer
@@ -139,7 +139,7 @@ class StateSlotArticleTest {
     assertThat(state.value(xyz)).isEqualTo(3);
 
     // Query for String type - should return "4"
-    Slot<String> xyzString = cortex.slot(XYZ, "default");
+    Slot< String > xyzString = cortex.slot(XYZ, "default");
     assertThat(state.value(xyzString)).isEqualTo("4");
 
     // Both values coexist because types differ
@@ -159,7 +159,7 @@ class StateSlotArticleTest {
    */
   @Test
   void scenario5_compactState() {
-    Slot<Integer> xyz = cortex.slot(XYZ, -1);
+    Slot< Integer > xyz = cortex.slot(XYZ, -1);
 
     State state = cortex.state()
       .state(XYZ, 4)
@@ -167,7 +167,7 @@ class StateSlotArticleTest {
       .compact();
 
     // After compact, should have only last value
-    List<Integer> values = state.values(xyz).collect(Collectors.toList());
+    List< Integer > values = state.values(xyz).collect(Collectors.toList());
 
     assertThat(values).containsExactly(3);  // Only last value (3)
     assertThat(state.stream().count()).isEqualTo(1);  // Only 1 slot after compact
@@ -186,7 +186,7 @@ class StateSlotArticleTest {
    */
   @Test
   void scenario6_multipleValuesWithSameNameAndType() {
-    Slot<Integer> xyz = cortex.slot(XYZ, -1);
+    Slot< Integer > xyz = cortex.slot(XYZ, -1);
 
     State state = cortex.state()
       .state(XYZ, 1)
@@ -197,7 +197,7 @@ class StateSlotArticleTest {
     assertThat(state.value(xyz)).isEqualTo(3);
 
     // values() returns ALL occurrences in reverse chronological order (most recent first)
-    List<Integer> allValues = state.values(xyz).collect(Collectors.toList());
+    List< Integer > allValues = state.values(xyz).collect(Collectors.toList());
     assertThat(allValues).containsExactly(3, 2, 1);
   }
 
@@ -225,7 +225,7 @@ class StateSlotArticleTest {
       .state(ABC, "hello")      // String (added second)
       .state(XYZ, true);        // Boolean (added third - most recent)
 
-    List<Slot<?>> allSlots = state.stream().collect(Collectors.toList());
+    List< Slot<?>> allSlots = state.stream().collect(Collectors.toList());
 
     assertThat(allSlots).hasSize(3);
 
@@ -266,11 +266,11 @@ class StateSlotArticleTest {
     State outerState = cortex.state().state(NODE, innerState);
 
     // Query for nested state
-    Slot<State> nodeSlot = TypedSlot.of(NODE, cortex.state(), State.class);
+    Slot< State > nodeSlot = TypedSlot.of(NODE, cortex.state(), State.class);
     State retrievedInner = outerState.value(nodeSlot);
 
     // Verify nested state content
-    Slot<String> nameSlot = cortex.slot(NAME, "");
+    Slot< String > nameSlot = cortex.slot(NAME, "");
     assertThat(retrievedInner.value(nameSlot)).isEqualTo("william");
   }
 
@@ -290,9 +290,9 @@ class StateSlotArticleTest {
       .state(PORT, true);       // Boolean enabled flag
 
     // Each type can be retrieved independently
-    Slot<Integer> portNumber = cortex.slot(PORT, 0);
-    Slot<String> portProtocol = cortex.slot(PORT, "");
-    Slot<Boolean> portEnabled = cortex.slot(PORT, false);
+    Slot< Integer > portNumber = cortex.slot(PORT, 0);
+    Slot< String > portProtocol = cortex.slot(PORT, "");
+    Slot< Boolean > portEnabled = cortex.slot(PORT, false);
 
     assertThat(state.value(portNumber)).isEqualTo(8080);
     assertThat(state.value(portProtocol)).isEqualTo("HTTP/1.1");
@@ -321,8 +321,8 @@ class StateSlotArticleTest {
     // Should keep last Integer (3) and last String ("b")
     assertThat(compacted.stream().count()).isEqualTo(2);
 
-    Slot<Integer> xyzInt = cortex.slot(XYZ, -1);
-    Slot<String> xyzStr = cortex.slot(XYZ, "");
+    Slot< Integer > xyzInt = cortex.slot(XYZ, -1);
+    Slot< String > xyzStr = cortex.slot(XYZ, "");
 
     assertThat(compacted.value(xyzInt)).isEqualTo(3);
     assertThat(compacted.value(xyzStr)).isEqualTo("b");
@@ -335,7 +335,7 @@ class StateSlotArticleTest {
   void edgeCase_emptyStateWithFallback() {
     State emptyState = cortex.state();
 
-    Slot<Integer> xyz = cortex.slot(XYZ, 999);
+    Slot< Integer > xyz = cortex.slot(XYZ, 999);
 
     // Should return fallback for empty state
     assertThat(emptyState.value(xyz)).isEqualTo(999);

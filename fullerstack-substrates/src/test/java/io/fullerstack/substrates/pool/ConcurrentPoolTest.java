@@ -13,7 +13,7 @@ class ConcurrentPoolTest {
 
   @Test
   void shouldReturnSameInstanceForSameName() {
-    Pool<String> pool = new ConcurrentPool<>(name -> "value-" + name.value());
+    Pool< String > pool = new ConcurrentPool<>(name -> "value-" + name.value());
 
     Name name = HierarchicalName.of("test");
     String value1 = pool.get(name);
@@ -24,7 +24,7 @@ class ConcurrentPoolTest {
 
   @Test
   void shouldReturnDifferentInstancesForDifferentNames() {
-    Pool<String> pool = new ConcurrentPool<>(name -> "value-" + name.value());
+    Pool< String > pool = new ConcurrentPool<>(name -> "value-" + name.value());
 
     String value1 = pool.get(HierarchicalName.of("test1"));
     String value2 = pool.get(HierarchicalName.of("test2"));
@@ -37,7 +37,7 @@ class ConcurrentPoolTest {
   @Test
   void shouldCallFactoryOnlyOnce() {
     AtomicInteger factoryCalls = new AtomicInteger(0);
-    Pool<String> pool = new ConcurrentPool<>(name -> {
+    Pool< String > pool = new ConcurrentPool<>(name -> {
       factoryCalls.incrementAndGet();
       return "value";
     });
@@ -53,7 +53,7 @@ class ConcurrentPoolTest {
   @Test
   void shouldSupportComplexObjects() {
     // Use path() to get full hierarchical name, not just value() which returns the last segment
-    Pool<ComplexObject> pool = new ConcurrentPool<>(name -> new ComplexObject(name.path().toString()));
+    Pool< ComplexObject > pool = new ConcurrentPool<>(name -> new ComplexObject(name.path().toString()));
 
     Name name = HierarchicalName.of("kafka.broker.1");
     ComplexObject obj = pool.get(name);
@@ -63,7 +63,7 @@ class ConcurrentPoolTest {
 
   @Test
   void shouldHandleNullFactory() {
-    Pool<String> pool = new ConcurrentPool<>(name -> null);
+    Pool< String > pool = new ConcurrentPool<>(name -> null);
 
     String value = pool.get(HierarchicalName.of("test"));
 
@@ -72,7 +72,7 @@ class ConcurrentPoolTest {
 
   @Test
   void shouldSupportConcurrentAccess() throws Exception {
-    Pool<String> pool = new ConcurrentPool<>(name -> "value-" + name.value());
+    Pool< String > pool = new ConcurrentPool<>(name -> "value-" + name.value());
     Name name = HierarchicalName.of("concurrent");
 
     Thread[] threads = new Thread[10];
