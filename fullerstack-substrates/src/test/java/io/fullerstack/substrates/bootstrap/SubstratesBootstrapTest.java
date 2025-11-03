@@ -16,68 +16,68 @@ import static org.assertj.core.api.Assertions.*;
 
 /**
  * Tests for {@link SubstratesBootstrap}.
- * < p >
+ * <p>
  * Demonstrates convention-based circuit discovery and bootstrap.
  */
 class SubstratesBootstrapTest {
 
   @Test
-  void testBootstrap_DiscoversTestCircuits() {
+  void testBootstrap_DiscoversTestCircuits () {
     // Bootstrap discovers config_broker-health.properties and config_partition-flow.properties
-    BootstrapResult result = SubstratesBootstrap.bootstrap();
+    BootstrapResult result = SubstratesBootstrap.bootstrap ();
 
     // Should discover our test circuits
-    assertThat(result.getCircuitNames())
-      .contains("broker-health", "partition-flow");
+    assertThat ( result.getCircuitNames () )
+      .contains ( "broker-health", "partition-flow" );
 
     // Cleanup
     try {
-      result.close();
-    } catch (Exception e) {
-      fail("Failed to close bootstrap result", e);
+      result.close ();
+    } catch ( Exception e ) {
+      fail ( "Failed to close bootstrap result", e );
     }
   }
 
   @Test
-  void testBootstrap_WithCallbacks() {
-    StringBuilder log = new StringBuilder();
+  void testBootstrap_WithCallbacks () {
+    StringBuilder log = new StringBuilder ();
 
-    BootstrapResult result = SubstratesBootstrap.builder()
-      .onCircuitCreated((name, circuit) -> {
-        log.append("Created: ").append(name).append("\n");
-      })
-      .onSensorStarted((circuit, sensor) -> {
-        log.append("Started sensor: ").append(sensor.name())
-          .append(" for circuit: ").append(circuit).append("\n");
-      })
-      .bootstrap();
+    BootstrapResult result = SubstratesBootstrap.builder ()
+      .onCircuitCreated ( ( name, circuit ) -> {
+        log.append ( "Created: " ).append ( name ).append ( "\n" );
+      } )
+      .onSensorStarted ( ( circuit, sensor ) -> {
+        log.append ( "Started sensor: " ).append ( sensor.name () )
+          .append ( " for circuit: " ).append ( circuit ).append ( "\n" );
+      } )
+      .bootstrap ();
 
     // Should have logged circuit creation
-    assertThat(log.toString()).contains("Created: broker-health");
-    assertThat(log.toString()).contains("Created: partition-flow");
+    assertThat ( log.toString () ).contains ( "Created: broker-health" );
+    assertThat ( log.toString () ).contains ( "Created: partition-flow" );
 
     // Cleanup
     try {
-      result.close();
-    } catch (Exception e) {
-      fail("Failed to close bootstrap result", e);
+      result.close ();
+    } catch ( Exception e ) {
+      fail ( "Failed to close bootstrap result", e );
     }
   }
 
   @Test
-  void testBootstrap_GetsCircuitByName() {
-    BootstrapResult result = SubstratesBootstrap.bootstrap();
+  void testBootstrap_GetsCircuitByName () {
+    BootstrapResult result = SubstratesBootstrap.bootstrap ();
 
     // Can get circuit by name
-    assertThat(result.getCircuit("broker-health")).isNotNull();
-    assertThat(result.getCircuit("partition-flow")).isNotNull();
-    assertThat(result.getCircuit("nonexistent")).isNull();
+    assertThat ( result.getCircuit ( "broker-health" ) ).isNotNull ();
+    assertThat ( result.getCircuit ( "partition-flow" ) ).isNotNull ();
+    assertThat ( result.getCircuit ( "nonexistent" ) ).isNull ();
 
     // Cleanup
     try {
-      result.close();
-    } catch (Exception e) {
-      fail("Failed to close bootstrap result", e);
+      result.close ();
+    } catch ( Exception e ) {
+      fail ( "Failed to close bootstrap result", e );
     }
   }
 
@@ -87,13 +87,13 @@ class SubstratesBootstrapTest {
   public static class TestComposerProvider implements ComposerProvider {
 
     @Override
-    public Composer<?, ?> getComposer(String circuitName, String componentName, ComponentType type) {
+    public Composer < ?, ? > getComposer ( String circuitName, String componentName, ComponentType type ) {
       // Return pipe composer for all components
-      return pipe();
+      return pipe ();
     }
 
     @Override
-    public Class<?> getSignalType(String circuitName, String componentName) {
+    public Class < ? > getSignalType ( String circuitName, String componentName ) {
       return String.class;  // Use String as test signal type
     }
   }
@@ -104,15 +104,15 @@ class SubstratesBootstrapTest {
   public static class TestSensorProvider implements SensorProvider {
 
     @Override
-    public List< Sensor > getSensors(
-        String circuitName,
-        Circuit circuit,
-        Cortex cortex,
-        HierarchicalConfig config,
-        BootstrapContext context
+    public List < Sensor > getSensors (
+      String circuitName,
+      Circuit circuit,
+      Cortex cortex,
+      HierarchicalConfig config,
+      BootstrapContext context
     ) {
       // No sensors for test circuits
-      return List.of();
+      return List.of ();
     }
   }
 }

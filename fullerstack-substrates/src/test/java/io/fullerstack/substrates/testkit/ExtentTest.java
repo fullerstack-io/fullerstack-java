@@ -42,13 +42,13 @@ final class ExtentTest {
   @Test
   void testCompareTo () {
 
-  final var a = TestExtent.root ( "a" );
-  final var b = TestExtent.root ( "b" );
-  final var c = TestExtent.root ( "c" );
+    final var a = TestExtent.root ( "a" );
+    final var b = TestExtent.root ( "b" );
+    final var c = TestExtent.root ( "c" );
 
-  assertTrue ( a.compareTo ( b ) < 0 );
-  assertTrue ( c.compareTo ( b ) > 0 );
-  assertEquals ( 0, a.compareTo ( a ) );
+    assertTrue ( a.compareTo ( b ) < 0 );
+    assertTrue ( c.compareTo ( b ) > 0 );
+    assertEquals ( 0, a.compareTo ( a ) );
 
   }
 
@@ -60,73 +60,73 @@ final class ExtentTest {
   @Test
   void testCompareToNullThrows () {
 
-  final var extent = TestExtent.root ( "test" );
+    final var extent = TestExtent.root ( "test" );
 
-  assertThrows (
-    NullPointerException.class,
-    () -> extent.compareTo ( null )
-  );
+    assertThrows (
+      NullPointerException.class,
+      () -> extent.compareTo ( null )
+    );
 
   }
 
   @Test
   void testCompareToSameHierarchy () {
 
-  final var root1 = TestExtent.root ( "root" );
-  final var child1 = root1.child ( "child" );
+    final var root1 = TestExtent.root ( "root" );
+    final var child1 = root1.child ( "child" );
 
-  final var root2 = TestExtent.root ( "root" );
-  final var child2 = root2.child ( "child" );
+    final var root2 = TestExtent.root ( "root" );
+    final var child2 = root2.child ( "child" );
 
-  assertEquals ( 0, child1.compareTo ( child2 ) );
+    assertEquals ( 0, child1.compareTo ( child2 ) );
 
   }
 
   @Test
   void testCompareToWithHierarchy () {
 
-  final var root = TestExtent.root ( "root" );
-  final var child = root.child ( "child" );
+    final var root = TestExtent.root ( "root" );
+    final var child = root.child ( "child" );
 
-  assertTrue ( root.compareTo ( child ) < 0 );
-  assertTrue ( child.compareTo ( root ) > 0 );
+    assertTrue ( root.compareTo ( child ) < 0 );
+    assertTrue ( child.compareTo ( root ) > 0 );
 
   }
 
   @Test
   void testConsistencyBetweenOperations () {
 
-  final var a = TestExtent.root ( "a" );
-  final var b = a.child ( "b" );
-  final var c = b.child ( "c" );
-  final var d = c.child ( "d" );
+    final var a = TestExtent.root ( "a" );
+    final var b = a.child ( "b" );
+    final var c = b.child ( "c" );
+    final var d = c.child ( "d" );
 
-  // Depth should match stream count
-  assertEquals ( d.depth (), d.stream ().count () );
+    // Depth should match stream count
+    assertEquals ( d.depth (), d.stream ().count () );
 
-  // Fold count should match depth
-  final var foldCount = d.fold (
-    _ -> 1,
-    ( acc, _ ) -> acc + 1
-  );
-  assertEquals ( d.depth (), foldCount );
+    // Fold count should match depth
+    final var foldCount = d.fold (
+      _ -> 1,
+      ( acc, _ ) -> acc + 1
+    );
+    assertEquals ( d.depth (), foldCount );
 
-  // Iterator count should match depth
-  final Iterator < TestExtent > iterator = d.iterator ();
-  var iteratorCount = 0;
-  while ( iterator.hasNext () ) {
-    iterator.next ();
-    iteratorCount++;
-  }
-  assertEquals ( d.depth (), iteratorCount );
+    // Iterator count should match depth
+    final Iterator < TestExtent > iterator = d.iterator ();
+    var iteratorCount = 0;
+    while ( iterator.hasNext () ) {
+      iterator.next ();
+      iteratorCount++;
+    }
+    assertEquals ( d.depth (), iteratorCount );
 
   }
 
   @Test
   void testDepthRoot () {
 
-  final var root = TestExtent.root ( "root" );
-  assertEquals ( 1, root.depth () );
+    final var root = TestExtent.root ( "root" );
+    assertEquals ( 1, root.depth () );
 
   }
 
@@ -137,28 +137,28 @@ final class ExtentTest {
   @Test
   void testDepthWithChildren () {
 
-  final var root = TestExtent.root ( "a" );
-  final var b = root.child ( "b" );
-  final var c = b.child ( "c" );
-  final var d = c.child ( "d" );
+    final var root = TestExtent.root ( "a" );
+    final var b = root.child ( "b" );
+    final var c = b.child ( "c" );
+    final var d = c.child ( "d" );
 
-  assertEquals ( 1, root.depth () );
-  assertEquals ( 2, b.depth () );
-  assertEquals ( 3, c.depth () );
-  assertEquals ( 4, d.depth () );
+    assertEquals ( 1, root.depth () );
+    assertEquals ( 2, b.depth () );
+    assertEquals ( 3, c.depth () );
+    assertEquals ( 4, d.depth () );
 
   }
 
   @Test
   void testEnclosureConsumer () {
 
-  final var root = TestExtent.root ( "root" );
-  final var child = root.child ( "child" );
-  final var result = new String[1];
+    final var root = TestExtent.root ( "root" );
+    final var child = root.child ( "child" );
+    final var result = new String[1];
 
-  child.enclosure ( parent -> result[0] = parent.part ().toString () );
+    child.enclosure ( parent -> result[0] = parent.part ().toString () );
 
-  assertEquals ( "root", result[0] );
+    assertEquals ( "root", result[0] );
 
   }
 
@@ -169,37 +169,37 @@ final class ExtentTest {
   @Test
   void testEnclosureConsumerNotCalledMultipleTimes () {
 
-  final var root = TestExtent.root ( "root" );
-  final var child = root.child ( "child" );
+    final var root = TestExtent.root ( "root" );
+    final var child = root.child ( "child" );
 
-  final var counter = new AtomicInteger ( 0 );
-  child.enclosure ( _ -> counter.incrementAndGet () );
+    final var counter = new AtomicInteger ( 0 );
+    child.enclosure ( _ -> counter.incrementAndGet () );
 
-  assertEquals ( 1, counter.get () );
+    assertEquals ( 1, counter.get () );
 
   }
 
   @Test
   void testEnclosureConsumerOnRoot () {
 
-  final var root = TestExtent.root ( "root" );
-  final var called = new boolean[1];
+    final var root = TestExtent.root ( "root" );
+    final var called = new boolean[1];
 
-  root.enclosure ( _ -> called[0] = true );
+    root.enclosure ( _ -> called[0] = true );
 
-  assertFalse ( called[0] );
+    assertFalse ( called[0] );
 
   }
 
   @Test
   void testEnclosureOnChild () {
 
-  final var root = TestExtent.root ( "root" );
-  final var child = root.child ( "child" );
+    final var root = TestExtent.root ( "root" );
+    final var child = root.child ( "child" );
 
-  final var enclosure = child.enclosure ();
-  assertTrue ( enclosure.isPresent () );
-  assertSame ( root, enclosure.get () );
+    final var enclosure = child.enclosure ();
+    assertTrue ( enclosure.isPresent () );
+    assertSame ( root, enclosure.get () );
 
   }
 
@@ -210,35 +210,35 @@ final class ExtentTest {
   @Test
   void testEnclosureOnRoot () {
 
-  final var root = TestExtent.root ( "root" );
-  assertTrue ( root.enclosure ().isEmpty () );
+    final var root = TestExtent.root ( "root" );
+    assertTrue ( root.enclosure ().isEmpty () );
 
   }
 
   @Test
   void testExtent () {
 
-  final var extent = TestExtent.root ( "test" );
-  assertSame ( extent, extent.extent () );
+    final var extent = TestExtent.root ( "test" );
+    assertSame ( extent, extent.extent () );
 
   }
 
   @Test
   void testExtentWithEmptyString () {
 
-  final var root = TestExtent.root ( "" );
-  assertEquals ( "", root.part () );
-  assertEquals ( "", root.path ().toString () );
+    final var root = TestExtent.root ( "" );
+    assertEquals ( "", root.part () );
+    assertEquals ( "", root.path ().toString () );
 
   }
 
   @Test
   void testExtentWithSpecialCharacters () {
 
-  final var root = TestExtent.root ( "test-name_123" );
-  final var child = root.child ( "child@#$" );
+    final var root = TestExtent.root ( "test-name_123" );
+    final var child = root.child ( "child@#$" );
 
-  assertEquals ( "test-name_123/child@#$", child.path ().toString () );
+    assertEquals ( "test-name_123/child@#$", child.path ().toString () );
 
   }
 
@@ -249,51 +249,51 @@ final class ExtentTest {
   @Test
   void testExtremity () {
 
-  final var root = TestExtent.root ( "root" );
-  final var child = root.child ( "child" );
-  final var grandchild = child.child ( "grandchild" );
+    final var root = TestExtent.root ( "root" );
+    final var child = root.child ( "child" );
+    final var grandchild = child.child ( "grandchild" );
 
-  assertSame ( root, grandchild.extremity () );
-  assertSame ( root, child.extremity () );
-  assertSame ( root, root.extremity () );
+    assertSame ( root, grandchild.extremity () );
+    assertSame ( root, child.extremity () );
+    assertSame ( root, root.extremity () );
 
   }
 
   @Test
   void testExtremityDeepHierarchy () {
 
-  var current = TestExtent.root ( "level0" );
+    var current = TestExtent.root ( "level0" );
 
-  for ( var i = 1; i <= 10; i++ ) {
-    current = current.child ( "level" + i );
-  }
+    for ( var i = 1; i <= 10; i++ ) {
+      current = current.child ( "level" + i );
+    }
 
-  final var root = current.extremity ();
-  assertEquals ( "level0", root.part () );
+    final var root = current.extremity ();
+    assertEquals ( "level0", root.part () );
 
   }
 
   @Test
   void testExtremityOnRoot () {
 
-  final var root = TestExtent.root ( "root" );
-  assertSame ( root, root.extremity () );
+    final var root = TestExtent.root ( "root" );
+    assertSame ( root, root.extremity () );
 
   }
 
   @Test
   void testFoldAccumulation () {
 
-  final var root = TestExtent.root ( "10" );
-  final var child = root.child ( "20" );
-  final var grandchild = child.child ( "30" );
+    final var root = TestExtent.root ( "10" );
+    final var child = root.child ( "20" );
+    final var grandchild = child.child ( "30" );
 
-  final var sum = grandchild.fold (
-    e -> Integer.parseInt ( e.part ().toString () ),
-    ( acc, e ) -> acc + Integer.parseInt ( e.part ().toString () )
-  );
+    final var sum = grandchild.fold (
+      e -> Integer.parseInt ( e.part ().toString () ),
+      ( acc, e ) -> acc + Integer.parseInt ( e.part ().toString () )
+    );
 
-  assertEquals ( 60, sum );
+    assertEquals ( 60, sum );
 
   }
 
@@ -304,64 +304,64 @@ final class ExtentTest {
   @Test
   void testFoldCount () {
 
-  final var root = TestExtent.root ( "a" );
-  final var child = root.child ( "b" );
-  final var grandchild = child.child ( "c" );
+    final var root = TestExtent.root ( "a" );
+    final var child = root.child ( "b" );
+    final var grandchild = child.child ( "c" );
 
-  final var count = grandchild.fold (
-    _ -> 1,
-    ( acc, _ ) -> acc + 1
-  );
+    final var count = grandchild.fold (
+      _ -> 1,
+      ( acc, _ ) -> acc + 1
+    );
 
-  assertEquals ( 3, count );
+    assertEquals ( 3, count );
 
   }
 
   @Test
   void testFoldOnRoot () {
 
-  final var root = TestExtent.root ( "test" );
+    final var root = TestExtent.root ( "test" );
 
-  final var result = root.fold (
-    e -> e.part ().toString (),
-    ( acc, e ) -> acc + "/" + e.part ()
-  );
+    final var result = root.fold (
+      e -> e.part ().toString (),
+      ( acc, e ) -> acc + "/" + e.part ()
+    );
 
-  assertEquals ( "test", result );
+    assertEquals ( "test", result );
 
   }
 
   @Test
   void testFoldRightToLeft () {
 
-  final var a = TestExtent.root ( "a" );
-  final var b = a.child ( "b" );
-  final var c = b.child ( "c" );
+    final var a = TestExtent.root ( "a" );
+    final var b = a.child ( "b" );
+    final var c = b.child ( "c" );
 
-  // fold goes from right (c) to left (a)
-  final var result = c.fold (
-    e -> e.part ().toString (),
-    ( acc, e ) -> e.part () + "/" + acc
-  );
+    // fold goes from right (c) to left (a)
+    final var result = c.fold (
+      e -> e.part ().toString (),
+      ( acc, e ) -> e.part () + "/" + acc
+    );
 
-  assertEquals ( "a/b/c", result );
+    assertEquals ( "a/b/c", result );
 
   }
 
   @Test
   void testFoldToLeftToRight () {
 
-  final var a = TestExtent.root ( "a" );
-  final var b = a.child ( "b" );
-  final var c = b.child ( "c" );
+    final var a = TestExtent.root ( "a" );
+    final var b = a.child ( "b" );
+    final var c = b.child ( "c" );
 
-  // foldTo goes from left (a) to right (c)
-  final var result = c.foldTo (
-    e -> e.part ().toString (),
-    ( acc, e ) -> acc + "." + e.part ()
-  );
+    // foldTo goes from left (a) to right (c)
+    final var result = c.foldTo (
+      e -> e.part ().toString (),
+      ( acc, e ) -> acc + "." + e.part ()
+    );
 
-  assertEquals ( "a.b.c", result );
+    assertEquals ( "a.b.c", result );
 
   }
 
@@ -372,38 +372,38 @@ final class ExtentTest {
   @Test
   void testFoldToOnRoot () {
 
-  final var root = TestExtent.root ( "single" );
+    final var root = TestExtent.root ( "single" );
 
-  final var result = root.foldTo (
-    e -> e.part ().toString (),
-    ( acc, e ) -> acc + "." + e.part ()
-  );
+    final var result = root.foldTo (
+      e -> e.part ().toString (),
+      ( acc, e ) -> acc + "." + e.part ()
+    );
 
-  assertEquals ( "single", result );
+    assertEquals ( "single", result );
 
   }
 
   @Test
   void testFoldToVsFoldOrder () {
 
-  final var a = TestExtent.root ( "first" );
-  final var b = a.child ( "second" );
-  final var c = b.child ( "third" );
+    final var a = TestExtent.root ( "first" );
+    final var b = a.child ( "second" );
+    final var c = b.child ( "third" );
 
-  // fold builds right-to-left
-  final var foldResult = c.fold (
-    e -> e.part ().toString (),
-    ( acc, e ) -> e.part () + "." + acc
-  );
+    // fold builds right-to-left
+    final var foldResult = c.fold (
+      e -> e.part ().toString (),
+      ( acc, e ) -> e.part () + "." + acc
+    );
 
-  // foldTo builds left-to-right
-  final var foldToResult = c.foldTo (
-    e -> e.part ().toString (),
-    ( acc, e ) -> acc + "." + e.part ()
-  );
+    // foldTo builds left-to-right
+    final var foldToResult = c.foldTo (
+      e -> e.part ().toString (),
+      ( acc, e ) -> acc + "." + e.part ()
+    );
 
-  assertEquals ( foldResult, foldToResult );
-  assertEquals ( "first.second.third", foldResult );
+    assertEquals ( foldResult, foldToResult );
+    assertEquals ( "first.second.third", foldResult );
 
   }
 
@@ -411,12 +411,12 @@ final class ExtentTest {
   @Test
   void testFoldToWithNullAccumulatorThrows () {
 
-  final var extent = TestExtent.root ( "test" );
+    final var extent = TestExtent.root ( "test" );
 
-  assertThrows (
-    NullPointerException.class,
-    () -> extent.foldTo ( _ -> 1, null )
-  );
+    assertThrows (
+      NullPointerException.class,
+      () -> extent.foldTo ( _ -> 1, null )
+    );
 
   }
 
@@ -424,27 +424,27 @@ final class ExtentTest {
   @Test
   void testFoldToWithNullInitializerThrows () {
 
-  final var extent = TestExtent.root ( "test" );
+    final var extent = TestExtent.root ( "test" );
 
-  assertThrows (
-    NullPointerException.class,
-    () -> extent.foldTo ( null, ( acc, _ ) -> acc )
-  );
+    assertThrows (
+      NullPointerException.class,
+      () -> extent.foldTo ( null, ( acc, _ ) -> acc )
+    );
 
   }
 
   @Test
   void testFoldToWithTransformation () {
 
-  final var root = TestExtent.root ( "one" );
-  final var child = root.child ( "two" );
+    final var root = TestExtent.root ( "one" );
+    final var child = root.child ( "two" );
 
-  final var result = child.foldTo (
-    e -> e.part ().toString ().toUpperCase (),
-    ( acc, e ) -> acc + "-" + e.part ().toString ().toUpperCase ()
-  );
+    final var result = child.foldTo (
+      e -> e.part ().toString ().toUpperCase (),
+      ( acc, e ) -> acc + "-" + e.part ().toString ().toUpperCase ()
+    );
 
-  assertEquals ( "ONE-TWO", result );
+    assertEquals ( "ONE-TWO", result );
 
   }
 
@@ -452,12 +452,12 @@ final class ExtentTest {
   @Test
   void testFoldWithNullAccumulatorThrows () {
 
-  final var extent = TestExtent.root ( "test" );
+    final var extent = TestExtent.root ( "test" );
 
-  assertThrows (
-    NullPointerException.class,
-    () -> extent.fold ( _ -> 1, null )
-  );
+    assertThrows (
+      NullPointerException.class,
+      () -> extent.fold ( _ -> 1, null )
+    );
 
   }
 
@@ -469,81 +469,81 @@ final class ExtentTest {
   @Test
   void testFoldWithNullInitializerThrows () {
 
-  final var extent = TestExtent.root ( "test" );
+    final var extent = TestExtent.root ( "test" );
 
-  assertThrows (
-    NullPointerException.class,
-    () -> extent.fold ( null, ( acc, _ ) -> acc )
-  );
+    assertThrows (
+      NullPointerException.class,
+      () -> extent.fold ( null, ( acc, _ ) -> acc )
+    );
 
   }
 
   @Test
   void testIterator () {
 
-  final var a = TestExtent.root ( "a" );
-  final var b = a.child ( "b" );
-  final var c = b.child ( "c" );
+    final var a = TestExtent.root ( "a" );
+    final var b = a.child ( "b" );
+    final var c = b.child ( "c" );
 
-  final var iterator = c.iterator ();
+    final var iterator = c.iterator ();
 
-  assertTrue ( iterator.hasNext () );
-  assertSame ( c, iterator.next () );
+    assertTrue ( iterator.hasNext () );
+    assertSame ( c, iterator.next () );
 
-  assertTrue ( iterator.hasNext () );
-  assertSame ( b, iterator.next () );
+    assertTrue ( iterator.hasNext () );
+    assertSame ( b, iterator.next () );
 
-  assertTrue ( iterator.hasNext () );
-  assertSame ( a, iterator.next () );
+    assertTrue ( iterator.hasNext () );
+    assertSame ( a, iterator.next () );
 
-  assertFalse ( iterator.hasNext () );
+    assertFalse ( iterator.hasNext () );
 
   }
 
   @Test
   void testIteratorMultiplePasses () {
 
-  final var root = TestExtent.root ( "a" );
-  final var child = root.child ( "b" );
+    final var root = TestExtent.root ( "a" );
+    final var child = root.child ( "b" );
 
-  // First iteration
-  final var values1 = new ArrayList < String > ();
-  child.iterator ().forEachRemaining (
-    e -> values1.add ( e.part ().toString () )
-  );
+    // First iteration
+    final var values1 = new ArrayList < String > ();
+    child.iterator ().forEachRemaining (
+      e -> values1.add ( e.part ().toString () )
+    );
 
-  // Second iteration
-  final var values2 = new ArrayList < String > ();
-  child.iterator ().forEachRemaining (
-    e -> values2.add ( e.part ().toString () )
-  );
+    // Second iteration
+    final var values2 = new ArrayList < String > ();
+    child.iterator ().forEachRemaining (
+      e -> values2.add ( e.part ().toString () )
+    );
 
-  assertEquals ( values1, values2 );
-  assertEquals ( List.of ( "b", "a" ), values1 );
+    assertEquals ( values1, values2 );
+    assertEquals ( List.of ( "b", "a" ), values1 );
 
   }
 
   @Test
   void testIteratorOnRoot () {
 
-  final var root = TestExtent.root ( "root" );
-  final var iterator = root.iterator ();
+    final var root = TestExtent.root ( "root" );
+    final var iterator = root.iterator ();
 
-  assertTrue ( iterator.hasNext () );
-  assertSame ( root, iterator.next () );
-  assertFalse ( iterator.hasNext () );
+    assertTrue ( iterator.hasNext () );
+    assertSame ( root, iterator.next () );
+    assertFalse ( iterator.hasNext () );
 
   }
 
   @Test
   void testIteratorThrowsWhenExhausted () {
 
-  final var root = TestExtent.root ( "root" );
-  final var iterator = root.iterator ();
+    final var root = TestExtent.root ( "root" );
+    final var iterator = root.iterator ();
 
-  iterator.next (); // consume the only element
+    iterator.next (); // consume the only element
 
-  assertThrows ( NoSuchElementException.class, iterator::next );
+    assertThrows ( NoSuchElementException.class, iterator::next );
 
   }
 
@@ -554,57 +554,57 @@ final class ExtentTest {
   @Test
   void testLongHierarchyChain () {
 
-  var current = TestExtent.root ( "level0" );
+    var current = TestExtent.root ( "level0" );
 
-  for ( var i = 1; i <= 100; i++ ) {
-    current = current.child ( "level" + i );
-  }
+    for ( var i = 1; i <= 100; i++ ) {
+      current = current.child ( "level" + i );
+    }
 
-  assertEquals ( 101, current.depth () );
-  assertEquals ( 101L, current.stream ().count () );
-  assertEquals ( "level0", current.extremity ().part () );
+    assertEquals ( 101, current.depth () );
+    assertEquals ( 101L, current.stream ().count () );
+    assertEquals ( "level0", current.extremity ().part () );
 
   }
 
   @Test
   void testMultipleChildrenNotInIterator () {
 
-  final var root = TestExtent.root ( "root" );
-  final var child1 = root.child ( "child1" );
-  final var child2 = root.child ( "child2" );
+    final var root = TestExtent.root ( "root" );
+    final var child1 = root.child ( "child1" );
+    final var child2 = root.child ( "child2" );
 
-  // child1's iterator should only include child1 and root
-  final var values1 = child1.stream ()
-    .map ( e -> e.part ().toString () )
-    .toList ();
+    // child1's iterator should only include child1 and root
+    final var values1 = child1.stream ()
+      .map ( e -> e.part ().toString () )
+      .toList ();
 
-  assertEquals ( List.of ( "child1", "root" ), values1 );
+    assertEquals ( List.of ( "child1", "root" ), values1 );
 
-  // child2's iterator should only include child2 and root
-  final var values2 = child2.stream ()
-    .map ( e -> e.part ().toString () )
-    .toList ();
+    // child2's iterator should only include child2 and root
+    final var values2 = child2.stream ()
+      .map ( e -> e.part ().toString () )
+      .toList ();
 
-  assertEquals ( List.of ( "child2", "root" ), values2 );
+    assertEquals ( List.of ( "child2", "root" ), values2 );
 
   }
 
   @Test
   void testPathDefaultSeparator () {
 
-  final var a = TestExtent.root ( "a" );
-  final var b = a.child ( "b" );
-  final var c = b.child ( "c" );
+    final var a = TestExtent.root ( "a" );
+    final var b = a.child ( "b" );
+    final var c = b.child ( "c" );
 
-  assertEquals ( "a/b/c", c.path ().toString () );
+    assertEquals ( "a/b/c", c.path ().toString () );
 
   }
 
   @Test
   void testPathOnRoot () {
 
-  final var root = TestExtent.root ( "root" );
-  assertEquals ( "root", root.path ().toString () );
+    final var root = TestExtent.root ( "root" );
+    assertEquals ( "root", root.path ().toString () );
 
   }
 
@@ -615,40 +615,40 @@ final class ExtentTest {
   @Test
   void testPathWithCharSeparator () {
 
-  final var root = TestExtent.root ( "x" );
-  final var child = root.child ( "y" );
+    final var root = TestExtent.root ( "x" );
+    final var child = root.child ( "y" );
 
-  assertEquals ( "x-y", child.path ( '-' ).toString () );
+    assertEquals ( "x-y", child.path ( '-' ).toString () );
 
   }
 
   @Test
   void testPathWithMapper () {
 
-  final var root = TestExtent.root ( "hello" );
-  final var child = root.child ( "world" );
+    final var root = TestExtent.root ( "hello" );
+    final var child = root.child ( "world" );
 
-  final var result = child.path (
-    e -> e.part ().toString ().toUpperCase (),
-    '/'
-  );
+    final var result = child.path (
+      e -> e.part ().toString ().toUpperCase (),
+      '/'
+    );
 
-  assertEquals ( "HELLO/WORLD", result.toString () );
+    assertEquals ( "HELLO/WORLD", result.toString () );
 
   }
 
   @Test
   void testPathWithMapperAndStringSeparator () {
 
-  final var a = TestExtent.root ( "foo" );
-  final var b = a.child ( "bar" );
+    final var a = TestExtent.root ( "foo" );
+    final var b = a.child ( "bar" );
 
-  final var result = b.path (
-    e -> e.part ().toString ().toUpperCase (),
-    " -> "
-  );
+    final var result = b.path (
+      e -> e.part ().toString ().toUpperCase (),
+      " -> "
+    );
 
-  assertEquals ( "FOO -> BAR", result.toString () );
+    assertEquals ( "FOO -> BAR", result.toString () );
 
   }
 
@@ -656,17 +656,17 @@ final class ExtentTest {
   @Test
   void testPathWithNullMapperAndStringSeparatorThrows () {
 
-  final var extent = TestExtent.root ( "test" );
+    final var extent = TestExtent.root ( "test" );
 
-  assertThrows (
-    NullPointerException.class,
-    () -> extent.path ( null, "::" )
-  );
+    assertThrows (
+      NullPointerException.class,
+      () -> extent.path ( null, "::" )
+    );
 
-  assertThrows (
-    NullPointerException.class,
-    () -> extent.path ( Extent::part, null )
-  );
+    assertThrows (
+      NullPointerException.class,
+      () -> extent.path ( Extent::part, null )
+    );
 
   }
 
@@ -674,12 +674,12 @@ final class ExtentTest {
   @Test
   void testPathWithNullMapperThrows () {
 
-  final var extent = TestExtent.root ( "test" );
+    final var extent = TestExtent.root ( "test" );
 
-  assertThrows (
-    NullPointerException.class,
-    () -> extent.path ( null, '/' )
-  );
+    assertThrows (
+      NullPointerException.class,
+      () -> extent.path ( null, '/' )
+    );
 
   }
 
@@ -687,12 +687,12 @@ final class ExtentTest {
   @Test
   void testPathWithNullStringSeparatorThrows () {
 
-  final var extent = TestExtent.root ( "test" );
+    final var extent = TestExtent.root ( "test" );
 
-  assertThrows (
-    NullPointerException.class,
-    () -> extent.path ( null )
-  );
+    assertThrows (
+      NullPointerException.class,
+      () -> extent.path ( null )
+    );
 
   }
 
@@ -703,119 +703,119 @@ final class ExtentTest {
   @Test
   void testPathWithStringSeparator () {
 
-  final var a = TestExtent.root ( "a" );
-  final var b = a.child ( "b" );
-  final var c = b.child ( "c" );
+    final var a = TestExtent.root ( "a" );
+    final var b = a.child ( "b" );
+    final var c = b.child ( "c" );
 
-  assertEquals ( "a::b::c", c.path ( "::" ).toString () );
+    assertEquals ( "a::b::c", c.path ( "::" ).toString () );
 
   }
 
   @Test
   void testStream () {
 
-  final var a = TestExtent.root ( "a" );
-  final var b = a.child ( "b" );
-  final var c = b.child ( "c" );
+    final var a = TestExtent.root ( "a" );
+    final var b = a.child ( "b" );
+    final var c = b.child ( "c" );
 
-  final var values = c.stream ()
-    .map ( e -> e.part ().toString () )
-    .toList ();
+    final var values = c.stream ()
+      .map ( e -> e.part ().toString () )
+      .toList ();
 
-  assertEquals ( List.of ( "c", "b", "a" ), values );
+    assertEquals ( List.of ( "c", "b", "a" ), values );
 
   }
 
   @Test
   void testStreamCount () {
 
-  final var root = TestExtent.root ( "a" );
-  final var child = root.child ( "b" );
-  final var grandchild = child.child ( "c" );
+    final var root = TestExtent.root ( "a" );
+    final var child = root.child ( "b" );
+    final var grandchild = child.child ( "c" );
 
-  assertEquals ( 3L, grandchild.stream ().count () );
-  assertEquals ( 2L, child.stream ().count () );
-  assertEquals ( 1L, root.stream ().count () );
+    assertEquals ( 3L, grandchild.stream ().count () );
+    assertEquals ( 2L, child.stream ().count () );
+    assertEquals ( 1L, root.stream ().count () );
 
   }
 
   @Test
   void testStreamMatchesDepth () {
 
-  final var root = TestExtent.root ( "a" );
-  final var child = root.child ( "b" );
-  final var grandchild = child.child ( "c" );
+    final var root = TestExtent.root ( "a" );
+    final var child = root.child ( "b" );
+    final var grandchild = child.child ( "c" );
 
-  assertEquals ( grandchild.depth (), grandchild.stream ().count () );
-  assertEquals ( child.depth (), child.stream ().count () );
-  assertEquals ( root.depth (), root.stream ().count () );
+    assertEquals ( grandchild.depth (), grandchild.stream ().count () );
+    assertEquals ( child.depth (), child.stream ().count () );
+    assertEquals ( root.depth (), root.stream ().count () );
 
   }
 
   @Test
   void testStreamMatchesFold () {
 
-  final var root = TestExtent.root ( "a" );
-  final var child = root.child ( "b" );
-  final var grandchild = child.child ( "c" );
+    final var root = TestExtent.root ( "a" );
+    final var child = root.child ( "b" );
+    final var grandchild = child.child ( "c" );
 
-  final var streamCount = grandchild.stream ().count ();
+    final var streamCount = grandchild.stream ().count ();
 
-  final var foldCount = grandchild.fold (
-    _ -> 1,
-    ( acc, _ ) -> acc + 1
-  );
+    final var foldCount = grandchild.fold (
+      _ -> 1,
+      ( acc, _ ) -> acc + 1
+    );
 
-  assertEquals ( streamCount, (long) foldCount );
+    assertEquals ( streamCount, (long) foldCount );
 
   }
 
   @Test
   void testStreamOperations () {
 
-  final var a = TestExtent.root ( "alpha" );
-  final var b = a.child ( "beta" );
-  final var c = b.child ( "gamma" );
+    final var a = TestExtent.root ( "alpha" );
+    final var b = a.child ( "beta" );
+    final var c = b.child ( "gamma" );
 
-  final var maxLength = c.stream ()
-    .map ( e -> e.part ().toString () )
-    .mapToInt ( String::length )
-    .max ()
-    .orElse ( 0 );
+    final var maxLength = c.stream ()
+      .map ( e -> e.part ().toString () )
+      .mapToInt ( String::length )
+      .max ()
+      .orElse ( 0 );
 
-  assertEquals ( 5, maxLength ); // "alpha" and "gamma" are 5 chars
+    assertEquals ( 5, maxLength ); // "alpha" and "gamma" are 5 chars
 
-  final var hasShortName = c.stream ()
-    .anyMatch ( e -> e.part ().length () < 5 );
+    final var hasShortName = c.stream ()
+      .anyMatch ( e -> e.part ().length () < 5 );
 
-  assertTrue ( hasShortName ); // "beta" is 4 chars
+    assertTrue ( hasShortName ); // "beta" is 4 chars
 
   }
 
   @Test
   void testWithin () {
 
-  final var root = TestExtent.root ( "root" );
-  final var child = root.child ( "child" );
-  final var grandchild = child.child ( "grandchild" );
+    final var root = TestExtent.root ( "root" );
+    final var child = root.child ( "child" );
+    final var grandchild = child.child ( "grandchild" );
 
-  assertTrue ( child.within ( root ) );
-  assertTrue ( grandchild.within ( root ) );
-  assertTrue ( grandchild.within ( child ) );
+    assertTrue ( child.within ( root ) );
+    assertTrue ( grandchild.within ( root ) );
+    assertTrue ( grandchild.within ( child ) );
 
   }
 
   @Test
   void testWithinDeepHierarchy () {
 
-  var current = TestExtent.root ( "level0" );
-  final var root = current;
+    var current = TestExtent.root ( "level0" );
+    final var root = current;
 
-  for ( var i = 1; i <= 10; i++ ) {
-    current = current.child ( "level" + i );
-  }
+    for ( var i = 1; i <= 10; i++ ) {
+      current = current.child ( "level" + i );
+    }
 
-  assertTrue ( current.within ( root ) );
+    assertTrue ( current.within ( root ) );
 
   }
 
@@ -823,41 +823,41 @@ final class ExtentTest {
   @Test
   void testWithinNullThrows () {
 
-  final var extent = TestExtent.root ( "test" );
+    final var extent = TestExtent.root ( "test" );
 
-  assertThrows (
-    NullPointerException.class,
-    () -> extent.within ( null )
-  );
+    assertThrows (
+      NullPointerException.class,
+      () -> extent.within ( null )
+    );
 
   }
 
   @Test
   void testWithinReverse () {
 
-  final var root = TestExtent.root ( "root" );
-  final var child = root.child ( "child" );
+    final var root = TestExtent.root ( "root" );
+    final var child = root.child ( "child" );
 
-  assertFalse ( root.within ( child ) );
+    assertFalse ( root.within ( child ) );
 
   }
 
   @Test
   void testWithinSelf () {
 
-  final var root = TestExtent.root ( "root" );
-  assertFalse ( root.within ( root ) );
+    final var root = TestExtent.root ( "root" );
+    assertFalse ( root.within ( root ) );
 
   }
 
   @Test
   void testWithinUnrelated () {
 
-  final var tree1 = TestExtent.root ( "tree1" );
-  final var tree2 = TestExtent.root ( "tree2" );
+    final var tree1 = TestExtent.root ( "tree1" );
+    final var tree2 = TestExtent.root ( "tree2" );
 
-  assertFalse ( tree1.within ( tree2 ) );
-  assertFalse ( tree2.within ( tree1 ) );
+    assertFalse ( tree1.within ( tree2 ) );
+    assertFalse ( tree2.within ( tree1 ) );
 
   }
 
@@ -865,55 +865,55 @@ final class ExtentTest {
   /// Represents a hierarchical structure of string values.
 
   private record TestExtent( String value, TestExtent parent )
-  implements Extent < TestExtent, TestExtent > {
+    implements Extent < TestExtent, TestExtent > {
 
-  private TestExtent (
-    final String value
-  ) {
+    private TestExtent (
+      final String value
+    ) {
 
-    this ( value, null );
+      this ( value, null );
 
-  }
+    }
 
-  /// Creates a root extent with no parent
+    /// Creates a root extent with no parent
 
-  static TestExtent root (
-    final String value
-  ) {
+    static TestExtent root (
+      final String value
+    ) {
 
-    return new TestExtent ( value );
+      return new TestExtent ( value );
 
-  }
+    }
 
-  /// Returns the parent (enclosure) of this extent
+    /// Returns the parent (enclosure) of this extent
 
-  @NotNull
-  @Override
-  public Optional < TestExtent > enclosure () {
+    @NotNull
+    @Override
+    public Optional < TestExtent > enclosure () {
 
-    return Optional.ofNullable ( parent );
+      return Optional.ofNullable ( parent );
 
-  }
+    }
 
-  /// Returns the part (value) of this extent
+    /// Returns the part (value) of this extent
 
-  @NotNull
-  @Override
-  public CharSequence part () {
+    @NotNull
+    @Override
+    public CharSequence part () {
 
-    return value;
+      return value;
 
-  }
+    }
 
-  /// Creates a child extent
+    /// Creates a child extent
 
-  TestExtent child (
-    final String value
-  ) {
+    TestExtent child (
+      final String value
+    ) {
 
-    return new TestExtent ( value, this );
+      return new TestExtent ( value, this );
 
-  }
+    }
 
   }
 

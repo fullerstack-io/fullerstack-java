@@ -4,53 +4,53 @@ import java.util.*;
 
 /**
  * Hierarchical configuration using ResourceBundle (zero dependencies).
- *
+ * <p>
  * < p >Supports fallback chain:
  * < ol >
- *   < li >config_{circuit}_{container}.properties (container-specific)</li >
- *   < li >config_{circuit}.properties (circuit-specific)</li >
- *   < li >config.properties (global defaults)</li >
+ * < li >config_{circuit}_{container}.properties (container-specific)</li >
+ * < li >config_{circuit}.properties (circuit-specific)</li >
+ * < li >config.properties (global defaults)</li >
  * </ol >
- *
+ * <p>
  * < p >< strong >How ResourceBundle Fallback Works:</strong >
  * < p >ResourceBundle uses {@link Locale} for fallback. We cleverly use locale
  * language tags to represent circuit/container hierarchy:
  * < ul >
- *   < li >Locale "broker-health" → config_broker-health.properties → config.properties</li >
- *   < li >Locale "broker-health-brokers" → config_broker-health-brokers.properties → config_broker-health.properties → config.properties</li >
+ * < li >Locale "broker-health" → config_broker-health.properties → config.properties</li >
+ * < li >Locale "broker-health-brokers" → config_broker-health-brokers.properties → config_broker-health.properties → config.properties</li >
  * </ul >
- *
+ * <p>
  * < p >< strong >Example Property Files:</strong >
  * < pre >
  * # config.properties (global defaults)
  * valve.queue-size=1000
  * valve.shutdown-timeout-ms=5000
- *
+ * <p>
  * # config_broker-health.properties (circuit override)
  * valve.queue-size=5000  # Heavy workload needs larger queue
- *
+ * <p>
  * # config_broker-health-brokers.properties (container override)
  * valve.queue-size=10000  # Broker container needs even larger queue
  * </pre >
- *
+ * <p>
  * < p >< strong >Usage:</strong >
  * < pre >
  * // Global config
  * HierarchicalConfig global = HierarchicalConfig.global();
  * int queueSize = global.getInt("valve.queue-size");
  * // → 1000 (from config.properties)
- *
+ * <p>
  * // Circuit-specific config
  * HierarchicalConfig brokerHealth = HierarchicalConfig.forCircuit("broker-health");
  * int queueSize = brokerHealth.getInt("valve.queue-size");
  * // → 5000 (from config_broker-health.properties)
- *
+ * <p>
  * // Container-specific config
  * HierarchicalConfig brokers = HierarchicalConfig.forContainer("broker-health", "brokers");
  * int queueSize = brokers.getInt("valve.queue-size");
  * // → 10000 (from config_broker-health-brokers.properties)
  * </pre >
- *
+ * <p>
  * < p >< strong >System Property Overrides:</strong >
  * < p >System properties take precedence over all property files:
  * < pre >
@@ -60,9 +60,9 @@ import java.util.*;
 public class HierarchicalConfig {
 
   private final ResourceBundle bundle;
-  private final String context;  // For debugging/logging
+  private final String         context;  // For debugging/logging
 
-  private HierarchicalConfig(ResourceBundle bundle, String context) {
+  private HierarchicalConfig ( ResourceBundle bundle, String context ) {
     this.bundle = bundle;
     this.context = context;
   }
@@ -72,64 +72,64 @@ public class HierarchicalConfig {
    *
    * @return Global configuration
    */
-  public static HierarchicalConfig global() {
-    ResourceBundle bundle = ResourceBundle.getBundle("config", Locale.ROOT);
-    return new HierarchicalConfig(bundle, "global");
+  public static HierarchicalConfig global () {
+    ResourceBundle bundle = ResourceBundle.getBundle ( "config", Locale.ROOT );
+    return new HierarchicalConfig ( bundle, "global" );
   }
 
   /**
    * Get circuit-specific configuration.
-   *
+   * <p>
    * < p >Fallback chain:
    * < ol >
-   *   < li >config_{circuitName}.properties</li >
-   *   < li >config.properties (global)</li >
+   * < li >config_{circuitName}.properties</li >
+   * < li >config.properties (global)</li >
    * </ol >
    *
    * @param circuitName Circuit name (e.g., "broker-health", "partition-flow")
    * @return Circuit-specific configuration
    */
-  public static HierarchicalConfig forCircuit(String circuitName) {
-    Objects.requireNonNull(circuitName, "circuitName cannot be null");
-    if (circuitName.isBlank()) {
-      throw new IllegalArgumentException("circuitName cannot be blank");
+  public static HierarchicalConfig forCircuit ( String circuitName ) {
+    Objects.requireNonNull ( circuitName, "circuitName cannot be null" );
+    if ( circuitName.isBlank () ) {
+      throw new IllegalArgumentException ( "circuitName cannot be blank" );
     }
 
     // Use language tag as circuit identifier
-    Locale circuitLocale = Locale.forLanguageTag(circuitName);
-    ResourceBundle bundle = ResourceBundle.getBundle("config", circuitLocale);
-    return new HierarchicalConfig(bundle, "circuit:" + circuitName);
+    Locale circuitLocale = Locale.forLanguageTag ( circuitName );
+    ResourceBundle bundle = ResourceBundle.getBundle ( "config", circuitLocale );
+    return new HierarchicalConfig ( bundle, "circuit:" + circuitName );
   }
 
   /**
    * Get container-specific configuration.
-   *
+   * <p>
    * < p >Fallback chain:
    * < ol >
-   *   < li >config_{circuitName}-{containerName}.properties</li >
-   *   < li >config_{circuitName}.properties (circuit default)</li >
-   *   < li >config.properties (global)</li >
+   * < li >config_{circuitName}-{containerName}.properties</li >
+   * < li >config_{circuitName}.properties (circuit default)</li >
+   * < li >config.properties (global)</li >
    * </ol >
    *
-   * @param circuitName Circuit name (e.g., "broker-health")
+   * @param circuitName   Circuit name (e.g., "broker-health")
    * @param containerName Container name (e.g., "brokers", "partitions")
    * @return Container-specific configuration
    */
-  public static HierarchicalConfig forContainer(String circuitName, String containerName) {
-    Objects.requireNonNull(circuitName, "circuitName cannot be null");
-    Objects.requireNonNull(containerName, "containerName cannot be null");
-    if (circuitName.isBlank()) {
-      throw new IllegalArgumentException("circuitName cannot be blank");
+  public static HierarchicalConfig forContainer ( String circuitName, String containerName ) {
+    Objects.requireNonNull ( circuitName, "circuitName cannot be null" );
+    Objects.requireNonNull ( containerName, "containerName cannot be null" );
+    if ( circuitName.isBlank () ) {
+      throw new IllegalArgumentException ( "circuitName cannot be blank" );
     }
-    if (containerName.isBlank()) {
-      throw new IllegalArgumentException("containerName cannot be blank");
+    if ( containerName.isBlank () ) {
+      throw new IllegalArgumentException ( "containerName cannot be blank" );
     }
 
     // Use language tag as circuit-container identifier
     // Locale "broker-health-brokers" → config_broker-health-brokers.properties
-    Locale containerLocale = Locale.forLanguageTag(circuitName + "-" + containerName);
-    ResourceBundle bundle = ResourceBundle.getBundle("config", containerLocale);
-    return new HierarchicalConfig(bundle, "container:" + circuitName + "/" + containerName);
+    Locale containerLocale = Locale.forLanguageTag ( circuitName + "-" + containerName );
+    ResourceBundle bundle = ResourceBundle.getBundle ( "config", containerLocale );
+    return new HierarchicalConfig ( bundle, "container:" + circuitName + "/" + containerName );
   }
 
   // =========================================================================
@@ -138,24 +138,24 @@ public class HierarchicalConfig {
 
   /**
    * Get string value.
-   *
+   * <p>
    * < p >Checks system properties first, then ResourceBundle.
    *
    * @param key Property key
    * @return Property value
    * @throws ConfigurationException if key not found
    */
-  public String getString(String key) {
+  public String getString ( String key ) {
     // System property override
-    String sysProp = System.getProperty(key);
-    if (sysProp != null) {
+    String sysProp = System.getProperty ( key );
+    if ( sysProp != null ) {
       return sysProp;
     }
 
     try {
-      return bundle.getString(key);
-    } catch (MissingResourceException e) {
-      throw new ConfigurationException(
+      return bundle.getString ( key );
+    } catch ( MissingResourceException e ) {
+      throw new ConfigurationException (
         "Missing config key '" + key + "' in context: " + context, e
       );
     }
@@ -164,20 +164,20 @@ public class HierarchicalConfig {
   /**
    * Get string value with default.
    *
-   * @param key Property key
+   * @param key          Property key
    * @param defaultValue Default if not found
    * @return Property value or default
    */
-  public String getString(String key, String defaultValue) {
+  public String getString ( String key, String defaultValue ) {
     // System property override
-    String sysProp = System.getProperty(key);
-    if (sysProp != null) {
+    String sysProp = System.getProperty ( key );
+    if ( sysProp != null ) {
       return sysProp;
     }
 
     try {
-      return bundle.getString(key);
-    } catch (MissingResourceException e) {
+      return bundle.getString ( key );
+    } catch ( MissingResourceException e ) {
       return defaultValue;
     }
   }
@@ -189,12 +189,12 @@ public class HierarchicalConfig {
    * @return Property value as double
    * @throws ConfigurationException if key not found or invalid format
    */
-  public double getDouble(String key) {
-    String value = getString(key);
+  public double getDouble ( String key ) {
+    String value = getString ( key );
     try {
-      return Double.parseDouble(value);
-    } catch (NumberFormatException e) {
-      throw new ConfigurationException(
+      return Double.parseDouble ( value );
+    } catch ( NumberFormatException e ) {
+      throw new ConfigurationException (
         "Invalid double value for key '" + key + "': " + value, e
       );
     }
@@ -203,18 +203,18 @@ public class HierarchicalConfig {
   /**
    * Get double value with default.
    *
-   * @param key Property key
+   * @param key          Property key
    * @param defaultValue Default if not found
    * @return Property value as double or default
    */
-  public double getDouble(String key, double defaultValue) {
+  public double getDouble ( String key, double defaultValue ) {
     try {
-      String value = getString(key, null);
-      if (value == null) {
+      String value = getString ( key, null );
+      if ( value == null ) {
         return defaultValue;
       }
-      return Double.parseDouble(value);
-    } catch (NumberFormatException e) {
+      return Double.parseDouble ( value );
+    } catch ( NumberFormatException e ) {
       return defaultValue;
     }
   }
@@ -226,12 +226,12 @@ public class HierarchicalConfig {
    * @return Property value as int
    * @throws ConfigurationException if key not found or invalid format
    */
-  public int getInt(String key) {
-    String value = getString(key);
+  public int getInt ( String key ) {
+    String value = getString ( key );
     try {
-      return Integer.parseInt(value);
-    } catch (NumberFormatException e) {
-      throw new ConfigurationException(
+      return Integer.parseInt ( value );
+    } catch ( NumberFormatException e ) {
+      throw new ConfigurationException (
         "Invalid int value for key '" + key + "': " + value, e
       );
     }
@@ -240,18 +240,18 @@ public class HierarchicalConfig {
   /**
    * Get int value with default.
    *
-   * @param key Property key
+   * @param key          Property key
    * @param defaultValue Default if not found
    * @return Property value as int or default
    */
-  public int getInt(String key, int defaultValue) {
+  public int getInt ( String key, int defaultValue ) {
     try {
-      String value = getString(key, null);
-      if (value == null) {
+      String value = getString ( key, null );
+      if ( value == null ) {
         return defaultValue;
       }
-      return Integer.parseInt(value);
-    } catch (NumberFormatException e) {
+      return Integer.parseInt ( value );
+    } catch ( NumberFormatException e ) {
       return defaultValue;
     }
   }
@@ -263,12 +263,12 @@ public class HierarchicalConfig {
    * @return Property value as long
    * @throws ConfigurationException if key not found or invalid format
    */
-  public long getLong(String key) {
-    String value = getString(key);
+  public long getLong ( String key ) {
+    String value = getString ( key );
     try {
-      return Long.parseLong(value);
-    } catch (NumberFormatException e) {
-      throw new ConfigurationException(
+      return Long.parseLong ( value );
+    } catch ( NumberFormatException e ) {
+      throw new ConfigurationException (
         "Invalid long value for key '" + key + "': " + value, e
       );
     }
@@ -277,18 +277,18 @@ public class HierarchicalConfig {
   /**
    * Get long value with default.
    *
-   * @param key Property key
+   * @param key          Property key
    * @param defaultValue Default if not found
    * @return Property value as long or default
    */
-  public long getLong(String key, long defaultValue) {
+  public long getLong ( String key, long defaultValue ) {
     try {
-      String value = getString(key, null);
-      if (value == null) {
+      String value = getString ( key, null );
+      if ( value == null ) {
         return defaultValue;
       }
-      return Long.parseLong(value);
-    } catch (NumberFormatException e) {
+      return Long.parseLong ( value );
+    } catch ( NumberFormatException e ) {
       return defaultValue;
     }
   }
@@ -299,26 +299,26 @@ public class HierarchicalConfig {
    * @param key Property key
    * @return Property value as boolean
    */
-  public boolean getBoolean(String key) {
-    String value = getString(key);
-    return Boolean.parseBoolean(value);
+  public boolean getBoolean ( String key ) {
+    String value = getString ( key );
+    return Boolean.parseBoolean ( value );
   }
 
   /**
    * Get boolean value with default.
    *
-   * @param key Property key
+   * @param key          Property key
    * @param defaultValue Default if not found
    * @return Property value as boolean or default
    */
-  public boolean getBoolean(String key, boolean defaultValue) {
+  public boolean getBoolean ( String key, boolean defaultValue ) {
     try {
-      String value = getString(key, null);
-      if (value == null) {
+      String value = getString ( key, null );
+      if ( value == null ) {
         return defaultValue;
       }
-      return Boolean.parseBoolean(value);
-    } catch (MissingResourceException e) {
+      return Boolean.parseBoolean ( value );
+    } catch ( MissingResourceException e ) {
       return defaultValue;
     }
   }
@@ -329,12 +329,12 @@ public class HierarchicalConfig {
    * @param key Property key
    * @return true if key exists
    */
-  public boolean contains(String key) {
+  public boolean contains ( String key ) {
     // Check system property first
-    if (System.getProperty(key) != null) {
+    if ( System.getProperty ( key ) != null ) {
       return true;
     }
-    return bundle.containsKey(key);
+    return bundle.containsKey ( key );
   }
 
   /**
@@ -342,8 +342,8 @@ public class HierarchicalConfig {
    *
    * @return Set of all keys
    */
-  public Set< String > keys() {
-    return bundle.keySet();
+  public Set < String > keys () {
+    return bundle.keySet ();
   }
 
   /**
@@ -351,12 +351,12 @@ public class HierarchicalConfig {
    *
    * @return Context description (e.g., "global", "circuit:broker-health")
    */
-  public String context() {
+  public String context () {
     return context;
   }
 
   @Override
-  public String toString() {
+  public String toString () {
     return "HierarchicalConfig[context=" + context + "]";
   }
 }

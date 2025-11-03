@@ -14,11 +14,11 @@ import java.util.stream.Stream;
 
 /**
  * Implementation of Substrates.Sink for buffering and draining emissions.
- *
+ * <p>
  * < p >Sink accumulates Capture events from a Source and provides them via drain().
  * Each call to drain() returns accumulated events since the last drain (or creation)
  * and clears the buffer.
- *
+ * <p>
  * < p >Thread-safe implementation using CopyOnWriteArrayList for concurrent access.
  *
  * @param < E > the emission type
@@ -26,16 +26,16 @@ import java.util.stream.Stream;
  * @see Source
  * @see Capture
  */
-public class CollectingSink< E > implements Sink< E > {
+public class CollectingSink < E > implements Sink < E > {
 
-  private final Subject< Sink< E >> sinkSubject;
-  private final Source< E, ?> source;
-  private final List< Capture< E >> buffer = new CopyOnWriteArrayList<>();
-  private final Subscription subscription;
-  private volatile boolean closed = false;
+  private final    Subject < Sink < E > > sinkSubject;
+  private final    Source < E, ? >        source;
+  private final    List < Capture < E > > buffer = new CopyOnWriteArrayList <> ();
+  private final    Subscription           subscription;
+  private volatile boolean                closed = false;
 
   // Cache the internal subscriber's Subject - represents persistent identity
-  private final Subject< Subscriber< E >> internalSubscriberSubject;
+  private final Subject < Subscriber < E > > internalSubscriberSubject;
 
   /**
    * Creates a Sink that subscribes to the given Source.
@@ -43,64 +43,64 @@ public class CollectingSink< E > implements Sink< E > {
    * @param source the source to subscribe to
    * @throws NullPointerException if source is null
    */
-  @SuppressWarnings("unchecked")
-  public CollectingSink(Source< E, ?> source) {
-    Objects.requireNonNull(source, "Source cannot be null");
+  @SuppressWarnings ( "unchecked" )
+  public CollectingSink ( Source < E, ? > source ) {
+    Objects.requireNonNull ( source, "Source cannot be null" );
 
     // Using HierarchicalName.of() static factory
     this.source = source;
-    Id sinkId = UuidIdentifier.generate();
-    this.sinkSubject = new HierarchicalSubject<>(
+    Id sinkId = UuidIdentifier.generate ();
+    this.sinkSubject = new HierarchicalSubject <> (
       sinkId,
-      HierarchicalName.of("sink").name(sinkId.toString()),
-      LinkedState.empty(),
-      (Class< Sink< E >>) (Class<?>) Sink.class
+      HierarchicalName.of ( "sink" ).name ( sinkId.toString () ),
+      LinkedState.empty (),
+      (Class < Sink < E > >) (Class < ? >) Sink.class
     );
 
     // Create internal subscriber's Subject once
-    this.internalSubscriberSubject = new HierarchicalSubject<>(
-      UuidIdentifier.generate(),
-      HierarchicalName.of("sink-subscriber"),
-      LinkedState.empty(),
-      (Class< Subscriber< E >>) (Class<?>) Subscriber.class
+    this.internalSubscriberSubject = new HierarchicalSubject <> (
+      UuidIdentifier.generate (),
+      HierarchicalName.of ( "sink-subscriber" ),
+      LinkedState.empty (),
+      (Class < Subscriber < E > >) (Class < ? >) Subscriber.class
     );
 
     // Subscribe to source and buffer all emissions
     // RC3: Use FunctionalSubscriber with callback
-    this.subscription = source.subscribe(
-      new io.fullerstack.substrates.subscriber.FunctionalSubscriber< E >(
-        HierarchicalName.of("sink-subscriber"),
-        (subject, registrar) -> {
+    this.subscription = source.subscribe (
+      new io.fullerstack.substrates.subscriber.FunctionalSubscriber < E > (
+        HierarchicalName.of ( "sink-subscriber" ),
+        ( subject, registrar ) -> {
           // Register a pipe that captures emissions into the buffer
-          registrar.register(emission -> {
-            if (!closed) {
-              buffer.add(new SubjectCapture<>(subject, emission));
+          registrar.register ( emission -> {
+            if ( !closed ) {
+              buffer.add ( new SubjectCapture <> ( subject, emission ) );
             }
-          });
+          } );
         }
       )
     );
   }
 
   @Override
-  public Subject subject() {
+  public Subject subject () {
     return sinkSubject;
   }
 
   @Override
-  public Stream< Capture< E >> drain() {
+  public Stream < Capture < E > > drain () {
     // Get all accumulated captures and clear the buffer
-    List< Capture< E >> captured = List.copyOf(buffer);
-    buffer.clear();
-    return captured.stream();
+    List < Capture < E > > captured = List.copyOf ( buffer );
+    buffer.clear ();
+    return captured.stream ();
   }
 
   @Override
-  public void close() {
-    if (!closed) {
+  public void close () {
+    if ( !closed ) {
       closed = true;
-      subscription.close();
-      buffer.clear();
+      subscription.close ();
+      buffer.clear ();
     }
   }
 }

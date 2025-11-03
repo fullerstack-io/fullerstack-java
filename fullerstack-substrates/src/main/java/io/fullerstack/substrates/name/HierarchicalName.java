@@ -11,21 +11,21 @@ import java.util.function.Function;
 
 /**
  * Node-based Name implementation - hierarchical parent-child structure.
- *
+ * <p>
  * < p >< b >Design Principles:</b >
  * < ul >
- *   < li >Cortex creates root names only: new HierarchicalName(null, "root")</li >
- *   < li >Hierarchy built by name() methods: parent.name("child")</li >
- *   < li >Parent-child links via constructor (node structure)</li >
- *   < li >All Extent methods use defaults (path, depth, iterator)</li >
- *   < li >< b >Name Interning:</b > Names with identical paths return same instance (like String.intern())</li >
+ * < li >Cortex creates root names only: new HierarchicalName(null, "root")</li >
+ * < li >Hierarchy built by name() methods: parent.name("child")</li >
+ * < li >Parent-child links via constructor (node structure)</li >
+ * < li >All Extent methods use defaults (path, depth, iterator)</li >
+ * < li >< b >Name Interning:</b > Names with identical paths return same instance (like String.intern())</li >
  * </ul >
- *
+ * <p>
  * < p >< b >Required implementations:</b >
  * < ul >
- *   < li >part() - returns this segment</li >
- *   < li >enclosure() - returns parent</li >
- *   < li >name() methods - create children with parent reference</li >
+ * < li >part() - returns this segment</li >
+ * < li >enclosure() - returns parent</li >
+ * < li >name() methods - create children with parent reference</li >
  * </ul >
  */
 public final class HierarchicalName implements Name {
@@ -35,31 +35,31 @@ public final class HierarchicalName implements Name {
    * Key: (parent, segment), Value: HierarchicalName instance
    * Ensures identical paths return same instance across entire JVM.
    */
-  private static final ConcurrentHashMap< NameKey, HierarchicalName > INTERN_CACHE = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap < NameKey, HierarchicalName > INTERN_CACHE = new ConcurrentHashMap <> ();
 
   private final HierarchicalName parent;
-  private final String segment;
+  private final String           segment;
 
   /**
    * Composite key for interning cache: (parent, segment) uniquely identifies a Name.
    */
-  private record NameKey(HierarchicalName parent, String segment) {
+  private record NameKey( HierarchicalName parent, String segment ) {
   }
 
   /**
    * Private constructor - use static factory methods or name() methods.
    */
-  private HierarchicalName(HierarchicalName parent, String segment) {
+  private HierarchicalName ( HierarchicalName parent, String segment ) {
     this.parent = parent;
-    this.segment = Objects.requireNonNull(segment, "segment cannot be null");
+    this.segment = Objects.requireNonNull ( segment, "segment cannot be null" );
   }
 
   /**
    * Intern a name - returns cached instance if exists, creates new if not.
    */
-  private static HierarchicalName intern(HierarchicalName parent, String segment) {
-    NameKey key = new NameKey(parent, segment);
-    return INTERN_CACHE.computeIfAbsent(key, k -> new HierarchicalName(parent, segment));
+  private static HierarchicalName intern ( HierarchicalName parent, String segment ) {
+    NameKey key = new NameKey ( parent, segment );
+    return INTERN_CACHE.computeIfAbsent ( key, k -> new HierarchicalName ( parent, segment ) );
   }
 
   /**
@@ -70,26 +70,26 @@ public final class HierarchicalName implements Name {
    * @param path the dot-separated path (e.g., "kafka.broker.1")
    * @return a hierarchical Name (interned)
    */
-  public static Name of(String path) {
-    Objects.requireNonNull(path, "path cannot be null");
-    if (path.isEmpty()) {
-      throw new IllegalArgumentException("path cannot be empty");
+  public static Name of ( String path ) {
+    Objects.requireNonNull ( path, "path cannot be null" );
+    if ( path.isEmpty () ) {
+      throw new IllegalArgumentException ( "path cannot be empty" );
     }
 
     // Split on dots to create hierarchy
-    String[] segments = path.split("\\.", -1); // -1 to preserve empty strings
+    String[] segments = path.split ( "\\.", -1 ); // -1 to preserve empty strings
 
     // Validate: no empty segments (leading/trailing/consecutive dots)
-    for (String segment : segments) {
-      if (segment.isEmpty()) {
-        throw new IllegalArgumentException("path cannot contain empty segments (leading, trailing, or consecutive dots)");
+    for ( String segment : segments ) {
+      if ( segment.isEmpty () ) {
+        throw new IllegalArgumentException ( "path cannot contain empty segments (leading, trailing, or consecutive dots)" );
       }
     }
 
     // Create root using intern, then use name() for children (which also interns)
-    Name current = intern(null, segments[0]);
-    for (int i = 1; i < segments.length; i++) {
-      current = current.name(segments[i]);
+    Name current = intern ( null, segments[0] );
+    for ( int i = 1; i < segments.length; i++ ) {
+      current = current.name ( segments[i] );
     }
     return current;
   }
@@ -97,129 +97,129 @@ public final class HierarchicalName implements Name {
   // ============ REQUIRED: Extent implementations ============
 
   @Override
-  public CharSequence part() {
+  public CharSequence part () {
     return segment;
   }
 
   @Override
-  public Optional< Name > enclosure() {
-    return Optional.ofNullable(parent);
+  public Optional < Name > enclosure () {
+    return Optional.ofNullable ( parent );
   }
 
   // ============ REQUIRED: Name interface - name() factory methods ============
   // Note: Name API doesn't provide defaults, must implement all
 
   @Override
-  public Name name(Name suffix) {
-    Objects.requireNonNull(suffix, "suffix");
+  public Name name ( Name suffix ) {
+    Objects.requireNonNull ( suffix, "suffix" );
     // Iterate from ROOT to LEAF by collecting in reverse order
     // suffix iterator goes LEAF→ROOT, so we need to reverse it
-    java.util.List< String > parts = new java.util.ArrayList<>();
-    for (Name part : suffix) {
-      parts.add(part.part().toString());
+    java.util.List < String > parts = new java.util.ArrayList <> ();
+    for ( Name part : suffix ) {
+      parts.add ( part.part ().toString () );
     }
     // Reverse to get ROOT→LEAF order
-    java.util.Collections.reverse(parts);
+    java.util.Collections.reverse ( parts );
 
     // Now append in correct order
     Name current = this;
-    for (String part : parts) {
-      current = current.name(part);
+    for ( String part : parts ) {
+      current = current.name ( part );
     }
     return current;
   }
 
   @Override
-  public Name name(String segment) {
-    Objects.requireNonNull(segment, "segment");
-    if (segment.isEmpty()) return this;
+  public Name name ( String segment ) {
+    Objects.requireNonNull ( segment, "segment" );
+    if ( segment.isEmpty () ) return this;
 
     // Check if segment contains dots - if so, parse as path
-    if (segment.contains(".")) {
-      String[] parts = segment.split("\\.", -1);
+    if ( segment.contains ( "." ) ) {
+      String[] parts = segment.split ( "\\.", -1 );
       // Validate no empty segments
-      for (String part : parts) {
-        if (part.isEmpty()) {
-          throw new IllegalArgumentException("segment cannot contain empty parts (consecutive dots)");
+      for ( String part : parts ) {
+        if ( part.isEmpty () ) {
+          throw new IllegalArgumentException ( "segment cannot contain empty parts (consecutive dots)" );
         }
       }
       // Build hierarchy
       Name current = this;
-      for (String part : parts) {
-        current = intern((HierarchicalName) current, part);
+      for ( String part : parts ) {
+        current = intern ( (HierarchicalName) current, part );
       }
       return current;
     }
 
     // Single segment - intern directly
-    return intern(this, segment);
+    return intern ( this, segment );
   }
 
   @Override
-  public Name name(Enum<?> e) {
-    Objects.requireNonNull(e, "e");
+  public Name name ( Enum < ? > e ) {
+    Objects.requireNonNull ( e, "e" );
     // Convert Class name to hierarchical Name with dots
     // Replace $ with . for inner classes to create proper hierarchy
-    String className = e.getDeclaringClass().getName().replace('$', '.');
-    return name(className).name(e.name());
+    String className = e.getDeclaringClass ().getName ().replace ( '$', '.' );
+    return name ( className ).name ( e.name () );
   }
 
   @Override
-  public Name name(Class<?> type) {
-    Objects.requireNonNull(type, "type");
+  public Name name ( Class < ? > type ) {
+    Objects.requireNonNull ( type, "type" );
     // Convert $ to . for proper hierarchical name with inner classes
-    return name(type.getName().replace('$', '.'));
+    return name ( type.getName ().replace ( '$', '.' ) );
   }
 
   @Override
-  public Name name(Member member) {
-    Objects.requireNonNull(member, "member");
+  public Name name ( Member member ) {
+    Objects.requireNonNull ( member, "member" );
     // Delegate to name(String) - don't force HierarchicalName
-    return name(member.getDeclaringClass().getName()).name(member.getName());
+    return name ( member.getDeclaringClass ().getName () ).name ( member.getName () );
   }
 
   @Override
-  public Name name(Iterable< String > parts) {
-    Objects.requireNonNull(parts, "parts");
+  public Name name ( Iterable < String > parts ) {
+    Objects.requireNonNull ( parts, "parts" );
     // Delegate to name(String) - don't force HierarchicalName
     Name current = this;
-    for (String part : parts) {
-      current = current.name(Objects.requireNonNull(part));
+    for ( String part : parts ) {
+      current = current.name ( Objects.requireNonNull ( part ) );
     }
     return current;
   }
 
   @Override
-  public < T > Name name(Iterable<? extends T > parts, Function< T, String > mapper) {
-    Objects.requireNonNull(parts, "parts");
-    Objects.requireNonNull(mapper, "mapper");
+  public < T > Name name ( Iterable < ? extends T > parts, Function < T, String > mapper ) {
+    Objects.requireNonNull ( parts, "parts" );
+    Objects.requireNonNull ( mapper, "mapper" );
     // Delegate to name(String) - don't force HierarchicalName
     Name current = this;
-    for (T item : parts) {
-      current = current.name(Objects.requireNonNull(mapper.apply(item)));
+    for ( T item : parts ) {
+      current = current.name ( Objects.requireNonNull ( mapper.apply ( item ) ) );
     }
     return current;
   }
 
   @Override
-  public Name name(Iterator< String > parts) {
-    Objects.requireNonNull(parts, "parts");
+  public Name name ( Iterator < String > parts ) {
+    Objects.requireNonNull ( parts, "parts" );
     // Delegate to name(String) - don't force HierarchicalName
     Name current = this;
-    while (parts.hasNext()) {
-      current = current.name(Objects.requireNonNull(parts.next()));
+    while ( parts.hasNext () ) {
+      current = current.name ( Objects.requireNonNull ( parts.next () ) );
     }
     return current;
   }
 
   @Override
-  public < T > Name name(Iterator<? extends T > parts, Function< T, String > mapper) {
-    Objects.requireNonNull(parts, "parts");
-    Objects.requireNonNull(mapper, "mapper");
+  public < T > Name name ( Iterator < ? extends T > parts, Function < T, String > mapper ) {
+    Objects.requireNonNull ( parts, "parts" );
+    Objects.requireNonNull ( mapper, "mapper" );
     // Delegate to name(String) - don't force HierarchicalName
     Name current = this;
-    while (parts.hasNext()) {
-      current = current.name(Objects.requireNonNull(mapper.apply(parts.next())));
+    while ( parts.hasNext () ) {
+      current = current.name ( Objects.requireNonNull ( mapper.apply ( parts.next () ) ) );
     }
     return current;
   }
@@ -233,43 +233,43 @@ public final class HierarchicalName implements Name {
 
   // Override default path() to use "." separator instead of Extent's "/" default
   @Override
-  public CharSequence path() {
-    return path('.');
+  public CharSequence path () {
+    return path ( '.' );
   }
 
   // Required: path(Function) is abstract in Name
   // Use "." as separator for hierarchical names (not "/" like filesystem paths)
   @Override
-  public CharSequence path(Function<? super String, ? extends CharSequence > mapper) {
-    Objects.requireNonNull(mapper, "mapper");
+  public CharSequence path ( Function < ? super String, ? extends CharSequence > mapper ) {
+    Objects.requireNonNull ( mapper, "mapper" );
     // Adapt Function< String, CharSequence > to Function< Name, CharSequence >
     // by extracting part() from each Name, then delegate to Extent's default
     // Use "." separator for dot-notation hierarchical names
-    return path(name -> mapper.apply(name.part().toString()), '.');
+    return path ( name -> mapper.apply ( name.part ().toString () ), '.' );
   }
 
   @Override
-  public String value() {
+  public String value () {
     // Return just this segment (part), not the full path
-    return part().toString();
+    return part ().toString ();
   }
 
   @Override
-  public String toString() {
+  public String toString () {
     // Use path() which uses '.' separator for hierarchical names
-    return path().toString();
+    return path ().toString ();
   }
 
   @Override
-  public int hashCode() {
+  public int hashCode () {
     // Hash based on full path string
-    return path().toString().hashCode();
+    return path ().toString ().hashCode ();
   }
 
   @Override
-  public boolean equals(Object o) {
-    if (this == o) return true;
-    if (!(o instanceof Name other)) return false;
-    return path().toString().equals(other.path().toString());
+  public boolean equals ( Object o ) {
+    if ( this == o ) return true;
+    if ( !( o instanceof Name other ) ) return false;
+    return path ().toString ().equals ( other.path ().toString () );
   }
 }
