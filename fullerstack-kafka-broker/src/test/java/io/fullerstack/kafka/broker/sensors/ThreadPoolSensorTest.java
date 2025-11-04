@@ -75,7 +75,7 @@ class ThreadPoolSensorTest {
 
         assertThatThrownBy(() -> new ThreadPoolSensor(config, null, circuitName))
             .isInstanceOf(NullPointerException.class)
-            .hasMessageContaining("signalPipe cannot be null");
+            .hasMessageContaining("channel cannot be null");
     }
 
     @Test

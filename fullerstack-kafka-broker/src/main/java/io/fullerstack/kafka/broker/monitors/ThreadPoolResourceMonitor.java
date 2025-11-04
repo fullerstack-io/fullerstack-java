@@ -74,7 +74,7 @@ public class ThreadPoolResourceMonitor {
             // Simple threshold assessment (no baseline)
             if (idlePercent < IDLE_EXHAUSTED_THRESHOLD) {
                 // EXHAUSTED: <10% idle → DENY (no capacity)
-                resource.deny(0);
+                resource.deny();
             } else {
                 // ≥10% idle → GRANT (capacity available)
                 resource.grant(metrics.idleThreads());

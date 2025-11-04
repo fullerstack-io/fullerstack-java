@@ -2,6 +2,7 @@ package io.fullerstack.kafka.producer.sensors;
 
 import io.humainary.substrates.ext.serventis.Services;
 import io.humainary.substrates.api.Substrates.Pipe;
+import io.humainary.substrates.api.Substrates.Channel;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -15,6 +16,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Unit tests for {@link ProducerEventInterceptor}.
@@ -28,37 +31,45 @@ class ProducerEventInterceptorTest {
 
     private ProducerEventInterceptor<String, String> interceptor;
     private List<Services.Signal> capturedSignals;
-    private Pipe<Services.Signal> mockPipe;
+    private Channel<Services.Signal> mockChannel;
+    private Services.Service mockService;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         interceptor = new ProducerEventInterceptor<>();
         capturedSignals = new ArrayList<>();
 
-        // Create a mock Pipe that captures emitted signals
-        mockPipe = new Pipe<>() {
-            @Override
-            public void emit(Services.Signal signal) {
-                capturedSignals.add(signal);
-            }
+        // Create mock Channel and Pipe that capture emitted signals
+        mockChannel = mock(Channel.class);
+        Pipe<Services.Signal> mockPipe = mock(Pipe.class);
 
-            @Override
-            public void flush() {
-                // No-op for tests
-            }
-        };
+        when(mockChannel.pipe()).thenReturn(mockPipe);
+
+        // Capture signals emitted to the pipe
+        doAnswer(invocation -> {
+            Services.Signal signal = invocation.getArgument(0);
+            capturedSignals.add(signal);
+            return null;
+        }).when(mockPipe).emit(any(Services.Signal.class));
+
+        doNothing().when(mockPipe).flush();
+
+        // Create mock Service instrument using RC3 API
+        mockService = Services.composer(mockChannel);
     }
 
     @Test
-    void configure_withPipeInConfig_shouldExtractPipe() {
-        // Given: Configuration with Pipe
+    void configure_withServiceInConfig_shouldExtractService() {
+        // Given: Configuration with Service instrument
         Map<String, Object> config = new HashMap<>();
         config.put("client.id", "test-producer");
+        config.put(ProducerEventInterceptor.SERVICE_KEY, mockService);
 
         // When: Configuring interceptor
         interceptor.configure(config);
 
-        // Then: Pipe should be extracted (verified by subsequent behavior)
+        // Then: Service should be extracted (verified by subsequent behavior)
         ProducerRecord<String, String> record = new ProducerRecord<>("test-topic", "key", "value");
         interceptor.onSend(record);
 
@@ -66,15 +77,15 @@ class ProducerEventInterceptorTest {
     }
 
     @Test
-    void configure_withoutPipe_shouldHandleGracefully() {
-        // Given: Configuration without Pipe
+    void configure_withoutService_shouldHandleGracefully() {
+        // Given: Configuration without Service instrument
         Map<String, Object> config = new HashMap<>();
         config.put("client.id", "test-producer");
 
         // When: Configuring interceptor
         interceptor.configure(config);
 
-        // Then: Should not fail, but onSend should not emit metrics
+        // Then: Should not fail, but onSend should not emit signals
         ProducerRecord<String, String> record = new ProducerRecord<>("test-topic", "key", "value");
         ProducerRecord<String, String> result = interceptor.onSend(record);
 
@@ -83,15 +94,16 @@ class ProducerEventInterceptorTest {
     }
 
     @Test
-    void configure_withWrongPipeType_shouldHandleGracefully() {
-        // Given: Configuration with wrong type for pipe
+    void configure_withWrongServiceType_shouldHandleGracefully() {
+        // Given: Configuration with wrong type for service
         Map<String, Object> config = new HashMap<>();
         config.put("client.id", "test-producer");
+        config.put(ProducerEventInterceptor.SERVICE_KEY, "not-a-service"); // Wrong type
 
         // When: Configuring interceptor
         interceptor.configure(config);
 
-        // Then: Should not fail, metrics should not be emitted
+        // Then: Should not fail, signals should not be emitted
         ProducerRecord<String, String> record = new ProducerRecord<>("test-topic", "key", "value");
         interceptor.onSend(record);
 
@@ -100,8 +112,9 @@ class ProducerEventInterceptorTest {
 
     @Test
     void configure_withoutClientId_shouldUseDefaultProducerId() {
-        // Given: Configuration without client.id
+        // Given: Configuration without client.id but with Service
         Map<String, Object> config = new HashMap<>();
+        config.put(ProducerEventInterceptor.SERVICE_KEY, mockService);
 
         // When: Configuring interceptor (should not fail)
         assertThatCode(() -> interceptor.configure(config)).doesNotThrowAnyException();
@@ -114,7 +127,7 @@ class ProducerEventInterceptorTest {
     }
 
     @Test
-    void onSend_withPipe_shouldEmitCallMetrics() {
+    void onSend_withService_shouldEmitCallSignal() {
         // Given: Configured interceptor
         configureInterceptor("test-producer");
 
@@ -381,7 +394,8 @@ class ProducerEventInterceptorTest {
     private void configureInterceptor(String producerId) {
         Map<String, Object> config = new HashMap<>();
         config.put("client.id", producerId);
-        // Note: Baseline service is optional - interceptor handles null gracefully
+        config.put(ProducerEventInterceptor.SERVICE_KEY, mockService);
+        // Note: Probe is optional - interceptor handles null gracefully (we're only testing Services layer)
         interceptor.configure(config);
     }
 

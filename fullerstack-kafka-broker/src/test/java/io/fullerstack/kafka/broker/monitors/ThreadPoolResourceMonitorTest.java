@@ -71,6 +71,9 @@ class ThreadPoolResourceMonitorTest {
             return null;
         }).when(pipe).emit(any(Resources.Signal.class));
 
+        // Mock flush() to return void
+        doNothing().when(pipe).flush();
+
         return channel;
     }
 
@@ -414,7 +417,7 @@ class ThreadPoolResourceMonitorTest {
             assertThatThrownBy(() ->
                 new ThreadPoolResourceMonitor(circuitName, null)
             ).isInstanceOf(NullPointerException.class)
-             .hasMessageContaining("signalChannel cannot be null");
+             .hasMessageContaining("channel cannot be null");
         }
     }
 
