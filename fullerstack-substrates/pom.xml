@@ -67,10 +67,10 @@
             <artifactId>humainary-substrates-api</artifactId>
         </dependency>
 
-        <!-- Serventis Extension (ext/serventis) - bundled with Substrates API RC3 -->
+        <!-- Serventis Extension (ext/serventis) - bundled with Substrates API RC5 -->
         <dependency>
             <groupId>io.humainary.substrates.ext</groupId>
-            <artifactId>humainary-serventis</artifactId>
+            <artifactId>humainary-substrates-ext-serventis</artifactId>
             <version>${substrates-api.version}</version>
         </dependency>
 

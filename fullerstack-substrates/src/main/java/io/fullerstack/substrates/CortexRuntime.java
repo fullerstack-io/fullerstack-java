@@ -3,6 +3,7 @@ package io.fullerstack.substrates;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.capture.SubjectCapture;
 import io.fullerstack.substrates.circuit.SingleThreadCircuit;
+import io.fullerstack.substrates.current.ThreadCurrent;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.pool.ConcurrentPool;
 import io.fullerstack.substrates.scope.ManagedScope;
@@ -89,6 +90,15 @@ public class CortexRuntime implements Cortex {
 
   private Circuit createCircuit ( Name name ) {
     return new SingleThreadCircuit ( name );
+  }
+
+  // ========== Current Management (1 method) ==========
+
+  @Override
+  public Current current () {
+    // Return Current for the calling thread
+    // Analogous to Thread.currentThread() in Java
+    return ThreadCurrent.of ();
   }
 
   // ========== Pipe Factory (5 methods) ==========
