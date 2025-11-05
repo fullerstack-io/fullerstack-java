@@ -190,15 +190,15 @@ if (authSuccessful) {
 
 | Kafka JMX Metric | MBean ObjectName | Serventis API | Implementation Status |
 |------------------|------------------|---------------|----------------------|
-| **ISR Shrinks** | `kafka.server:type=ReplicaManager,name=IsrShrinksPerSec` | ⭐ **Routers** (RC6) | 🔄 **Planned** (Epic 2.2) |
-| **ISR Expands** | `kafka.server:type=ReplicaManager,name=IsrExpandsPerSec` | ⭐ **Routers** (RC6) | 🔄 **Planned** (Epic 2.2) |
+| **ISR Shrinks** | `kafka.server:type=ReplicaManager,name=IsrShrinksPerSec` | ⭐ **Routers** (RC6) | 🔄 **Proposed** (Enhancement #2) |
+| **ISR Expands** | `kafka.server:type=ReplicaManager,name=IsrExpandsPerSec` | ⭐ **Routers** (RC6) | 🔄 **Proposed** (Enhancement #2) |
 | **Under Replicated Partitions** | `kafka.server:type=ReplicaManager,name=UnderReplicatedPartitions` | **Monitors** | ❌ Not mapped |
 | **Offline Partitions** | `kafka.controller:type=KafkaController,name=OfflinePartitionsCount` | **Monitors** | ❌ Not mapped |
 | **Active Controller Count** | `kafka.controller:type=KafkaController,name=ActiveControllerCount` | **Monitors** | ❌ Not mapped |
-| **Replica Lag Max** | `kafka.server:type=ReplicaFetcherManager,name=MaxLag,clientId=Replica` | ⭐ **Routers** (RC6) | 🔄 **Planned** (Epic 2.2) |
-| **Replica Fetch Rate** | `kafka.server:type=ReplicaFetcherManager,name=MinFetchRate,clientId=Replica` | ⭐ **Routers** (RC6) | 🔄 **Planned** (Epic 2.2) |
+| **Replica Lag Max** | `kafka.server:type=ReplicaFetcherManager,name=MaxLag,clientId=Replica` | ⭐ **Routers** (RC6) | 🔄 **Proposed** (Enhancement #2) |
+| **Replica Fetch Rate** | `kafka.server:type=ReplicaFetcherManager,name=MinFetchRate,clientId=Replica` | ⭐ **Routers** (RC6) | 🔄 **Proposed** (Enhancement #2) |
 
-**RC6 Routers API Enhancement** (Epic 2.2):
+**RC6 Routers API Proposed Enhancement** (Enhancement #2 - ISR Replication):
 ```java
 // ISR Replication Monitor (Routers API)
 Router leader = routers.get(cortex().name("partition-0.leader.broker-1"));
@@ -426,7 +426,7 @@ if (totalLag >= 10_000) {
 | Kafka JMX Metric | MBean ObjectName | Serventis API | Implementation Status |
 |------------------|------------------|---------------|----------------------|
 | **Rebalance Events** | Via ConsumerRebalanceListener | **Services** | ✅ **Implemented** (`ConsumerRebalanceListenerAdapter`) |
-| **Partition Assignment** | Via ConsumerRebalanceListener | ⭐ **Agents** (RC6) | 🔄 **Planned** (Epic 2.1) |
+| **Partition Assignment** | Via ConsumerRebalanceListener | ⭐ **Agents** (RC6) | 🔄 **Proposed** (Enhancement #1) |
 | **Rebalance Time** | Custom tracking | **Gauges** | ❌ Not mapped |
 
 **Current Implementation** (`ConsumerRebalanceListenerAdapter.java`):
@@ -445,7 +445,7 @@ public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
 }
 ```
 
-**RC6 Enhancement (Agents API)** - Epic 2.1:
+**RC6 Proposed Enhancement (Agents API)** - Enhancement #1 (Consumer Rebalance Coordination):
 ```java
 // Consumer Rebalance Agent Monitor (Agents API)
 Agent consumer = agents.get(cortex().name("consumer-1"));
@@ -505,7 +505,7 @@ if (fetchRate < expectedRate * 0.5) {
 | **Partition Size** | `kafka.log:type=Log,name=Size,topic=*,partition=*` | **Gauges** | ❌ Not mapped |
 | **Log End Offset** | `kafka.log:type=Log,name=LogEndOffset,topic=*,partition=*` | **Counters** | ❌ Not mapped |
 | **Leader Epoch** | Via AdminClient | **Monitors** | ❌ Not mapped |
-| **ISR Count** | Via AdminClient `describeTopics()` | ⭐ **Routers** (RC6) | 🔄 **Planned** (Epic 2.2) |
+| **ISR Count** | Via AdminClient `describeTopics()` | ⭐ **Routers** (RC6) | 🔄 **Proposed** (Enhancement #2) |
 
 **Recommended Mapping** (Gauges for size):
 ```java
@@ -525,11 +525,11 @@ if (size >= maxSize * 0.95) {
 
 | Kafka JMX Metric | MBean ObjectName | Serventis API | Implementation Status |
 |------------------|------------------|---------------|----------------------|
-| **Reassignment Progress** | Via AdminClient `listPartitionReassignments()` | ⭐ **Routers** (RC6) | 🔄 **Planned** (Epic 2.3) |
-| **Adding Replicas** | Via AdminClient | ⭐ **Routers** (RC6) | 🔄 **Planned** (Epic 2.3) |
-| **Removing Replicas** | Via AdminClient | ⭐ **Routers** (RC6) | 🔄 **Planned** (Epic 2.3) |
+| **Reassignment Progress** | Via AdminClient `listPartitionReassignments()` | ⭐ **Routers** (RC6) | 🔄 **Proposed** (Enhancement #3) |
+| **Adding Replicas** | Via AdminClient | ⭐ **Routers** (RC6) | 🔄 **Proposed** (Enhancement #3) |
+| **Removing Replicas** | Via AdminClient | ⭐ **Routers** (RC6) | 🔄 **Proposed** (Enhancement #3) |
 
-**RC6 Routers API Enhancement** (Epic 2.3):
+**RC6 Routers API Proposed Enhancement** (Enhancement #3 - Partition Reassignment):
 ```java
 // Partition Reassignment Monitor (Routers API)
 Router oldLeader = routers.get(cortex().name("partition-0.old-leader"));
@@ -627,13 +627,15 @@ if (networkError) {
 
 ### ⭐ RC6 Opportunities (new with RC6 upgrade)
 
-| Enhancement | Epic | Serventis API (RC6) | Kafka Metrics to Cover |
-|-------------|------|---------------------|----------------------|
-| **Consumer Rebalance Coordination** | Epic 2.1 | **Agents** | Rebalance promise lifecycle (INQUIRE→FULFILL/BREACH) |
-| **ISR Replication Topology** | Epic 2.2 | **Routers** | ISR shrinks/expands, replica lag, fetch rate |
-| **Partition Reassignment Tracking** | Epic 2.3 | **Routers** | Reassignment FRAGMENT→REASSEMBLE lifecycle |
-| **JMX Operation Tracking** | Epic 2.4 | **Actors** | Dynamic config changes, topic operations |
-| **Network Partition Detection** | Epic 2.5 | **Routers** | Cross-broker communication DROP patterns |
+**Note**: These are **proposed implementations** for fullerstack-kafka modules (not existing epics). See `RC6-FULLERSTACK-KAFKA-IMPACT-ASSESSMENT.md` for detailed implementation plans.
+
+| Enhancement | Proposal Reference | Serventis API (RC6) | Kafka Metrics to Cover |
+|-------------|-------------------|---------------------|----------------------|
+| **Consumer Rebalance Coordination** | Proposed Enhancement #1 | **Agents** | Rebalance promise lifecycle (INQUIRE→FULFILL/BREACH) |
+| **ISR Replication Topology** | Proposed Enhancement #2 | **Routers** | ISR shrinks/expands, replica lag, fetch rate |
+| **Partition Reassignment Tracking** | Proposed Enhancement #3 | **Routers** | Reassignment FRAGMENT→REASSEMBLE lifecycle |
+| **JMX Operation Tracking** | Proposed Enhancement #4 | **Actors** | Dynamic config changes, topic operations |
+| **Network Partition Detection** | Proposed Enhancement #5 | **Routers** | Cross-broker communication DROP patterns |
 
 **Total Additional Metrics**: ~8-12 metrics with deep semantic intelligence
 
@@ -685,12 +687,14 @@ if (networkError) {
 
 ### Priority 2: High-Value Enhancements (Short-term)
 
-| Enhancement | Serventis API (RC6) | Business Value | Complexity |
-|-------------|---------------------|----------------|------------|
-| **Consumer Rebalance Coordination** | Agents | ⭐⭐⭐⭐⭐ | Medium (3-4 days) |
-| **ISR Replication Topology** | Routers | ⭐⭐⭐⭐⭐ | High (5-6 days) |
-| **Request/Response Rates** | Counters | ⭐⭐⭐⭐ | Low (1-2 days) |
-| **Authentication Tracking** | Probes | ⭐⭐⭐⭐ | Low (1-2 days) |
+**Note**: These are **proposed enhancements** for fullerstack-kafka. See `RC6-FULLERSTACK-KAFKA-IMPACT-ASSESSMENT.md` for complete implementation plans.
+
+| Enhancement | Serventis API (RC6) | Business Value | Complexity | Proposal Ref |
+|-------------|---------------------|----------------|------------|--------------|
+| **Consumer Rebalance Coordination** | Agents | ⭐⭐⭐⭐⭐ | Medium (3-4 days) | Enhancement #1 |
+| **ISR Replication Topology** | Routers | ⭐⭐⭐⭐⭐ | High (5-6 days) | Enhancement #2 |
+| **Request/Response Rates** | Counters | ⭐⭐⭐⭐ | Low (1-2 days) | - |
+| **Authentication Tracking** | Probes | ⭐⭐⭐⭐ | Low (1-2 days) | - |
 
 **Effort**: 10-14 days total
 **Impact**: Transformative observability for rebalancing + ISR
@@ -699,12 +703,12 @@ if (networkError) {
 
 ### Priority 3: Medium-Value Gaps (Medium-term)
 
-| Metric Category | Serventis API | Business Value | Complexity |
-|----------------|---------------|----------------|------------|
-| **Producer Send Lifecycle** | Services + Probes | ⭐⭐⭐⭐ | Medium (2-3 days) |
-| **Network Throughput** | Counters | ⭐⭐⭐ | Low (1-2 days) |
-| **Topic/Partition Sizes** | Gauges | ⭐⭐⭐ | Low (1-2 days) |
-| **Partition Reassignment** | Routers | ⭐⭐⭐⭐ | High (4-5 days) |
+| Metric Category | Serventis API | Business Value | Complexity | Proposal Ref |
+|----------------|---------------|----------------|------------|--------------|
+| **Producer Send Lifecycle** | Services + Probes | ⭐⭐⭐⭐ | Medium (2-3 days) | - |
+| **Network Throughput** | Counters | ⭐⭐⭐ | Low (1-2 days) | - |
+| **Topic/Partition Sizes** | Gauges | ⭐⭐⭐ | Low (1-2 days) | - |
+| **Partition Reassignment** | Routers | ⭐⭐⭐⭐ | High (4-5 days) | Enhancement #3 |
 
 **Effort**: 8-12 days total
 
@@ -712,12 +716,12 @@ if (networkError) {
 
 ### Priority 4: Nice-to-Have (Long-term)
 
-| Metric Category | Serventis API | Business Value | Complexity |
-|----------------|---------------|----------------|------------|
-| **Log Flush Metrics** | Counters | ⭐⭐ | Low |
-| **Batch Sizes** | Gauges | ⭐⭐ | Low |
-| **JMX Operations** | Actors | ⭐⭐⭐ | Medium |
-| **Network Partition Detection** | Routers | ⭐⭐⭐ | High |
+| Metric Category | Serventis API | Business Value | Complexity | Proposal Ref |
+|----------------|---------------|----------------|------------|--------------|
+| **Log Flush Metrics** | Counters | ⭐⭐ | Low | - |
+| **Batch Sizes** | Gauges | ⭐⭐ | Low | - |
+| **JMX Operations** | Actors | ⭐⭐⭐ | Medium | Enhancement #4 |
+| **Network Partition Detection** | Routers | ⭐⭐⭐ | High | Enhancement #5 |
 
 **Effort**: 8-12 days total
 
@@ -796,13 +800,17 @@ if (networkError) {
 
 ### Short-term Goals (Priority 2 with RC6)
 
-1. **Consumer Rebalance Coordination** (Agents API) - Epic 2.1
-2. **ISR Replication Topology** (Routers API) - Epic 2.2
+**Note**: These are proposed enhancements for fullerstack-kafka modules.
+
+1. **Consumer Rebalance Coordination** (Agents API) - Enhancement #1
+2. **ISR Replication Topology** (Routers API) - Enhancement #2
 3. **Request/Response Rate Tracking** (Counters)
 4. **Authentication Tracking** (Probes)
 
 **Total Priority 2 Effort**: 10-14 days
 **Total Priority 2 Impact**: +15 metrics, transformative rebalancing + ISR visibility
+
+See `RC6-FULLERSTACK-KAFKA-IMPACT-ASSESSMENT.md` for detailed implementation plans.
 
 ---
 
