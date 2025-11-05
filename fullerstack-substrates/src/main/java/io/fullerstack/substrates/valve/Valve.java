@@ -8,7 +8,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 /**
  * Valve - Controls the flow of tasks through a virtual thread processor.
  * <p>
- * < p >< b >RC3 Dual-Queue Architecture:</b >
+ * < p >< b >Dual-Queue Architecture:</b >
  * < ul >
  * < li >< b >Ingress Queue (FIFO)</b >: Emissions from external threads (outside circuit)</li >
  * < li >< b >Transit Deque (LIFO)</b >: Emissions from circuit thread (recursive, stack-like)</li >
@@ -48,7 +48,7 @@ public class Valve implements AutoCloseable {
 
   private final String name;
 
-  // RC3 Dual-Queue Architecture
+  // Dual-Queue Architecture
   private final BlockingQueue < Runnable > ingressQueue;  // External emissions (FIFO)
   private final BlockingDeque < Runnable > transitDeque;  // Recursive emissions (LIFO for depth-first)
 
@@ -74,7 +74,7 @@ public class Valve implements AutoCloseable {
   /**
    * Submits a task to the valve for execution.
    * <p>
-   * < p >< b >RC3 Dual-Queue Routing:</b >
+   * < p >< b >Dual-Queue Routing:</b >
    * < ul >
    * < li >If called from circuit thread (recursive): < b >Pushes to front of Transit deque</b > (LIFO stack)</li >
    * < li >If called from external thread: < b >Appends to Ingress queue</b > (FIFO)</li >
@@ -88,7 +88,7 @@ public class Valve implements AutoCloseable {
    */
   public boolean submit ( Runnable task ) {
     if ( task != null && running ) {
-      // RC3: Route to appropriate queue based on calling thread
+      //  Route to appropriate queue based on calling thread
       if ( Thread.currentThread () == processor ) {
         // Recursive emission from circuit thread → Append to Transit (FIFO within batch)
         // Transit has priority, but siblings maintain emit order
@@ -123,7 +123,7 @@ public class Valve implements AutoCloseable {
 
     // Event-driven wait - no polling!
     synchronized ( idleLock ) {
-      // RC3: Check BOTH ingress queue and transit deque
+      //  Check BOTH ingress queue and transit deque
       while ( running && ( executing || !ingressQueue.isEmpty () || !transitDeque.isEmpty () ) ) {
         try {
           idleLock.wait ();  // Block until notified by processor
@@ -141,15 +141,15 @@ public class Valve implements AutoCloseable {
    * @return true if idle, false if tasks are pending or executing
    */
   public boolean isIdle () {
-    // RC3: Check BOTH ingress queue and transit deque
+    //  Check BOTH ingress queue and transit deque
     return !executing && ingressQueue.isEmpty () && transitDeque.isEmpty ();
   }
 
   /**
-   * Background processor that executes tasks using RC3 dual-queue depth-first execution.
+   * Background processor that executes tasks using dual-queue depth-first execution.
    * Runs in a virtual thread (parks when both queues empty, unparks when task arrives).
    * <p>
-   * < p >< b >RC3 True Depth-First Algorithm:</b >
+   * < p >< b >True Depth-First Algorithm:</b >
    * < ol >
    * < li >Check Transit deque first (pop from front - LIFO stack behavior)</li >
    * < li >If Transit empty, take from Ingress queue (FIFO)</li >
@@ -171,7 +171,7 @@ public class Valve implements AutoCloseable {
       try {
         Runnable task = null;
 
-        // RC3 Depth-First: Poll from front of Transit (FIFO, preserves sibling order)
+        // Depth-First: Poll from front of Transit (FIFO, preserves sibling order)
         // Transit has priority over Ingress (recursive before external)
         task = transitDeque.pollFirst ();  // Take from front (oldest in Transit batch)
 

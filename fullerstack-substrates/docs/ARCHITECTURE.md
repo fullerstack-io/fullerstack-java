@@ -1,21 +1,23 @@
 # Fullerstack Substrates - Architecture & Core Concepts
 
-**API Version:** M18 (Cell API + Flow.skip)
-**Java Version:** 25 (LTS with Virtual Threads)
-**Status:** Production-ready (497 tests passing)
+**Substrates API:** RC5 (RC5 + sealed hierarchy + Cell API + Flow.skip)
+**Serventis API:** RC5 (Queues, Monitors, Probes, Services, Resources, Reporters)
+**Java Version:** 25 (Virtual Threads)
+**Status:** 502 tests passing (38 API compliance tests)
 
 ---
 
 ## Table of Contents
 
 1. [What is Substrates?](#what-is-substrates)
-2. [Design Philosophy](#design-philosophy)
-3. [M18 Sealed Hierarchy](#m17-sealed-hierarchy)
-4. [Core Entities](#core-entities)
-5. [Data Flow](#data-flow)
-6. [Implementation Details](#implementation-details)
-7. [Thread Safety](#thread-safety)
-8. [Resource Lifecycle](#resource-lifecycle)
+2. [Serventis Integration](#serventis-integration)
+3. [Design Philosophy](#design-philosophy)
+4. [RC5 Sealed Hierarchy](#rc5-sealed-hierarchy)
+5. [Core Entities](#core-entities)
+6. [Data Flow](#data-flow)
+7. [Implementation Details](#implementation-details)
+8. [Thread Safety](#thread-safety)
+9. [Resource Lifecycle](#resource-lifecycle)
 
 ---
 
@@ -39,7 +41,143 @@ Situations (system states)
 Steering (automated responses)
 ```
 
-**Substrates** provides the infrastructure layer, **Serventis** provides the semantic signal types.
+**Substrates** provides the infrastructure layer (routing, ordering, lifecycle), **Serventis** provides the semantic instrument APIs (typed signals with meaning).
+
+---
+
+## Serventis Integration
+
+Serventis extends Substrates with **typed instrument APIs** for building semiotic observability systems. Each instrument emits domain-specific signals that gain meaning through their Subject context.
+
+### The Nine Instrument APIs (RC5)
+
+#### OBSERVE Phase (Sensing)
+
+**1. Probes** - Communication outcomes
+```java
+Conduit<Probe, Probes.Signal> probes = circuit.conduit(name, Probes::composer);
+Probe probe = probes.get(cortex().name("kafka.broker-1.network"));
+probe.operation(Operation.CONNECT, Origin.CLIENT, Outcome.SUCCESS);
+```
+
+**2. Services** - Interaction lifecycle
+```java
+Conduit<Service, Services.Signal> services = circuit.conduit(name, Services::composer);
+Service service = services.get(cortex().name("kafka.broker-1.api"));
+service.call();
+service.succeeded();  // or service.failed()
+```
+
+**3. Queues** - Flow control events
+```java
+Conduit<Queue, Queues.Signal> queues = circuit.conduit(name, Queues::composer);
+Queue queue = queues.get(cortex().name("producer-1.buffer"));
+queue.enqueue();  // Item added to queue
+queue.dequeue();  // Item removed from queue
+queue.overflow(95L);  // Buffer capacity exceeded
+queue.underflow();  // Take from empty queue
+```
+
+**4. Gauges** - Bidirectional metrics (NEW in RC5)
+```java
+Conduit<Gauge, Gauges.Sign> gauges = circuit.conduit(name, Gauges::composer);
+Gauge gauge = gauges.get(cortex().name("broker-1.connections"));
+gauge.increment();  // Connections increased
+gauge.decrement();  // Connections decreased
+gauge.overflow();   // Max capacity exceeded
+gauge.underflow();  // Min threshold breached
+gauge.reset();      // Reset to baseline
+```
+
+**5. Counters** - Monotonic metrics (NEW in RC5)
+```java
+Conduit<Counter, Counters.Sign> counters = circuit.conduit(name, Counters::composer);
+Counter counter = counters.get(cortex().name("broker-1.requests"));
+counter.increment();  // Request count increased
+counter.overflow();   // Counter wrapped around
+counter.underflow();  // Invalid decrement attempted
+counter.reset();      // Explicitly zeroed
+```
+
+**6. Caches** - Hit/miss tracking (NEW in RC5)
+```java
+Conduit<Cache, Caches.Sign> caches = circuit.conduit(name, Caches::composer);
+Cache cache = caches.get(cortex().name("metadata-cache"));
+cache.lookup();  // Attempt to retrieve entry
+cache.hit();     // Lookup succeeded
+cache.miss();    // Lookup failed
+cache.store();   // Entry added/updated
+cache.evict();   // Automatic removal due to capacity
+cache.expire();  // Removal due to TTL
+cache.remove();  // Explicit invalidation
+```
+
+#### ORIENT Phase (Understanding)
+
+**7. Monitors** - Condition assessment
+```java
+Conduit<Monitor, Monitors.Status> monitors = circuit.conduit(name, Monitors::composer);
+Monitor monitor = monitors.get(cortex().name("broker-1.health"));
+monitor.degraded(Monitors.Confidence.HIGH);  // Convenience method
+// Or: monitor.stable(), .converging(), .diverging(), .erratic(), .defective(), .down()
+// Or generic: monitor.status(Monitors.Condition.DEGRADED, Monitors.Confidence.HIGH)
+```
+
+**8. Resources** - Capacity tracking
+```java
+Conduit<Resource, Resources.Sign> resources = circuit.conduit(name, Resources::composer);
+Resource resource = resources.get(cortex().name("thread-pool"));
+resource.attempt();  // Non-blocking request
+resource.acquire();  // Blocking/wait-based request
+resource.grant();    // Successful allocation
+resource.deny();     // Insufficient capacity
+resource.timeout();  // Wait period exceeded
+resource.release();  // Return granted units
+```
+
+#### DECIDE Phase (Urgency)
+
+**9. Reporters** - Situation assessment
+```java
+Conduit<Reporter, Reporters.Situation> reporters = circuit.conduit(name, Reporters::composer);
+Reporter reporter = reporters.get(cortex().name("cluster-health"));
+reporter.critical();  // Serious situation demanding intervention
+// Or: reporter.normal(), reporter.warning()
+```
+
+### Context Creates Meaning
+
+The **key insight**: The same signal means different things depending on its Subject (entity context).
+
+```java
+// Same OVERFLOW signal, different meanings:
+Queue producerBuffer = queues.get(cortex().name("producer.buffer"));
+Queue consumerLag = queues.get(cortex().name("consumer.lag"));
+
+producerBuffer.overflow(95L);  // → Backpressure (annoying)
+consumerLag.overflow(95L);     // → Data loss risk (critical!)
+
+// Subscribers interpret based on Subject:
+queues.subscribe(cortex().subscriber(
+    cortex().name("assessor"),
+    (Subject<Channel<Queues.Signal>> subject, Registrar<Queues.Signal> registrar) -> {
+        Monitor monitor = monitors.get(subject.name());
+        registrar.register(signal -> {
+            if (signal == Queues.Signal.OVERFLOW) {
+                if (subject.name().toString().contains("producer")) {
+                    monitor.status(DEGRADED, HIGH);  // Backpressure
+                } else if (subject.name().toString().contains("consumer")) {
+                    monitor.status(DEFECTIVE, HIGH);  // Critical!
+                }
+            }
+        });
+    }
+));
+```
+
+This is **semiotic observability** - meaning arises from the interplay between signal and context.
+
+---
 
 ### Key Capabilities
 
@@ -57,12 +195,12 @@ Steering (automated responses)
 
 ## Design Philosophy
 
-**Core Principle:** Simplified, lean implementation focused on correctness, clarity, and production readiness.
+**Core Principle:** Simplified, lean implementation focused on correctness, clarity, and design targets.
 
 ### Architecture Principles
 
 1. **Simplified Design** - Single implementations, no factory abstractions
-2. **M18 Sealed Hierarchy** - Type-safe API contracts enforced by sealed interfaces
+2. **RC5 Sealed Hierarchy** - Type-safe API contracts enforced by sealed interfaces
 3. **Valve Pattern** (William's architecture) - BlockingQueue + Virtual Thread per Circuit
 4. **Event-Driven Synchronization** - Zero-latency await() using wait/notify (no polling)
 5. **Pipeline Fusion** - JVM-style optimization of adjacent transformations
@@ -88,11 +226,11 @@ Steering (automated responses)
 
 ---
 
-## M18 Sealed Hierarchy
+## RC5 Sealed Hierarchy
 
 ### Sealed Interfaces (Java JEP 409)
 
-M18 uses sealed interfaces to restrict which classes can implement them:
+RC5 uses sealed interfaces to restrict which classes can implement them:
 
 ```java
 sealed interface Source<E> permits Context
@@ -119,14 +257,14 @@ The API controls the type hierarchy to prevent incorrect compositions.
 
 ### Impact on Implementation
 
-**SourceImpl doesn't implement Source:**
+**internal subscriber management doesn't implement Source:**
 
 ```java
 // Source is sealed, so this won't compile:
-public class SourceImpl<E> implements Source<E> { }  // ❌
+public class internal subscriber management<E> implements Source<E> { }  // ❌
 
-// Instead, SourceImpl is an internal utility:
-public class SourceImpl<E> {
+// Instead, internal subscriber management is an internal utility:
+public class internal subscriber management<E> {
     public Subscription subscribe(Subscriber<E> subscriber) { }  // ✅
 }
 ```
@@ -177,13 +315,13 @@ Conduit<P, E> extends Container<P, E, Conduit<P, E>> extends Component<E, Condui
 ```java
 // Create conduit (which is itself a Source<Long>)
 Conduit<Pipe<Long>, Long> conduit = circuit.conduit(
-    Cortex.name("sensors"),
+    cortex().name("sensors"),
     Composer.pipe()
 );
 
 // Subscribe to the conduit (possible because Conduit IS-A Source)
-conduit.subscribe(Cortex.subscriber(
-    Cortex.name("aggregator"),
+conduit.subscribe(cortex().subscriber(
+    cortex().name("aggregator"),
     (subject, registrar) -> {
         // subject is Subject<Channel<Long>> - the channel that was created
         // We can inspect it and decide how to route
@@ -220,11 +358,11 @@ This design enables **dynamic, hierarchical routing** where subscribers can:
 ```java
 import static io.humainary.substrates.api.Substrates.*;
 
-Circuit circuit = Cortex.circuit(Cortex.name("kafka"));
-Name brokerName = Cortex.name("kafka.broker.1");
+Circuit circuit = cortex().circuit(cortex().name("kafka"));
+Name brokerName = cortex().name("kafka.broker.1");
 ```
 
-**M18 Change:** Cortex is now accessed statically via `Substrates.Cortex`, not instantiated.
+**RC5 Change:** Cortex is now accessed statically via `Substrates.Cortex`, not instantiated.
 
 **Implementation:**
 
@@ -253,12 +391,12 @@ public class CortexRuntime implements Cortex {
 - Component lifecycle management
 
 ```java
-Circuit circuit = Cortex.circuit(Cortex.name("kafka.monitoring"));
+Circuit circuit = cortex().circuit(cortex().name("kafka.monitoring"));
 
 Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
-    circuit.conduit(Cortex.name("monitors"), Composer.pipe());
+    circuit.conduit(cortex().name("monitors"), Composer.pipe());
 
-Clock clock = circuit.clock(Cortex.name("timer"));
+Clock clock = circuit.clock(cortex().name("timer"));
 ```
 
 **Virtual CPU Core Pattern:**
@@ -319,10 +457,10 @@ public final class HierarchicalName implements Name {
 
 ```java
 // From string
-Name name = Cortex.name("kafka.broker.1.metrics.bytes-in");
+Name name = cortex().name("kafka.broker.1.metrics.bytes-in");
 
 // Hierarchically
-Name kafka = Cortex.name("kafka");
+Name kafka = cortex().name("kafka");
 Name broker = kafka.name("broker").name("1");
 Name metrics = broker.name("metrics");
 Name bytesIn = metrics.name("bytes-in");
@@ -337,16 +475,16 @@ Name bytesIn = metrics.name("bytes-in");
 
 ```java
 Conduit<Pipe<String>, String> messages =
-    circuit.conduit(Cortex.name("messages"), Composer.pipe());
+    circuit.conduit(cortex().name("messages"), Composer.pipe());
 
 // Get Pipe for specific subject
-Pipe<String> pipe = messages.get(Cortex.name("user.login"));
+Pipe<String> pipe = messages.get(cortex().name("user.login"));
 pipe.emit("User logged in");
 
-// Subscribe to all subjects (Conduit IS-A Source in M18)
+// Subscribe to all subjects (Conduit IS-A Source in RC5)
 messages.subscribe(
-    Cortex.subscriber(
-        Cortex.name("logger"),
+    cortex().subscriber(
+        cortex().name("logger"),
         (subject, registrar) -> registrar.register(msg -> log.info(msg))
     )
 );
@@ -356,7 +494,7 @@ messages.subscribe(
 
 ```java
 public class TransformingConduit<P, E> implements Conduit<P, E> {
-    private final SourceImpl<E> source;  // Internal subscriber management
+    private final internal subscriber management<E> source;  // Internal subscriber management
     private final Map<Name, EmissionChannel<E>> channels = new ConcurrentHashMap<>();
     private final Consumer<Flow<E>> flowConfigurer;  // Transformations
 
@@ -371,7 +509,7 @@ public class TransformingConduit<P, E> implements Conduit<P, E> {
 
     @Override
     public Subscription subscribe(Subscriber<E> subscriber) {
-        return source.subscribe(subscriber);  // Delegate to SourceImpl
+        return source.subscribe(subscriber);  // Delegate to internal subscriber management
     }
 }
 ```
@@ -458,7 +596,7 @@ registrar.register(ConsumerPipe.of(value -> {
 
 ```java
 Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-    Cortex.name("filtered-numbers"),
+    cortex().name("filtered-numbers"),
     Composer.pipe(flow -> flow
         .sift(n -> n > 0)     // Only positive
         .limit(100)           // Max 100 emissions
@@ -476,20 +614,20 @@ Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
 ```java
 // Level 1: JMX stats → Broker health
 Cell<JMXStats, BrokerHealth> brokerCell = circuit.cell(
-    Cortex.name("broker-1"),
+    cortex().name("broker-1"),
     stats -> assessBrokerHealth(stats)
 );
 
 // Level 2: Broker health → Cluster health
 Cell<BrokerHealth, ClusterHealth> clusterCell = brokerCell.cell(
-    Cortex.name("cluster"),
+    cortex().name("cluster"),
     health -> aggregateClusterHealth(health)
 );
 
 // Subscribe to cluster health
 clusterCell.subscribe(
-    Cortex.subscriber(
-        Cortex.name("alerting"),
+    cortex().subscriber(
+        cortex().name("alerting"),
         (subject, registrar) -> registrar.register(health -> {
             if (health.status() == ClusterStatus.CRITICAL) {
                 sendAlert(health);
@@ -508,7 +646,7 @@ brokerCell.input(jmxClient.fetchStats());
 ```java
 public class SimpleCell<I, E> implements Cell<I, E> {
     private final Function<I, E> transformer;  // I → E transformation
-    private final SourceImpl<E> source;
+    private final internal subscriber management<E> source;
     private final Map<Name, SimpleCell<E, ?>> children = new ConcurrentHashMap<>();
 
     @Override
@@ -532,11 +670,11 @@ public class SimpleCell<I, E> implements Cell<I, E> {
 **Purpose:** Timer utility for time-driven behaviors
 
 ```java
-Clock clock = circuit.clock(Cortex.name("poller"));
+Clock clock = circuit.clock(cortex().name("poller"));
 
 // Poll every second
 clock.consume(
-    Cortex.name("jmx-poll"),
+    cortex().name("jmx-poll"),
     Clock.Cycle.SECOND,
     instant -> {
         BrokerStats stats = jmxClient.fetchStats();
@@ -550,10 +688,10 @@ clock.consume(
 All Clocks in a Circuit share one ScheduledExecutorService:
 
 ```java
-Circuit circuit = Cortex.circuit(Cortex.name("kafka"));
-Clock clock1 = circuit.clock(Cortex.name("clock-1"));  // Uses circuit scheduler
-Clock clock2 = circuit.clock(Cortex.name("clock-2"));  // Same scheduler
-Clock clock3 = circuit.clock(Cortex.name("clock-3"));  // Same scheduler
+Circuit circuit = cortex().circuit(cortex().name("kafka"));
+Clock clock1 = circuit.clock(cortex().name("clock-1"));  // Uses circuit scheduler
+Clock clock2 = circuit.clock(cortex().name("clock-2"));  // Same scheduler
+Clock clock3 = circuit.clock(cortex().name("clock-3"));  // Same scheduler
 ```
 
 **Benefits:** Reduced thread overhead, better resource utilization.
@@ -565,11 +703,11 @@ Clock clock3 = circuit.clock(Cortex.name("clock-3"));  // Same scheduler
 **Purpose:** Automatic resource cleanup
 
 ```java
-Scope scope = Cortex.scope(Cortex.name("session"));
+Scope scope = cortex().scope(cortex().name("session"));
 
-Circuit circuit = scope.register(Cortex.circuit(Cortex.name("kafka")));
+Circuit circuit = scope.register(cortex().circuit(cortex().name("kafka")));
 Conduit<Pipe<Event>, Event> events = scope.register(
-    circuit.conduit(Cortex.name("events"), Composer.pipe())
+    circuit.conduit(cortex().name("events"), Composer.pipe())
 );
 
 // Use resources...
@@ -579,12 +717,12 @@ scope.close();  // Closes all registered resources automatically
 
 ---
 
-### 9. SourceImpl (Internal Subscriber Management)
+### 9. internal subscriber management (Internal Subscriber Management)
 
 **Purpose:** Internal utility for managing subscribers (does NOT implement Source)
 
 ```java
-public class SourceImpl<E> {
+public class internal subscriber management<E> {
     private final List<Subscriber<E>> subscribers = new CopyOnWriteArrayList<>();
 
     public Subscription subscribe(Subscriber<E> subscriber) {
@@ -615,16 +753,16 @@ public class SourceImpl<E> {
 ```java
 // Create state
 State state = Cortex.state()
-    .state(Cortex.name("broker-id"), 1)
-    .state(Cortex.name("heap-used"), 850_000_000L)
-    .state(Cortex.name("status"), "HEALTHY");
+    .state(cortex().name("broker-id"), 1)
+    .state(cortex().name("heap-used"), 850_000_000L)
+    .state(cortex().name("status"), "HEALTHY");
 
 // Access values (type-safe)
-Integer brokerId = state.value(slot(Cortex.name("broker-id"), 0));
-Long heapUsed = state.value(slot(Cortex.name("heap-used"), 0L));
+Integer brokerId = state.value(slot(cortex().name("broker-id"), 0));
+Long heapUsed = state.value(slot(cortex().name("heap-used"), 0L));
 
 // State is immutable - create new state to change
-State newState = state.state(Cortex.name("heap-used"), 900_000_000L);
+State newState = state.state(cortex().name("heap-used"), 900_000_000L);
 ```
 
 **Key Features:**
@@ -645,9 +783,9 @@ State newState = state.state(Cortex.name("heap-used"), 900_000_000L);
 
 2. Pipe:
    Transformations applied (sift, limit, sample)
-   Transformed value → SourceImpl.emit()
+   Transformed value → internal subscriber management.emit()
 
-3. SourceImpl:
+3. internal subscriber management:
    Iterates subscribers (CopyOnWriteArrayList)
    Calls subscriber callbacks
 
@@ -885,7 +1023,7 @@ flow.skip(100)
 
 ```java
 // NAME = Linguistic referent (like "Miles" the identifier)
-Name milesName = Cortex.name("Miles");
+Name milesName = cortex().name("Miles");
 
 // SUBJECT = Temporal/contextual instantiation
 Subject<?> milesInCircuitA = HierarchicalSubject.builder()
@@ -913,12 +1051,12 @@ milesInCircuitA.state() != milesInCircuitB.state() // Different states
 ```java
 // Example: "Miles" exists in multiple Circuits simultaneously
 
-Circuit circuitA = Cortex.circuit(Cortex.name("circuit-A"));
-Circuit circuitB = Cortex.circuit(Cortex.name("circuit-B"));
+Circuit circuitA = cortex().circuit(cortex().name("circuit-A"));
+Circuit circuitB = cortex().circuit(cortex().name("circuit-B"));
 
 // Both circuits create Channels named "Miles"
-Channel<Metric> milesInA = conduitA.get(Cortex.name("Miles"));
-Channel<Metric> milesInB = conduitB.get(Cortex.name("Miles"));
+Channel<Metric> milesInA = conduitA.get(cortex().name("Miles"));
+Channel<Metric> milesInB = conduitB.get(cortex().name("Miles"));
 
 // Same Name referent, different Subject instances:
 // - milesInA.subject() → Subject with unique ID in Circuit A context
@@ -968,7 +1106,7 @@ SimpleCell
 - 0 failures, 0 errors
 - Includes 308 tests from official Substrates testkit
 
-**Production Target:**
+**Design Target:**
 - 100k+ metrics @ 1Hz
 - ~2% CPU usage (estimated)
 - ~200-300MB memory
@@ -1021,17 +1159,17 @@ Scope.close()
 
 ```java
 // 1. Try-with-resources
-try (Circuit circuit = Cortex.circuit(Cortex.name("test"))) {
+try (Circuit circuit = cortex().circuit(cortex().name("test"))) {
     // Use circuit
 }
 
 // 2. Scope for grouped cleanup
-Scope scope = Cortex.scope(Cortex.name("session"));
-Circuit circuit = scope.register(Cortex.circuit(Cortex.name("kafka")));
+Scope scope = cortex().scope(cortex().name("session"));
+Circuit circuit = scope.register(cortex().circuit(cortex().name("kafka")));
 scope.close();  // Closes all registered resources
 
 // 3. Manual cleanup
-Circuit circuit = Cortex.circuit(Cortex.name("kafka"));
+Circuit circuit = cortex().circuit(cortex().name("kafka"));
 try {
     // Use circuit
 } finally {
@@ -1047,15 +1185,15 @@ try {
 
 ```java
 // Create Circuit
-Circuit circuit = Cortex.circuit(Cortex.name("kafka.broker.health"));
+Circuit circuit = cortex().circuit(cortex().name("kafka.broker.health"));
 
 // Create Conduit for MonitorSignals
 Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
-    circuit.conduit(Cortex.name("monitors"), Composer.pipe());
+    circuit.conduit(cortex().name("monitors"), Composer.pipe());
 
 // Get Pipe for specific subject
 Pipe<MonitorSignal> heapPipe =
-    monitors.get(Cortex.name("broker-1.jvm.heap"));
+    monitors.get(cortex().name("broker-1.jvm.heap"));
 
 // Emit MonitorSignal
 MonitorSignal signal = new MonitorSignal(
@@ -1071,8 +1209,8 @@ heapPipe.emit(signal);
 
 // Subscribe to observe signals
 monitors.subscribe(
-    Cortex.subscriber(
-        Cortex.name("health-aggregator"),
+    cortex().subscriber(
+        cortex().name("health-aggregator"),
         (subject, registrar) -> {
             registrar.register(s -> {
                 if (s.status() == MonitorStatus.DEGRADED) {
@@ -1091,7 +1229,7 @@ monitors.subscribe(
 **Fullerstack Substrates:**
 
 ✅ **Simple** - No complex optimizations, easy to understand
-✅ **Correct** - 247 tests passing, proper M18 sealed interface usage
+✅ **Correct** - 247 tests passing, proper RC5 sealed interface usage
 ✅ **Fast Enough** - Handles 100k+ metrics @ 1Hz
 ✅ **Thread-Safe** - Proper concurrent collections
 ✅ **Clean** - Explicit resource lifecycle management
@@ -1105,6 +1243,6 @@ monitors.subscribe(
 
 - [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java)
 - [Observability X Blog Series](https://humainary.io/blog/category/observability-x/)
-- [M18 Migration Guide](../../API-ANALYSIS.md)
+- [RC5 Migration Guide](../../API-ANALYSIS.md)
 - [Developer Guide](DEVELOPER-GUIDE.md)
 - [Async Architecture](ASYNC-ARCHITECTURE.md)

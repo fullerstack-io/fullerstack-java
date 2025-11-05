@@ -81,7 +81,7 @@ public class TransformingConduit < P, E > implements Conduit < P, E > {
 
   // Cache: Subject Name -> Subscriber -> List of registered Pipes
   // Pipes are registered only once per Subject per Subscriber (on first emission)
-  // RC3: Pipes now use ? super E for contra-variance
+  //  Pipes now use ? super E for contra-variance
   private final Map < Name, Map < Subscriber < E >, List < Pipe < ? super E > > > > pipeCache = new ConcurrentHashMap <> ();
 
   /**
@@ -241,7 +241,7 @@ public class TransformingConduit < P, E > implements Conduit < P, E > {
    */
   private void notifySubscribersOfNewSubject ( Subject < Channel < E > > subject ) {
     for ( Subscriber < E > subscriber : subscribers ) {
-      // RC3: Get callback from subscriber (stored internally)
+      //  Get callback from subscriber (stored internally)
       BiConsumer < Subject < Channel < E > >, Registrar < E > > callback =
         ( (FunctionalSubscriber < E >) subscriber ).getCallback ();
 
@@ -258,7 +258,7 @@ public class TransformingConduit < P, E > implements Conduit < P, E > {
 
         @Override
         public void register ( Consumer < ? super E > consumer ) {
-          // RC3: Convenience method for Consumer registration
+          //  Convenience method for Consumer registration
           // Convert Consumer to anonymous Pipe and register it
           register ( new Pipe < E > () {
             @Override
@@ -317,7 +317,7 @@ public class TransformingConduit < P, E > implements Conduit < P, E > {
       // First emission from this Subject - retrieve callback and invoke
       List < Pipe < ? super E > > registeredPipes = new CopyOnWriteArrayList <> ();
 
-      // RC3: Get callback from subscriber
+      //  Get callback from subscriber
       BiConsumer < Subject < Channel < E > >, Registrar < E > > callback =
         ( (FunctionalSubscriber < E >) sub ).getCallback ();
 
@@ -329,7 +329,7 @@ public class TransformingConduit < P, E > implements Conduit < P, E > {
 
         @Override
         public void register ( Consumer < ? super E > consumer ) {
-          // RC3: Convert Consumer to Pipe (can't use lambda - Pipe not functional)
+          //  Convert Consumer to Pipe (can't use lambda - Pipe not functional)
           register ( new Pipe < E > () {
             @Override
             public void emit ( E emission ) {

@@ -52,25 +52,25 @@ See the [Architecture Guide](../ARCHITECTURE.md#advanced-patterns) for:
 
 ```java
 Conduit<Pipe<LogEvent>, LogEvent> logs = circuit.conduit(
-    cortex.name("logs"),
+    cortex().name("logs"),
     Composer.pipe()
 );
 
 // Console logger
-logs.source().subscribe(consoleSubscriber);
+logs.subscribe(consoleSubscriber);
 
 // File logger
-logs.source().subscribe(fileSubscriber);
+logs.subscribe(fileSubscriber);
 
 // Metrics collector
-logs.source().subscribe(metricsSubscriber);
+logs.subscribe(metricsSubscriber);
 ```
 
 ### Event Processing Pipeline
 
 ```java
 Conduit<Pipe<Event>, Event> events = circuit.conduit(
-    cortex.name("events"),
+    cortex().name("events"),
     Composer.pipe(segment -> segment
         .guard(e -> e.isValid())        // Filter invalid
         .replace(e -> e.normalize())     // Normalize
@@ -79,33 +79,21 @@ Conduit<Pipe<Event>, Event> events = circuit.conduit(
 );
 ```
 
-### Time-based Collection
-
-```java
-Clock clock = circuit.clock(cortex.name("metrics"));
-
-clock.consume(
-    cortex.name("collector"),
-    Clock.Cycle.SECOND,
-    instant -> collectMetrics(instant)
-);
-```
-
 ### Hierarchical Resource Cleanup
 
 ```java
-try (Scope scope = cortex.scope(cortex.name("request"))) {
-    Circuit circuit = scope.register(cortex.circuit());
+try (Scope scope = cortex().scope(cortex().name("request"))) {
+    Circuit circuit = scope.register(cortex().circuit());
     // ... use circuit
 } // Auto-closes all
 ```
 
 ## Tips
 
-1. **Always close** Circuit, Clock, Subscription, Sink
+1. **Always close** Circuit, Subscription, Conduit resources
 2. **Use Scope** for managing multiple related resources
 3. **Subscribe early** before emitting to avoid missed events
-4. **Sleep briefly** after emitting in examples to allow async processing
+4. **Use circuit.await()** to wait for async processing (not Thread.sleep())
 5. **Check Subject.name()** in subscribers for conditional logic
 
 ## Next Steps

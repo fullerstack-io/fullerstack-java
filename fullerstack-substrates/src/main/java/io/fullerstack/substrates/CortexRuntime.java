@@ -1,6 +1,7 @@
 package io.fullerstack.substrates;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.humainary.substrates.spi.CortexProvider;
 import io.fullerstack.substrates.capture.SubjectCapture;
 import io.fullerstack.substrates.circuit.SingleThreadCircuit;
 import io.fullerstack.substrates.current.ThreadCurrent;
@@ -26,8 +27,9 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
- * Complete implementation of Substrates.Cortex interface.
+ * Complete implementation of Substrates.Cortex interface via CortexProvider SPI.
  * <p>
+ * < p >API requires provider classes to extend CortexProvider and implement create().
  * < p >This class implements ALL 38 methods of the Cortex interface,
  * providing full Humainary Substrates API compliance.
  * <p>
@@ -45,30 +47,41 @@ import java.util.stream.Stream;
  * </ul >
  *
  * @see Cortex
+ * @see CortexProvider
  */
-public class CortexRuntime implements Cortex {
+public class CortexRuntime extends CortexProvider implements Cortex {
 
   private final Map < Name, Scope > scopes;
 
-  // Singleton instance for SPI provider pattern
-  private static final Cortex INSTANCE = new CortexRuntime ();
-
   /**
-   * Private constructor to enforce singleton pattern.
-   * Use {@link #cortex()} to get the singleton instance.
+   * Public constructor for SPI instantiation.
+   * CortexProvider will call create() which instantiates this class.
+   * The singleton pattern is enforced by CortexProvider.
    */
-  private CortexRuntime () {
+  public CortexRuntime () {
     this.scopes = new ConcurrentHashMap <> ();
   }
 
   /**
-   * SPI provider method required by Substrates API M18+.
-   * This method is discovered via system property: io.humainary.substrates.spi.provider
+   * SPI provider method required by CortexProvider base class.
+   * Called by CortexProvider.cortex() to create the singleton instance.
+   * CortexProvider caches the result, so this is only called once.
+   *
+   * @return A new Cortex instance (cached by CortexProvider)
+   */
+  @Override
+  protected Cortex create () {
+    return new CortexRuntime();
+  }
+
+  /**
+   * Static accessor for tests and direct usage.
+   * Delegates to CortexProvider.cortex() which handles caching.
    *
    * @return The singleton Cortex instance
    */
   public static Cortex cortex () {
-    return INSTANCE;
+    return CortexProvider.cortex();
   }
 
   // ========== Circuit Management (2 methods) ==========
@@ -106,7 +119,7 @@ public class CortexRuntime implements Cortex {
   @Override
   public Pipe < Object > pipe () {
     // Factory method for creating a simple no-op pipe (Object type)
-    // RC3 addition - returns a sink pipe that discards emissions
+    // addition - returns a sink pipe that discards emissions
     return new Pipe < Object > () {
       @Override
       public void emit ( Object value ) {
@@ -254,7 +267,7 @@ public class CortexRuntime implements Cortex {
   public < T > Pool < T > pool ( Function < ? super Name, ? extends T > factory ) {
     Objects.requireNonNull ( factory, "Pool factory cannot be null" );
     // Create pool with the provided factory function
-    // RC3 API addition - direct factory function support
+    // API addition - direct factory function support
     return new ConcurrentPool <> ( factory );
   }
 

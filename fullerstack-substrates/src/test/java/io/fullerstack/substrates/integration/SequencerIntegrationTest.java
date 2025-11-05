@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static io.humainary.substrates.api.Substrates.CORTEX;
+import static io.humainary.substrates.api.Substrates.cortex;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -35,7 +35,7 @@ class SequencerIntegrationTest {
    * Helper to create a simple subscriber that collects emissions.
    */
   private < E > Subscriber < E > subscriber ( Name name, List < E > collector, CountDownLatch latch ) {
-    return CORTEX.subscriber ( name, ( subject, registrar ) -> {
+    return cortex().subscriber ( name, ( subject, registrar ) -> {
       registrar.register ( emission -> {
         collector.add ( emission );
         latch.countDown ();

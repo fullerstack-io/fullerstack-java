@@ -5,12 +5,14 @@ Shows proper resource lifecycle management using Scope and Closure.
 ## Code
 
 ```java
-import io.fullerstack.substrates.CortexRuntime;
+
 import io.humainary.substrates.api.Substrates.*;
+
+import static io.humainary.substrates.api.Substrates.cortex;
 
 public class ResourceManagementExample {
     public static void main(String[] args) {
-        Cortex cortex = CortexRuntime.create();
+        // Cortex accessed via static cortex() method
 
         // Example 1: Manual lifecycle
         manualLifecycle(cortex);
@@ -28,8 +30,8 @@ public class ResourceManagementExample {
     static void manualLifecycle(Cortex cortex) {
         System.out.println("=== Manual Lifecycle ===");
 
-        Circuit circuit = cortex.circuit(cortex.name("manual"));
-        Clock clock = circuit.clock(cortex.name("timer"));
+        Circuit circuit = cortex().circuit(cortex().name("manual"));
+        Clock clock = circuit.clock(cortex().name("timer"));
 
         // Use resources...
         System.out.println("Using resources...");
@@ -44,15 +46,15 @@ public class ResourceManagementExample {
     static void scopeBasedLifecycle(Cortex cortex) {
         System.out.println("=== Scope-based Lifecycle ===");
 
-        Scope scope = cortex.scope(cortex.name("transaction"));
+        Scope scope = cortex().scope(cortex().name("transaction"));
 
         // Register resources with scope
         Circuit circuit = scope.register(
-            cortex.circuit(cortex.name("scoped"))
+            cortex().circuit(cortex().name("scoped"))
         );
 
         Clock clock = scope.register(
-            circuit.clock(cortex.name("timer"))
+            circuit.clock(cortex().name("timer"))
         );
 
         // Use resources...
@@ -67,19 +69,19 @@ public class ResourceManagementExample {
     static void closurePattern(Cortex cortex) {
         System.out.println("=== Closure Pattern (ARM) ===");
 
-        Scope scope = cortex.scope(cortex.name("closure-scope"));
-        Circuit circuit = cortex.circuit(cortex.name("arm"));
+        Scope scope = cortex().scope(cortex().name("closure-scope"));
+        Circuit circuit = cortex().circuit(cortex().name("arm"));
 
         // Use closure for automatic cleanup
         scope.closure(circuit).consume(c -> {
             System.out.println("Using circuit in closure...");
 
             Conduit<Pipe<String>, String> conduit = c.conduit(
-                cortex.name("temp"),
+                cortex().name("temp"),
                 Composer.pipe()
             );
 
-            Pipe<String> pipe = conduit.get(cortex.name("p"));
+            Pipe<String> pipe = conduit.get(cortex().name("p"));
             pipe.emit("Temporary message");
 
             // Circuit automatically closed when this block exits
@@ -92,19 +94,19 @@ public class ResourceManagementExample {
     static void tryWithResources(Cortex cortex) {
         System.out.println("=== Try-with-Resources ===");
 
-        try (Scope scope = cortex.scope(cortex.name("try-scope"))) {
+        try (Scope scope = cortex().scope(cortex().name("try-scope"))) {
             Circuit circuit = scope.register(
-                cortex.circuit(cortex.name("try"))
+                cortex().circuit(cortex().name("try"))
             );
 
             System.out.println("Using resources in try block...");
 
             Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-                cortex.name("numbers"),
+                cortex().name("numbers"),
                 Composer.pipe()
             );
 
-            Pipe<Integer> pipe = conduit.get(cortex.name("counter"));
+            Pipe<Integer> pipe = conduit.get(cortex().name("counter"));
             pipe.emit(42);
 
         } // Scope auto-closes, cleaning up circuit
@@ -139,7 +141,7 @@ Try block exited (scope auto-closed)
 ### 1. Manual Cleanup
 
 ```java
-Circuit circuit = cortex.circuit();
+Circuit circuit = cortex().circuit();
 try {
     // Use circuit
 } finally {
@@ -153,8 +155,8 @@ try {
 ### 2. Scope Registration
 
 ```java
-Scope scope = cortex.scope();
-Circuit c1 = scope.register(cortex.circuit());
+Scope scope = cortex().scope();
+Circuit c1 = scope.register(cortex().circuit());
 Clock c2 = scope.register(c1.clock());
 // ...
 scope.close();  // Closes all
@@ -177,7 +179,7 @@ scope.closure(resource).consume(r -> {
 ### 4. Try-with-Resources
 
 ```java
-try (Scope scope = cortex.scope()) {
+try (Scope scope = cortex().scope()) {
     // Register and use resources
 }  // Auto-closes
 ```
@@ -188,12 +190,12 @@ try (Scope scope = cortex.scope()) {
 ## Hierarchical Scopes
 
 ```java
-Scope parent = cortex.scope(cortex.name("parent"));
-Scope child1 = parent.scope(cortex.name("child1"));
-Scope child2 = parent.scope(cortex.name("child2"));
+Scope parent = cortex().scope(cortex().name("parent"));
+Scope child1 = parent.scope(cortex().name("child1"));
+Scope child2 = parent.scope(cortex().name("child2"));
 
-Circuit c1 = child1.register(cortex.circuit());
-Circuit c2 = child2.register(cortex.circuit());
+Circuit c1 = child1.register(cortex().circuit());
+Circuit c2 = child2.register(cortex().circuit());
 
 parent.close();
 // → Closes child1 and child2
@@ -203,8 +205,8 @@ parent.close();
 ## Scope Navigation (Extent Interface)
 
 ```java
-Scope parent = cortex.scope(cortex.name("parent"));
-Scope child = parent.scope(cortex.name("child"));
+Scope parent = cortex().scope(cortex().name("parent"));
+Scope child = parent.scope(cortex().name("child"));
 
 // Navigate up
 child.enclosure().ifPresent(p -> {

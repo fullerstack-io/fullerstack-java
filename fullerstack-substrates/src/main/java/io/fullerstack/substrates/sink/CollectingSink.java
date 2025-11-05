@@ -66,7 +66,7 @@ public class CollectingSink < E > implements Sink < E > {
     );
 
     // Subscribe to source and buffer all emissions
-    // RC3: Use FunctionalSubscriber with callback
+    //  Use FunctionalSubscriber with callback
     this.subscription = source.subscribe (
       new io.fullerstack.substrates.subscriber.FunctionalSubscriber < E > (
         HierarchicalName.of ( "sink-subscriber" ),

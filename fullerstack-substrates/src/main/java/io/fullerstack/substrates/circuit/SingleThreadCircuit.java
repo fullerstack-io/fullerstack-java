@@ -1,6 +1,7 @@
 package io.fullerstack.substrates.circuit;
 
 import io.humainary.substrates.api.Substrates.*;
+import static io.humainary.substrates.api.Substrates.cortex;
 import io.fullerstack.substrates.cell.SimpleCell;
 import io.fullerstack.substrates.channel.EmissionChannel;
 import io.fullerstack.substrates.conduit.TransformingConduit;
@@ -167,14 +168,14 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
     }
   }
 
-  // ========== Legacy Cell API (BiFunction-based, pre-RC3) ==========
+  // ========== Legacy Cell API (BiFunction-based) ==========
   // These methods are retained for backward compatibility but don't override Circuit interface
 
   /**
-   * Legacy Cell creation using BiFunction transformers (pre-RC3).
+   * Legacy Cell creation using BiFunction transformers.
    * Retained for backward compatibility with existing code.
    *
-   * @deprecated Use {@link #cell(Composer, Composer, Pipe)} instead (RC3 API)
+   * @deprecated Use {@link #cell(Composer, Composer, Pipe)} instead
    */
   @Deprecated
   public < I, E > Cell < I, E > cell (
@@ -185,10 +186,10 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
   }
 
   /**
-   * Legacy Cell creation with name using BiFunction transformers (pre-RC3).
+   * Legacy Cell creation with name using BiFunction transformers.
    * Retained for backward compatibility with existing code.
    *
-   * @deprecated Use {@link #cell(Name, Composer, Composer, Pipe)} instead (RC3 API)
+   * @deprecated Use {@link #cell(Name, Composer, Composer, Pipe)} instead
    */
   @Deprecated
   public < I, E > Cell < I, E > cell (
@@ -222,7 +223,7 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
     Pipe < I > inputPipe = transformer.apply ( cellSubject, channelPipe );
 
     // Apply aggregator to output pipe
-    // RC3: Cast needed for contra-variance (Pipe<? super E > -> Pipe< E >)
+    //  Cast needed for contra-variance (Pipe<? super E > -> Pipe< E >)
     @SuppressWarnings ( "unchecked" )
     Pipe < E > outputPipe = aggregator.apply ( cellSubject, (Pipe < E >) pipe );
 
@@ -231,18 +232,35 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
     @SuppressWarnings ( "unchecked" )
     Conduit < Pipe < I >, E > cellConduit = (Conduit < Pipe < I >, E >) (Conduit < ?, E >) tempConduit;
 
-    // Create SimpleCell with explicit type parameters
+    // Wrap BiFunction transformations as Composers for child cell creation
+    Composer < E, Pipe < I > > ingressComposer = channel -> {
+      // Cast channel to Pipe<E> for BiFunction
+      @SuppressWarnings ( "unchecked" )
+      Pipe < E > channelAsPipe = (Pipe < E >) channel;
+      return transformer.apply ( cellSubject, channelAsPipe );
+    };
+
+    Composer < E, Pipe < E > > egressComposer = channel -> {
+      // Cast channel to Pipe<E> for BiFunction
+      @SuppressWarnings ( "unchecked" )
+      Pipe < E > channelAsPipe = (Pipe < E >) channel;
+      return aggregator.apply ( cellSubject, channelAsPipe );
+    };
+
+    // Create SimpleCell with explicit type parameters and composers
     return new SimpleCell < I, E > (
       null,
       name,
       inputPipe,
       outputPipe,
       cellConduit,
+      ingressComposer,
+      egressComposer,
       circuitSubject
     );
   }
 
-  // ========== RC3 Cell API (Composer-based) ==========
+  // ========== Cell API (Composer-based) ==========
 
   @Override
   public < I, E > Cell < I, E > cell (
@@ -258,36 +276,52 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
     Composer < E, Pipe < I > > ingress,
     Composer < E, Pipe < E > > egress,
     Pipe < ? super E > pipe ) {
-    // Bridge RC3 Composer API to our existing BiFunction implementation
-    // Composer< E, Pipe< I >> = Channel< E > -> Pipe< I >
-    // BiFunction = (Subject< Cell >, Pipe< E >) -> Pipe< I >
+    Objects.requireNonNull ( name, "Cell name cannot be null" );
+    Objects.requireNonNull ( ingress, "Ingress composer cannot be null" );
+    Objects.requireNonNull ( egress, "Egress composer cannot be null" );
+    Objects.requireNonNull ( pipe, "Output pipe cannot be null" );
 
     // Create a conduit with Channel< E > as the percept
+    // Use Composer.channel() to get Channel instances instead of plain Pipes
     Conduit < Channel < E >, E > channelConduit = conduit ( name, Composer.channel () );
 
     // Get the channel for this cell
     Channel < E > channel = channelConduit.get ( name );
 
-    // Apply the composers to get the input and output pipes
+    // Apply the composers to create the input and output pipes
     Pipe < I > inputPipe = ingress.compose ( channel );
     Pipe < E > outputPipe = egress.compose ( channel );
 
-    // Create adapters that just return the pre-composed pipes
-    BiFunction < Subject < Cell < I, E > >, Pipe < E >, Pipe < I > > transformer =
-      ( subject, channelPipe ) -> inputPipe;
+    // CRITICAL: Subscribe the outlet pipe to the conduit so child emissions flow upward
+    channelConduit.subscribe ( cortex().subscriber (
+      cortex().name ( "cell-outlet-" + name ),
+      ( Subject < Channel < E > > subject, Registrar < E > registrar ) -> {
+        registrar.register ( emission -> pipe.emit ( emission ) );
+      }
+    ) );
 
-    BiFunction < Subject < Cell < I, E > >, Pipe < E >, Pipe < E > > aggregator =
-      ( subject, channelPipe ) -> outputPipe;
+    // Cast conduit for SimpleCell (it expects Conduit<?, E>)
+    @SuppressWarnings ( "unchecked" )
+    Conduit < ?, E > cellConduit = (Conduit < ?, E >) channelConduit;
 
-    // Delegate to existing BiFunction implementation
-    return cell ( name, transformer, aggregator, pipe );
+    // Create SimpleCell with explicit type parameters and composers
+    return new SimpleCell < I, E > (
+      null,           // No parent (this is root)
+      name,
+      inputPipe,
+      outputPipe,
+      cellConduit,
+      ingress,        // Pass ingress composer for child creation
+      egress,         // Pass egress composer for child creation
+      circuitSubject
+    );
   }
 
   @Override
   public < E > Pipe < E > pipe ( Pipe < ? super E > target ) {
     Objects.requireNonNull ( target, "Target pipe cannot be null" );
     // Return a pipe that routes emissions through the valve to the target
-    // RC3: Pipe is no longer functional (has emit + flush), so use explicit implementation
+    //  Pipe is no longer functional (has emit + flush), so use explicit implementation
     return new Pipe < E > () {
       @Override
       public void emit ( E value ) {
@@ -378,7 +412,7 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
 
     // COLD PATH: Create new conduit with flow configurer
     // Use simple name - hierarchy is implicit through parent Subject references
-    // RC3: Cast needed for contra-variance (Consumer<? super Flow< E >> -> Consumer< Flow< E >>)
+    //  Cast needed for contra-variance (Consumer<? super Flow< E >> -> Consumer< Flow< E >>)
     @SuppressWarnings ( "unchecked" )
     Conduit < P, E > newConduit = new TransformingConduit < P, E > (
       name, composer, this, (Consumer < Flow < E > >) configurer

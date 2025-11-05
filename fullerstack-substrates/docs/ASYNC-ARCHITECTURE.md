@@ -41,19 +41,19 @@ onNext() returns
 
 ```java
 // Substrates Pipe
-Circuit circuit = Cortex.circuit();
+Circuit circuit = cortex().circuit();
 Conduit<Pipe<String>, String> conduit = circuit.conduit(
-    Cortex.name("test"),
+    cortex().name("test"),
     Composer.pipe()
 );
 
 AtomicReference<String> received = new AtomicReference<>();
-conduit.source().subscribe(Cortex.subscriber(
-    Cortex.name("sub"),
+conduit.subscribe(cortex().subscriber(
+    cortex().name("sub"),
     (subject, registrar) -> registrar.register(received::set)
 ));
 
-Pipe<String> pipe = conduit.get(Cortex.name("channel"));
+Pipe<String> pipe = conduit.get(cortex().name("channel"));
 pipe.emit("hello");  // ← Returns IMMEDIATELY (posts Script to Queue)
 
 // ❌ WRONG: received.get() is still NULL (async hasn't executed yet)
@@ -68,7 +68,7 @@ assertEquals("hello", received.get());  // Now it's available
 ```
 pipe.emit("hello")
   ↓
-PipeImpl.postScript() creates Script
+Pipe implementation.postScript() creates Script
   ↓
 circuitQueue.post(script)  // ← Returns immediately (async boundary)
   ↓
@@ -133,7 +133,7 @@ Valve processes tasks sequentially (single-threaded):
      ├─→ pipe.emit(value)                    // User emits to Pipe
      │        │
      │        ↓
-     │   [PipeImpl]
+     │   [Pipe implementation]
      │        │
      │        ├─→ flow.apply(value)?          // Optional: Apply transformations
      │        │
@@ -163,7 +163,7 @@ Valve processes tasks sequentially (single-threaded):
      │        ├─→ Resolve Subscriber Pipes (cached or register new)
      │        │
      │        ↓
-     │   [SourceImpl.notifySubscribers]
+     │   [internal subscriber management.notifySubscribers]
      │        │
      │        └─→ pipe.emit(value)            // Deliver to all registered outlet Pipes
      │                 │
@@ -181,7 +181,7 @@ Valve processes tasks sequentially (single-threaded):
 
 ### Implementation - Event-Driven (No Polling!)
 
-**New Approach (M18):**
+**New Approach (RC5):**
 ```java
 // Valve.java - Event-driven with wait/notify
 public void await(String contextName) {
@@ -245,20 +245,20 @@ This is the PRIMARY use case for `circuit.await()` in tests:
 @Test
 void testEmission() throws Exception {
     // Setup
-    Circuit circuit = Cortex.circuit();
+    Circuit circuit = cortex().circuit();
     Conduit<Pipe<String>, String> conduit = circuit.conduit(
-        Cortex.name("test"),
+        cortex().name("test"),
         Composer.pipe()
     );
 
     AtomicReference<String> received = new AtomicReference<>();
-    conduit.source().subscribe(Cortex.subscriber(
-        Cortex.name("sub"),
+    conduit.subscribe(cortex().subscriber(
+        cortex().name("sub"),
         (subject, registrar) -> registrar.register(received::set)
     ));
 
     // Act
-    Pipe<String> pipe = conduit.get(Cortex.name("channel"));
+    Pipe<String> pipe = conduit.get(cortex().name("channel"));
     pipe.emit("hello");
 
     // Assert - MUST wait for async processing
@@ -270,7 +270,7 @@ void testEmission() throws Exception {
 **Use Case 2: Graceful Shutdown**
 
 ```java
-Circuit circuit = Cortex.circuit();
+Circuit circuit = cortex().circuit();
 // ... use circuit ...
 
 // Ensure all pending emissions are processed before closing
@@ -330,8 +330,8 @@ void testEmission_WRONG() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
     AtomicReference<String> received = new AtomicReference<>();
 
-    conduit.source().subscribe(Cortex.subscriber(
-        Cortex.name("sub"),
+    conduit.subscribe(cortex().subscriber(
+        cortex().name("sub"),
         (subject, registrar) -> registrar.register(value -> {
             received.set(value);
             latch.countDown();  // Trying to signal completion
@@ -356,8 +356,8 @@ void testEmission_WRONG() throws Exception {
 void testEmission_CORRECT() throws Exception {
     AtomicReference<String> received = new AtomicReference<>();
 
-    conduit.source().subscribe(Cortex.subscriber(
-        Cortex.name("sub"),
+    conduit.subscribe(cortex().subscriber(
+        cortex().name("sub"),
         (subject, registrar) -> registrar.register(received::set)
     ));
 
@@ -517,7 +517,7 @@ assertEquals("hello", received.get());  // Works - async completed
 **Add logging to see async flow**:
 
 ```java
-// PipeImpl
+// Pipe implementation
 pipe.emit(value);  // Log: "Emitting: value"
 
 // Queue processor
@@ -542,7 +542,7 @@ T+10ms:  Subscriber receives "hello"
 
 ```java
 // Check if queue is processing
-Circuit circuit = Cortex.circuit();
+Circuit circuit = cortex().circuit();
 Queue queue = circuit.queue();
 
 pipe.emit("value");

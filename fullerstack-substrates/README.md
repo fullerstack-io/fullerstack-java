@@ -1,26 +1,53 @@
 # Fullerstack Substrates (Java)
 
-A Java implementation of the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java) for building event-driven observability systems.
+A Java implementation of the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java) with integrated [Serventis instrument APIs](https://github.com/humainary-io/substrates-ext-serventis-java) for building semiotic observability systems.
 
 ## Overview
 
-Substrates provides a flexible framework for building event-driven and observability systems by combining concepts of circuits, conduits, channels, pipes, subscribers, and subjects. This implementation aligns with William Louth's vision for **semiotic observability** - moving from metrics to signs, symptoms, syndromes, situations, and steering.
+Substrates provides the foundational event-routing infrastructure for building observable, event-driven systems. Combined with **Serventis instrument APIs**, it enables **semiotic observability** - transforming raw signals into meaningful insights through progressive interpretation:
+
+```
+Raw Signals → Signs → Symptoms → Syndromes → Situations → Steering
+   (Probes)    (Monitors)  (Assessors)  (Reporters)    (Actions)
+```
+
+This implementation brings William Louth's vision for **humane observability** to life:
+- **Context creates meaning** - The same signal means different things in different contexts
+- **Progressive interpretation** - From sensing (OBSERVE) to understanding (ORIENT) to action (DECIDE/ACT)
+- **Precise event ordering** - Virtual CPU core pattern ensures deterministic processing
+- **Type-safe instrument APIs** - Compiler-enforced correctness for observable systems
 
 ## Features
 
-### Core Infrastructure
-- **Circuit** - Central processing engine with virtual CPU core pattern for precise event ordering
-- **Conduit** - Container that coordinates Channels, Pipes, and subscriber management
-- **Channel** - Named emission port linking producers to the event stream
-- **HierarchicalCell** - Hierarchical container with type transformation (I → E) for building observability trees
-- **HierarchicalName** - Hierarchical dot-notation names (e.g., "kafka.broker.1") with parent-child structure
-- **Flow/Sift** - Transformation pipelines (filter, map, reduce, limit, sample, and more)
-- **Clock** - Scheduled event emission with shared ScheduledExecutorService optimization
-- **Scope** - Hierarchical resource lifecycle management
-- **Sink** - Event capture and storage for testing and debugging
-- **Subscriber Management** - Thread-safe subscriber registration and notification (via internal SourceImpl)
-- **Immutable State** - Slot-based state management with type safety
-- **M18 API** - Full support for sealed interface hierarchy with type safety guarantees
+### Serventis Instrument APIs (Semiotic Observability)
+
+**OBSERVE Phase** - What's happening?
+- **Probes** - Communication outcomes: `probe.observation(CLIENT, CONNECT, SUCCESS)`
+- **Services** - Interaction lifecycle: `service.call()`, `service.succeeded()`, `service.failed()`
+- **Queues** - Flow control: `queue.enqueue()`, `queue.dequeue()`, `queue.overflow()`, `queue.underflow()`
+- **Gauges** - Bidirectional metrics: `gauge.increment()`, `gauge.decrement()`, `gauge.overflow()`, `gauge.underflow()`
+- **Counters** - Monotonic metrics: `counter.increment()`, `counter.overflow()`, `counter.reset()`
+- **Caches** - Hit/miss tracking: `cache.hit()`, `cache.miss()`, `cache.evict()`, `cache.expire()`
+
+**ORIENT Phase** - What does it mean?
+- **Monitors** - Condition assessment: `monitor.degraded(HIGH)`, `monitor.stable(HIGH)`, etc.
+- **Resources** - Capacity assessment: `resource.grant()`, `resource.deny()`, `resource.timeout()`
+
+**DECIDE Phase** - How urgent?
+- **Reporters** - Situation urgency: `reporter.critical()`, `reporter.warning()`, `reporter.normal()`
+
+**Key Insight:** Context creates meaning. A `queue.overflow()` signal from a producer buffer means something different than the same signal from a consumer lag metric. Subscribers assess conditions based on the Subject (entity context) of each signal.
+
+### Substrates Core Infrastructure
+- **Circuit** - Virtual CPU core with Valve pattern for deterministic event ordering
+- **Conduit** - Dynamic channel creation with type-safe Composer transformations
+- **Cell** - Hierarchical computational cells with bidirectional type transformation (I → E)
+- **Channel** - Named pipes with Subject identity for contextual signal routing
+- **Flow/Sift** - Transformation pipelines (guard, limit, replace, reduce, diff, sample, skip)
+- **Pool** - Thread-safe caching with single-instance-per-name guarantee
+- **Scope** - Hierarchical resource lifecycle management with automatic cleanup
+- **State/Slot** - Immutable, type-safe state management
+- **Subject/Name** - Hierarchical identity with dot-notation (e.g., "kafka.broker-1.jvm.heap")
 
 ### Bootstrap System (NEW)
 - **SubstratesBootstrap** - **ONE LINE** automatic circuit discovery and initialization
@@ -36,20 +63,21 @@ See [Bootstrap Guide](docs/BOOTSTRAP-GUIDE.md) for complete documentation.
 Substrates is optimized for high-throughput, low-latency observability with a simplified, lean implementation:
 
 - **Simplified Design** - Removed unnecessary abstractions (4 Name implementations, 8 Registry implementations, benchmark/queue packages)
-- **Shared Schedulers** - Clock instances share a single ScheduledExecutorService per Circuit
+- **Simplified Architecture** - Removed unnecessary abstractions for clarity
 - **Efficient Emissions** - Direct pipe emission with minimal overhead
 - **Thread-Safe** - CopyOnWriteArrayList for subscribers (optimized for read-heavy workloads)
 - **Zero-Copy State** - Immutable slot-based state management
 
 **Test Performance:**
-- **419 tests** complete in ~20 seconds
+- **502 tests** complete in ~6 seconds (including 38 API compliance tests)
 - All tests pass with **0 failures, 0 errors**
-- Integration tests include multi-threading and timing scenarios
+- Compliance tests verify documented API behaviors from Substrates.java
+- Integration tests include multi-threading, async patterns, and timing scenarios
 
-**Production Readiness:**
-- Designed for Kafka monitoring (100k+ metrics @ 1Hz)
+**Design Targets:**
+- High-throughput observability (100k+ metrics @ 1Hz)
 - Virtual CPU core pattern ensures ordered event processing
-- Resource cleanup via Scope ensures no memory leaks
+- Resource cleanup via Scope ensures proper lifecycle management
 
 See [Developer Guide](docs/DEVELOPER-GUIDE.md) for performance details and best practices.
 
@@ -158,40 +186,86 @@ for (int i = 0; i < 1000; i++) {
 }
 ```
 
-### Clock Example
+### Serventis Example: Context Creates Meaning
+
+This example shows how **the same signal means different things in different contexts**:
 
 ```java
-// Create clock that ticks every second
-Clock clock = circuit.clock(cortex.name("timer"));
+import static io.humainary.substrates.ext.serventis.Serventis.*;
 
-// Subscribe to second ticks
-clock.consume(
-    cortex.name("tick-handler"),
-    Clock.Cycle.SECOND,
-    instant -> System.out.println("Tick: " + instant)
+// Create circuit
+Circuit circuit = cortex().circuit(cortex().name("kafka-monitoring"));
+
+// OBSERVE: Create Queue instrument conduit
+Conduit<Queue, Queues.Signal> queues = circuit.conduit(
+    cortex().name("queues"),
+    Queues::composer  // Method reference to Serventis composer
 );
 
-// Clock runs until circuit is closed
-Thread.sleep(5000);
+// Get Queue instruments for different entities (creates Channels with Subject identity)
+Queue producerBuffer = queues.get(cortex().name("producer-1.buffer"));
+Queue consumerLag = queues.get(cortex().name("consumer-1.lag"));
+
+// ORIENT: Monitor conduit assesses conditions based on Queue signals
+Conduit<Monitor, Monitors.Status> monitors = circuit.conduit(
+    cortex().name("monitors"),
+    Monitors::composer
+);
+
+// Subscribe to Queue signals and assess conditions
+queues.subscribe(cortex().subscriber(
+    cortex().name("queue-assessor"),
+    (Subject<Channel<Queues.Signal>> subject, Registrar<Queues.Signal> registrar) -> {
+        // Get Monitor for this specific entity
+        Monitor monitor = monitors.get(subject.name());
+
+        registrar.register(signal -> {
+            // CONTEXT CREATES MEANING
+            // Same OVERFLOW signal, different interpretations:
+
+            if (subject.name().toString().contains("producer")) {
+                // Producer buffer overflow = backpressure from broker
+                if (signal == Queues.Signal.OVERFLOW) {
+                    monitor.degraded(Monitors.Confidence.HIGH);  // Use convenience method
+                    System.out.println("⚠️  Producer backpressure on " + subject.name());
+                }
+            } else if (subject.name().toString().contains("consumer")) {
+                // Consumer lag overflow = falling behind, data loss risk
+                if (signal == Queues.Signal.OVERFLOW) {
+                    monitor.defective(Monitors.Confidence.HIGH);  // Use convenience method
+                    System.out.println("🚨 Consumer lag critical on " + subject.name());
+                }
+            }
+        });
+    }
+));
+
+// Emit signals - same signal, different contexts
+producerBuffer.overflow(95L);  // Producer: annoying but recoverable
+consumerLag.overflow(95L);     // Consumer: data loss imminent!
+
+circuit.await();  // Process all signals
 circuit.close();
 ```
+
+**Key Insight:** The `Subject` (entity identity) carried with each signal allows subscribers to interpret meaning contextually. This is the essence of semiotic observability - signals become signs, signs reveal symptoms, symptoms indicate syndromes, leading to informed steering decisions.
 
 ### Scope for Resource Management
 
 ```java
 // Create scope for resource lifecycle management
-Scope scope = cortex.scope(cortex.name("transaction"));
+Scope scope = cortex().scope(cortex().name("transaction"));
 
 // Register resources
-Circuit circuit = scope.register(cortex.circuit());
+Circuit circuit = scope.register(cortex().circuit());
 Conduit<Pipe<String>, String> conduit = scope.register(
-    circuit.conduit(cortex.name("events"), Composer.pipe())
+    circuit.conduit(cortex().name("events"), Composer.pipe())
 );
 
 // Use closure for automatic cleanup
 scope.closure(circuit).consume(c -> {
     // Circuit is automatically closed when this block exits
-    Pipe<String> pipe = conduit.get(cortex.name("producer"));
+    Pipe<String> pipe = conduit.get(cortex().name("producer"));
     pipe.emit("Event data");
 });
 
@@ -203,14 +277,14 @@ scope.close();
 
 **Core Documentation:**
 
-1. **[Architecture & Core Concepts](docs/ARCHITECTURE.md)** - System design, M18 sealed hierarchy, all core entities
+1. **[Architecture & Core Concepts](docs/ARCHITECTURE.md)** - System design, RC5 sealed hierarchy, all core entities
 2. **[Developer Guide](docs/DEVELOPER-GUIDE.md)** - Best practices, performance tips, testing strategies
 3. **[Async-First Architecture](docs/ASYNC-ARCHITECTURE.md)** ⚠️ **CRITICAL** - Understanding async queue processing
 
 **Additional Resources:**
 
 - **[Examples](docs/examples/)** - Hands-on examples from simple to complex
-- **[M18 Migration Guide](../API-ANALYSIS.md)** - Sealed interfaces and migration from M16
+- **[RC5 Migration Guide](../API-ANALYSIS.md)** - Sealed interfaces and migration from RC4
 
 ## Key Concepts
 
@@ -249,7 +323,7 @@ Consumer Side:
 ### Design Principles
 
 1. **Simplified Architecture** - Single HierarchicalName implementation, no factory abstractions
-2. **Sealed Hierarchy** - M18 sealed interfaces enforce correct type composition
+2. **Sealed Hierarchy** - RC5 sealed interfaces enforce correct type composition
 3. **Interface Types** - Public API uses interface types for flexibility
 4. **@Temporal Types** - Transient types (Registrar, Sift, Closure) are not retained
 5. **Thread Safety** - CopyOnWriteArrayList for subscribers (read-optimized)
@@ -270,11 +344,6 @@ for (int i = 0; i < 1000000; i++) {
 for (int i = 0; i < 1000000; i++) {
     conduit.get(name).emit(value);  // Repeated lookups add overhead
 }
-
-// ✅ GOOD: Share scheduler across Clocks in same Circuit
-Circuit circuit = cortex.circuit(name);
-Clock clock1 = circuit.clock(name1);  // Shares scheduler
-Clock clock2 = circuit.clock(name2);  // Shares same scheduler
 
 // ✅ GOOD: Use hierarchical names for organization
 Name brokerName = cortex.name("kafka.broker.1");

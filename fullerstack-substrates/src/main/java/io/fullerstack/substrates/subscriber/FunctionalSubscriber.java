@@ -9,9 +9,9 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 
 /**
- * Implementation of Substrates.Subscriber interface using the Strategy Pattern (RC3).
+ * Implementation of Substrates.Subscriber interface using the Strategy Pattern ().
  * <p>
- * < p >< b >RC3 Change:</b > Subscriber is now a marker interface with no methods. The BiConsumer
+ * < p >< b >Change:</b > Subscriber is now a marker interface with no methods. The BiConsumer
  * callback is stored internally and retrieved by the runtime when needed.
  * <p>
  * < p >This implementation supports two patterns via {@link SubscriberStrategy}:
@@ -52,11 +52,11 @@ public class FunctionalSubscriber < E > implements Subscriber < E > {
   private final Subject < Subscriber < E > > subscriberSubject;
   private final SubscriberStrategy < E >     strategy;
 
-  // RC3: Store the callback internally since Subscriber interface has no methods
+  //  Store the callback internally since Subscriber interface has no methods
   private final BiConsumer < Subject < Channel < E > >, Registrar < E > > callback;
 
   /**
-   * Creates a function-based Subscriber (RC3).
+   * Creates a function-based Subscriber ().
    *
    * @param name    the name to be used by the subject assigned to the subscriber
    * @param handler the callback function that receives (Subject, Registrar)
@@ -67,11 +67,11 @@ public class FunctionalSubscriber < E > implements Subscriber < E > {
     Objects.requireNonNull ( handler, "Callback handler cannot be null" );
     this.subscriberSubject = createSubject ( name );
     this.strategy = new FunctionStrategy <> ( handler );
-    this.callback = handler;  // RC3: Store callback for runtime retrieval
+    this.callback = handler;  //  Store callback for runtime retrieval
   }
 
   /**
-   * Creates a pool-based Subscriber (RC3).
+   * Creates a pool-based Subscriber ().
    * <p>
    * < p >When a Subject emits, this Subscriber retrieves a Pipe from the pool
    * using the Subject's name and registers it to receive the emission.
@@ -86,7 +86,7 @@ public class FunctionalSubscriber < E > implements Subscriber < E > {
     this.subscriberSubject = createSubject ( name );
     PoolStrategy < E > poolStrategy = new PoolStrategy <> ( pool );
     this.strategy = poolStrategy;
-    // RC3: Create callback from pool strategy
+    //  Create callback from pool strategy
     this.callback = ( subject, registrar ) -> poolStrategy.apply ( subject, registrar );
   }
 
@@ -106,9 +106,9 @@ public class FunctionalSubscriber < E > implements Subscriber < E > {
   }
 
   /**
-   * Returns the callback for this subscriber (RC3 pattern).
+   * Returns the callback for this subscriber (pattern).
    * <p>
-   * < p >In RC3, the Subscriber interface is a marker with no methods. The runtime
+   * < p >In , the Subscriber interface is a marker with no methods. The runtime
    * (TransformingConduit) retrieves the callback via this method and invokes it
    * when new Channels are created.
    *

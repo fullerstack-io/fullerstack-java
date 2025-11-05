@@ -5,17 +5,19 @@ Shows how to use Sequencer to transform emissions with filter, limit, and sampli
 ## Code
 
 ```java
-import io.fullerstack.substrates.CortexRuntime;
+
 import io.humainary.substrates.api.Substrates.*;
+
+import static io.humainary.substrates.api.Substrates.cortex;
 
 public class TransformationsExample {
     public static void main(String[] args) throws InterruptedException {
-        Cortex cortex = CortexRuntime.create();
-        Circuit circuit = cortex.circuit(cortex.name("transform-circuit"));
+        // Cortex accessed via static cortex() method
+        Circuit circuit = cortex().circuit(cortex().name("transform-circuit"));
 
         // Create conduit with transformation pipeline
         Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(
-            cortex.name("numbers"),
+            cortex().name("numbers"),
             Composer.pipe(segment -> segment
                 .guard(n -> n > 0)      // Only positive numbers
                 .guard(n -> n % 2 == 0) // Only even numbers
@@ -25,9 +27,9 @@ public class TransformationsExample {
         );
 
         // Subscribe to see what gets through
-        conduit.source().subscribe(
-            cortex.subscriber(
-                cortex.name("consumer"),
+        conduit.subscribe(
+            cortex().subscriber(
+                cortex().name("consumer"),
                 (subject, registrar) -> {
                     registrar.register(n -> {
                         System.out.println("Received: " + n);
@@ -37,13 +39,13 @@ public class TransformationsExample {
         );
 
         // Emit numbers from -10 to 50
-        Pipe<Integer> pipe = conduit.get(cortex.name("counter"));
+        Pipe<Integer> pipe = conduit.get(cortex().name("counter"));
         for (int i = -10; i <= 50; i++) {
             pipe.emit(i);
         }
 
         // Wait for processing
-        Thread.sleep(100);
+        circuit.await();
         circuit.close();
     }
 }

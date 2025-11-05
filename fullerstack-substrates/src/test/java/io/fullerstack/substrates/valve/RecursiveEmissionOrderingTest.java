@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.humainary.substrates.api.Substrates.Composer;
-import static io.humainary.substrates.api.Substrates.CORTEX;
+import static io.humainary.substrates.api.Substrates.cortex;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -43,19 +43,19 @@ class RecursiveEmissionOrderingTest {
 
   @Test
   void testDepthFirstRecursiveEmissions () {
-    circuit = CORTEX.circuit ( CORTEX.name ( "test" ) );
+    circuit = cortex().circuit ( cortex().name ( "test" ) );
 
     // Create execution log
     List < String > executionOrder = new ArrayList <> ();
 
     // Create conduit with subscriber that emits recursively
     Conduit < Pipe < String >, String > conduit = circuit.conduit (
-      CORTEX.name ( "events" ),
+      cortex().name ( "events" ),
       Composer.pipe ()
     );
 
-    conduit.subscribe ( CORTEX.subscriber (
-      CORTEX.name ( "logger" ),
+    conduit.subscribe ( cortex().subscriber (
+      cortex().name ( "logger" ),
       ( subject, registrar ) -> {
         registrar.register ( value -> {
           executionOrder.add ( value );
@@ -71,7 +71,7 @@ class RecursiveEmissionOrderingTest {
     ) );
 
     // Get pipe for emissions
-    Pipe < String > pipe = conduit.get ( CORTEX.name ( "events" ) );
+    Pipe < String > pipe = conduit.get ( cortex().name ( "events" ) );
 
     // Emit A, B, C from external thread
     pipe.emit ( "A" );
@@ -94,17 +94,17 @@ class RecursiveEmissionOrderingTest {
 
   @Test
   void testNestedRecursiveEmissions () {
-    circuit = CORTEX.circuit ( CORTEX.name ( "test" ) );
+    circuit = cortex().circuit ( cortex().name ( "test" ) );
 
     List < String > executionOrder = new ArrayList <> ();
 
     Conduit < Pipe < String >, String > conduit = circuit.conduit (
-      CORTEX.name ( "events" ),
+      cortex().name ( "events" ),
       Composer.pipe ()
     );
 
-    conduit.subscribe ( CORTEX.subscriber (
-      CORTEX.name ( "logger" ),
+    conduit.subscribe ( cortex().subscriber (
+      cortex().name ( "logger" ),
       ( subject, registrar ) -> {
         registrar.register ( value -> {
           executionOrder.add ( value );
@@ -125,7 +125,7 @@ class RecursiveEmissionOrderingTest {
       }
     ) );
 
-    Pipe < String > pipe = conduit.get ( CORTEX.name ( "events" ) );
+    Pipe < String > pipe = conduit.get ( cortex().name ( "events" ) );
 
     // Emit A, B
     pipe.emit ( "A" );
@@ -143,17 +143,17 @@ class RecursiveEmissionOrderingTest {
 
   @Test
   void testConcurrentExternalEmissionsWithRecursion () {
-    circuit = CORTEX.circuit ( CORTEX.name ( "test" ) );
+    circuit = cortex().circuit ( cortex().name ( "test" ) );
 
     List < String > executionOrder = new ArrayList <> ();
 
     Conduit < Pipe < String >, String > conduit = circuit.conduit (
-      CORTEX.name ( "events" ),
+      cortex().name ( "events" ),
       Composer.pipe ()
     );
 
-    conduit.subscribe ( CORTEX.subscriber (
-      CORTEX.name ( "logger" ),
+    conduit.subscribe ( cortex().subscriber (
+      cortex().name ( "logger" ),
       ( subject, registrar ) -> {
         registrar.register ( value -> {
           executionOrder.add ( value );
@@ -167,7 +167,7 @@ class RecursiveEmissionOrderingTest {
       }
     ) );
 
-    Pipe < String > pipe = conduit.get ( CORTEX.name ( "events" ) );
+    Pipe < String > pipe = conduit.get ( cortex().name ( "events" ) );
 
     // Emit from multiple threads simultaneously
     Thread t1 = new Thread ( () -> pipe.emit ( "A" ) );

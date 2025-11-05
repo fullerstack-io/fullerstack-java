@@ -42,26 +42,32 @@ public class SimpleCell < I, E > implements Cell < I, E > {
   private final String                      segment;
   private final Pipe < I >                  inputPipe;                 // Input: created by Composer
   private final Pipe < E >                  outputPipe;                // Output: provided by M18 API
-  private final Conduit < Pipe < I >, E >   conduit;       // Provides subscription infrastructure
+  private final Conduit < ?, E >            conduit;                   // Provides subscription infrastructure (type E emissions)
+  private final Composer < E, Pipe < I > >  ingressComposer;           // Transforms Channel<E> -> Pipe<I>
+  private final Composer < E, Pipe < E > >  egressComposer;            // Transforms Channel<E> -> Pipe<E>
   private final Subject                     subject;
   private final Map < Name, Cell < I, E > > children = new ConcurrentHashMap <> ();
 
   /**
-   * Creates a new Cell with input and output pipes (M18 API).
+   * Creates a new Cell with input and output pipes and composers (API).
    *
-   * @param parent        parent Cell (null for root)
-   * @param name          Cell name
-   * @param inputPipe     Pipe created by Composer (receives I values)
-   * @param outputPipe    Pipe for emitting E values (M18 API parameter)
-   * @param conduit       Conduit providing subscription infrastructure
-   * @param parentSubject parent Subject for hierarchy (null for root)
+   * @param parent          parent Cell (null for root)
+   * @param name            Cell name
+   * @param inputPipe       Pipe created by applying ingress composer (receives I values)
+   * @param outputPipe      Pipe for emitting E values
+   * @param conduit         Conduit providing subscription infrastructure (emits type E)
+   * @param ingressComposer Composer to transform Channel<E> -> Pipe<I> for children
+   * @param egressComposer  Composer to transform Channel<E> -> Pipe<E> for children
+   * @param parentSubject   parent Subject for hierarchy (null for root)
    */
   public SimpleCell (
     SimpleCell < I, E > parent,
     Name name,
     Pipe < I > inputPipe,
     Pipe < E > outputPipe,
-    Conduit < Pipe < I >, E > conduit,
+    Conduit < ?, E > conduit,
+    Composer < E, Pipe < I > > ingressComposer,
+    Composer < E, Pipe < E > > egressComposer,
     Subject < ? > parentSubject
   ) {
     this.parent = parent;
@@ -69,6 +75,8 @@ public class SimpleCell < I, E > implements Cell < I, E > {
     this.inputPipe = Objects.requireNonNull ( inputPipe, "inputPipe cannot be null" );
     this.outputPipe = Objects.requireNonNull ( outputPipe, "outputPipe cannot be null" );
     this.conduit = Objects.requireNonNull ( conduit, "conduit cannot be null" );
+    this.ingressComposer = Objects.requireNonNull ( ingressComposer, "ingressComposer cannot be null" );
+    this.egressComposer = Objects.requireNonNull ( egressComposer, "egressComposer cannot be null" );
     this.subject = new HierarchicalSubject <> (
       UuidIdentifier.generate (),
       name,
@@ -78,12 +86,12 @@ public class SimpleCell < I, E > implements Cell < I, E > {
     );
   }
 
-  // ========== Pipe< I > accessor (RC3) ==========
+  // ========== Pipe< I > accessor ==========
 
   @Override
   public Pipe < I > pipe () {
-    // Return the input pipe (Cell no longer implements Pipe directly in RC3)
-    // RC3 change: Cell.pipe() method instead of implementing Pipe interface
+    // Return the input pipe (Cell no longer implements Pipe directly)
+    // Cell.pipe() method instead of implementing Pipe interface
     return inputPipe;
   }
 
@@ -110,13 +118,19 @@ public class SimpleCell < I, E > implements Cell < I, E > {
   @Override
   public Cell < I, E > get ( Name name ) {
     return children.computeIfAbsent ( name, n -> {
-      // Get the child input pipe from the conduit
-      // This creates a new Channel and invokes the composer
-      Pipe < I > childInputPipe = conduit.get ( n );
+      // Get Channel<E> from conduit (conduit.get() returns Pipe but it's actually a Channel)
+      // A Channel is a named Pipe
+      @SuppressWarnings ( "unchecked" )
+      Channel < E > childChannel = (Channel < E >) conduit.get ( n );
 
-      // Child cells share the same output pipe as the parent
-      // (all cells in the hierarchy emit to the same output)
-      return new SimpleCell <> ( this, n, childInputPipe, outputPipe, conduit, this.subject );
+      // Apply ingress composer: Channel<E> -> Pipe<I>
+      Pipe < I > childInputPipe = ingressComposer.compose ( childChannel );
+
+      // Apply egress composer: Channel<E> -> Pipe<E>
+      Pipe < E > childOutputPipe = egressComposer.compose ( childChannel );
+
+      // Create child cell with same composers (all children use same transformation logic)
+      return new SimpleCell <> ( this, n, childInputPipe, childOutputPipe, conduit, ingressComposer, egressComposer, this.subject );
     } );
   }
 

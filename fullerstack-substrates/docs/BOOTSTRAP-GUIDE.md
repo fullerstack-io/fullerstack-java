@@ -1,7 +1,7 @@
 # Substrates Bootstrap System - Developer Guide
 
 **Version:** 1.0.0-SNAPSHOT
-**API:** M18
+**API:** RC5
 **Dependencies:** Zero (ResourceBundle + ServiceLoader only)
 
 ---
@@ -56,11 +56,11 @@ my.app.setting=value
 package com.example;
 
 import io.fullerstack.substrates.spi.CircuitStructureProvider;
+import io.fullerstack.substrates.bootstrap.BootstrapContext;
 import io.fullerstack.substrates.config.HierarchicalConfig;
 import io.humainary.substrates.api.Substrates.*;
 
 import static io.humainary.substrates.api.Substrates.Composer.pipe;
-import static io.fullerstack.substrates.CortexRuntime.cortex;
 
 public class MyStructureProvider implements CircuitStructureProvider {
 
@@ -69,7 +69,8 @@ public class MyStructureProvider implements CircuitStructureProvider {
         String circuitName,
         Circuit circuit,
         Cortex cortex,
-        HierarchicalConfig config
+        HierarchicalConfig config,
+        BootstrapContext context
     ) {
         if ("my-circuit".equals(circuitName)) {
             // Create typed cell
@@ -647,9 +648,10 @@ void testBuildStructure() {
     Cortex cortex = CortexRuntime.cortex();
     Circuit circuit = cortex.circuit(cortex.name("test-circuit"));
     HierarchicalConfig config = HierarchicalConfig.forCircuit("test-circuit");
+    BootstrapContext context = new BootstrapContext();
 
     MyStructureProvider provider = new MyStructureProvider();
-    provider.buildStructure("test-circuit", circuit, cortex, config);
+    provider.buildStructure("test-circuit", circuit, cortex, config, context);
 
     // Verify structure was built
     assertThat(circuit).isNotNull();

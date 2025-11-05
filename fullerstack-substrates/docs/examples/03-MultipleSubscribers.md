@@ -5,26 +5,26 @@ Demonstrates how one producer can have multiple independent consumers.
 ## Code
 
 ```java
-import io.fullerstack.substrates.CortexRuntime;
+
 import io.humainary.substrates.api.Substrates.*;
+
+import static io.humainary.substrates.api.Substrates.cortex;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class FanOutExample {
     public static void main(String[] args) throws InterruptedException {
-        Cortex cortex = CortexRuntime.create();
-        Circuit circuit = cortex.circuit(cortex.name("fanout-circuit"));
+        // Cortex accessed via static cortex() method
+        Circuit circuit = cortex().circuit(cortex().name("fanout-circuit"));
 
         Conduit<Pipe<String>, String> conduit = circuit.conduit(
-            cortex.name("events"),
+            cortex().name("events"),
             Composer.pipe()
         );
 
-        Source<String> source = conduit.source();
-
         // Subscriber 1: Console logger
-        source.subscribe(
-            cortex.subscriber(
-                cortex.name("console"),
+        conduit.subscribe(
+            cortex().subscriber(
+                cortex().name("console"),
                 (subject, registrar) -> {
                     registrar.register(msg -> {
                         System.out.println("[Console] " + msg);
@@ -35,9 +35,9 @@ public class FanOutExample {
 
         // Subscriber 2: Error counter
         AtomicInteger errorCount = new AtomicInteger(0);
-        source.subscribe(
-            cortex.subscriber(
-                cortex.name("error-counter"),
+        conduit.subscribe(
+            cortex().subscriber(
+                cortex().name("error-counter"),
                 (subject, registrar) -> {
                     registrar.register(msg -> {
                         if (msg.contains("ERROR")) {
@@ -50,9 +50,9 @@ public class FanOutExample {
         );
 
         // Subscriber 3: Length analyzer
-        source.subscribe(
-            cortex.subscriber(
-                cortex.name("length-analyzer"),
+        conduit.subscribe(
+            cortex().subscriber(
+                cortex().name("length-analyzer"),
                 (subject, registrar) -> {
                     registrar.register(msg -> {
                         System.out.println("[Analyzer] Length: " + msg.length());
@@ -62,13 +62,13 @@ public class FanOutExample {
         );
 
         // Emit messages
-        Pipe<String> pipe = conduit.get(cortex.name("producer"));
+        Pipe<String> pipe = conduit.get(cortex().name("producer"));
         pipe.emit("INFO: System started");
         pipe.emit("ERROR: Connection failed");
         pipe.emit("WARN: High memory usage");
         pipe.emit("ERROR: Timeout occurred");
 
-        Thread.sleep(100);
+        circuit.await();
 
         System.out.println("\nFinal error count: " + errorCount.get());
         circuit.close();
@@ -102,8 +102,6 @@ One producer, multiple consumers:
            │
            ▼
         Conduit
-           │
-         Source
          / │ \
         /  │  \
        ▼   ▼   ▼
@@ -117,9 +115,9 @@ Each subscriber receives **all emissions**.
 Subscribe only to specific subjects:
 
 ```java
-source.subscribe(
-    cortex.subscriber(
-        cortex.name("filtered"),
+conduit.subscribe(
+    cortex().subscriber(
+        cortex().name("filtered"),
         (subject, registrar) -> {
             // Only subscribe to "important" subjects
             if (subject.name().value().contains("important")) {
@@ -134,7 +132,7 @@ source.subscribe(
 
 ```java
 // Subscribe
-Subscription sub = source.subscribe(subscriber);
+Subscription sub = conduit.subscribe(subscriber);
 
 // Later, unsubscribe
 sub.close();  // No more emissions received

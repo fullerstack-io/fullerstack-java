@@ -102,7 +102,7 @@ public class ConsumerPipe < E > implements Pipe < E > {
    * Flushes any buffered emissions.
    * <p>
    * < p >ConsumerPipe has no buffering - emissions are processed immediately.
-   * This is a no-op implementation as required by RC3 Pipe interface.
+   * This is a no-op implementation as required by Pipe interface.
    */
   @Override
   public void flush () {
