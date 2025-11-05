@@ -40,7 +40,7 @@
         <!-- Serventis Extension (shaded by fullerstack-substrates, needed for compilation) -->
         <dependency>
             <groupId>io.humainary.substrates.ext</groupId>
-            <artifactId>humainary-serventis</artifactId>
+            <artifactId>humainary-substrates-ext-serventis</artifactId>
         </dependency>
 
         <!-- Logging -->
