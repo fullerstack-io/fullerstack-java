@@ -1,5 +1,7 @@
 package io.fullerstack.kafka.producer.sensors;
 
+import io.humainary.substrates.ext.serventis.Counters.Counter;
+import io.humainary.substrates.ext.serventis.Gauges.Gauge;
 import io.humainary.substrates.ext.serventis.Queues.Queue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +22,18 @@ class ProducerBufferMonitorTest {
 
     @Mock
     private Queue mockQueue;
+
+    @Mock
+    private Gauge mockTotalBytesGauge;
+
+    @Mock
+    private Counter mockExhaustedCounter;
+
+    @Mock
+    private Gauge mockBatchSizeGauge;
+
+    @Mock
+    private Gauge mockRecordsPerRequestGauge;
 
     private AutoCloseable mocks;
 
@@ -45,7 +59,11 @@ class ProducerBufferMonitorTest {
         ProducerBufferMonitor monitor = new ProducerBufferMonitor(
             "producer-1",
             "localhost:11001",
-            mockQueue
+            mockQueue,
+            mockTotalBytesGauge,
+            mockExhaustedCounter,
+            mockBatchSizeGauge,
+            mockRecordsPerRequestGauge
         );
 
         // Then
@@ -61,11 +79,19 @@ class ProducerBufferMonitorTest {
         ProducerBufferMonitor monitor = new ProducerBufferMonitor(
             "producer-1",
             "localhost:11001",
-            mockQueue
+            mockQueue,
+            mockTotalBytesGauge,
+            mockExhaustedCounter,
+            mockBatchSizeGauge,
+            mockRecordsPerRequestGauge
         );
 
-        // Then - queue should not be called during construction
+        // Then - instruments should not be called during construction
         verifyNoInteractions(mockQueue);
+        verifyNoInteractions(mockTotalBytesGauge);
+        verifyNoInteractions(mockExhaustedCounter);
+        verifyNoInteractions(mockBatchSizeGauge);
+        verifyNoInteractions(mockRecordsPerRequestGauge);
 
         // Cleanup
         monitor.close();
@@ -81,7 +107,11 @@ class ProducerBufferMonitorTest {
         ProducerBufferMonitor monitor = new ProducerBufferMonitor(
             "producer-1",
             "localhost:11001",
-            mockQueue
+            mockQueue,
+            mockTotalBytesGauge,
+            mockExhaustedCounter,
+            mockBatchSizeGauge,
+            mockRecordsPerRequestGauge
         );
 
         // When / Then - should not throw
@@ -94,7 +124,11 @@ class ProducerBufferMonitorTest {
         ProducerBufferMonitor monitor = new ProducerBufferMonitor(
             "producer-1",
             "localhost:11001",
-            mockQueue
+            mockQueue,
+            mockTotalBytesGauge,
+            mockExhaustedCounter,
+            mockBatchSizeGauge,
+            mockRecordsPerRequestGauge
         );
 
         // When / Then - should not throw
@@ -117,7 +151,11 @@ class ProducerBufferMonitorTest {
         ProducerBufferMonitor monitor = new ProducerBufferMonitor(
             "producer-1",
             "localhost:11001",
-            mockQueue
+            mockQueue,
+            mockTotalBytesGauge,
+            mockExhaustedCounter,
+            mockBatchSizeGauge,
+            mockRecordsPerRequestGauge
         );
 
         // Then
@@ -137,7 +175,11 @@ class ProducerBufferMonitorTest {
         ProducerBufferMonitor monitor = new ProducerBufferMonitor(
             "test-producer-id",
             "localhost:11001",
-            mockQueue
+            mockQueue,
+            mockTotalBytesGauge,
+            mockExhaustedCounter,
+            mockBatchSizeGauge,
+            mockRecordsPerRequestGauge
         );
 
         // Then
@@ -153,7 +195,11 @@ class ProducerBufferMonitorTest {
         ProducerBufferMonitor monitor = new ProducerBufferMonitor(
             "producer-1",
             "test-jmx-endpoint:9999",
-            mockQueue
+            mockQueue,
+            mockTotalBytesGauge,
+            mockExhaustedCounter,
+            mockBatchSizeGauge,
+            mockRecordsPerRequestGauge
         );
 
         // Then
@@ -173,7 +219,11 @@ class ProducerBufferMonitorTest {
         ProducerBufferMonitor monitor = new ProducerBufferMonitor(
             "producer-1",
             "localhost:11001",
-            mockQueue
+            mockQueue,
+            mockTotalBytesGauge,
+            mockExhaustedCounter,
+            mockBatchSizeGauge,
+            mockRecordsPerRequestGauge
         );
 
         // When / Then - multiple closes should not throw

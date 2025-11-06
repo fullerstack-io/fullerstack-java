@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -38,10 +38,10 @@ import static org.mockito.Mockito.*;
 class ThreadPoolResourceMonitorTest {
 
     private Name circuitName;
-    private Channel<Resources.Signal> signalChannel;
+    private Channel<Resources.Sign> signalChannel;
     private ThreadPoolResourceMonitor monitor;
 
-    private List<Resources.Signal> emittedSignals;
+    private List<Resources.Sign> emittedSignals;
 
     @BeforeEach
     void setUp() {
@@ -57,19 +57,19 @@ class ThreadPoolResourceMonitorTest {
      * Creates a mock Channel that captures emitted signals.
      */
     @SuppressWarnings("unchecked")
-    private Channel<Resources.Signal> createSignalCaptor() {
-        Channel<Resources.Signal> channel = mock(Channel.class);
-        Pipe<Resources.Signal> pipe = mock(Pipe.class);
+    private Channel<Resources.Sign> createSignalCaptor() {
+        Channel<Resources.Sign> channel = mock(Channel.class);
+        Pipe<Resources.Sign> pipe = mock(Pipe.class);
 
         // Channel.pipe() returns the Pipe
         when(channel.pipe()).thenReturn(pipe);
 
         // Capture signals emitted to the pipe
         doAnswer(invocation -> {
-            Resources.Signal signal = invocation.getArgument(0);
+            Resources.Sign signal = invocation.getArgument(0);
             emittedSignals.add(signal);
             return null;
-        }).when(pipe).emit(any(Resources.Signal.class));
+        }).when(pipe).emit(any(Resources.Sign.class));
 
         // Mock flush() to return void
         doNothing().when(pipe).flush();
@@ -105,7 +105,7 @@ class ThreadPoolResourceMonitorTest {
     /**
      * Gets the last emitted signal.
      */
-    private Resources.Signal getLastSignal() {
+    private Resources.Sign getLastSignal() {
         assertThat(emittedSignals).isNotEmpty();
         return emittedSignals.get(emittedSignals.size() - 1);
     }
@@ -134,8 +134,8 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metrics);
 
             // Then
-            Resources.Signal signal = getLastSignal();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
+            Resources.Sign signal = getLastSignal();
+            assertThat(signal).isEqualTo(Resources.Sign.GRANT);
         }
 
         @Test
@@ -148,11 +148,11 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metrics);
 
             // Then
-            Resources.Signal signal = getLastSignal();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
+            Resources.Sign signal = getLastSignal();
+            assertThat(signal).isEqualTo(Resources.Sign.GRANT);
         }
 
-        // TODO RC3: payload() method removed from Resources.Signal
+        // TODO RC3: payload() method removed from Resources.Sign
         // This test checked payload completeness which is no longer accessible in RC3
         /*
         @Test
@@ -181,8 +181,8 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metrics);
 
             // Then
-            Resources.Signal signal = getLastSignal();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
+            Resources.Sign signal = getLastSignal();
+            assertThat(signal).isEqualTo(Resources.Sign.GRANT);
         }
 
         @Test
@@ -195,8 +195,8 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metrics);
 
             // Then
-            Resources.Signal signal = getLastSignal();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
+            Resources.Sign signal = getLastSignal();
+            assertThat(signal).isEqualTo(Resources.Sign.GRANT);
         }
     }
 
@@ -218,8 +218,8 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metrics);
 
             // Then
-            Resources.Signal signal = getLastSignal();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.DENY);
+            Resources.Sign signal = getLastSignal();
+            assertThat(signal).isEqualTo(Resources.Sign.DENY);
         }
 
         @Test
@@ -232,8 +232,8 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metrics);
 
             // Then
-            Resources.Signal signal = getLastSignal();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.DENY);
+            Resources.Sign signal = getLastSignal();
+            assertThat(signal).isEqualTo(Resources.Sign.DENY);
         }
 
         @Test
@@ -257,8 +257,8 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metricsWithRejections);
 
             // Then
-            Resources.Signal signal = getLastSignal();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.DENY);
+            Resources.Sign signal = getLastSignal();
+            assertThat(signal).isEqualTo(Resources.Sign.DENY);
         }
     }
 
@@ -280,7 +280,7 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metrics);
 
             // Then
-            Resources.Signal signal = getLastSignal();
+            Resources.Sign signal = getLastSignal();
         }
 
         @Test
@@ -292,10 +292,10 @@ class ThreadPoolResourceMonitorTest {
 
             // When
             monitor.emit(networkMetrics);
-            Resources.Signal networkSignal = getLastSignal();
+            Resources.Sign networkSignal = getLastSignal();
 
             monitor.emit(ioMetrics);
-            Resources.Signal ioSignal = getLastSignal();
+            Resources.Sign ioSignal = getLastSignal();
 
             // Then: Different entity names
         }
@@ -330,7 +330,7 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metricsWithQueue);
 
             // Then
-            Resources.Signal signal = getLastSignal();
+            Resources.Sign signal = getLastSignal();
         }
 
         @Test
@@ -343,10 +343,10 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metrics);
 
             // Then
-            Resources.Signal signal = getLastSignal();
+            Resources.Sign signal = getLastSignal();
         }
 
-        // TODO RC3: payload() removed from Resources.Signal
+        // TODO RC3: payload() removed from Resources.Sign
         /*
         @Test
         @DisplayName("Should not include Layer 4 fields")
@@ -377,11 +377,11 @@ class ThreadPoolResourceMonitorTest {
         @DisplayName("Should handle Pipe failure gracefully")
         void testErrorHandling_PipeFailure() {
             // Given: Pipe that throws
-            Channel<Resources.Signal> throwingChannel = mock(Channel.class);
-            Pipe<Resources.Signal> throwingPipe = mock(Pipe.class);
+            Channel<Resources.Sign> throwingChannel = mock(Channel.class);
+            Pipe<Resources.Sign> throwingPipe = mock(Pipe.class);
             when(throwingChannel.pipe()).thenReturn(throwingPipe);
             doThrow(new RuntimeException("Pipe error"))
-                .when(throwingPipe).emit(any(Resources.Signal.class));
+                .when(throwingPipe).emit(any(Resources.Sign.class));
 
             ThreadPoolResourceMonitor monitorWithThrowingPipe =
                 new ThreadPoolResourceMonitor(circuitName, throwingChannel);
@@ -426,7 +426,7 @@ class ThreadPoolResourceMonitorTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("Resources.Signal Semantic Helpers")
+    @DisplayName("Resources.Sign Semantic Helpers")
     class SemanticTests {
 
         @Test
@@ -439,9 +439,9 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metrics);
 
             // Then - Verify DENY signal was emitted
-            Resources.Signal signal = getLastSignal();
+            Resources.Sign signal = getLastSignal();
             assertThat(signal).isNotNull();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.DENY);
+            assertThat(signal).isEqualTo(Resources.Sign.DENY);
         }
 
         @Test
@@ -454,9 +454,9 @@ class ThreadPoolResourceMonitorTest {
             monitor.emit(metrics);
 
             // Then - Verify GRANT signal was emitted
-            Resources.Signal signal = getLastSignal();
+            Resources.Sign signal = getLastSignal();
             assertThat(signal).isNotNull();
-            assertThat(signal.sign()).isEqualTo(Resources.Sign.GRANT);
+            assertThat(signal).isEqualTo(Resources.Sign.GRANT);
         }
     }
 }

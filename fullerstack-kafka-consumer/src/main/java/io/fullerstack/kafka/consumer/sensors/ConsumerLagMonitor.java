@@ -205,20 +205,20 @@ public class ConsumerLagMonitor implements AutoCloseable {
 
     private void emitLagSignal(long totalLag) {
         if (totalLag >= SEVERE_LAG_THRESHOLD) {
-            // Severely lagging - UNDERFLOW with high units
-            lagQueue.underflow(totalLag);
+            // Severely lagging - UNDERFLOW (RC6: no parameters)
+            lagQueue.underflow();
             logger.warn("Consumer group {} SEVERE LAG: {} messages behind",
                 consumerGroupId, totalLag);
 
         } else if (totalLag >= LAG_THRESHOLD) {
-            // Lagging - UNDERFLOW with moderate units
-            lagQueue.underflow(totalLag);
+            // Lagging - UNDERFLOW (RC6: no parameters)
+            lagQueue.underflow();
             logger.debug("Consumer group {} LAGGING: {} messages behind",
                 consumerGroupId, totalLag);
 
         } else {
-            // Normal operation - TAKE without units (consuming normally)
-            lagQueue.take();
+            // Normal operation - DEQUEUE (consuming normally)
+            lagQueue.dequeue();
             logger.trace("Consumer group {} NORMAL: {} messages behind",
                 consumerGroupId, totalLag);
         }

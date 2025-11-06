@@ -46,7 +46,7 @@ import java.util.concurrent.TimeUnit;
  * <pre>{@code
  * // Runtime creates conduit for Resources.Signal
  * Circuit circuit = Cortex.circuit(name("kafka.broker.resources"));
- * Channel<Resources.Signal> channel = circuit
+ * Channel<Resources.Sign> channel = circuit
  *     .conduit(Resources::composer)
  *     .channel(name("thread-pools"));
  *
@@ -102,7 +102,7 @@ public class ThreadPoolSensor implements AutoCloseable {
      */
     public ThreadPoolSensor (
       final BrokerSensorConfig config,
-      final Channel < Resources.Signal > channel,
+      final Channel < Resources.Sign > channel,
       final Name circuitName
     ) {
 

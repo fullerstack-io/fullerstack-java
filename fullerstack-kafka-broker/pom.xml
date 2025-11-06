@@ -43,6 +43,12 @@
             <artifactId>humainary-substrates-ext-serventis</artifactId>
         </dependency>
 
+        <!-- Kafka Clients (for AdminClient) -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+        </dependency>
+
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>

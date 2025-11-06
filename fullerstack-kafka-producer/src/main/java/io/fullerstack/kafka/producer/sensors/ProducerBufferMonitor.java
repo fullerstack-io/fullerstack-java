@@ -1,5 +1,7 @@
 package io.fullerstack.kafka.producer.sensors;
 
+import io.humainary.substrates.ext.serventis.Counters.Counter;
+import io.humainary.substrates.ext.serventis.Gauges.Gauge;
 import io.humainary.substrates.ext.serventis.Queues.Queue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,24 +16,34 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Monitors Kafka producer buffer utilization and emits queue signals using RC1 Serventis API.
+ * Monitors Kafka producer buffer utilization and emits signals using RC7 Serventis API.
  * <p>
  * Collects JMX metrics from producer buffer and emits signals based on utilization thresholds:
  * <ul>
- *   <li><b>OVERFLOW</b> (≥95%): Buffer nearly full → {@code queue.overflow(utilization%)}</li>
- *   <li><b>PUT with pressure</b> (80-95%): High utilization → {@code queue.put(utilization%)}</li>
- *   <li><b>PUT normal</b> (<80%): Normal operation → {@code queue.put()}</li>
+ *   <li><b>Buffer Available Bytes</b> (Queue): OVERFLOW (≥95%), PUT (normal)</li>
+ *   <li><b>Buffer Total Bytes</b> (Gauge): INCREMENT (growing), DECREMENT (shrinking)</li>
+ *   <li><b>Buffer Exhausted Total</b> (Counter): INCREMENT (each exhaustion event)</li>
+ *   <li><b>Batch Size Avg</b> (Gauge): INCREMENT (growing), DECREMENT (shrinking)</li>
+ *   <li><b>Records Per Request Avg</b> (Gauge): INCREMENT (growing), DECREMENT (shrinking)</li>
  * </ul>
  *
  * <h3>Usage:</h3>
  * <pre>{@code
- * QueueFlowCircuit circuit = new QueueFlowCircuit();
- * Queue bufferQueue = circuit.queueFor("producer-1.buffer");
+ * // From circuit that provides instruments
+ * Queue bufferQueue = ...;
+ * Gauge totalBytesGauge = ...;
+ * Counter exhaustedCounter = ...;
+ * Gauge batchSizeGauge = ...;
+ * Gauge recordsPerRequestGauge = ...;
  *
  * ProducerBufferMonitor monitor = new ProducerBufferMonitor(
  *     "producer-1",
  *     "localhost:11001",  // JMX endpoint
- *     bufferQueue
+ *     bufferQueue,
+ *     totalBytesGauge,
+ *     exhaustedCounter,
+ *     batchSizeGauge,
+ *     recordsPerRequestGauge
  * );
  *
  * monitor.start();  // Begins monitoring every 10 seconds
@@ -42,6 +54,8 @@ import java.util.concurrent.TimeUnit;
  *
  * @author Fullerstack
  * @see Queue
+ * @see Gauge
+ * @see Counter
  */
 public class ProducerBufferMonitor implements AutoCloseable {
 
@@ -54,27 +68,49 @@ public class ProducerBufferMonitor implements AutoCloseable {
     private final String producerId;
     private final String jmxEndpoint;
     private final Queue bufferQueue;
+    private final Gauge totalBytesGauge;
+    private final Counter exhaustedCounter;
+    private final Gauge batchSizeGauge;
+    private final Gauge recordsPerRequestGauge;
 
     private final ScheduledExecutorService scheduler;
     private JMXConnector jmxConnector;
     private MBeanServerConnection mbeanServer;
     private volatile boolean running = false;
 
+    // Previous values for delta calculations
+    private long previousTotalBytes = 0;
+    private double previousBatchSize = 0.0;
+    private double previousRecordsPerRequest = 0.0;
+    private long previousExhaustedTotal = 0;
+
     /**
      * Creates a new producer buffer monitor.
      *
-     * @param producerId   Producer identifier (e.g., "producer-1")
-     * @param jmxEndpoint  JMX endpoint (e.g., "localhost:11001")
-     * @param bufferQueue  Queue instrument for emitting buffer signals
+     * @param producerId              Producer identifier (e.g., "producer-1")
+     * @param jmxEndpoint            JMX endpoint (e.g., "localhost:11001")
+     * @param bufferQueue            Queue instrument for buffer pressure signals
+     * @param totalBytesGauge        Gauge instrument for total buffer bytes
+     * @param exhaustedCounter       Counter instrument for buffer exhaustion events
+     * @param batchSizeGauge         Gauge instrument for average batch size
+     * @param recordsPerRequestGauge Gauge instrument for average records per request
      */
     public ProducerBufferMonitor(
         String producerId,
         String jmxEndpoint,
-        Queue bufferQueue
+        Queue bufferQueue,
+        Gauge totalBytesGauge,
+        Counter exhaustedCounter,
+        Gauge batchSizeGauge,
+        Gauge recordsPerRequestGauge
     ) {
         this.producerId = producerId;
         this.jmxEndpoint = jmxEndpoint;
         this.bufferQueue = bufferQueue;
+        this.totalBytesGauge = totalBytesGauge;
+        this.exhaustedCounter = exhaustedCounter;
+        this.batchSizeGauge = batchSizeGauge;
+        this.recordsPerRequestGauge = recordsPerRequestGauge;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "producer-buffer-monitor-" + producerId);
             t.setDaemon(true);
@@ -173,15 +209,36 @@ public class ProducerBufferMonitor implements AutoCloseable {
     private void collectAndEmit() {
         try {
             // Collect JMX metrics
-            long availableBytes = getJmxMetric("buffer-available-bytes");
-            long totalBytes = getJmxMetric("buffer-total-bytes");
+            long availableBytes = getJmxMetricLong("buffer-available-bytes");
+            long totalBytes = getJmxMetricLong("buffer-total-bytes");
+            long exhaustedTotal = getJmxMetricLong("buffer-exhausted-total");
+            double batchSizeAvg = getJmxMetricDouble("batch-size-avg");
+            double recordsPerRequestAvg = getJmxMetricDouble("records-per-request-avg");
 
             // Calculate utilization
             double utilization = 1.0 - ((double) availableBytes / totalBytes);
             long utilizationPercent = (long) (utilization * 100);
 
-            // Emit signal based on buffer state (RC1 instrument pattern)
+            // Emit buffer availability signal (Queue API - RC7)
             emitBufferSignal(utilization, utilizationPercent);
+
+            // Emit total bytes signal (Gauge API - RC7)
+            emitTotalBytesSignal(totalBytes);
+
+            // Emit exhausted counter signal (Counter API - RC7)
+            emitExhaustedSignal(exhaustedTotal);
+
+            // Emit batch size signal (Gauge API - RC7)
+            emitBatchSizeSignal(batchSizeAvg);
+
+            // Emit records per request signal (Gauge API - RC7)
+            emitRecordsPerRequestSignal(recordsPerRequestAvg);
+
+            // Update previous values
+            previousTotalBytes = totalBytes;
+            previousBatchSize = batchSizeAvg;
+            previousRecordsPerRequest = recordsPerRequestAvg;
+            previousExhaustedTotal = exhaustedTotal;
 
         } catch (Exception e) {
             logger.error("Error collecting buffer metrics for producer {}", producerId, e);
@@ -211,7 +268,68 @@ public class ProducerBufferMonitor implements AutoCloseable {
         }
     }
 
-    private long getJmxMetric(String metricName) throws Exception {
+    private void emitTotalBytesSignal(long totalBytes) {
+        long delta = totalBytes - previousTotalBytes;
+
+        if (delta > 0) {
+            totalBytesGauge.increment();
+            logger.debug("Producer buffer {} total bytes INCREASED: {}→{} bytes",
+                producerId, previousTotalBytes, totalBytes);
+        } else if (delta < 0) {
+            totalBytesGauge.decrement();
+            logger.debug("Producer buffer {} total bytes DECREASED: {}→{} bytes",
+                producerId, previousTotalBytes, totalBytes);
+        }
+        // No signal on no change (steady state)
+    }
+
+    private void emitExhaustedSignal(long exhaustedTotal) {
+        long delta = exhaustedTotal - previousExhaustedTotal;
+
+        if (delta > 0) {
+            // Buffer exhaustion events occurred
+            for (int i = 0; i < delta; i++) {
+                exhaustedCounter.increment();
+            }
+            logger.warn("Producer buffer {} EXHAUSTED: {} new exhaustion events (total={})",
+                producerId, delta, exhaustedTotal);
+        }
+        // Counter is monotonic - only increment
+    }
+
+    private void emitBatchSizeSignal(double batchSizeAvg) {
+        double delta = batchSizeAvg - previousBatchSize;
+        double threshold = 10.0; // 10 bytes change threshold to avoid noise
+
+        if (delta > threshold) {
+            batchSizeGauge.increment();
+            logger.debug("Producer {} batch size INCREASED: {:.1f}→{:.1f} bytes",
+                producerId, previousBatchSize, batchSizeAvg);
+        } else if (delta < -threshold) {
+            batchSizeGauge.decrement();
+            logger.debug("Producer {} batch size DECREASED: {:.1f}→{:.1f} bytes",
+                producerId, previousBatchSize, batchSizeAvg);
+        }
+        // No signal on minor fluctuations
+    }
+
+    private void emitRecordsPerRequestSignal(double recordsPerRequestAvg) {
+        double delta = recordsPerRequestAvg - previousRecordsPerRequest;
+        double threshold = 0.1; // 0.1 records threshold
+
+        if (delta > threshold) {
+            recordsPerRequestGauge.increment();
+            logger.debug("Producer {} records/request INCREASED: {:.2f}→{:.2f}",
+                producerId, previousRecordsPerRequest, recordsPerRequestAvg);
+        } else if (delta < -threshold) {
+            recordsPerRequestGauge.decrement();
+            logger.debug("Producer {} records/request DECREASED: {:.2f}→{:.2f}",
+                producerId, previousRecordsPerRequest, recordsPerRequestAvg);
+        }
+        // No signal on minor fluctuations
+    }
+
+    private long getJmxMetricLong(String metricName) throws Exception {
         // Build MBean object name for producer metrics
         // Example: kafka.producer:type=producer-metrics,client-id=producer-1
         ObjectName objectName = new ObjectName(
@@ -223,6 +341,24 @@ public class ProducerBufferMonitor implements AutoCloseable {
 
         if (value instanceof Number) {
             return ((Number) value).longValue();
+        } else {
+            throw new IllegalArgumentException(
+                "Metric " + metricName + " is not a number: " + value
+            );
+        }
+    }
+
+    private double getJmxMetricDouble(String metricName) throws Exception {
+        // Build MBean object name for producer metrics
+        ObjectName objectName = new ObjectName(
+            String.format("kafka.producer:type=producer-metrics,client-id=%s", producerId)
+        );
+
+        // Get metric value
+        Object value = mbeanServer.getAttribute(objectName, metricName);
+
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
         } else {
             throw new IllegalArgumentException(
                 "Metric " + metricName + " is not a number: " + value

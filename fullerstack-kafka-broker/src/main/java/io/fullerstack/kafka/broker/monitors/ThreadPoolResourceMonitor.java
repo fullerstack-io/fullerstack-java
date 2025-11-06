@@ -38,7 +38,7 @@ public class ThreadPoolResourceMonitor {
     private static final double IDLE_EXHAUSTED_THRESHOLD = 0.10;  // 10% idle = exhausted
 
     private final Name circuitName;
-    private final Channel<Resources.Signal> channel;
+    private final Channel<Resources.Sign> channel;
     private final Resources.Resource resource;
 
     /**
@@ -50,7 +50,7 @@ public class ThreadPoolResourceMonitor {
      */
     public ThreadPoolResourceMonitor(
         Name circuitName,
-        Channel<Resources.Signal> channel
+        Channel<Resources.Sign> channel
     ) {
         this.circuitName = Objects.requireNonNull(circuitName, "circuitName cannot be null");
         this.channel = Objects.requireNonNull(channel, "channel cannot be null");
@@ -77,7 +77,7 @@ public class ThreadPoolResourceMonitor {
                 resource.deny();
             } else {
                 // ≥10% idle → GRANT (capacity available)
-                resource.grant(metrics.idleThreads());
+                resource.grant();
             }
 
             if (logger.isDebugEnabled()) {
