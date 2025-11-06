@@ -32,6 +32,12 @@
             <artifactId>humainary-substrates-api</artifactId>
         </dependency>
 
+        <!-- Serventis Extension (Gauges, Counters, etc.) -->
+        <dependency>
+            <groupId>io.humainary.substrates.ext</groupId>
+            <artifactId>humainary-substrates-ext-serventis</artifactId>
+        </dependency>
+
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
