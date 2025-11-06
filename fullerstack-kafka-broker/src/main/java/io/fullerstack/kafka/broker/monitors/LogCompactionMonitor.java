@@ -176,7 +176,7 @@ public class LogCompactionMonitor implements AutoCloseable {
 
             circuit.await();
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Log compaction metrics polling failed", e);
         }
     }
@@ -206,7 +206,7 @@ public class LogCompactionMonitor implements AutoCloseable {
 
         } catch (InstanceNotFoundException e) {
             logger.debug("LogCleanerManager metrics not available (compaction may be disabled)");
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.debug("Failed to query compaction rate: {}", e.getMessage());
         }
     }
@@ -268,7 +268,7 @@ public class LogCompactionMonitor implements AutoCloseable {
 
         } catch (InstanceNotFoundException e) {
             logger.debug("LogCleaner metrics not available (compaction may be disabled)");
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.debug("Failed to query compaction latency: {}", e.getMessage());
         }
     }
@@ -327,7 +327,7 @@ public class LogCompactionMonitor implements AutoCloseable {
 
         } catch (InstanceNotFoundException e) {
             logger.debug("LogCleanerManager dirty ratio not available (compaction may be disabled)");
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.debug("Failed to query dirty ratio: {}", e.getMessage());
         }
     }

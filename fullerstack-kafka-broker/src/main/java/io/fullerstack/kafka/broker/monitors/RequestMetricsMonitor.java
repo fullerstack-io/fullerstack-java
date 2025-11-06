@@ -122,7 +122,7 @@ public class RequestMetricsMonitor {
                     String.format("%.1f", metrics.totalTimeMs()),
                     String.format("%.1f", metrics.errorsPerSec()));
             }
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Failed to emit request signals for {}.{}: {}",
                 metrics.brokerId(),
                 metrics.requestType().name(),

@@ -160,11 +160,26 @@ public class ProducerHealthDetector implements AutoCloseable {
         Monitors.Dimension confidence = determineConfidence();
 
         if (newCondition != currentCondition) {
-            // Condition changed - emit status
-            healthMonitor.status(newCondition, confidence);
+            // Condition changed - emit status using semantic method
+            emitCondition(newCondition, confidence);
             logger.info("Producer {} health status: {} → {} (confidence: {})",
                 producerId, currentCondition, newCondition, confidence);
             currentCondition = newCondition;
+        }
+    }
+
+    /**
+     * Emit condition using RC7 Monitor semantic methods.
+     */
+    private void emitCondition(Monitors.Sign sign, Monitors.Dimension dimension) {
+        switch (sign) {
+            case STABLE -> healthMonitor.stable(dimension);
+            case CONVERGING -> healthMonitor.converging(dimension);
+            case DIVERGING -> healthMonitor.diverging(dimension);
+            case ERRATIC -> healthMonitor.erratic(dimension);
+            case DEGRADED -> healthMonitor.degraded(dimension);
+            case DEFECTIVE -> healthMonitor.defective(dimension);
+            case DOWN -> healthMonitor.down(dimension);
         }
     }
 
@@ -228,7 +243,7 @@ public class ProducerHealthDetector implements AutoCloseable {
         exhaustedCount = 0;
         bufferPressure = false;
         currentCondition = Monitors.Sign.STABLE;
-        healthMonitor.status(Monitors.Sign.STABLE, Monitors.Dimension.CONFIRMED);
+        healthMonitor.stable(Monitors.Dimension.CONFIRMED);
         logger.info("Producer {} health state RESET", producerId);
     }
 

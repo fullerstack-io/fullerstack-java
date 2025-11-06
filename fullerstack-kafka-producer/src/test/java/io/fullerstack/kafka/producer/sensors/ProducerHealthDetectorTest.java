@@ -103,12 +103,8 @@ class ProducerHealthDetectorTest {
         assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DIVERGING);
         assertThat(detector.getOverflowCount()).isEqualTo(1);
 
-        // Verify monitor.status() was called with DIVERGING
-        ArgumentCaptor<Monitors.Sign> conditionCaptor = ArgumentCaptor.forClass(Monitors.Sign.class);
-        ArgumentCaptor<Monitors.Dimension> confidenceCaptor = ArgumentCaptor.forClass(Monitors.Dimension.class);
-        verify(mockHealthMonitor).status(conditionCaptor.capture(), confidenceCaptor.capture());
-
-        assertThat(conditionCaptor.getValue()).isEqualTo(Monitors.Sign.DIVERGING);
+        // Verify monitor.diverging() was called (RC7 semantic method)
+        verify(mockHealthMonitor).diverging(any(Monitors.Dimension.class));
     }
 
     @Test
@@ -162,7 +158,7 @@ class ProducerHealthDetectorTest {
         assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DIVERGING);
         assertThat(detector.getErrorCount()).isEqualTo(1);
 
-        verify(mockHealthMonitor).status(Monitors.Sign.DIVERGING, Monitors.Dimension.TENTATIVE);
+        verify(mockHealthMonitor).diverging(Monitors.Dimension.TENTATIVE);
     }
 
     @Test
@@ -319,7 +315,7 @@ class ProducerHealthDetectorTest {
         assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
 
         // Verify STABLE signal emitted
-        verify(mockHealthMonitor).status(Monitors.Sign.STABLE, Monitors.Dimension.CONFIRMED);
+        verify(mockHealthMonitor).stable(Monitors.Dimension.CONFIRMED);
     }
 
     // ========================================
@@ -332,7 +328,7 @@ class ProducerHealthDetectorTest {
         detector.onErrorIncrement();
 
         // Then - TENTATIVE confidence
-        verify(mockHealthMonitor).status(Monitors.Sign.DIVERGING, Monitors.Dimension.TENTATIVE);
+        verify(mockHealthMonitor).diverging(Monitors.Dimension.TENTATIVE);
     }
 
     @Test
@@ -342,12 +338,8 @@ class ProducerHealthDetectorTest {
             detector.onErrorIncrement();
         }
 
-        // Then - CONFIRMED confidence
-        ArgumentCaptor<Monitors.Dimension> confidenceCaptor = ArgumentCaptor.forClass(Monitors.Dimension.class);
-        verify(mockHealthMonitor, atLeastOnce()).status(any(), confidenceCaptor.capture());
-
-        // Last call should have CONFIRMED
-        assertThat(confidenceCaptor.getValue()).isEqualTo(Monitors.Dimension.CONFIRMED);
+        // Then - CONFIRMED confidence (last emission should be defective with CONFIRMED)
+        verify(mockHealthMonitor, atLeastOnce()).defective(Monitors.Dimension.CONFIRMED);
     }
 
     // ========================================
@@ -383,7 +375,7 @@ class ProducerHealthDetectorTest {
         detector.onErrorIncrement();
 
         // Then - signal emitted
-        verify(mockHealthMonitor, times(1)).status(Monitors.Sign.DIVERGING, Monitors.Dimension.TENTATIVE);
+        verify(mockHealthMonitor, times(1)).diverging(Monitors.Dimension.TENTATIVE);
 
         // When - second error (still DIVERGING, no state change)
         reset(mockHealthMonitor);
@@ -405,7 +397,7 @@ class ProducerHealthDetectorTest {
         detector.onErrorIncrement();
 
         // Then - new signal for DEGRADED
-        verify(mockHealthMonitor).status(eq(Monitors.Sign.DEGRADED), any(Monitors.Dimension.class));
+        verify(mockHealthMonitor).degraded(any(Monitors.Dimension.class));
     }
 
     @Test
@@ -423,7 +415,7 @@ class ProducerHealthDetectorTest {
         }
 
         // Then - new signal for DEFECTIVE
-        verify(mockHealthMonitor).status(eq(Monitors.Sign.DEFECTIVE), any(Monitors.Dimension.class));
+        verify(mockHealthMonitor).defective(any(Monitors.Dimension.class));
     }
 
     // ========================================

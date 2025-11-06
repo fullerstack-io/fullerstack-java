@@ -207,7 +207,7 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
 
         } catch (TimeoutException e) {
             logger.error("AdminClient query timed out", e);
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Reassignment monitoring failed", e);
         }
     }
@@ -370,7 +370,7 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
             );
             Object value = mbsc.getAttribute(name, "Count");
             return value != null ? ((Number) value).longValue() : 0L;
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.debug("Failed to get bytes moved: {}", e.getMessage());
             return 0L;
         }

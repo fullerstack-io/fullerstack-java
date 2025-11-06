@@ -132,7 +132,7 @@ public class LogMetricsMonitor {
                     metrics.numSegments(),
                     metrics.logEndOffset());
             }
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Failed to emit log signals for {}.{}: {}",
                 metrics.brokerId(),
                 metrics.partitionId(),

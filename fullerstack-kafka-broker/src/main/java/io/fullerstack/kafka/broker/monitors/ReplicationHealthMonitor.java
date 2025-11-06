@@ -104,7 +104,7 @@ public class ReplicationHealthMonitor {
             // Emit controller health assessment
             emitControllerHealth(metrics);
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Failed to emit Monitors.Signal for {}: {}",
                 metrics.clusterId(),
                 e.getMessage(),

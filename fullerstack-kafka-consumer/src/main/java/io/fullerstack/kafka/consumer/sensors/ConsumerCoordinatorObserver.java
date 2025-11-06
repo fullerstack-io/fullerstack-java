@@ -237,7 +237,7 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
             logger.error("Not authorized to describe consumer groups", e);
         } catch (TimeoutException e) {
             logger.error("AdminClient query timed out", e);
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Coordinator metrics polling failed", e);
         }
     }
@@ -307,7 +307,7 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
 
             previousHeartbeatLatencies.put(groupId, heartbeatLatency);
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Failed to query heartbeat latency for group {}: {}", groupId, e.getMessage());
             // Emit overflow on error (conservative approach)
             heartbeatGauges.get(groupId).overflow();
@@ -343,7 +343,7 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
                 sessionMonitor.stable(Monitors.Dimension.CONFIRMED);
             }
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.debug("Could not check session timeout for group {}: {}", groupId, e.getMessage());
             // Don't emit signal if we can't measure
         }
@@ -378,7 +378,7 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
                 pollMonitor.stable(Monitors.Dimension.CONFIRMED);
             }
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.debug("Could not check poll interval for group {}: {}", groupId, e.getMessage());
             // Don't emit signal if we can't measure
         }

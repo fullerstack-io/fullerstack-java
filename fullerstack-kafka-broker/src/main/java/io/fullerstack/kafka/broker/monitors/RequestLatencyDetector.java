@@ -124,7 +124,7 @@ public class RequestLatencyDetector {
                     describePattern(history));
             }
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Failed to process gauge signal for {}: {}",
                 entityName,
                 e.getMessage(),

@@ -151,7 +151,7 @@ public class IsrReplicationRouterMonitor {
                 }
             }
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Failed to emit Routers.Signal for {}: {}",
                 deltaMetrics.brokerId(),
                 e.getMessage(),
@@ -192,7 +192,7 @@ public class IsrReplicationRouterMonitor {
                 }
             }
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Failed to emit absolute Routers.Signal for {}: {}",
                 metrics.brokerId(),
                 e.getMessage(),

@@ -270,7 +270,7 @@ public class RouterFlowCircuit implements AutoCloseable {
         try {
             circuit.close();
             logger.debug("RouterFlowCircuit closed");
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             logger.error("Error closing RouterFlowCircuit: {}", e.getMessage(), e);
         }
     }

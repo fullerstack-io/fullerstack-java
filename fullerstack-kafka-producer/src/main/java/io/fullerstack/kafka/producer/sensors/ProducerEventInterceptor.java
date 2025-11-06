@@ -208,7 +208,7 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
             logger.trace("Producer {} CALL for topic {} partition {}",
                 producerId, record.topic(), record.partition());
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             // CRITICAL: Don't let interceptor errors break the producer
             logger.error("Error in ProducerEventInterceptor.onSend for producer {}: {}",
                 producerId, e.getMessage(), e);
@@ -229,7 +229,7 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
      * @param exception Null for successful ack, non-null for failures
      */
     @Override
-    public void onAcknowledgement(RecordMetadata metadata, Exception exception) {
+    public void onAcknowledgement(RecordMetadata metadata, java.lang.Exception exception) {
         try {
             // Calculate latency
             String key = requestKey(metadata.topic(), metadata.partition());
@@ -272,7 +272,7 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
                     exception.getClass().getSimpleName());
             }
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             // CRITICAL: Don't let interceptor errors break the producer
             logger.error("Error in ProducerEventInterceptor.onAcknowledgement for producer {}: {}",
                 producerId, e.getMessage(), e);
