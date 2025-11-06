@@ -281,19 +281,22 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
     Objects.requireNonNull ( egress, "Egress composer cannot be null" );
     Objects.requireNonNull ( pipe, "Output pipe cannot be null" );
 
-    // Create a conduit with Channel< E > as the percept
-    // Use Composer.channel() to get Channel instances instead of plain Pipes
-    Conduit < Channel < E >, E > channelConduit = conduit ( name, Composer.channel () );
+    // RC7 Pattern: Composers receive Channel<E> and return Percepts (Pipe<I> or Pipe<E>)
+    // Create a conduit using Composer.pipe() which internally creates Channel<E>
+    Conduit < Pipe < E >, E > cellConduit = conduit ( name, Composer.pipe () );
 
-    // Get the channel for this cell
-    Channel < E > channel = channelConduit.get ( name );
+    // Create an internal channel by creating it directly (like TransformingConduit does)
+    // Cast to TransformingConduit since that's our implementation type
+    @SuppressWarnings ( "unchecked" )
+    TransformingConduit < Pipe < E >, E > transformingConduit = (TransformingConduit < Pipe < E >, E >) cellConduit;
+    Channel < E > channel = new EmissionChannel <> ( name, transformingConduit, null );
 
-    // Apply the composers to create the input and output pipes
+    // Now apply the composers to the channel to get the pipes
     Pipe < I > inputPipe = ingress.compose ( channel );
     Pipe < E > outputPipe = egress.compose ( channel );
 
-    // CRITICAL: Subscribe the outlet pipe to the conduit so child emissions flow upward
-    channelConduit.subscribe ( cortex().subscriber (
+    // Subscribe the outlet pipe to the conduit so emissions flow upward
+    cellConduit.subscribe ( cortex().subscriber (
       cortex().name ( "cell-outlet-" + name ),
       ( Subject < Channel < E > > subject, Registrar < E > registrar ) -> {
         registrar.register ( emission -> pipe.emit ( emission ) );
@@ -302,7 +305,7 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
 
     // Cast conduit for SimpleCell (it expects Conduit<?, E>)
     @SuppressWarnings ( "unchecked" )
-    Conduit < ?, E > cellConduit = (Conduit < ?, E >) channelConduit;
+    Conduit < ?, E > conduit = (Conduit < ?, E >) cellConduit;
 
     // Create SimpleCell with explicit type parameters and composers
     return new SimpleCell < I, E > (
@@ -310,7 +313,7 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
       name,
       inputPipe,
       outputPipe,
-      cellConduit,
+      conduit,
       ingress,        // Pass ingress composer for child creation
       egress,         // Pass egress composer for child creation
       circuitSubject
@@ -336,7 +339,7 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
   }
 
   @Override
-  public < E > Pipe < E > pipe ( Pipe < ? super E > target, Consumer < ? super Flow < E > > configurer ) {
+  public < E > Pipe < E > pipe ( Pipe < ? super E > target, Consumer < Flow < E > > configurer ) {
     Objects.requireNonNull ( target, "Target pipe cannot be null" );
     Objects.requireNonNull ( configurer, "Flow configurer cannot be null" );
     // TODO: Implement Flow transformations before dispatching to target
@@ -345,13 +348,13 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
   }
 
   @Override
-  public < P, E > Conduit < P, E > conduit ( Composer < E, ? extends P > composer ) {
+  public < P extends Percept, E > Conduit < P, E > conduit ( Composer < E, ? extends P > composer ) {
     // Generate unique name for unnamed conduits to avoid caching collisions
     return conduit ( HierarchicalName.of ( "conduit-" + UuidIdentifier.generate ().toString () ), composer );
   }
 
   @Override
-  public < P, E > Conduit < P, E > conduit ( Name name, Composer < E, ? extends P > composer ) {
+  public < P extends Percept, E > Conduit < P, E > conduit ( Name name, Composer < E, ? extends P > composer ) {
     checkClosed ();
     Objects.requireNonNull ( name, "Conduit name cannot be null" );
     Objects.requireNonNull ( composer, "Composer cannot be null" );
@@ -391,7 +394,7 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
   }
 
   @Override
-  public < P, E > Conduit < P, E > conduit ( Name name, Composer < E, ? extends P > composer, Consumer < ? super Flow < E > > configurer ) {
+  public < P extends Percept, E > Conduit < P, E > conduit ( Name name, Composer < E, ? extends P > composer, Consumer < Flow < E > > configurer ) {
     checkClosed ();
     Objects.requireNonNull ( name, "Conduit name cannot be null" );
     Objects.requireNonNull ( composer, "Composer cannot be null" );
@@ -412,10 +415,8 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
 
     // COLD PATH: Create new conduit with flow configurer
     // Use simple name - hierarchy is implicit through parent Subject references
-    //  Cast needed for contra-variance (Consumer<? super Flow< E >> -> Consumer< Flow< E >>)
-    @SuppressWarnings ( "unchecked" )
     Conduit < P, E > newConduit = new TransformingConduit < P, E > (
-      name, composer, this, (Consumer < Flow < E > >) configurer
+      name, composer, this, configurer
     );
 
     // Add to slot structure

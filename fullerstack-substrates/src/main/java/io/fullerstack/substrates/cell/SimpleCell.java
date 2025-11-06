@@ -118,10 +118,13 @@ public class SimpleCell < I, E > implements Cell < I, E > {
   @Override
   public Cell < I, E > get ( Name name ) {
     return children.computeIfAbsent ( name, n -> {
-      // Get Channel<E> from conduit (conduit.get() returns Pipe but it's actually a Channel)
-      // A Channel is a named Pipe
+      // RC7 Pattern: Create Channel directly like Circuit.cell() does
+      // Conduit.get() returns Percept (Pipe), not Channel
+      // We need to create Channel and pass it to composers
       @SuppressWarnings ( "unchecked" )
-      Channel < E > childChannel = (Channel < E >) conduit.get ( n );
+      io.fullerstack.substrates.conduit.TransformingConduit < ?, E > transformingConduit =
+        (io.fullerstack.substrates.conduit.TransformingConduit < ?, E >) conduit;
+      Channel < E > childChannel = new io.fullerstack.substrates.channel.EmissionChannel <> ( n, transformingConduit, null );
 
       // Apply ingress composer: Channel<E> -> Pipe<I>
       Pipe < I > childInputPipe = ingressComposer.compose ( childChannel );

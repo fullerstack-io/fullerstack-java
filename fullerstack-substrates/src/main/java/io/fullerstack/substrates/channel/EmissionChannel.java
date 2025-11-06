@@ -113,7 +113,7 @@ public class EmissionChannel < E > implements Channel < E > {
   }
 
   @Override
-  public Pipe < E > pipe ( Consumer < ? super Flow < E > > configurer ) {
+  public Pipe < E > pipe ( Consumer < Flow < E > > configurer ) {
     Objects.requireNonNull ( configurer, "Flow configurer cannot be null" );
 
     // Create a FlowRegulator and apply the Consumer transformations

@@ -128,7 +128,7 @@ public class ManagedScope implements Scope {
     for ( Scope scope : childScopes.values () ) {
       try {
         scope.close ();
-      } catch ( Exception e ) {
+      } catch ( java.lang.Exception e ) {
         // Log but continue closing others
       }
     }
@@ -138,7 +138,7 @@ public class ManagedScope implements Scope {
     resources.forEach ( resource -> {
       try {
         resource.close ();
-      } catch ( Exception e ) {
+      } catch ( java.lang.Exception e ) {
         // Log but continue closing others
       }
     } );

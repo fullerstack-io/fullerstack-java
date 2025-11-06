@@ -90,7 +90,7 @@ public class AutoClosingResource < R extends Resource > implements Closure < R >
     } finally {
       try {
         resource.close ();
-      } catch ( Exception e ) {
+      } catch ( java.lang.Exception e ) {
         // Ignore close errors - resource may already be closed by scope
       } finally {
         // Run cleanup callback (e.g., clear cache in Scope)

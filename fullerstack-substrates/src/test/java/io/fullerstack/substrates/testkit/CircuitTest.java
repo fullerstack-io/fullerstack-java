@@ -139,7 +139,7 @@ final class CircuitTest
 
           latch.countDown ();
 
-        } catch ( final Exception ignored ) {
+        } catch ( final java.lang.Exception ignored ) {
         }
       } );
 

@@ -23,7 +23,7 @@ class HumainaryBlogExampleTest {
    * Subject[name=cache.hit,type=CHANNEL,id=4fdbf813-2be8-4905-af70-5406d3e35612] -> 1
    */
   @Test
-  void shouldMatchBlogExample_SubjectHierarchy () throws Exception {
+  void shouldMatchBlogExample_SubjectHierarchy () throws java.lang.Exception {
     Cortex cortex = CortexRuntime.cortex ();
 
     // Exact blog example code
@@ -97,7 +97,7 @@ class HumainaryBlogExampleTest {
    * Output: network/5g/region/eu-nl/pop/ams
    */
   @Test
-  void shouldMatchBlogExample_NameHierarchy () throws Exception {
+  void shouldMatchBlogExample_NameHierarchy () throws java.lang.Exception {
     Cortex cortex = CortexRuntime.cortex ();
 
     // Blog example: naming percepts with hierarchical names

@@ -150,25 +150,25 @@ public class CortexRuntime extends CortexProvider implements Cortex {
   }
 
   @Override
-  public < E > Pipe < E > pipe ( Consumer < ? super E > consumer ) {
-    // Factory method for creating a pipe that routes to a consumer
+  public < E > Pipe < E > pipe ( Observer < ? super E > observer ) {
+    // Factory method for creating a pipe that routes to an observer
     return new Pipe < E > () {
       @Override
       public void emit ( E value ) {
-        consumer.accept ( value );
+        observer.observe ( value );
       }
 
       @Override
       public void flush () {
-        // No-op: consumer has no buffering
+        // No-op: observer has no buffering
       }
     };
   }
 
   @Override
-  public < E > Pipe < E > pipe ( Class < E > type, Consumer < ? super E > consumer ) {
-    // Factory method for creating a typed pipe that routes to a consumer
-    return pipe ( consumer );  // Type is just for compile-time safety
+  public < E > Pipe < E > pipe ( Class < E > type, Observer < ? super E > observer ) {
+    // Factory method for creating a typed pipe that routes to an observer
+    return pipe ( observer );  // Type is just for compile-time safety
   }
 
   @Override

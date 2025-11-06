@@ -68,7 +68,7 @@ import java.util.function.Consumer;
  * @param < E > the emission type (e.g., MonitorSignal)
  */
 @Getter
-public class TransformingConduit < P, E > implements Conduit < P, E > {
+public class TransformingConduit < P extends Percept, E > implements Conduit < P, E > {
 
   private final Circuit                     circuit; // Parent Circuit in hierarchy (provides scheduling + Subject)
   private final Subject                     conduitSubject;
@@ -257,18 +257,18 @@ public class TransformingConduit < P, E > implements Conduit < P, E > {
         }
 
         @Override
-        public void register ( Consumer < ? super E > consumer ) {
-          //  Convenience method for Consumer registration
-          // Convert Consumer to anonymous Pipe and register it
+        public void register ( Observer < ? super E > observer ) {
+          //  Convenience method for Observer registration
+          // Convert Observer to anonymous Pipe and register it
           register ( new Pipe < E > () {
             @Override
             public void emit ( E emission ) {
-              consumer.accept ( emission );
+              observer.observe ( emission );
             }
 
             @Override
             public void flush () {
-              // No-op: Consumer has no buffering
+              // No-op: Observer has no buffering
             }
           } );
         }
@@ -328,17 +328,17 @@ public class TransformingConduit < P, E > implements Conduit < P, E > {
         }
 
         @Override
-        public void register ( Consumer < ? super E > consumer ) {
-          //  Convert Consumer to Pipe (can't use lambda - Pipe not functional)
+        public void register ( Observer < ? super E > observer ) {
+          //  Convert Observer to Pipe (can't use lambda - Pipe not functional)
           register ( new Pipe < E > () {
             @Override
             public void emit ( E emission ) {
-              consumer.accept ( emission );
+              observer.observe ( emission );
             }
 
             @Override
             public void flush () {
-              // No-op: Consumer has no buffering
+              // No-op: Observer has no buffering
             }
           } );
         }

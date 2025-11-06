@@ -269,7 +269,7 @@ public class FlowRegulator < E > implements Flow < E > {
   }
 
   @Override
-  public Flow < E > sift ( Comparator < ? super E > comparator, Consumer < ? super Sift < E > > configurer ) {
+  public Flow < E > sift ( Comparator < ? super E > comparator, Consumer < Sift < E > > configurer ) {
     Objects.requireNonNull ( comparator, "Comparator cannot be null" );
     Objects.requireNonNull ( configurer, "Configurer cannot be null" );
 
