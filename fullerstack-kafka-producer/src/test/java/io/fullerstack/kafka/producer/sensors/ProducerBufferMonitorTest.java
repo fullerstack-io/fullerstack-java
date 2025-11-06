@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.substrates.ext.serventis.Counters.Counter;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
-import io.humainary.substrates.ext.serventis.Queues.Queue;
+import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Queues.Queue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

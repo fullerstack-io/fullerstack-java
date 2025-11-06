@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.broker.monitors;
 
 import io.fullerstack.kafka.broker.models.NetworkMetrics;
-import io.humainary.substrates.ext.serventis.Counters;
+import io.humainary.substrates.ext.serventis.ext.Counters;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import org.slf4j.Logger;
@@ -12,7 +12,7 @@ import java.util.Objects;
 import static io.fullerstack.substrates.CortexRuntime.cortex;
 
 /**
- * Emits Counters.Signal for network I/O metrics using Serventis RC1 vocabulary.
+ * Emits Counters.Sign for network I/O metrics using Serventis RC1 vocabulary.
  *
  * <p><b>Layer 2: Serventis Signal Emission</b>
  * This observer emits signals with Counters API vocabulary (INCREMENT/OVERFLOW), NOT interpretations.
@@ -88,7 +88,7 @@ public class NetworkMetricsObserver {
     }
 
     /**
-     * Emits Counters.Signal for network I/O metrics.
+     * Emits Counters.Sign for network I/O metrics.
      *
      * @param metrics Network metrics from JMX collector
      * @throws NullPointerException if metrics is null

@@ -1,9 +1,9 @@
 package io.fullerstack.kafka.broker.monitors;
 
 import io.fullerstack.kafka.broker.models.RequestMetrics;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Probes;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Probes;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import org.slf4j.Logger;
@@ -133,7 +133,7 @@ public class RequestMetricsMonitor {
     }
 
     /**
-     * Emits Counters.Signal for request rate.
+     * Emits Counters.Sign for request rate.
      */
     private void emitRequestRateSignals(RequestMetrics metrics) {
         double currentRate = metrics.requestsPerSec();
@@ -147,7 +147,7 @@ public class RequestMetricsMonitor {
     }
 
     /**
-     * Emits Gauges.Signal for request latency.
+     * Emits Gauges.Sign for request latency.
      */
     private void emitLatencySignals(RequestMetrics metrics) {
         double currentLatency = metrics.totalTimeMs();
@@ -166,7 +166,7 @@ public class RequestMetricsMonitor {
     }
 
     /**
-     * Emits Gauges.Signal for queue times (request and response queues).
+     * Emits Gauges.Sign for queue times (request and response queues).
      */
     private void emitQueueTimeSignals(RequestMetrics metrics) {
         // Request queue time
@@ -185,7 +185,7 @@ public class RequestMetricsMonitor {
     }
 
     /**
-     * Emits Counters.Signal and Probes.Signal for errors.
+     * Emits Counters.Sign and Probes.Signal for errors.
      */
     private void emitErrorSignals(RequestMetrics metrics) {
         if (metrics.errorsPerSec() > 0) {

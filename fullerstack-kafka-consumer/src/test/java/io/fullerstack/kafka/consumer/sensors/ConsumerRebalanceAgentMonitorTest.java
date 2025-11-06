@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.consumer.sensors;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.humainary.substrates.ext.serventis.Agents;
-import io.humainary.substrates.ext.serventis.Agents.Agent;
+import io.humainary.substrates.ext.serventis.ext.Agents;
+import io.humainary.substrates.ext.serventis.ext.Agents.Agent;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -101,11 +101,11 @@ class ConsumerRebalanceAgentMonitorTest {
         assertSignal(2, "test-consumer", Agents.Signal.PROMISE);      // Consumer: "I commit"
         assertSignal(3, "coordinator-test-group", Agents.Signal.ACCEPTED);  // Coordinator: "Confirmed"
 
-        // Verify directions
-        assertThat(capturedSignals.get(0).signal.direction()).isEqualTo(Agents.Direction.OUTBOUND);
-        assertThat(capturedSignals.get(1).signal.direction()).isEqualTo(Agents.Direction.INBOUND);
-        assertThat(capturedSignals.get(2).signal.direction()).isEqualTo(Agents.Direction.OUTBOUND);
-        assertThat(capturedSignals.get(3).signal.direction()).isEqualTo(Agents.Direction.INBOUND);
+        // Verify directions: OUTBOUND (consumer INQUIRE), INBOUND (coordinator OFFERED), OUTBOUND (consumer PROMISE), INBOUND (coordinator ACCEPTED)
+        assertThat(capturedSignals.get(0).signal.dimension()).isEqualTo(Agents.Dimension.OUTBOUND);
+        assertThat(capturedSignals.get(1).signal.dimension()).isEqualTo(Agents.Dimension.INBOUND);
+        assertThat(capturedSignals.get(2).signal.dimension()).isEqualTo(Agents.Dimension.OUTBOUND);
+        assertThat(capturedSignals.get(3).signal.dimension()).isEqualTo(Agents.Dimension.INBOUND);
     }
 
     @Test
@@ -122,7 +122,7 @@ class ConsumerRebalanceAgentMonitorTest {
         // Then
         assertThat(capturedSignals).hasSize(1);
         assertSignal(0, "test-consumer", Agents.Signal.INQUIRE);
-        assertThat(capturedSignals.get(0).signal.direction()).isEqualTo(Agents.Direction.OUTBOUND);
+        assertThat(capturedSignals.get(0).signal.dimension()).isEqualTo(Agents.Dimension.OUTBOUND);
     }
 
     @Test
@@ -143,10 +143,10 @@ class ConsumerRebalanceAgentMonitorTest {
         assertSignal(1, "test-consumer", Agents.Signal.PROMISE);
         assertSignal(2, "coordinator-test-group", Agents.Signal.ACCEPTED);
 
-        // Verify directions: INBOUND, OUTBOUND, INBOUND
-        assertThat(capturedSignals.get(0).signal.direction()).isEqualTo(Agents.Direction.INBOUND);
-        assertThat(capturedSignals.get(1).signal.direction()).isEqualTo(Agents.Direction.OUTBOUND);
-        assertThat(capturedSignals.get(2).signal.direction()).isEqualTo(Agents.Direction.INBOUND);
+        // Verify directions: INBOUND (coordinator OFFERED), OUTBOUND (consumer PROMISE), INBOUND (coordinator ACCEPTED)
+        assertThat(capturedSignals.get(0).signal.dimension()).isEqualTo(Agents.Dimension.INBOUND);
+        assertThat(capturedSignals.get(1).signal.dimension()).isEqualTo(Agents.Dimension.OUTBOUND);
+        assertThat(capturedSignals.get(2).signal.dimension()).isEqualTo(Agents.Dimension.INBOUND);
     }
 
     @Test
@@ -200,7 +200,7 @@ class ConsumerRebalanceAgentMonitorTest {
     }
 
     // ========================================
-    // Direction Tests (OUTBOUND vs INBOUND)
+    // Aspect Tests (OUTBOUND vs INBOUND)
     // ========================================
 
     @Test
@@ -224,9 +224,9 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // All consumer signals are OUTBOUND (self-reporting)
         consumerSignals.forEach(event -> {
-            assertThat(event.signal.direction())
+            assertThat(event.signal.dimension())
                 .as("Consumer signal %s should be OUTBOUND", event.signal.sign())
-                .isEqualTo(Agents.Direction.OUTBOUND);
+                .isEqualTo(Agents.Dimension.OUTBOUND);
         });
     }
 
@@ -250,9 +250,9 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // All coordinator signals are INBOUND (observed by consumer)
         coordinatorSignals.forEach(event -> {
-            assertThat(event.signal.direction())
+            assertThat(event.signal.dimension())
                 .as("Coordinator signal %s should be INBOUND", event.signal.sign())
-                .isEqualTo(Agents.Direction.INBOUND);
+                .isEqualTo(Agents.Dimension.INBOUND);
         });
     }
 
@@ -455,7 +455,7 @@ class ConsumerRebalanceAgentMonitorTest {
 
         @Override
         public String toString() {
-            return subjectName + ":" + signal.sign() + ":" + signal.direction();
+            return subjectName + ":" + signal.sign() + ":" + signal.dimension();
         }
     }
 }

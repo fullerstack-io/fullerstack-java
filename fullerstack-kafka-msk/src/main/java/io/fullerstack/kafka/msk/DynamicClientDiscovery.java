@@ -203,7 +203,7 @@ public class DynamicClientDiscovery implements AutoCloseable {
   /**
    * Start Epic 1's ProducerBufferMonitor for a new producer.
    * <p>
-   * Epic 1's monitor emits Queues.Signal via queue.overflow() (RC1 API).
+   * Epic 1's monitor emits Queues.Sign via queue.overflow() (RC1 API).
    */
   private void startProducerMonitoring(String producerId) {
     try {
@@ -224,7 +224,7 @@ public class DynamicClientDiscovery implements AutoCloseable {
   /**
    * Start Epic 1's ConsumerLagMonitor for a new consumer group.
    * <p>
-   * Epic 1's monitor emits Queues.Signal via queue.underflow() (RC1 API).
+   * Epic 1's monitor emits Queues.Sign via queue.underflow() (RC1 API).
    */
   private void startConsumerMonitoring(String groupId) {
     try {

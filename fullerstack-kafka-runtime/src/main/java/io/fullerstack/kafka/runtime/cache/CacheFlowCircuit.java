@@ -1,12 +1,13 @@
 package io.fullerstack.kafka.runtime.cache;
 
-import io.humainary.substrates.ext.serventis.Caches;
-import io.humainary.substrates.ext.serventis.Caches.Cache;
+import io.humainary.substrates.ext.serventis.ext.Caches;
+import io.humainary.substrates.ext.serventis.ext.Caches.Cache;
 import io.humainary.substrates.api.Substrates.*;
 
 import java.util.function.BiConsumer;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import io.humainary.substrates.api.Substrates;
+import static io.humainary.substrates.api.Substrates.*;
 
 /**
  * Circuit for cache interaction signal monitoring (RC5 Serventis API).
@@ -67,7 +68,7 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  */
 public class CacheFlowCircuit implements AutoCloseable {
 
-  private final Cortex cortex;
+  
   private final Circuit circuit;
   private final Conduit < Cache, Caches.Sign > conduit;
 
@@ -77,15 +78,12 @@ public class CacheFlowCircuit implements AutoCloseable {
    * Initializes circuit "cache.flow" with a conduit using {@link Caches#composer}.
    */
   public CacheFlowCircuit () {
-    // Get Cortex instance
-    this.cortex = cortex ();
-
-    // Create circuit
-    this.circuit = cortex.circuit ( cortex.name ( "cache.flow" ) );
+    // Create circuit using static Cortex methods
+    this.circuit = Substrates.cortex().circuit ( Substrates.cortex().name ( "cache.flow" ) );
 
     // Create conduit with Caches composer (returns Cache instruments)
     this.conduit = circuit.conduit (
-      cortex.name ( "cache-monitoring" ),
+      Substrates.cortex().name ( "cache-monitoring" ),
       Caches::composer
     );
   }
@@ -97,7 +95,7 @@ public class CacheFlowCircuit implements AutoCloseable {
    * @return Cache instrument for emitting cache signals via method calls
    */
   public Cache cacheFor ( String entityName ) {
-    return conduit.get ( cortex.name ( entityName ) );
+    return conduit.get ( Substrates.cortex().name ( entityName ) );
   }
 
   /**
@@ -107,7 +105,7 @@ public class CacheFlowCircuit implements AutoCloseable {
    * @param subscriber subscriber function receiving Subject and Registrar
    */
   public void subscribe ( String name, BiConsumer < Subject < Channel < Caches.Sign > >, Registrar < Caches.Sign > > subscriber ) {
-    conduit.subscribe ( cortex.subscriber ( cortex.name ( name ), subscriber ) );
+    conduit.subscribe ( Substrates.cortex().subscriber ( Substrates.cortex().name ( name ), subscriber ) );
   }
 
   /**

@@ -2,12 +2,12 @@ package io.fullerstack.kafka.consumer.sensors;
 
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Conduit;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Counters.Counter;
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
-import io.humainary.substrates.ext.serventis.Monitors;
-import io.humainary.substrates.ext.serventis.Monitors.Monitor;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Monitors.Monitor;
 import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.common.ConsumerGroupState;
 import org.apache.kafka.common.KafkaFuture;

@@ -1,11 +1,11 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.substrates.ext.serventis.Monitors;
-import io.humainary.substrates.ext.serventis.Monitors.Monitor;
-import io.humainary.substrates.ext.serventis.Queues;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Probes;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Monitors.Monitor;
+import io.humainary.substrates.ext.serventis.ext.Queues;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Probes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +68,7 @@ public class ProducerHealthDetector implements AutoCloseable {
     private int latencyOverflowCount = 0;
     private int exhaustedCount = 0;
     private boolean bufferPressure = false;
-    private Monitors.Condition currentCondition = Monitors.Condition.STABLE;
+    private Monitors.Sign currentCondition = Monitors.Sign.STABLE;
 
     /**
      * Creates a new producer health detector.
@@ -156,8 +156,8 @@ public class ProducerHealthDetector implements AutoCloseable {
      * Assesses overall producer health based on accumulated signals.
      */
     private void assessHealth() {
-        Monitors.Condition newCondition = determineCondition();
-        Monitors.Confidence confidence = determineConfidence();
+        Monitors.Sign newCondition = determineCondition();
+        Monitors.Dimension confidence = determineConfidence();
 
         if (newCondition != currentCondition) {
             // Condition changed - emit status
@@ -168,54 +168,54 @@ public class ProducerHealthDetector implements AutoCloseable {
         }
     }
 
-    private Monitors.Condition determineCondition() {
+    private Monitors.Sign determineCondition() {
         // DEFECTIVE: Critical failure (sustained errors + buffer overflow)
         if (errorCount >= ERROR_THRESHOLD_DEFECTIVE ||
             (errorCount >= ERROR_THRESHOLD_DEGRADED && overflowCount >= OVERFLOW_THRESHOLD_DEGRADED)) {
-            return Monitors.Condition.DEFECTIVE;
+            return Monitors.Sign.DEFECTIVE;
         }
 
         // DEGRADED: Significant issues
         if (errorCount >= ERROR_THRESHOLD_DEGRADED ||
             overflowCount >= OVERFLOW_THRESHOLD_DEGRADED ||
             exhaustedCount >= 2) {
-            return Monitors.Condition.DEGRADED;
+            return Monitors.Sign.DEGRADED;
         }
 
         // DIVERGING: Early warning signs
         if (errorCount > 0 ||
             latencyOverflowCount >= LATENCY_THRESHOLD_DIVERGING ||
             bufferPressure) {
-            return Monitors.Condition.DIVERGING;
+            return Monitors.Sign.DIVERGING;
         }
 
         // CONVERGING: Recovering (decreasing issues)
-        if (currentCondition != Monitors.Condition.STABLE &&
+        if (currentCondition != Monitors.Sign.STABLE &&
             errorCount == 0 &&
             overflowCount == 0 &&
             latencyOverflowCount == 0) {
-            return Monitors.Condition.CONVERGING;
+            return Monitors.Sign.CONVERGING;
         }
 
         // STABLE: Normal operation
-        return Monitors.Condition.STABLE;
+        return Monitors.Sign.STABLE;
     }
 
-    private Monitors.Confidence determineConfidence() {
+    private Monitors.Dimension determineConfidence() {
         // HIGH: Clear evidence of condition
         if (errorCount >= ERROR_THRESHOLD_DEFECTIVE ||
             overflowCount >= OVERFLOW_THRESHOLD_DEGRADED + 2) {
-            return Monitors.Confidence.CONFIRMED;
+            return Monitors.Dimension.CONFIRMED;
         }
 
         // MEDIUM: Moderate evidence
         if (errorCount >= ERROR_THRESHOLD_DEGRADED ||
             overflowCount >= OVERFLOW_THRESHOLD_DEGRADED) {
-            return Monitors.Confidence.MEASURED;
+            return Monitors.Dimension.MEASURED;
         }
 
         // LOW: Initial signals
-        return Monitors.Confidence.TENTATIVE;
+        return Monitors.Dimension.TENTATIVE;
     }
 
     /**
@@ -227,8 +227,8 @@ public class ProducerHealthDetector implements AutoCloseable {
         latencyOverflowCount = 0;
         exhaustedCount = 0;
         bufferPressure = false;
-        currentCondition = Monitors.Condition.STABLE;
-        healthMonitor.status(Monitors.Condition.STABLE, Monitors.Confidence.CONFIRMED);
+        currentCondition = Monitors.Sign.STABLE;
+        healthMonitor.status(Monitors.Sign.STABLE, Monitors.Dimension.CONFIRMED);
         logger.info("Producer {} health state RESET", producerId);
     }
 
@@ -253,7 +253,7 @@ public class ProducerHealthDetector implements AutoCloseable {
         return latencyOverflowCount;
     }
 
-    public Monitors.Condition getCurrentCondition() {
+    public Monitors.Sign getCurrentCondition() {
         return currentCondition;
     }
 }

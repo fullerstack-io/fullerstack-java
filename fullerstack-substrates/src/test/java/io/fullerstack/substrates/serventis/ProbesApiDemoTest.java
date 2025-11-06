@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Probes.*;
+import static io.humainary.substrates.ext.serventis.ext.Probes.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Probes;
+import io.humainary.substrates.ext.serventis.ext.Probes;
 
 /**
  * Demonstration of the Probes API (RC6) - Communication operation observability.
@@ -24,8 +24,8 @@ import io.humainary.substrates.ext.serventis.Probes;
  * <p>
  * Key Concepts:
  * - Signs represent operation types (CONNECT, TRANSMIT, RECEIVE, etc.)
- * - Orientations represent perspective (RELEASE = self, RECEIPT = observed)
- * - Signals combine Sign + Orientation for complete observability
+ * - Polaritys represent perspective (RELEASE = self, RECEIPT = observed)
+ * - Signals combine Sign + Polarity for complete observability
  * <p>
  * Communication Signs (7):
  * - CONNECT/CONNECTED: Connection establishment
@@ -113,7 +113,7 @@ class ProbesApiDemoTest {
             cortex().name("observer"),
             (Subject<Channel<Signal>> subject, Registrar<Signal> registrar) -> {
                 registrar.register(signal -> {
-                    String perspective = signal.orientation() == Orientation.RELEASE ? "SELF" : "OBSERVED";
+                    String perspective = signal.dimension() == Dimension.RELEASE ? "SELF" : "OBSERVED";
                     timeline.add(subject.name() + ":" + signal.sign() + ":" + perspective);
                 });
             }
@@ -173,8 +173,8 @@ class ProbesApiDemoTest {
 
         // ASSERT: Both failure signals captured
         assertThat(failures).hasSize(2);
-        assertThat(failures.get(0).orientation()).isEqualTo(Orientation.RELEASE);
-        assertThat(failures.get(1).orientation()).isEqualTo(Orientation.RECEIPT);
+        assertThat(failures.get(0).dimension()).isEqualTo(Dimension.RELEASE);
+        assertThat(failures.get(1).dimension()).isEqualTo(Dimension.RECEIPT);
     }
 
     @Test
@@ -344,7 +344,7 @@ class ProbesApiDemoTest {
 
         // ASSERT: All observations are RECEIPT (observed)
         assertThat(observations).allMatch(
-            signal -> signal.orientation() == Orientation.RECEIPT
+            signal -> signal.dimension() == Dimension.RECEIPT
         );
     }
 
@@ -362,7 +362,7 @@ class ProbesApiDemoTest {
             (Subject<Channel<Signal>> subject, Registrar<Signal> registrar) -> {
                 registrar.register(signal -> {
                     String actor = subject.name().toString().contains("client") ? "CLIENT" : "SERVER";
-                    communication.add(actor + ":" + signal.sign() + ":" + signal.orientation());
+                    communication.add(actor + ":" + signal.sign() + ":" + signal.dimension());
                 });
             }
         ));
@@ -390,7 +390,7 @@ class ProbesApiDemoTest {
 
     @Test
     @DisplayName("All 7 signs and 2 orientations available")
-    void allSignsAndOrientationsAvailable() {
+    void allSignsAndPolaritysAvailable() {
         // Verify complete API surface
 
         Probe probe = probes.get(cortex().name("test-probe"));
@@ -431,11 +431,11 @@ class ProbesApiDemoTest {
         );
 
         // ASSERT: Both orientations exist
-        Orientation[] allOrientations = Orientation.values();
-        assertThat(allOrientations).hasSize(2);
-        assertThat(allOrientations).contains(
-            Orientation.RELEASE,
-            Orientation.RECEIPT
+        Dimension[] allDimensions = Dimension.values();
+        assertThat(allDimensions).hasSize(2);
+        assertThat(allDimensions).contains(
+            Dimension.RELEASE,
+            Dimension.RECEIPT
         );
 
         // ASSERT: All 14 signals exist (7 signs × 2 orientations)
@@ -459,13 +459,13 @@ class ProbesApiDemoTest {
         ));
 
         // ACT: Emit a signal
-        probe.transmit();  // TRANSMIT (Sign.TRANSMIT, Orientation.RELEASE)
+        probe.transmit();  // TRANSMIT (Sign.TRANSMIT, Dimension.RELEASE)
 
         circuit.await();
 
         // ASSERT: Signal properties accessible
         Signal signal = capturedSignal.get();
         assertThat(signal.sign()).isEqualTo(Sign.TRANSMIT);
-        assertThat(signal.orientation()).isEqualTo(Orientation.RELEASE);
+        assertThat(signal.dimension()).isEqualTo(Dimension.RELEASE);
     }
 }

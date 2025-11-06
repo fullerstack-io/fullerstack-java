@@ -2,7 +2,7 @@ package io.fullerstack.kafka.broker.monitors;
 
 import io.fullerstack.kafka.broker.models.ThreadPoolMetrics;
 import io.fullerstack.kafka.broker.models.ThreadPoolType;
-import io.humainary.substrates.ext.serventis.Resources;
+import io.humainary.substrates.ext.serventis.ext.Resources;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Pipe;

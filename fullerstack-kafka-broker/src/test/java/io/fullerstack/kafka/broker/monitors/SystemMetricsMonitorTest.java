@@ -4,7 +4,7 @@ import io.fullerstack.kafka.broker.models.SystemMetrics;
 import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pipe;
-import io.humainary.substrates.ext.serventis.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Routers.*;
+import static io.humainary.substrates.ext.serventis.ext.Routers.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Routers;
+import io.humainary.substrates.ext.serventis.ext.Routers;
 
 /**
  * Demonstration of the Routers API (RC6) - Network packet routing observability.

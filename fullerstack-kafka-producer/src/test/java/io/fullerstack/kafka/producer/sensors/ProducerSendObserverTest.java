@@ -1,9 +1,9 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.substrates.ext.serventis.Counters.Counter;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
-import io.humainary.substrates.ext.serventis.Probes.Probe;
-import io.humainary.substrates.ext.serventis.Services.Service;
+import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Probes.Probe;
+import io.humainary.substrates.ext.serventis.ext.Services.Service;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

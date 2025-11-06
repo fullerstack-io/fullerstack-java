@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.consumer.sensors;
 
-import io.humainary.substrates.ext.serventis.Queues.Queue;
+import io.humainary.substrates.ext.serventis.ext.Queues.Queue;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.OffsetSpec;
@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
  * <ul>
  *   <li><b>UNDERFLOW (severely lagging)</b> (≥10,000 messages): {@code queue.underflow(lag)}</li>
  *   <li><b>UNDERFLOW (lagging)</b> (1,000-10,000 messages): {@code queue.underflow(lag)}</li>
- *   <li><b>TAKE (normal)</b> (<1,000 messages): {@code queue.take()}</li>
+ *   <li><b>TAKE (normal)</b> (<1,000 messages): {@code queue.dequeue()}</li>
  * </ul>
  *
  * <h3>Usage:</h3>

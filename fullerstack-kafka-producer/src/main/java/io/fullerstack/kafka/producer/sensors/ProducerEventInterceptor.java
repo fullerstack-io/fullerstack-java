@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.substrates.ext.serventis.Probes;
-import io.humainary.substrates.ext.serventis.Services;
+import io.humainary.substrates.ext.serventis.ext.Probes;
+import io.humainary.substrates.ext.serventis.ext.Services;
 import io.humainary.substrates.api.Substrates.*;
 import org.apache.kafka.clients.producer.ProducerInterceptor;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -197,7 +197,7 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
 
             // Layer 1 (Probes): Raw observation - attempting to send
             if (probe != null) {
-                probe.send(Probes.Origin.CLIENT, Probes.Outcome.SUCCESS);
+                probe.transmitted();
             }
 
             // Layer 2 (Services): Service-level semantics - calling broker
@@ -243,7 +243,7 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
 
                 // Layer 1 (Probes): Raw observation - received acknowledgement
                 if (probe != null) {
-                    probe.receive(Probes.Origin.CLIENT, Probes.Outcome.SUCCESS);
+                    probe.received();
                 }
 
                 // Layer 2 (Services): Service-level semantics - call succeeded
@@ -259,7 +259,7 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
 
                 // Layer 1 (Probes): Raw observation - send failed
                 if (probe != null) {
-                    probe.send(Probes.Origin.CLIENT, Probes.Outcome.FAILURE);
+                    probe.failed();
                 }
 
                 // Layer 2 (Services): Service-level semantics - call failed

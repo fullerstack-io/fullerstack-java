@@ -10,11 +10,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Monitors.*;
+import static io.humainary.substrates.ext.serventis.ext.Monitors.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Monitors;
-import static io.humainary.substrates.ext.serventis.Monitors.Confidence.*;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import static io.humainary.substrates.ext.serventis.ext.Monitors.Dimension.*;
 
 /**
  * Demonstration of the Monitors API (RC6) - Condition assessment (ORIENT phase).
@@ -62,7 +62,7 @@ class MonitorsApiDemoTest {
         // ASSERT
         assertThat(signals).hasSize(1);
         assertThat(signals.get(0).sign()).isEqualTo(Sign.STABLE);
-        assertThat(signals.get(0).confidence()).isEqualTo(CONFIRMED);
+        assertThat(signals.get(0).dimension()).isEqualTo(CONFIRMED);
     }
 
     @Test

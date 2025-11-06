@@ -4,8 +4,8 @@ import io.fullerstack.kafka.broker.models.IsrMetrics;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Conduit;
-import io.humainary.substrates.ext.serventis.Routers;
-import io.humainary.substrates.ext.serventis.Routers.Router;
+import io.humainary.substrates.ext.serventis.ext.Routers;
+import io.humainary.substrates.ext.serventis.ext.Routers.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -10,10 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Resources.*;
+import static io.humainary.substrates.ext.serventis.ext.Resources.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Resources;
+import io.humainary.substrates.ext.serventis.ext.Resources;
 
 /**
  * Demonstration of the Resources API (RC6) - Resources.Resource acquisition/release (ORIENT phase).

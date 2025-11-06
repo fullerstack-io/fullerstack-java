@@ -10,10 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Gauges.*;
+import static io.humainary.substrates.ext.serventis.ext.Gauges.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
 
 /**
  * Demonstration of the Gauges API (RC6) - Value level tracking with bounds.

@@ -10,10 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Services.*;
+import static io.humainary.substrates.ext.serventis.ext.Services.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Services;
+import io.humainary.substrates.ext.serventis.ext.Services;
 
 /**
  * Demonstration of the Services API (RC6) - Service interaction lifecycle.
@@ -289,7 +289,7 @@ class ServicesApiDemoTest {
 
     @Test
     @DisplayName("Dual orientation: RELEASE vs RECEIPT")
-    void dualOrientation() {
+    void dualPolarity() {
         Service client = services.get(cortex().name("client"));
         Service server = services.get(cortex().name("server"));
 
@@ -298,7 +298,7 @@ class ServicesApiDemoTest {
             cortex().name("observer"),
             (Subject<Channel<Signal>> subject, Registrar<Signal> registrar) -> {
                 registrar.register(signal -> {
-                    String perspective = signal.orientation() == Orientation.RELEASE ? "SELF" : "OBSERVED";
+                    String perspective = signal.dimension() == Dimension.RELEASE ? "SELF" : "OBSERVED";
                     orientations.add(subject.name() + ":" + signal.sign() + ":" + perspective);
                 });
             }

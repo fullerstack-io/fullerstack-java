@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.consumer.sensors;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.humainary.substrates.ext.serventis.Agents;
-import io.humainary.substrates.ext.serventis.Agents.Agent;
+import io.humainary.substrates.ext.serventis.ext.Agents;
+import io.humainary.substrates.ext.serventis.ext.Agents.Agent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,7 +35,7 @@ class AgentFlowCircuitTest {
             cortex().name("timeline-capture"),
             (Subject<Channel<Agents.Signal>> subject, Registrar<Agents.Signal> registrar) -> {
                 registrar.register(signal -> {
-                    String event = subject.name() + ":" + signal.sign() + ":" + signal.direction();
+                    String event = subject.name() + ":" + signal.sign() + ":" + signal.dimension();
                     capturedTimeline.add(event);
                 });
             }
@@ -268,7 +268,7 @@ class AgentFlowCircuitTest {
     }
 
     // ========================================
-    // Direction Tests
+    // Aspect Tests
     // ========================================
 
     @Test
@@ -393,7 +393,7 @@ class AgentFlowCircuitTest {
 
     @Test
     @DisplayName("Both directions are available for each sign")
-    void shouldSupportBothDirectionsForEachSign() {
+    void shouldSupportBothAspectsForEachSign() {
         // Given
         Agent agent = circuit.agent("test-agent");
 

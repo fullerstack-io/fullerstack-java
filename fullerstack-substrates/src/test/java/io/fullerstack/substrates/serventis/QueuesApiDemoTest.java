@@ -10,10 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Queues.*;
+import static io.humainary.substrates.ext.serventis.ext.Queues.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Queues;
+import io.humainary.substrates.ext.serventis.ext.Queues;
 
 /**
  * Demonstration of the Queues API (RC6) - Queue flow control observability.

@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.substrates.ext.serventis.Services;
+import io.humainary.substrates.ext.serventis.ext.Services;
 import io.humainary.substrates.api.Substrates.Pipe;
 import io.humainary.substrates.api.Substrates.Channel;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -22,7 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 /**
  * Unit tests for {@link ProducerEventInterceptor}.
  * <p>
- * Verifies that the interceptor correctly emits Services.Signals with interpreted meaning
+ * Verifies that the interceptor correctly emits Services.Signs with interpreted meaning
  * (latency assessments, error analysis) in response to producer lifecycle events.
  * <p>
  * Updated for signal-first architecture: tests now verify signal interpretation, not data bags.

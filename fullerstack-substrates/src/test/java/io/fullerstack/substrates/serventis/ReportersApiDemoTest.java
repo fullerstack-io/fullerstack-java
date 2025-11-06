@@ -10,10 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Reporters.*;
+import static io.humainary.substrates.ext.serventis.ext.Reporters.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Reporters;
 
 /**
  * Demonstration of the Reporters API (RC6) - Situation urgency assessment (DECIDE phase).

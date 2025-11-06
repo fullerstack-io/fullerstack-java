@@ -2,7 +2,7 @@ package io.fullerstack.kafka.broker.monitors;
 
 import io.fullerstack.kafka.broker.models.ThreadPoolMetrics;
 import io.fullerstack.kafka.broker.models.ThreadPoolType;
-import io.humainary.substrates.ext.serventis.Resources;
+import io.humainary.substrates.ext.serventis.ext.Resources;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import org.slf4j.Logger;
@@ -13,7 +13,7 @@ import java.util.Objects;
 import static io.fullerstack.substrates.CortexRuntime.cortex;
 
 /**
- * Emits Resources.Signal for thread pool metrics using Serventis RC1 vocabulary.
+ * Emits Resources.Sign for thread pool metrics using Serventis RC1 vocabulary.
  *
  * <p><b>Layer 2: Serventis Signal Emission</b>
  * This monitor emits signals with Resources API vocabulary (GRANT/DENY), NOT interpretations.
@@ -45,7 +45,7 @@ public class ThreadPoolResourceMonitor {
      * Creates a ThreadPoolResourceMonitor.
      *
      * @param circuitName Circuit name for logging
-     * @param channel  Channel to emit Resources.Signal
+     * @param channel  Channel to emit Resources.Sign
      * @throws NullPointerException if any parameter is null
      */
     public ThreadPoolResourceMonitor(
@@ -60,7 +60,7 @@ public class ThreadPoolResourceMonitor {
     }
 
     /**
-     * Emits Resources.Signal for thread pool metrics.
+     * Emits Resources.Sign for thread pool metrics.
      *
      * @param metrics Thread pool metrics from JMX collector
      * @throws NullPointerException if metrics is null
@@ -81,13 +81,13 @@ public class ThreadPoolResourceMonitor {
             }
 
             if (logger.isDebugEnabled()) {
-                logger.debug("Emitted Resources.Signal for {}.{}: idlePercent={}%",
+                logger.debug("Emitted Resources.Sign for {}.{}: idlePercent={}%",
                     metrics.brokerId(),
                     metrics.poolType().name(),
                     (int)(idlePercent * 100));
             }
         } catch (Exception e) {
-            logger.error("Failed to emit Resources.Signal for {}.{}: {}",
+            logger.error("Failed to emit Resources.Sign for {}.{}: {}",
                 metrics.brokerId(),
                 metrics.poolType().name(),
                 e.getMessage(),

@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.substrates.ext.serventis.Counters.Counter;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

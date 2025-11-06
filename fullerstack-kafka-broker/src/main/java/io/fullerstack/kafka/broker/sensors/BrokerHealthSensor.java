@@ -9,9 +9,9 @@ import io.fullerstack.kafka.core.config.BrokerEndpoint;
 import io.fullerstack.kafka.core.config.BrokerSensorConfig;
 import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Name;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +62,7 @@ import java.util.concurrent.TimeUnit;
  *     Counters::composer
  * ).channel(cortex().name("broker-health"));
  *
- * Channel<Monitors.Status> monitorsChannel = circuit.conduit(
+ * Channel<Monitors.Sign> monitorsChannel = circuit.conduit(
  *     cortex().name("monitors"),
  *     Monitors::composer
  * ).channel(cortex().name("broker-health"));

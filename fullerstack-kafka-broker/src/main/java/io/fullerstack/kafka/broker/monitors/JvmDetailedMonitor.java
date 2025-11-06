@@ -3,8 +3,8 @@ package io.fullerstack.kafka.broker.monitors;
 import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Conduit;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

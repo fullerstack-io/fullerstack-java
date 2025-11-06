@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.consumer.sensors;
 
 import io.humainary.substrates.api.Substrates.Circuit;
-import io.humainary.substrates.ext.serventis.Agents;
-import io.humainary.substrates.ext.serventis.Agents.Agent;
+import io.humainary.substrates.ext.serventis.ext.Agents;
+import io.humainary.substrates.ext.serventis.ext.Agents.Agent;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;

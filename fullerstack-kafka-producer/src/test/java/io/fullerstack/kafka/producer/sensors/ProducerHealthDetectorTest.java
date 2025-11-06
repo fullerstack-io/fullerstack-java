@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.substrates.ext.serventis.Monitors;
-import io.humainary.substrates.ext.serventis.Monitors.Monitor;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Monitors.Monitor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,7 +56,7 @@ class ProducerHealthDetectorTest {
 
         // Then
         assertThat(detector).isNotNull();
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
 
         // Cleanup
         detector.close();
@@ -84,7 +84,7 @@ class ProducerHealthDetectorTest {
     @Test
     void testInitialConditionIsStable() {
         // Then
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
         assertThat(detector.getErrorCount()).isZero();
         assertThat(detector.getOverflowCount()).isZero();
         assertThat(detector.getLatencyOverflowCount()).isZero();
@@ -100,15 +100,15 @@ class ProducerHealthDetectorTest {
         detector.onBufferOverflow();
 
         // Then
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DIVERGING);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DIVERGING);
         assertThat(detector.getOverflowCount()).isEqualTo(1);
 
         // Verify monitor.status() was called with DIVERGING
-        ArgumentCaptor<Monitors.Condition> conditionCaptor = ArgumentCaptor.forClass(Monitors.Condition.class);
-        ArgumentCaptor<Monitors.Confidence> confidenceCaptor = ArgumentCaptor.forClass(Monitors.Confidence.class);
+        ArgumentCaptor<Monitors.Sign> conditionCaptor = ArgumentCaptor.forClass(Monitors.Sign.class);
+        ArgumentCaptor<Monitors.Dimension> confidenceCaptor = ArgumentCaptor.forClass(Monitors.Dimension.class);
         verify(mockHealthMonitor).status(conditionCaptor.capture(), confidenceCaptor.capture());
 
-        assertThat(conditionCaptor.getValue()).isEqualTo(Monitors.Condition.DIVERGING);
+        assertThat(conditionCaptor.getValue()).isEqualTo(Monitors.Sign.DIVERGING);
     }
 
     @Test
@@ -118,7 +118,7 @@ class ProducerHealthDetectorTest {
         detector.onBufferOverflow();
 
         // Then
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DEGRADED);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DEGRADED);
         assertThat(detector.getOverflowCount()).isEqualTo(2);
     }
 
@@ -139,13 +139,13 @@ class ProducerHealthDetectorTest {
     @Test
     void testBufferNormalWithNoOverflowsDoesNotChangeState() {
         // Given - initially stable
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
 
         // When
         detector.onBufferNormal();
 
         // Then - still stable, no signals emitted
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
         verifyNoInteractions(mockHealthMonitor);
     }
 
@@ -159,10 +159,10 @@ class ProducerHealthDetectorTest {
         detector.onErrorIncrement();
 
         // Then
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DIVERGING);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DIVERGING);
         assertThat(detector.getErrorCount()).isEqualTo(1);
 
-        verify(mockHealthMonitor).status(Monitors.Condition.DIVERGING, Monitors.Confidence.TENTATIVE);
+        verify(mockHealthMonitor).status(Monitors.Sign.DIVERGING, Monitors.Dimension.TENTATIVE);
     }
 
     @Test
@@ -173,7 +173,7 @@ class ProducerHealthDetectorTest {
         detector.onErrorIncrement();
 
         // Then
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DEGRADED);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DEGRADED);
         assertThat(detector.getErrorCount()).isEqualTo(3);
     }
 
@@ -185,7 +185,7 @@ class ProducerHealthDetectorTest {
         }
 
         // Then
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DEFECTIVE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DEFECTIVE);
         assertThat(detector.getErrorCount()).isEqualTo(10);
     }
 
@@ -199,7 +199,7 @@ class ProducerHealthDetectorTest {
         detector.onBufferExhaustion();
 
         // Then - still STABLE (needs 2+ for DEGRADED)
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
     }
 
     @Test
@@ -209,7 +209,7 @@ class ProducerHealthDetectorTest {
         detector.onBufferExhaustion();
 
         // Then
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DEGRADED);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DEGRADED);
     }
 
     // ========================================
@@ -222,7 +222,7 @@ class ProducerHealthDetectorTest {
         detector.onLatencyOverflow();
 
         // Then - still STABLE (needs 3+ for DIVERGING)
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
         assertThat(detector.getLatencyOverflowCount()).isEqualTo(1);
     }
 
@@ -234,7 +234,7 @@ class ProducerHealthDetectorTest {
         detector.onLatencyOverflow();
 
         // Then
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DIVERGING);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DIVERGING);
         assertThat(detector.getLatencyOverflowCount()).isEqualTo(3);
     }
 
@@ -266,7 +266,7 @@ class ProducerHealthDetectorTest {
         detector.onBufferOverflow();
 
         // Then
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DEFECTIVE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DEFECTIVE);
     }
 
     @Test
@@ -278,8 +278,8 @@ class ProducerHealthDetectorTest {
 
         // Then - should be at least DIVERGING
         assertThat(detector.getCurrentCondition()).isIn(
-            Monitors.Condition.DIVERGING,
-            Monitors.Condition.DEGRADED
+            Monitors.Sign.DIVERGING,
+            Monitors.Sign.DEGRADED
         );
     }
 
@@ -291,13 +291,13 @@ class ProducerHealthDetectorTest {
     void testRecoveryFromDivergingToConverging() {
         // Given - in DIVERGING state
         detector.onErrorIncrement();
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DIVERGING);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DIVERGING);
 
         // When - errors clear (simulated by reset)
         detector.reset();
 
         // Then - back to STABLE
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
         assertThat(detector.getErrorCount()).isZero();
     }
 
@@ -316,10 +316,10 @@ class ProducerHealthDetectorTest {
         assertThat(detector.getErrorCount()).isZero();
         assertThat(detector.getOverflowCount()).isZero();
         assertThat(detector.getLatencyOverflowCount()).isZero();
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
 
         // Verify STABLE signal emitted
-        verify(mockHealthMonitor).status(Monitors.Condition.STABLE, Monitors.Confidence.CONFIRMED);
+        verify(mockHealthMonitor).status(Monitors.Sign.STABLE, Monitors.Dimension.CONFIRMED);
     }
 
     // ========================================
@@ -332,7 +332,7 @@ class ProducerHealthDetectorTest {
         detector.onErrorIncrement();
 
         // Then - TENTATIVE confidence
-        verify(mockHealthMonitor).status(Monitors.Condition.DIVERGING, Monitors.Confidence.TENTATIVE);
+        verify(mockHealthMonitor).status(Monitors.Sign.DIVERGING, Monitors.Dimension.TENTATIVE);
     }
 
     @Test
@@ -343,11 +343,11 @@ class ProducerHealthDetectorTest {
         }
 
         // Then - CONFIRMED confidence
-        ArgumentCaptor<Monitors.Confidence> confidenceCaptor = ArgumentCaptor.forClass(Monitors.Confidence.class);
+        ArgumentCaptor<Monitors.Dimension> confidenceCaptor = ArgumentCaptor.forClass(Monitors.Dimension.class);
         verify(mockHealthMonitor, atLeastOnce()).status(any(), confidenceCaptor.capture());
 
         // Last call should have CONFIRMED
-        assertThat(confidenceCaptor.getValue()).isEqualTo(Monitors.Confidence.CONFIRMED);
+        assertThat(confidenceCaptor.getValue()).isEqualTo(Monitors.Dimension.CONFIRMED);
     }
 
     // ========================================
@@ -377,13 +377,13 @@ class ProducerHealthDetectorTest {
     @Test
     void testStateTransitionEmitsOnlyOnChange() {
         // Given - initial STABLE
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
 
         // When - first error (STABLE → DIVERGING)
         detector.onErrorIncrement();
 
         // Then - signal emitted
-        verify(mockHealthMonitor, times(1)).status(Monitors.Condition.DIVERGING, Monitors.Confidence.TENTATIVE);
+        verify(mockHealthMonitor, times(1)).status(Monitors.Sign.DIVERGING, Monitors.Dimension.TENTATIVE);
 
         // When - second error (still DIVERGING, no state change)
         reset(mockHealthMonitor);
@@ -397,7 +397,7 @@ class ProducerHealthDetectorTest {
     void testStateTransitionFromDivergingToDegraded() {
         // Given - DIVERGING state
         detector.onErrorIncrement();
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DIVERGING);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DIVERGING);
         reset(mockHealthMonitor);
 
         // When - more errors push to DEGRADED
@@ -405,7 +405,7 @@ class ProducerHealthDetectorTest {
         detector.onErrorIncrement();
 
         // Then - new signal for DEGRADED
-        verify(mockHealthMonitor).status(eq(Monitors.Condition.DEGRADED), any(Monitors.Confidence.class));
+        verify(mockHealthMonitor).status(eq(Monitors.Sign.DEGRADED), any(Monitors.Dimension.class));
     }
 
     @Test
@@ -414,7 +414,7 @@ class ProducerHealthDetectorTest {
         for (int i = 0; i < 3; i++) {
             detector.onErrorIncrement();
         }
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DEGRADED);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DEGRADED);
         reset(mockHealthMonitor);
 
         // When - many more errors push to DEFECTIVE
@@ -423,7 +423,7 @@ class ProducerHealthDetectorTest {
         }
 
         // Then - new signal for DEFECTIVE
-        verify(mockHealthMonitor).status(eq(Monitors.Condition.DEFECTIVE), any(Monitors.Confidence.class));
+        verify(mockHealthMonitor).status(eq(Monitors.Sign.DEFECTIVE), any(Monitors.Dimension.class));
     }
 
     // ========================================
@@ -433,13 +433,13 @@ class ProducerHealthDetectorTest {
     @Test
     void testZeroEventsKeepsStable() {
         // Given - no events
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
 
         // When - normal buffer operation
         detector.onBufferNormal();
 
         // Then - still stable
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
         verifyNoInteractions(mockHealthMonitor);
     }
 
@@ -476,26 +476,26 @@ class ProducerHealthDetectorTest {
         // Scenario: Producer starts having issues
         // 1. Initial errors
         detector.onErrorIncrement();
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DIVERGING);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DIVERGING);
 
         // 2. Buffer starts filling up
         detector.onBufferOverflow();
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DIVERGING);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DIVERGING);
 
         // 3. More errors accumulate
         detector.onErrorIncrement();
         detector.onErrorIncrement();
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DEGRADED);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DEGRADED);
 
         // 4. Buffer exhaustion
         detector.onBufferExhaustion();
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DEGRADED);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DEGRADED);
 
         // 5. Critical failure
         for (int i = 0; i < 7; i++) {
             detector.onErrorIncrement();
         }
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.DEFECTIVE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.DEFECTIVE);
     }
 
     @Test
@@ -510,7 +510,7 @@ class ProducerHealthDetectorTest {
         detector.reset();
 
         // 3. Back to normal
-        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Condition.STABLE);
+        assertThat(detector.getCurrentCondition()).isEqualTo(Monitors.Sign.STABLE);
         assertThat(detector.getErrorCount()).isZero();
         assertThat(detector.getOverflowCount()).isZero();
     }

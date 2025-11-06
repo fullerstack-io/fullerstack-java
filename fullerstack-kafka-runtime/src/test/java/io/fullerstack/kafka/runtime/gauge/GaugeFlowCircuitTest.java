@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.runtime.gauge;
 
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
 import io.humainary.substrates.api.Substrates.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

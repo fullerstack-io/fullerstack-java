@@ -2,16 +2,16 @@ package io.fullerstack.kafka.broker.monitors;
 
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Name;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Counters.Counter;
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
-import io.humainary.substrates.ext.serventis.Monitors;
-import io.humainary.substrates.ext.serventis.Monitors.Monitor;
-import io.humainary.substrates.ext.serventis.Probes;
-import io.humainary.substrates.ext.serventis.Probes.Probe;
-import io.humainary.substrates.ext.serventis.Resources;
-import io.humainary.substrates.ext.serventis.Resources.Resource;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Monitors.Monitor;
+import io.humainary.substrates.ext.serventis.ext.Probes;
+import io.humainary.substrates.ext.serventis.ext.Probes.Probe;
+import io.humainary.substrates.ext.serventis.ext.Resources;
+import io.humainary.substrates.ext.serventis.ext.Resources.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +27,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static io.fullerstack.substrates.CortexRuntime.cortex;
-import static io.humainary.substrates.ext.serventis.Monitors.Confidence.*;
+import static io.humainary.substrates.ext.serventis.ext.Monitors.Dimension.*;
 
 /**
  * Emits Serventis signals for advanced network and security metrics (RC7).

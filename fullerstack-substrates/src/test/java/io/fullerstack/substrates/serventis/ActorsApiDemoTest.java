@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Actors.*;
+import static io.humainary.substrates.ext.serventis.ext.Actors.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Actors;
+import io.humainary.substrates.ext.serventis.ext.Actors;
 
 /**
  * Demonstration of the Actors API (RC6) - Speech Act Theory for conversational agents.

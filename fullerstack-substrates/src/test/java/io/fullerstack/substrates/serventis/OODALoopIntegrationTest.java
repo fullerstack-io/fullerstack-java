@@ -12,11 +12,11 @@ import java.util.List;
 import static io.humainary.substrates.api.Substrates.cortex;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Probes;
-import io.humainary.substrates.ext.serventis.Services;
-import io.humainary.substrates.ext.serventis.Queues;
-import io.humainary.substrates.ext.serventis.Monitors;
-import io.humainary.substrates.ext.serventis.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Probes;
+import io.humainary.substrates.ext.serventis.ext.Services;
+import io.humainary.substrates.ext.serventis.ext.Queues;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Reporters;
 
 /**
  * Integration test demonstrating complete OODA Loop signal flow.
@@ -25,7 +25,7 @@ import io.humainary.substrates.ext.serventis.Reporters;
  * <p>
  * This test shows how signals flow through the cognitive hierarchy:
  * 1. OBSERVE: Raw signals from Probes/Services/Queues
- * 2. ORIENT: Condition assessment via Monitors
+ * 2. ORIENT: Sign assessment via Monitors
  * 3. DECIDE: Urgency determination via Reporters
  * 4. ACT: (Would trigger remediation - simulated here)
  * <p>
@@ -156,7 +156,7 @@ class OODALoopIntegrationTest {
         circuit.await();
 
         // Phase 3: ORIENT - Assess degradation
-        consumerHealth.diverging(Monitors.Confidence.MEASURED);  // Early warning
+        consumerHealth.diverging(Monitors.Dimension.MEASURED);  // Early warning
 
         circuit.await();
 
@@ -168,7 +168,7 @@ class OODALoopIntegrationTest {
         circuit.await();
 
         // Phase 5: ORIENT - Condition worsening
-        consumerHealth.degraded(Monitors.Confidence.CONFIRMED);  // Confirmed degradation
+        consumerHealth.degraded(Monitors.Dimension.CONFIRMED);  // Confirmed degradation
 
         circuit.await();
 
@@ -184,7 +184,7 @@ class OODALoopIntegrationTest {
         circuit.await();
 
         // Phase 8: ORIENT - Critical assessment
-        consumerHealth.defective(Monitors.Confidence.CONFIRMED);  // Major malfunction
+        consumerHealth.defective(Monitors.Dimension.CONFIRMED);  // Major malfunction
 
         circuit.await();
 
@@ -248,7 +248,7 @@ class OODALoopIntegrationTest {
         // ACT: Overflow triggers assessment
         queue.enqueue();
         queue.overflow();                  // OBSERVE
-        monitor.degraded(Monitors.Confidence.CONFIRMED);  // ORIENT
+        monitor.degraded(Monitors.Dimension.CONFIRMED);  // ORIENT
 
         circuit.await();
 
@@ -282,13 +282,13 @@ class OODALoopIntegrationTest {
         ));
 
         // ACT: Degradation triggers urgency assessment
-        monitor.stable(Monitors.Confidence.CONFIRMED);
+        monitor.stable(Monitors.Dimension.CONFIRMED);
         reporter.normal();
 
-        monitor.diverging(Monitors.Confidence.MEASURED);
+        monitor.diverging(Monitors.Dimension.MEASURED);
         reporter.warning();
 
-        monitor.degraded(Monitors.Confidence.CONFIRMED);
+        monitor.degraded(Monitors.Dimension.CONFIRMED);
         reporter.critical();
 
         circuit.await();
@@ -336,7 +336,7 @@ class OODALoopIntegrationTest {
         // ACT: Both consumers experiencing issues
         consumer1Queue.overflow();
         consumer2Queue.overflow();
-        groupHealth.degraded(Monitors.Confidence.CONFIRMED);
+        groupHealth.degraded(Monitors.Dimension.CONFIRMED);
         groupStatus.critical();
 
         circuit.await();

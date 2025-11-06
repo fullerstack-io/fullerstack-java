@@ -4,15 +4,15 @@ import io.fullerstack.kafka.broker.models.ReplicationHealthMetrics;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Conduit;
-import io.humainary.substrates.ext.serventis.Monitors;
-import io.humainary.substrates.ext.serventis.Monitors.Monitor;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Monitors.Monitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Monitors.Confidence.CONFIRMED;
+import static io.humainary.substrates.ext.serventis.ext.Monitors.Dimension.CONFIRMED;
 
 /**
  * Emits Monitors.Signal for replication health metrics using Serventis RC6 vocabulary.

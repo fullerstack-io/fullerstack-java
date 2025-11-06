@@ -3,8 +3,8 @@ package io.fullerstack.kafka.consumer.sensors;
 import io.humainary.substrates.api.Substrates;
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Conduit;
-import io.humainary.substrates.ext.serventis.Agents;
-import io.humainary.substrates.ext.serventis.Agents.Agent;
+import io.humainary.substrates.ext.serventis.ext.Agents;
+import io.humainary.substrates.ext.serventis.ext.Agents.Agent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

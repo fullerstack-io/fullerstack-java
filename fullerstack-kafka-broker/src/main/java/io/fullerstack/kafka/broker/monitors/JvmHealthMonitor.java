@@ -4,9 +4,9 @@ import io.fullerstack.kafka.broker.models.JvmGcMetrics;
 import io.fullerstack.kafka.broker.models.JvmMemoryMetrics;
 import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Name;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.fullerstack.substrates.CortexRuntime.cortex;
-import static io.humainary.substrates.ext.serventis.Monitors.Confidence.*;
+import static io.humainary.substrates.ext.serventis.ext.Monitors.Dimension.*;
 
 /**
  * Emits Serventis signals for JVM memory and GC metrics (RC6).

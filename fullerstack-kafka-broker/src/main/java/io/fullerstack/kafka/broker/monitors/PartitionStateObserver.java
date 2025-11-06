@@ -1,9 +1,9 @@
 package io.fullerstack.kafka.broker.monitors;
 
 import io.fullerstack.kafka.broker.models.PartitionMetrics;
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import org.slf4j.Logger;
@@ -142,10 +142,10 @@ public class PartitionStateObserver {
             // 4. Leader Epoch - emit monitor signal for leadership changes
             if (previous != null && metrics.hasLeaderChanged(previous.leaderEpoch())) {
                 // Leader changed - emit DIVERGING
-                epochMonitor.diverging(Monitors.Confidence.CONFIRMED);
+                epochMonitor.diverging(Monitors.Dimension.CONFIRMED);
             } else {
                 // Leader stable
-                epochMonitor.stable(Monitors.Confidence.CONFIRMED);
+                epochMonitor.stable(Monitors.Dimension.CONFIRMED);
             }
 
             // Update previous metrics for next poll

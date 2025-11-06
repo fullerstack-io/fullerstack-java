@@ -9,10 +9,10 @@ import io.fullerstack.kafka.core.config.BrokerSensorConfig;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Conduit;
-import io.humainary.substrates.ext.serventis.Routers;
-import io.humainary.substrates.ext.serventis.Routers.Router;
-import io.humainary.substrates.ext.serventis.Monitors;
-import io.humainary.substrates.ext.serventis.Monitors.Monitor;
+import io.humainary.substrates.ext.serventis.ext.Routers;
+import io.humainary.substrates.ext.serventis.ext.Routers.Router;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Monitors.Monitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

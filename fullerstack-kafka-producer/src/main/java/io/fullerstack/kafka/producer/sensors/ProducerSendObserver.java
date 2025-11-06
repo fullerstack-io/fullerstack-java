@@ -1,11 +1,11 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.substrates.ext.serventis.Counters.Counter;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
-import io.humainary.substrates.ext.serventis.Probes;
-import io.humainary.substrates.ext.serventis.Probes.Probe;
-import io.humainary.substrates.ext.serventis.Services;
-import io.humainary.substrates.ext.serventis.Services.Service;
+import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Probes;
+import io.humainary.substrates.ext.serventis.ext.Probes.Probe;
+import io.humainary.substrates.ext.serventis.ext.Services;
+import io.humainary.substrates.ext.serventis.ext.Services.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -259,7 +259,7 @@ public class ProducerSendObserver implements AutoCloseable {
         } catch (Exception e) {
             logger.error("Error collecting send metrics for producer {}", producerId, e);
             // Emit failure probe on error
-            sendProbe.send(Probes.Origin.CLIENT, Probes.Outcome.FAILURE);
+            sendProbe.failed();
         }
     }
 
@@ -299,7 +299,7 @@ public class ProducerSendObserver implements AutoCloseable {
 
         if (approximateErrors > 0) {
             // Emit Probe signal for send failure
-            sendProbe.send(Probes.Origin.CLIENT, Probes.Outcome.FAILURE);
+            sendProbe.failed();
 
             // Also increment error counter
             errorCounter.increment();
@@ -308,7 +308,7 @@ public class ProducerSendObserver implements AutoCloseable {
                 producerId, errorRate, approximateErrors);
         } else if (previousErrorRate > 0 && errorRate == 0) {
             // Errors cleared - emit success
-            sendProbe.send(Probes.Origin.CLIENT, Probes.Outcome.SUCCESS);
+            sendProbe.transmitted();
             logger.info("Producer {} error rate cleared", producerId);
         }
 

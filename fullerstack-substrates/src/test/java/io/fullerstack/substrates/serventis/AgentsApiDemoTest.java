@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Agents.*;
+import static io.humainary.substrates.ext.serventis.ext.Agents.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.humainary.substrates.ext.serventis.Agents;
+import io.humainary.substrates.ext.serventis.ext.Agents;
 
 /**
  * Demonstration of the Agents API (RC6) - Promise Theory-based coordination.
@@ -320,10 +320,10 @@ class AgentsApiDemoTest {
         );
 
         // Verify signal properties
-        assertThat(Signal.PROMISE.direction())
-            .isEqualTo(Direction.OUTBOUND);
-        assertThat(Signal.PROMISED.direction())
-            .isEqualTo(Direction.INBOUND);
+        assertThat(Signal.PROMISE.dimension())
+            .isEqualTo(Dimension.OUTBOUND);
+        assertThat(Signal.PROMISED.dimension())
+            .isEqualTo(Dimension.INBOUND);
     }
 
     @Test

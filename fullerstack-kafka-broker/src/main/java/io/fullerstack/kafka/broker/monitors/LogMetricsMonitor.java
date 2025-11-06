@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.broker.monitors;
 
 import io.fullerstack.kafka.broker.models.LogMetrics;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import org.slf4j.Logger;
@@ -143,7 +143,7 @@ public class LogMetricsMonitor {
     }
 
     /**
-     * Emits Counters.Signal for log flush rate.
+     * Emits Counters.Sign for log flush rate.
      */
     private void emitFlushRateSignals(LogMetrics metrics) {
         if (metrics.flushRatePerSec() > 0) {
@@ -152,7 +152,7 @@ public class LogMetricsMonitor {
     }
 
     /**
-     * Emits Gauges.Signal for log size.
+     * Emits Gauges.Sign for log size.
      */
     private void emitLogSizeSignals(LogMetrics metrics, PreviousLogMetrics prev) {
         long currentSize = metrics.sizeBytes();
@@ -171,7 +171,7 @@ public class LogMetricsMonitor {
     }
 
     /**
-     * Emits Gauges.Signal for segment count.
+     * Emits Gauges.Sign for segment count.
      */
     private void emitSegmentCountSignals(LogMetrics metrics, PreviousLogMetrics prev) {
         int currentSegments = metrics.numSegments();
@@ -190,7 +190,7 @@ public class LogMetricsMonitor {
     }
 
     /**
-     * Emits Counters.Signal for log offsets.
+     * Emits Counters.Sign for log offsets.
      */
     private void emitOffsetSignals(LogMetrics metrics, PreviousLogMetrics prev) {
         // Log end offset (monotonically increasing)

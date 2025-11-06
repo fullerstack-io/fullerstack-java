@@ -4,7 +4,7 @@ import io.fullerstack.kafka.broker.models.ThreadPoolMetrics;
 import io.fullerstack.kafka.broker.monitors.ThreadPoolResourceMonitor;
 import io.fullerstack.kafka.core.config.BrokerEndpoint;
 import io.fullerstack.kafka.core.config.BrokerSensorConfig;
-import io.humainary.substrates.ext.serventis.Resources;
+import io.humainary.substrates.ext.serventis.ext.Resources;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import org.slf4j.Logger;
@@ -17,11 +17,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Sensor for collecting thread pool metrics from Kafka brokers via JMX and emitting Resources.Signal (RC1).
+ * Sensor for collecting thread pool metrics from Kafka brokers via JMX and emitting Resources.Sign (RC1).
  *
  * <p><b>Layer 2: Serventis Signal Emission</b>
  * This sensor collects raw JMX metrics and passes them to {@link ThreadPoolResourceMonitor}
- * which emits Resources.Signal using Serventis vocabulary (GRANT/DENY).
+ * which emits Resources.Sign using Serventis vocabulary (GRANT/DENY).
  *
  * <p><b>Note:</b> Per ADR-002, interpretation (baselines, trends, recommendations) removed
  * from sensors. Will be added in Epic 2 via Observers (Layer 4 - Semiosphere).
@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>Schedule periodic JMX collection from configured brokers</li>
  *   <li>Collect thread pool metrics (network, I/O, log cleaner) via {@link ThreadPoolMetricsCollector}</li>
  *   <li>Pass metrics to {@link ThreadPoolResourceMonitor} for signal emission</li>
- *   <li>Monitor emits Resources.Signal directly via Channel (RC1 pattern)</li>
+ *   <li>Monitor emits Resources.Sign directly via Channel (RC1 pattern)</li>
  *   <li>Handle collection failures gracefully (continue with other pools/brokers)</li>
  * </ul>
  *
@@ -44,7 +44,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <h3>Example Usage (RC1 Pattern)</h3>
  * <pre>{@code
- * // Runtime creates conduit for Resources.Signal
+ * // Runtime creates conduit for Resources.Sign
  * Circuit circuit = Cortex.circuit(name("kafka.broker.resources"));
  * Channel<Resources.Sign> channel = circuit
  *     .conduit(Resources::composer)
@@ -96,7 +96,7 @@ public class ThreadPoolSensor implements AutoCloseable {
      * Epic 2 Observers (Layer 4 - Semiosphere).
      *
      * @param config      Sensor configuration with broker endpoints and collection interval
-     * @param channel     Channel to emit Resources.Signal (RC1 pattern)
+     * @param channel     Channel to emit Resources.Sign (RC1 pattern)
      * @param circuitName Circuit name for logging
      * @throws NullPointerException if any parameter is null
      */

@@ -2,12 +2,12 @@ package io.fullerstack.kafka.consumer.sensors;
 
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Conduit;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Counters.Counter;
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
-import io.humainary.substrates.ext.serventis.Monitors;
-import io.humainary.substrates.ext.serventis.Monitors.Monitor;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Monitors.Monitor;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ConsumerGroupDescription;
 import org.apache.kafka.common.ConsumerGroupState;
@@ -327,20 +327,20 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
 
             if (timeSinceLastHeartbeat > sessionTimeoutMs) {
                 // Session timeout violated
-                sessionMonitor.defective(Monitors.Confidence.CONFIRMED);
+                sessionMonitor.defective(Monitors.Dimension.CONFIRMED);
                 logger.error("Consumer group {} SESSION TIMEOUT VIOLATION: {}ms > {}ms",
                     groupId, timeSinceLastHeartbeat, sessionTimeoutMs);
 
             } else if (timeSinceLastHeartbeat > sessionTimeoutMs * SESSION_TIMEOUT_WARNING_RATIO) {
                 // Approaching session timeout
-                sessionMonitor.degraded(Monitors.Confidence.MEASURED);
+                sessionMonitor.degraded(Monitors.Dimension.MEASURED);
                 logger.warn("Consumer group {} APPROACHING SESSION TIMEOUT: {}ms ({}% of {}ms)",
                     groupId, timeSinceLastHeartbeat,
                     (int)(SESSION_TIMEOUT_WARNING_RATIO * 100), sessionTimeoutMs);
 
             } else {
                 // Healthy session
-                sessionMonitor.stable(Monitors.Confidence.CONFIRMED);
+                sessionMonitor.stable(Monitors.Dimension.CONFIRMED);
             }
 
         } catch (Exception e) {
@@ -362,20 +362,20 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
 
             if (lastPollMs > maxPollIntervalMs) {
                 // Poll interval violated
-                pollMonitor.defective(Monitors.Confidence.CONFIRMED);
+                pollMonitor.defective(Monitors.Dimension.CONFIRMED);
                 logger.error("Consumer group {} POLL INTERVAL VIOLATION: {}ms > {}ms",
                     groupId, lastPollMs, maxPollIntervalMs);
 
             } else if (lastPollMs > maxPollIntervalMs * POLL_INTERVAL_WARNING_RATIO) {
                 // Approaching poll interval limit
-                pollMonitor.degraded(Monitors.Confidence.MEASURED);
+                pollMonitor.degraded(Monitors.Dimension.MEASURED);
                 logger.warn("Consumer group {} APPROACHING POLL INTERVAL LIMIT: {}ms ({}% of {}ms)",
                     groupId, lastPollMs,
                     (int)(POLL_INTERVAL_WARNING_RATIO * 100), maxPollIntervalMs);
 
             } else {
                 // Healthy poll rate
-                pollMonitor.stable(Monitors.Confidence.CONFIRMED);
+                pollMonitor.stable(Monitors.Dimension.CONFIRMED);
             }
 
         } catch (Exception e) {

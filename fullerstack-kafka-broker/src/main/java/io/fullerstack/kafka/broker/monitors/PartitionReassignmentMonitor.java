@@ -2,14 +2,14 @@ package io.fullerstack.kafka.broker.monitors;
 
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Conduit;
-import io.humainary.substrates.ext.serventis.Routers;
-import io.humainary.substrates.ext.serventis.Routers.Router;
-import io.humainary.substrates.ext.serventis.Monitors;
-import io.humainary.substrates.ext.serventis.Monitors.Monitor;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Counters.Counter;
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Routers;
+import io.humainary.substrates.ext.serventis.ext.Routers.Router;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Monitors.Monitor;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.PartitionReassignment;
 import org.apache.kafka.common.TopicPartition;
@@ -241,7 +241,7 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
 
         // Set monitor to DEGRADED
         Monitor monitor = monitors.get(cortex().name("reassignment-" + tp));
-        monitor.degraded(Monitors.Confidence.CONFIRMED);
+        monitor.degraded(Monitors.Dimension.CONFIRMED);
         logger.debug("Emitted DEGRADED monitor signal for {}", tp);
 
         // Track state
@@ -347,7 +347,7 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
 
         // Set monitor to STABLE
         Monitor monitor = monitors.get(cortex().name("reassignment-" + tp));
-        monitor.stable(Monitors.Confidence.CONFIRMED);
+        monitor.stable(Monitors.Dimension.CONFIRMED);
 
         // Cleanup
         activeReassignments.remove(tp);

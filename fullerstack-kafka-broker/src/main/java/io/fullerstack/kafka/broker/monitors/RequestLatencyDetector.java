@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.broker.monitors;
 
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Channel;
 import org.slf4j.Logger;
@@ -115,7 +115,7 @@ public class RequestLatencyDetector {
             updateSignalHistory(history, sign);
 
             // Assess health based on signal pattern and emit appropriate signal
-            Monitors.Confidence confidence = assessConfidence(history);
+            Monitors.Dimension confidence = assessConfidence(history);
             emitHealthAssessment(history, confidence);
 
             if (logger.isDebugEnabled()) {
@@ -136,7 +136,7 @@ public class RequestLatencyDetector {
     /**
      * Emits health assessment based on signal pattern.
      */
-    private void emitHealthAssessment(SignalHistory history, Monitors.Confidence confidence) {
+    private void emitHealthAssessment(SignalHistory history, Monitors.Dimension confidence) {
         // DEFECTIVE: Sustained SLA violations (3+ consecutive overflows)
         if (history.consecutiveOverflows >= DEFECTIVE_OVERFLOW_COUNT) {
             healthMonitor.defective(confidence);
@@ -207,7 +207,7 @@ public class RequestLatencyDetector {
     /**
      * Assesses confidence level based on signal history.
      */
-    private Monitors.Confidence assessConfidence(SignalHistory history) {
+    private Monitors.Dimension assessConfidence(SignalHistory history) {
         // CONFIRMED: Sustained pattern (3+ consecutive same signals)
         int maxConsecutive = Math.max(
             history.consecutiveIncrements,
@@ -215,16 +215,16 @@ public class RequestLatencyDetector {
         );
 
         if (maxConsecutive >= 3) {
-            return Monitors.Confidence.CONFIRMED;
+            return Monitors.Dimension.CONFIRMED;
         }
 
         // MEASURED: Emerging pattern (2 consecutive)
         if (maxConsecutive >= 2) {
-            return Monitors.Confidence.MEASURED;
+            return Monitors.Dimension.MEASURED;
         }
 
         // TENTATIVE: Single signal
-        return Monitors.Confidence.TENTATIVE;
+        return Monitors.Dimension.TENTATIVE;
     }
 
     /**

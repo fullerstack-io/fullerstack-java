@@ -1,10 +1,11 @@
 package io.fullerstack.kafka.runtime.queue;
 
-import io.humainary.substrates.ext.serventis.Queues;
-import io.humainary.substrates.ext.serventis.Queues.Queue;
+import io.humainary.substrates.ext.serventis.ext.Queues;
+import io.humainary.substrates.ext.serventis.ext.Queues.Queue;
 import io.humainary.substrates.api.Substrates.*;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import io.humainary.substrates.api.Substrates;
+import static io.humainary.substrates.api.Substrates.*;
 
 /**
  * Circuit for queue flow signal monitoring (RC1 Serventis API).
@@ -15,7 +16,7 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  * <b>RC1 Instrument Pattern</b>:
  * <ul>
  *   <li>Uses {@link Queue} instrument with method calls (overflow(), underflow(), put(), take())</li>
- *   <li>Signals are {@link Queues.Signal} records with Sign + units</li>
+ *   <li>Signals are {@link Queues.Sign} records with Sign + units</li>
  *   <li>Subject context in Channel, not in signals</li>
  *   <li>NO manual Signal construction needed - instruments handle it</li>
  * </ul>
@@ -31,7 +32,7 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  * } else if (utilization > 0.80) {
  *     producerBuffer.put((long)(utilization * 100));       // PUT with pressure indication
  * } else {
- *     producerBuffer.put();                                // Normal PUT
+ *     producerBuffer.enqueue();                                // Normal PUT
  * }
  *
  * circuit.close();
@@ -42,9 +43,9 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  */
 public class QueueFlowCircuit implements AutoCloseable {
 
-    private final Cortex cortex;
+    
     private final Circuit circuit;
-    private final Conduit<Queue, Queues.Signal> conduit;
+    private final Conduit<Queue, Queues.Sign> conduit;
 
     /**
      * Creates a new queue flow circuit.
@@ -52,15 +53,12 @@ public class QueueFlowCircuit implements AutoCloseable {
      * Initializes circuit "queue.flow" with a conduit using {@link Queues#composer}.
      */
     public QueueFlowCircuit() {
-        // Get Cortex instance
-        this.cortex = cortex();
-
-        // Create circuit
-        this.circuit = cortex.circuit(cortex.name("queue.flow"));
+        // Create circuit using static Cortex methods
+        this.circuit = Substrates.cortex().circuit(Substrates.cortex().name("queue.flow"));
 
         // Create conduit with Queues composer (returns Queue instruments)
         this.conduit = circuit.conduit(
-            cortex.name("queue-monitoring"),
+            Substrates.cortex().name("queue-monitoring"),
             Queues::composer
         );
     }
@@ -72,7 +70,7 @@ public class QueueFlowCircuit implements AutoCloseable {
      * @return Queue instrument for emitting queue signals via method calls
      */
     public Queue queueFor(String entityName) {
-        return conduit.get(cortex.name(entityName));
+        return conduit.get(Substrates.cortex().name(entityName));
     }
 
     /**

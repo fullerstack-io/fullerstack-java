@@ -1,12 +1,13 @@
 package io.fullerstack.kafka.runtime.gauge;
 
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
 import io.humainary.substrates.api.Substrates.*;
 
 import java.util.function.BiConsumer;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import io.humainary.substrates.api.Substrates;
+import static io.humainary.substrates.api.Substrates.*;
 
 /**
  * Circuit for gauge signal monitoring (RC5 Serventis API).
@@ -76,7 +77,6 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  */
 public class GaugeFlowCircuit implements AutoCloseable {
 
-  private final Cortex cortex;
   private final Circuit circuit;
   private final Conduit < Gauge, Gauges.Sign > conduit;
 
@@ -86,15 +86,12 @@ public class GaugeFlowCircuit implements AutoCloseable {
    * Initializes circuit "gauge.flow" with a conduit using {@link Gauges#composer}.
    */
   public GaugeFlowCircuit () {
-    // Get Cortex instance
-    this.cortex = cortex ();
-
-    // Create circuit
-    this.circuit = cortex.circuit ( cortex.name ( "gauge.flow" ) );
+    // Create circuit using static Cortex methods
+    this.circuit = Substrates.cortex().circuit ( Substrates.cortex().name ( "gauge.flow" ) );
 
     // Create conduit with Gauges composer (returns Gauge instruments)
     this.conduit = circuit.conduit (
-      cortex.name ( "gauge-monitoring" ),
+      Substrates.cortex().name ( "gauge-monitoring" ),
       Gauges::composer
     );
   }
@@ -106,7 +103,7 @@ public class GaugeFlowCircuit implements AutoCloseable {
    * @return Gauge instrument for emitting gauge signals via method calls
    */
   public Gauge gaugeFor ( String entityName ) {
-    return conduit.get ( cortex.name ( entityName ) );
+    return conduit.get ( Substrates.cortex().name ( entityName ) );
   }
 
   /**
@@ -116,7 +113,7 @@ public class GaugeFlowCircuit implements AutoCloseable {
    * @param subscriber subscriber function receiving Subject and Registrar
    */
   public void subscribe ( String name, BiConsumer < Subject < Channel < Gauges.Sign > >, Registrar < Gauges.Sign > > subscriber ) {
-    conduit.subscribe ( cortex.subscriber ( cortex.name ( name ), subscriber ) );
+    conduit.subscribe ( Substrates.cortex().subscriber ( Substrates.cortex().name ( name ), subscriber ) );
   }
 
   /**

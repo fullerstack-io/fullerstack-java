@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.producer.sensors;
 
-import io.humainary.substrates.ext.serventis.Counters.Counter;
-import io.humainary.substrates.ext.serventis.Gauges.Gauge;
-import io.humainary.substrates.ext.serventis.Queues.Queue;
+import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Queues.Queue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -250,19 +250,19 @@ public class ProducerBufferMonitor implements AutoCloseable {
     private void emitBufferSignal(double utilization, long utilizationPercent) {
         if (utilization >= OVERFLOW_THRESHOLD) {
             // Buffer nearly full - OVERFLOW signal
-            bufferQueue.overflow(utilizationPercent);
+            bufferQueue.overflow();
             logger.warn("Producer buffer {} OVERFLOW: utilization={}%",
                 producerId, utilizationPercent);
 
         } else if (utilization >= PRESSURE_THRESHOLD) {
-            // High utilization - PUT with pressure indication
-            bufferQueue.put(utilizationPercent);
+            // High utilization - enqueue with pressure indication
+            bufferQueue.enqueue();
             logger.debug("Producer buffer {} PRESSURE: utilization={}%",
                 producerId, utilizationPercent);
 
         } else {
             // Normal operation - PUT without units (or with low units)
-            bufferQueue.put();
+            bufferQueue.enqueue();
             logger.trace("Producer buffer {} NORMAL: utilization={}%",
                 producerId, utilizationPercent);
         }

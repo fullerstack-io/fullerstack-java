@@ -5,9 +5,9 @@ import io.fullerstack.kafka.broker.models.JvmMemoryMetrics;
 import io.humainary.substrates.api.Substrates.Channel;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pipe;
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Gauges;
-import io.humainary.substrates.ext.serventis.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.humainary.substrates.api.Substrates.cortex;
-import static io.humainary.substrates.ext.serventis.Monitors.Confidence.*;
+import static io.humainary.substrates.ext.serventis.ext.Monitors.Dimension.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -266,7 +266,7 @@ class JvmHealthMonitorTest {
             assertThat(emittedMonitorSignals).hasSize(1);
             Monitors.Signal signal = emittedMonitorSignals.get(0);
             assertThat(signal.sign()).isEqualTo(Monitors.Sign.DEFECTIVE);
-            assertThat(signal.confidence()).isEqualTo(CONFIRMED);
+            assertThat(signal.dimension()).isEqualTo(CONFIRMED);
         }
 
         @Test
@@ -282,7 +282,7 @@ class JvmHealthMonitorTest {
             assertThat(emittedMonitorSignals).hasSize(1);
             Monitors.Signal signal = emittedMonitorSignals.get(0);
             assertThat(signal.sign()).isEqualTo(Monitors.Sign.DEGRADED);
-            assertThat(signal.confidence()).isEqualTo(CONFIRMED);
+            assertThat(signal.dimension()).isEqualTo(CONFIRMED);
         }
 
         @Test
@@ -298,7 +298,7 @@ class JvmHealthMonitorTest {
             assertThat(emittedMonitorSignals).hasSize(1);
             Monitors.Signal signal = emittedMonitorSignals.get(0);
             assertThat(signal.sign()).isEqualTo(Monitors.Sign.DIVERGING);
-            assertThat(signal.confidence()).isEqualTo(MEASURED);
+            assertThat(signal.dimension()).isEqualTo(MEASURED);
         }
 
         @Test
@@ -314,7 +314,7 @@ class JvmHealthMonitorTest {
             assertThat(emittedMonitorSignals).hasSize(1);
             Monitors.Signal signal = emittedMonitorSignals.get(0);
             assertThat(signal.sign()).isEqualTo(Monitors.Sign.STABLE);
-            assertThat(signal.confidence()).isEqualTo(CONFIRMED);
+            assertThat(signal.dimension()).isEqualTo(CONFIRMED);
         }
     }
 

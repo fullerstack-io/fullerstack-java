@@ -1,9 +1,9 @@
 package io.fullerstack.kafka.broker.circuits;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.humainary.substrates.ext.serventis.Routers;
-import io.humainary.substrates.ext.serventis.Routers.Router;
-import io.humainary.substrates.ext.serventis.Routers.Sign;
+import io.humainary.substrates.ext.serventis.ext.Routers;
+import io.humainary.substrates.ext.serventis.ext.Routers.Router;
+import io.humainary.substrates.ext.serventis.ext.Routers.Sign;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +69,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * <p>
  * <b>Thread Safety</b>: All operations synchronized via Circuit's Valve (virtual thread)
  *
- * @see io.humainary.substrates.ext.serventis.Routers
+ * @see io.humainary.substrates.ext.serventis.ext.Routers
  * @see IsrReplicationObserver
  */
 public class RouterFlowCircuit implements AutoCloseable {

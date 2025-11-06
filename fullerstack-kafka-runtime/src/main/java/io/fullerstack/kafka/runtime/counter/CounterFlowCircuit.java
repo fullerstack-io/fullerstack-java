@@ -1,12 +1,13 @@
 package io.fullerstack.kafka.runtime.counter;
 
-import io.humainary.substrates.ext.serventis.Counters;
-import io.humainary.substrates.ext.serventis.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Counters;
+import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
 import io.humainary.substrates.api.Substrates.*;
 
 import java.util.function.BiConsumer;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import io.humainary.substrates.api.Substrates;
+import static io.humainary.substrates.api.Substrates.*;
 
 /**
  * Circuit for counter signal monitoring (RC5 Serventis API).
@@ -67,7 +68,7 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  */
 public class CounterFlowCircuit implements AutoCloseable {
 
-  private final Cortex cortex;
+  
   private final Circuit circuit;
   private final Conduit < Counter, Counters.Sign > conduit;
 
@@ -77,15 +78,12 @@ public class CounterFlowCircuit implements AutoCloseable {
    * Initializes circuit "counter.flow" with a conduit using {@link Counters#composer}.
    */
   public CounterFlowCircuit () {
-    // Get Cortex instance
-    this.cortex = cortex ();
-
-    // Create circuit
-    this.circuit = cortex.circuit ( cortex.name ( "counter.flow" ) );
+    // Create circuit using static Cortex methods
+    this.circuit = Substrates.cortex().circuit ( Substrates.cortex().name ( "counter.flow" ) );
 
     // Create conduit with Counters composer (returns Counter instruments)
     this.conduit = circuit.conduit (
-      cortex.name ( "counter-monitoring" ),
+      Substrates.cortex().name ( "counter-monitoring" ),
       Counters::composer
     );
   }
@@ -97,7 +95,7 @@ public class CounterFlowCircuit implements AutoCloseable {
    * @return Counter instrument for emitting counter signals via method calls
    */
   public Counter counterFor ( String entityName ) {
-    return conduit.get ( cortex.name ( entityName ) );
+    return conduit.get ( Substrates.cortex().name ( entityName ) );
   }
 
   /**
@@ -107,7 +105,7 @@ public class CounterFlowCircuit implements AutoCloseable {
    * @param subscriber subscriber function receiving Subject and Registrar
    */
   public void subscribe ( String name, BiConsumer < Subject < Channel < Counters.Sign > >, Registrar < Counters.Sign > > subscriber ) {
-    conduit.subscribe ( cortex.subscriber ( cortex.name ( name ), subscriber ) );
+    conduit.subscribe ( Substrates.cortex().subscriber ( Substrates.cortex().name ( name ), subscriber ) );
   }
 
   /**
