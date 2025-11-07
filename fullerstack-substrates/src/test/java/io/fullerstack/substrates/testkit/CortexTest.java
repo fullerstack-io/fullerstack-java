@@ -257,7 +257,7 @@ final class CortexTest
   void testPoolCreationWithSingleton () {
 
     final var singleton = "test-singleton";
-    final Pool<Pipe<String>> pool = cortex.pool(name -> new MockPipe<>(singleton));
+    final Pool<Pipe<String>> pool = cortex.pool(name -> new MockPipe<>(singleton), Pool.Mode.CONCURRENT);
 
     assertNotNull ( pool );
 
@@ -267,7 +267,7 @@ final class CortexTest
   void testPoolGetBySubject () {
 
     final var singleton = 42;
-    final Pool<Pipe<Integer>> pool = cortex.pool(name -> new MockPipe<>(singleton));
+    final Pool<Pipe<Integer>> pool = cortex.pool(name -> new MockPipe<>(singleton), Pool.Mode.CONCURRENT);
 
     final var circuit = cortex.circuit ();
 
@@ -293,7 +293,7 @@ final class CortexTest
   void testPoolGetBySubstrate () {
 
     final var singleton = 3.14159;
-    final Pool<Pipe<Double>> pool = cortex.pool(name -> new MockPipe<>(singleton));
+    final Pool<Pipe<Double>> pool = cortex.pool(name -> new MockPipe<>(singleton), Pool.Mode.CONCURRENT);
 
     final var circuit = cortex.circuit ();
 
@@ -314,7 +314,7 @@ final class CortexTest
   void testPoolReturnsSameSingletonInstance () {
 
     final var singleton = "singleton-value";
-    final Pool<Pipe<String>> pool = cortex.pool(name -> new MockPipe<>(singleton));
+    final Pool<Pipe<String>> pool = cortex.pool(name -> new MockPipe<>(singleton), Pool.Mode.CONCURRENT);
 
     final var name1 = cortex.name ( "pool.test.first" );
     final var name2 = cortex.name ( "pool.test.second" );
@@ -844,7 +844,7 @@ final class CortexTest
       @Override
       public void flush () { }
     };
-    final Pool<Pipe<Integer>> pool = cortex.pool(name -> pipe);
+    final Pool<Pipe<Integer>> pool = cortex.pool(name -> pipe, Pool.Mode.CONCURRENT);
 
     final var subscriber =
       cortex.subscriber ( subscriberName, pool );
@@ -940,7 +940,7 @@ final class CortexTest
         @Override
         public void flush () { }
       };
-      final var pool = cortex.pool(name -> collectorPipe);
+      final var pool = cortex.pool(name -> collectorPipe, Pool.Mode.CONCURRENT);
 
       final Subscriber < Integer > subscriber =
         cortex.subscriber (

@@ -321,9 +321,9 @@ class AgentsApiDemoTest {
 
         // Verify signal properties
         assertThat(Signal.PROMISE.dimension())
-            .isEqualTo(Dimension.OUTBOUND);
+            .isEqualTo(Dimension.PROMISER);
         assertThat(Signal.PROMISED.dimension())
-            .isEqualTo(Dimension.INBOUND);
+            .isEqualTo(Dimension.PROMISEE);
     }
 
     @Test

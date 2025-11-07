@@ -138,7 +138,7 @@ class AgentFlowCircuitTest {
 
         // Then
         assertThat(capturedTimeline).hasSize(1);
-        assertThat(capturedTimeline.get(0)).contains("INQUIRE").contains("OUTBOUND");
+        assertThat(capturedTimeline.get(0)).contains("INQUIRE").contains("PROMISER");
     }
 
     @Test
@@ -169,11 +169,11 @@ class AgentFlowCircuitTest {
 
         // Then - verify complete lifecycle signals
         assertThat(capturedTimeline).containsExactly(
-            "consumer-1:INQUIRE:OUTBOUND",
-            "coordinator-test-group:OFFER:INBOUND",
-            "consumer-1:PROMISE:OUTBOUND",
-            "coordinator-test-group:ACCEPT:INBOUND",
-            "consumer-1:FULFILL:OUTBOUND"
+            "consumer-1:INQUIRE:PROMISER",
+            "coordinator-test-group:OFFER:PROMISEE",
+            "consumer-1:PROMISE:PROMISER",
+            "coordinator-test-group:ACCEPT:PROMISEE",
+            "consumer-1:FULFILL:PROMISER"
         );
     }
 
@@ -209,7 +209,7 @@ class AgentFlowCircuitTest {
 
         // Then - verify breach sequence
         assertThat(capturedTimeline)
-            .contains("consumer-2:BREACH:OUTBOUND")
+            .contains("consumer-2:BREACH:PROMISER")
             .hasSize(5);  // INQUIRE, OFFERED, PROMISE, ACCEPTED, BREACH
     }
 
@@ -272,7 +272,7 @@ class AgentFlowCircuitTest {
     // ========================================
 
     @Test
-    @DisplayName("Consumer signals are OUTBOUND")
+    @DisplayName("Consumer signals are PROMISER")
     void shouldEmitOutboundSignalsForConsumer() {
         // Given
         Agent consumer = circuit.consumer("test-consumer");
@@ -283,18 +283,18 @@ class AgentFlowCircuitTest {
         consumer.fulfill();
         circuit.awaitSignals();
 
-        // Then - all consumer signals are OUTBOUND
+        // Then - all consumer signals are PROMISER
         List<String> consumerEvents = capturedTimeline.stream()
             .filter(e -> e.startsWith("test-consumer"))
             .toList();
 
         consumerEvents.forEach(event -> {
-            assertThat(event).endsWith("OUTBOUND");
+            assertThat(event).endsWith("PROMISER");
         });
     }
 
     @Test
-    @DisplayName("Coordinator signals are INBOUND")
+    @DisplayName("Coordinator signals are PROMISEE")
     void shouldEmitInboundSignalsForCoordinator() {
         // Given
         Agent coordinator = circuit.coordinator("test-group");
@@ -304,13 +304,13 @@ class AgentFlowCircuitTest {
         coordinator.accepted();
         circuit.awaitSignals();
 
-        // Then - coordinator signals are INBOUND (observed by consumer)
+        // Then - coordinator signals are PROMISEE (observed by consumer)
         List<String> coordinatorEvents = capturedTimeline.stream()
             .filter(e -> e.contains("coordinator"))
             .toList();
 
         coordinatorEvents.forEach(event -> {
-            assertThat(event).endsWith("INBOUND");
+            assertThat(event).endsWith("PROMISEE");
         });
     }
 
@@ -398,14 +398,14 @@ class AgentFlowCircuitTest {
         Agent agent = circuit.agent("test-agent");
 
         // When - emit both directions for PROMISE
-        agent.promise();   // OUTBOUND
-        agent.promised();  // INBOUND
+        agent.promise();   // PROMISER
+        agent.promised();  // PROMISEE
         circuit.awaitSignals();
 
         // Then
         assertThat(capturedTimeline).containsExactly(
-            "test-agent:PROMISE:OUTBOUND",
-            "test-agent:PROMISE:INBOUND"
+            "test-agent:PROMISE:PROMISER",
+            "test-agent:PROMISE:PROMISEE"
         );
     }
 
