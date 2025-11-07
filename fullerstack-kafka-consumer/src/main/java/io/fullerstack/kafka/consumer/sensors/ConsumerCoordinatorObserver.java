@@ -228,8 +228,8 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
                 emitPollIntervalSignal(groupId);
             }
 
-            // Await signal processing (RC7 pattern)
-            circuit.await();
+            // Signal processing happens asynchronously via Valve
+            // No blocking await() in production code
 
         } catch (GroupIdNotFoundException e) {
             logger.debug("Consumer group not found (may not exist yet): {}", e.getMessage());

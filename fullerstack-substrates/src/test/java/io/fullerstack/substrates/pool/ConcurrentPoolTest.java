@@ -1,6 +1,7 @@
 package io.fullerstack.substrates.pool;
 
 import io.humainary.substrates.api.Substrates.Name;
+import io.humainary.substrates.api.Substrates.Pipe;
 import io.humainary.substrates.api.Substrates.Pool;
 import io.fullerstack.substrates.name.HierarchicalName;
 import org.junit.jupiter.api.Test;
@@ -11,35 +12,65 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ConcurrentPoolTest {
 
+  /**
+   * Helper to create a simple mock Pipe for testing.
+   */
+  private static class MockPipe<T> implements Pipe<T> {
+    private final String value;
+
+    MockPipe(String value) {
+      this.value = value;
+    }
+
+    @Override
+    public void emit(T t) {
+      // No-op for testing
+    }
+
+    @Override
+    public void flush() {
+      // No-op for testing
+    }
+
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return value;
+    }
+  }
+
   @Test
   void shouldReturnSameInstanceForSameName () {
-    Pool < String > pool = new ConcurrentPool <> ( name -> "value-" + name.value () );
+    Pool<Pipe<String>> pool = new ConcurrentPool<>( name -> new MockPipe<>("value-" + name.value()) );
 
     Name name = HierarchicalName.of ( "test" );
-    String value1 = pool.get ( name );
-    String value2 = pool.get ( name );
+    Pipe<String> value1 = pool.get ( name );
+    Pipe<String> value2 = pool.get ( name );
 
     assertThat ( value1 ).isSameAs ( value2 );
   }
 
   @Test
   void shouldReturnDifferentInstancesForDifferentNames () {
-    Pool < String > pool = new ConcurrentPool <> ( name -> "value-" + name.value () );
+    Pool<Pipe<String>> pool = new ConcurrentPool<>( name -> new MockPipe<>("value-" + name.value()) );
 
-    String value1 = pool.get ( HierarchicalName.of ( "test1" ) );
-    String value2 = pool.get ( HierarchicalName.of ( "test2" ) );
+    Pipe<String> value1 = pool.get ( HierarchicalName.of ( "test1" ) );
+    Pipe<String> value2 = pool.get ( HierarchicalName.of ( "test2" ) );
 
     assertThat ( value1 ).isNotEqualTo ( value2 );
-    assertThat ( value1 ).isEqualTo ( "value-test1" );
-    assertThat ( value2 ).isEqualTo ( "value-test2" );
+    assertThat ( value1.toString() ).isEqualTo ( "value-test1" );
+    assertThat ( value2.toString() ).isEqualTo ( "value-test2" );
   }
 
   @Test
   void shouldCallFactoryOnlyOnce () {
     AtomicInteger factoryCalls = new AtomicInteger ( 0 );
-    Pool < String > pool = new ConcurrentPool <> ( name -> {
+    Pool<Pipe<String>> pool = new ConcurrentPool<>( name -> {
       factoryCalls.incrementAndGet ();
-      return "value";
+      return new MockPipe<>("value");
     } );
 
     Name name = HierarchicalName.of ( "test" );
@@ -53,30 +84,30 @@ class ConcurrentPoolTest {
   @Test
   void shouldSupportComplexObjects () {
     // Use path() to get full hierarchical name, not just value() which returns the last segment
-    Pool < ComplexObject > pool = new ConcurrentPool <> ( name -> new ComplexObject ( name.path ().toString () ) );
+    Pool<ComplexPipe> pool = new ConcurrentPool<>( name -> new ComplexPipe( name.path ().toString () ) );
 
     Name name = HierarchicalName.of ( "kafka.broker.1" );
-    ComplexObject obj = pool.get ( name );
+    ComplexPipe obj = pool.get ( name );
 
     assertThat ( obj.value ).isEqualTo ( "kafka.broker.1" );
   }
 
   @Test
   void shouldHandleNullFactory () {
-    Pool < String > pool = new ConcurrentPool <> ( name -> null );
+    Pool<Pipe<String>> pool = new ConcurrentPool<>( name -> null );
 
-    String value = pool.get ( HierarchicalName.of ( "test" ) );
+    Pipe<String> value = pool.get ( HierarchicalName.of ( "test" ) );
 
     assertThat ( value ).isNull ();
   }
 
   @Test
   void shouldSupportConcurrentAccess () throws Exception {
-    Pool < String > pool = new ConcurrentPool <> ( name -> "value-" + name.value () );
+    Pool<Pipe<String>> pool = new ConcurrentPool<>( name -> new MockPipe<>("value-" + name.value()) );
     Name name = HierarchicalName.of ( "concurrent" );
 
     Thread[] threads = new Thread[10];
-    String[] results = new String[10];
+    Pipe<String>[] results = new Pipe[10];
 
     for ( int i = 0; i < threads.length; i++ ) {
       final int index = i;
@@ -96,11 +127,24 @@ class ConcurrentPoolTest {
     }
   }
 
-  private static class ComplexObject {
+  /**
+   * Complex Pipe implementation for testing
+   */
+  private static class ComplexPipe implements Pipe<Object> {
     final String value;
 
-    ComplexObject ( String value ) {
+    ComplexPipe ( String value ) {
       this.value = value;
+    }
+
+    @Override
+    public void emit(Object o) {
+      // No-op for testing
+    }
+
+    @Override
+    public void flush() {
+      // No-op for testing
     }
   }
 }

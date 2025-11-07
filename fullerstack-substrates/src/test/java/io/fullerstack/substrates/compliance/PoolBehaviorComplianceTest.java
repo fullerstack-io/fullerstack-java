@@ -25,6 +25,50 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PoolBehaviorComplianceTest {
 
   /**
+   * Helper to create a mock Pipe for testing Pool behavior.
+   * Uses a String identifier for easy testing.
+   */
+  private static class MockPipe implements Pipe<String> {
+    private final String id;
+
+    MockPipe(String id) {
+      this.id = id;
+    }
+
+    @Override
+    public void emit(String s) {
+      // No-op for testing
+    }
+
+    @Override
+    public void flush() {
+      // No-op for testing
+    }
+
+    @Override
+    public String toString() {
+      return id;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof MockPipe)) return false;
+      MockPipe mockPipe = (MockPipe) o;
+      return id.equals(mockPipe.id);
+    }
+
+    @Override
+    public int hashCode() {
+      return id.hashCode();
+    }
+
+    public String getId() {
+      return id;
+    }
+  }
+
+  /**
    * **Documented Behavior**: Instance caching - same name returns same instance.
    * <p>
    * From Pool documentation:
@@ -36,16 +80,16 @@ class PoolBehaviorComplianceTest {
    */
   @Test
   void testCaching_SameNameReturnsSameInstance() {
-    Pool<String> pool = new ConcurrentPool<>(name -> "instance-" + name.part());
+    Pool<Pipe<String>> pool = new ConcurrentPool<>(name -> new MockPipe("instance-" + name.part()));
 
     Name name = cortex().name("entity");
-    String first = pool.get(name);
-    String second = pool.get(name);
-    String third = pool.get(name);
+    Pipe<String> first = pool.get(name);
+    Pipe<String> second = pool.get(name);
+    Pipe<String> third = pool.get(name);
 
     // Verify: Same object reference (identity, not just equality)
-    assertThat((Object) first).isSameAs(second);
-    assertThat((Object) second).isSameAs(third);
+    assertThat(first).isSameAs(second);
+    assertThat(second).isSameAs(third);
   }
 
   /**
@@ -62,9 +106,9 @@ class PoolBehaviorComplianceTest {
   @Test
   void testFactoryInvocation_CalledOnlyOncePerName() {
     AtomicInteger factoryCalls = new AtomicInteger(0);
-    Pool<String> pool = new ConcurrentPool<>(name -> {
+    Pool<Pipe<String>> pool = new ConcurrentPool<>(name -> {
       factoryCalls.incrementAndGet();
-      return "instance-" + name.part();
+      return new MockPipe("instance-" + name.part());
     });
 
     Name name = cortex().name("entity");
@@ -90,7 +134,7 @@ class PoolBehaviorComplianceTest {
   @Test
   void testThreadSafety_ConcurrentAccessCreatesOneInstance() throws InterruptedException {
     AtomicInteger factoryCalls = new AtomicInteger(0);
-    Pool<String> pool = new ConcurrentPool<>(name -> {
+    Pool<Pipe<String>> pool = new ConcurrentPool<>(name -> {
       factoryCalls.incrementAndGet();
       // Simulate some work to increase contention
       try {
@@ -98,14 +142,14 @@ class PoolBehaviorComplianceTest {
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       }
-      return "instance-" + name.part();
+      return new MockPipe("instance-" + name.part());
     });
 
     Name name = cortex().name("concurrent");
     int threadCount = 20;
     CountDownLatch startLatch = new CountDownLatch(1);
     CountDownLatch doneLatch = new CountDownLatch(threadCount);
-    String[] results = new String[threadCount];
+    Pipe<String>[] results = new Pipe[threadCount];
 
     // Create threads that all try to get the same instance simultaneously
     for (int i = 0; i < threadCount; i++) {
@@ -131,7 +175,7 @@ class PoolBehaviorComplianceTest {
 
     // Verify: All threads got the same instance
     for (int i = 1; i < threadCount; i++) {
-      assertThat((Object) results[i]).isSameAs(results[0]);
+      assertThat(results[i]).isSameAs(results[0]);
     }
   }
 
@@ -146,7 +190,7 @@ class PoolBehaviorComplianceTest {
    */
   @Test
   void testAccessMethods_SubjectDelegatesToName() {
-    Pool<String> pool = new ConcurrentPool<>(name -> "instance-" + name.part());
+    Pool<Pipe<String>> pool = new ConcurrentPool<>(name -> new MockPipe("instance-" + name.part()));
 
     Circuit circuit = cortex().circuit(cortex().name("test-circuit"));
     try {
@@ -157,13 +201,13 @@ class PoolBehaviorComplianceTest {
       );
 
       // Access via Subject
-      String viaSubject = pool.get(conduit.subject());
+      Pipe<String> viaSubject = pool.get(conduit.subject());
 
       // Access via Name directly
-      String viaName = pool.get(cortex().name("entity"));
+      Pipe<String> viaName = pool.get(cortex().name("entity"));
 
       // Verify: Both return the same instance
-      assertThat((Object) viaSubject).isSameAs(viaName);
+      assertThat(viaSubject).isSameAs(viaName);
     } finally {
       circuit.close();
     }
@@ -180,7 +224,7 @@ class PoolBehaviorComplianceTest {
    */
   @Test
   void testAccessMethods_SubstrateDelegatesToName() {
-    Pool<String> pool = new ConcurrentPool<>(name -> "instance-" + name.part());
+    Pool<Pipe<String>> pool = new ConcurrentPool<>(name -> new MockPipe("instance-" + name.part()));
 
     Circuit circuit = cortex().circuit(cortex().name("test-circuit"));
     try {
@@ -191,13 +235,13 @@ class PoolBehaviorComplianceTest {
       );
 
       // Access via Substrate
-      String viaSubstrate = pool.get((Substrate<?>) conduit);
+      Pipe<String> viaSubstrate = pool.get((Substrate<?>) conduit);
 
       // Access via Name directly
-      String viaName = pool.get(cortex().name("entity"));
+      Pipe<String> viaName = pool.get(cortex().name("entity"));
 
       // Verify: Both return the same instance
-      assertThat((Object) viaSubstrate).isSameAs(viaName);
+      assertThat(viaSubstrate).isSameAs(viaName);
     } finally {
       circuit.close();
     }
@@ -212,9 +256,9 @@ class PoolBehaviorComplianceTest {
   @Test
   void testNameEquivalence_AllAccessMethodsReturnSameInstance() {
     AtomicInteger factoryCalls = new AtomicInteger(0);
-    Pool<String> pool = new ConcurrentPool<>(name -> {
+    Pool<Pipe<String>> pool = new ConcurrentPool<>(name -> {
       factoryCalls.incrementAndGet();
-      return "instance-" + name.part();
+      return new MockPipe("instance-" + name.part());
     });
 
     Circuit circuit = cortex().circuit(cortex().name("test-circuit"));
@@ -223,13 +267,13 @@ class PoolBehaviorComplianceTest {
       Conduit<Pipe<Integer>, Integer> conduit = circuit.conduit(entityName, Composer.pipe());
 
       // Access via all three methods
-      String viaName = pool.get(entityName);
-      String viaSubject = pool.get(conduit.subject());
-      String viaSubstrate = pool.get((Substrate<?>) conduit);
+      Pipe<String> viaName = pool.get(entityName);
+      Pipe<String> viaSubject = pool.get(conduit.subject());
+      Pipe<String> viaSubstrate = pool.get((Substrate<?>) conduit);
 
       // Verify: All return the same instance
-      assertThat((Object) viaName).isSameAs(viaSubject);
-      assertThat((Object) viaSubject).isSameAs(viaSubstrate);
+      assertThat(viaName).isSameAs(viaSubject);
+      assertThat(viaSubject).isSameAs(viaSubstrate);
 
       // Verify: Factory called exactly once for all three accesses
       assertThat(factoryCalls.get()).isEqualTo(1);
@@ -245,21 +289,21 @@ class PoolBehaviorComplianceTest {
    */
   @Test
   void testCaching_DifferentNamesReturnDifferentInstances() {
-    Pool<String> pool = new ConcurrentPool<>(name -> "instance-" + name.part());
+    Pool<Pipe<String>> pool = new ConcurrentPool<>(name -> new MockPipe("instance-" + name.part()));
 
-    String entity1 = pool.get(cortex().name("entity1"));
-    String entity2 = pool.get(cortex().name("entity2"));
-    String entity3 = pool.get(cortex().name("entity3"));
+    Pipe<String> entity1 = pool.get(cortex().name("entity1"));
+    Pipe<String> entity2 = pool.get(cortex().name("entity2"));
+    Pipe<String> entity3 = pool.get(cortex().name("entity3"));
 
     // Verify: Different instances for different names
-    assertThat((Object) entity1).isNotSameAs(entity2);
-    assertThat((Object) entity2).isNotSameAs(entity3);
-    assertThat((Object) entity1).isNotSameAs(entity3);
+    assertThat(entity1).isNotSameAs(entity2);
+    assertThat(entity2).isNotSameAs(entity3);
+    assertThat(entity1).isNotSameAs(entity3);
 
     // Verify: Factory used name correctly
-    assertThat(entity1).isEqualTo("instance-entity1");
-    assertThat(entity2).isEqualTo("instance-entity2");
-    assertThat(entity3).isEqualTo("instance-entity3");
+    assertThat(entity1.toString()).isEqualTo("instance-entity1");
+    assertThat(entity2.toString()).isEqualTo("instance-entity2");
+    assertThat(entity3.toString()).isEqualTo("instance-entity3");
   }
 
   /**
@@ -276,9 +320,9 @@ class PoolBehaviorComplianceTest {
    */
   @Test
   void testReturnValue_NeverNull() {
-    Pool<String> pool = new ConcurrentPool<>(name -> "non-null-" + name.part());
+    Pool<Pipe<String>> pool = new ConcurrentPool<>(name -> new MockPipe("non-null-" + name.part()));
 
-    String result = pool.get(cortex().name("entity"));
+    Pipe<String> result = pool.get(cortex().name("entity"));
 
     // Verify: Result is not null (API contract)
     assertThat(result).isNotNull();

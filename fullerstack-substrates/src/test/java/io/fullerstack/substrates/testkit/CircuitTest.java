@@ -887,11 +887,11 @@ final class CircuitTest
           emptyPipe         // empty aggregation pipe
         );
 
-      // In RC3, cell.get() returns a Cell, not a Pipe
-      // Use cell.get(name).pipe() to get the input pipe for a specific channel
+      // In PREVIEW, Cell extends Pipe directly
+      // cell.get() returns a Cell which IS a Pipe
       final Pipe < String > pipe = cell.get (
         cortex.name ( "cell.channel" )
-      ).pipe ();
+      );
 
       assertNotNull ( pipe );
 

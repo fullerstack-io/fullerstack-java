@@ -90,8 +90,13 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When - simulate complete rebalance
         monitor.onPartitionsRevoked(partitions);
+        circuit.await();
         monitor.onPartitionsAssigned(partitions);
 
+        // Await signal processing (TEST ONLY)
+        circuit.await();
+
+        circuit.await();
         // Then - verify promise sequence
         assertThat(capturedSignals).hasSize(4);
 
@@ -118,7 +123,9 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When
         monitor.onPartitionsRevoked(partitions);
+        circuit.await();
 
+        circuit.await();
         // Then
         assertThat(capturedSignals).hasSize(1);
         assertSignal(0, "test-consumer", Agents.Signal.INQUIRE);
@@ -135,7 +142,9 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When
         monitor.onPartitionsAssigned(partitions);
+        circuit.await();
 
+        circuit.await();
         // Then - verify 3-signal promise sequence
         assertThat(capturedSignals).hasSize(3);
 
@@ -157,7 +166,9 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When
         monitor.onPartitionsAssigned(emptyPartitions);
+        circuit.await();
 
+        circuit.await();
         // Then - promise sequence still occurs (consumer commits to having zero partitions)
         assertThat(capturedSignals).hasSize(3);
         assertSignal(0, "coordinator-test-group", Agents.Signal.OFFERED);
@@ -178,11 +189,14 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When - simulate two consecutive rebalances
         monitor.onPartitionsRevoked(partitions1);
+        circuit.await();
         monitor.onPartitionsAssigned(partitions1);
 
         monitor.onPartitionsRevoked(partitions2);
+        circuit.await();
         monitor.onPartitionsAssigned(partitions2);
 
+        circuit.await();
         // Then - 8 total signals (4 per rebalance)
         assertThat(capturedSignals).hasSize(8);
 
@@ -213,8 +227,10 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When
         monitor.onPartitionsRevoked(partitions);
+        circuit.await();
         monitor.onPartitionsAssigned(partitions);
 
+        circuit.await();
         // Then - filter consumer signals
         List<SignalEvent> consumerSignals = capturedSignals.stream()
             .filter(e -> e.subjectName.equals("test-consumer"))
@@ -240,7 +256,9 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When
         monitor.onPartitionsAssigned(partitions);
+        circuit.await();
 
+        circuit.await();
         // Then - filter coordinator signals
         List<SignalEvent> coordinatorSignals = capturedSignals.stream()
             .filter(e -> e.subjectName.contains("coordinator"))
@@ -270,8 +288,11 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When
         monitor.onPartitionsRevoked(partitions);
+        circuit.await();
         monitor.onPartitionsAssigned(partitions);
+        circuit.await();
 
+        circuit.await();
         // Then - verify Sign enum values
         assertThat(capturedSignals.get(0).signal.sign()).isEqualTo(Agents.Sign.INQUIRE);
         assertThat(capturedSignals.get(1).signal.sign()).isEqualTo(Agents.Sign.OFFER);   // OFFERED signal has OFFER sign
@@ -289,8 +310,11 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When
         monitor.onPartitionsRevoked(partitions);
+        circuit.await();
         monitor.onPartitionsAssigned(partitions);
+        circuit.await();
 
+        circuit.await();
         // Then - verify Promise Theory flow
         // 1. Discovery: Consumer asks, Coordinator offers
         assertThat(capturedSignals.get(0).signal.sign()).isEqualTo(Agents.Sign.INQUIRE);
@@ -327,8 +351,10 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When - multiple calls should still work
         monitor.onPartitionsRevoked(partitions);
+        circuit.await();
         monitor.onPartitionsRevoked(partitions);
 
+        circuit.await();
         // Then - both revokes processed
         long inquireCount = capturedSignals.stream()
             .filter(e -> e.signal.sign() == Agents.Sign.INQUIRE)
@@ -347,8 +373,10 @@ class ConsumerRebalanceAgentMonitorTest {
 
         // When - multiple assignments
         monitor.onPartitionsAssigned(partitions);
+        circuit.await();
         monitor.onPartitionsAssigned(partitions);
 
+        circuit.await();
         // Then - both assignments processed
         long promiseCount = capturedSignals.stream()
             .filter(e -> e.signal.sign() == Agents.Sign.PROMISE)
@@ -370,6 +398,7 @@ class ConsumerRebalanceAgentMonitorTest {
         );
 
         monitor.onPartitionsAssigned(partitions);
+        circuit.await();
         capturedSignals.clear();
 
         // When - notify of offset commits
@@ -378,7 +407,9 @@ class ConsumerRebalanceAgentMonitorTest {
                 new org.apache.kafka.clients.consumer.OffsetAndMetadata(100L));
 
         monitor.onOffsetsCommitted(offsets);
+        circuit.await();
 
+        circuit.await();
         // Then - no immediate signals (just tracked for future fulfillment)
         // (In production, this would contribute to FULFILL assessment)
         assertThat(capturedSignals).isEmpty();
@@ -389,8 +420,10 @@ class ConsumerRebalanceAgentMonitorTest {
     void shouldHandleNullOffsetCommits() {
         // When
         monitor.onOffsetsCommitted(null);
+        circuit.await();
         monitor.onOffsetsCommitted(Collections.emptyMap());
 
+        circuit.await();
         // Then - no errors
         assertThat(capturedSignals).isEmpty();
     }
@@ -408,10 +441,12 @@ class ConsumerRebalanceAgentMonitorTest {
         );
 
         monitor.onPartitionsAssigned(partitions);
+        circuit.await();
 
         // When
         monitor.close();
 
+        circuit.await();
         // Then - no exceptions, resources released
         // (Scheduler should be shut down)
     }

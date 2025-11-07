@@ -1,6 +1,8 @@
 package io.fullerstack.substrates.cell;
 
 import io.humainary.substrates.api.Substrates.*;
+import io.fullerstack.substrates.channel.EmissionChannel;
+import io.fullerstack.substrates.conduit.TransformingConduit;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.subject.HierarchicalSubject;
@@ -86,13 +88,18 @@ public class SimpleCell < I, E > implements Cell < I, E > {
     );
   }
 
-  // ========== Pipe< I > accessor ==========
+  // ========== Pipe< I > implementation (PREVIEW API: Cell extends Pipe<I>) ==========
 
   @Override
-  public Pipe < I > pipe () {
-    // Return the input pipe (Cell no longer implements Pipe directly)
-    // Cell.pipe() method instead of implementing Pipe interface
-    return inputPipe;
+  public void emit ( I emission ) {
+    // Delegate to the input pipe
+    inputPipe.emit ( emission );
+  }
+
+  @Override
+  public void flush () {
+    // Delegate to the input pipe
+    inputPipe.flush ();
   }
 
   // ========== Source< E > implementation (output) ==========
@@ -122,9 +129,9 @@ public class SimpleCell < I, E > implements Cell < I, E > {
       // Conduit.get() returns Percept (Pipe), not Channel
       // We need to create Channel and pass it to composers
       @SuppressWarnings ( "unchecked" )
-      io.fullerstack.substrates.conduit.TransformingConduit < ?, E > transformingConduit =
-        (io.fullerstack.substrates.conduit.TransformingConduit < ?, E >) conduit;
-      Channel < E > childChannel = new io.fullerstack.substrates.channel.EmissionChannel <> ( n, transformingConduit, null );
+      TransformingConduit < ?, E > transformingConduit =
+        (TransformingConduit < ?, E >) conduit;
+      Channel < E > childChannel = new EmissionChannel <> ( n, transformingConduit, null );
 
       // Apply ingress composer: Channel<E> -> Pipe<I>
       Pipe < I > childInputPipe = ingressComposer.compose ( childChannel );

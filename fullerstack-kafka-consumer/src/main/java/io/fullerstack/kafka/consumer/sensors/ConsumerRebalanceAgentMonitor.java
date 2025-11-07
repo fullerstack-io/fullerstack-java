@@ -167,7 +167,7 @@ public class ConsumerRebalanceAgentMonitor implements ConsumerRebalanceListener,
             // Consumer inquires about joining new generation
             // OUTBOUND: "I ask to participate in rebalance"
             consumer.inquire();
-            circuit.await();
+            // Signal processing happens asynchronously via Valve
 
             rebalanceStartTime = System.currentTimeMillis();
 
@@ -208,17 +208,16 @@ public class ConsumerRebalanceAgentMonitor implements ConsumerRebalanceListener,
             // Step 1: Coordinator offers partition assignment
             // INBOUND: "Coordinator offered me these partitions" (past tense, observed)
             coordinator.offered();
-            circuit.await();
 
             // Step 2: Consumer promises to consume partitions
             // OUTBOUND: "I promise to consume these partitions" (present tense, self)
             consumer.promise();
-            circuit.await();
 
             // Step 3: Coordinator accepts the promise
             // INBOUND: "Coordinator accepted my promise" (past tense, observed)
             coordinator.accepted();
-            circuit.await();
+
+            // All signals process asynchronously via Valve
 
             logger.debug("Consumer {} completed promise lifecycle (OFFERED → PROMISE → ACCEPTED)",
                 consumerId);
@@ -307,7 +306,7 @@ public class ConsumerRebalanceAgentMonitor implements ConsumerRebalanceListener,
                     consumerId, totalLag, BREACH_LAG_THRESHOLD);
 
                 consumer.breach();  // OUTBOUND: "I failed to keep my promise"
-                circuit.await();
+                // Signal processes asynchronously
 
                 stopBreachMonitoring();
 
@@ -317,7 +316,7 @@ public class ConsumerRebalanceAgentMonitor implements ConsumerRebalanceListener,
                     consumerId, totalLag, FULFILL_LAG_THRESHOLD);
 
                 consumer.fulfill();  // OUTBOUND: "I kept my promise"
-                circuit.await();
+                // Signal processes asynchronously
 
                 stopBreachMonitoring();
             } else {

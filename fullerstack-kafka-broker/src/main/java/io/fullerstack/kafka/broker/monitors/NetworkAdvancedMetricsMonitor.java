@@ -144,8 +144,6 @@ public class NetworkAdvancedMetricsMonitor implements AutoCloseable {
             pollSaslMetrics();
             pollNetworkThreadWait();
 
-            circuit.await();
-
         } catch (Exception e) {
             logger.error("Advanced network metrics polling failed", e);
         }

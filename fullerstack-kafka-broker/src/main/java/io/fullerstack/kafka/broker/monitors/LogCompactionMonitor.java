@@ -174,8 +174,6 @@ public class LogCompactionMonitor implements AutoCloseable {
             pollCompactionLatency();
             pollDirtyRatio();
 
-            circuit.await();
-
         } catch (java.lang.Exception e) {
             logger.error("Log compaction metrics polling failed", e);
         }

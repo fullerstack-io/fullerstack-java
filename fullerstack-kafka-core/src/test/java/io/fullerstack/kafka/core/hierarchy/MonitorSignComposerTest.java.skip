@@ -1,0 +1,115 @@
+package io.fullerstack.kafka.core.hierarchy;
+
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Unit tests for {@link MonitorSignComposer}.
+ */
+class MonitorSignComposerTest {
+
+    private final MonitorSignComposer composer = new MonitorSignComposer();
+
+    @Test
+    void testWorstCaseAggregation() {
+        // Given: 3 child signs (STABLE, DEGRADED, STABLE)
+        List<Monitors.Sign> children = List.of(
+            Monitors.Sign.STABLE,
+            Monitors.Sign.DEGRADED,
+            Monitors.Sign.STABLE
+        );
+
+        // When: Compose
+        Monitors.Sign result = composer.compose(children);
+
+        // Then: Should return worst-case (DEGRADED)
+        assertThat(result).isEqualTo(Monitors.Sign.DEGRADED);
+    }
+
+    @Test
+    void testAllSeverityLevels() {
+        // Given: All severity levels with DOWN being worst
+        List<Monitors.Sign> children = List.of(
+            Monitors.Sign.STABLE,
+            Monitors.Sign.CONVERGING,
+            Monitors.Sign.DIVERGING,
+            Monitors.Sign.ERRATIC,
+            Monitors.Sign.DEGRADED,
+            Monitors.Sign.DEFECTIVE,
+            Monitors.Sign.DOWN
+        );
+
+        // When: Compose
+        Monitors.Sign result = composer.compose(children);
+
+        // Then: DOWN should override all others
+        assertThat(result).isEqualTo(Monitors.Sign.DOWN);
+    }
+
+    @Test
+    void testEmptyChildren() {
+        // Given: Empty iterable
+        List<Monitors.Sign> children = List.of();
+
+        // When: Compose
+        Monitors.Sign result = composer.compose(children);
+
+        // Then: Should return STABLE (default)
+        assertThat(result).isEqualTo(Monitors.Sign.STABLE);
+    }
+
+    @Test
+    void testSingleChild() {
+        // Given: Single DEGRADED child
+        List<Monitors.Sign> children = List.of(Monitors.Sign.DEGRADED);
+
+        // When: Compose
+        Monitors.Sign result = composer.compose(children);
+
+        // Then: Should return DEGRADED
+        assertThat(result).isEqualTo(Monitors.Sign.DEGRADED);
+    }
+
+    @Test
+    void testSeverityOrdering() {
+        // Test that DEFECTIVE overrides DEGRADED
+        List<Monitors.Sign> test1 = List.of(Monitors.Sign.DEGRADED, Monitors.Sign.DEFECTIVE);
+        assertThat(composer.compose(test1)).isEqualTo(Monitors.Sign.DEFECTIVE);
+
+        // Test that DEGRADED overrides ERRATIC
+        List<Monitors.Sign> test2 = List.of(Monitors.Sign.ERRATIC, Monitors.Sign.DEGRADED);
+        assertThat(composer.compose(test2)).isEqualTo(Monitors.Sign.DEGRADED);
+
+        // Test that ERRATIC overrides DIVERGING
+        List<Monitors.Sign> test3 = List.of(Monitors.Sign.DIVERGING, Monitors.Sign.ERRATIC);
+        assertThat(composer.compose(test3)).isEqualTo(Monitors.Sign.ERRATIC);
+
+        // Test that DIVERGING overrides CONVERGING
+        List<Monitors.Sign> test4 = List.of(Monitors.Sign.CONVERGING, Monitors.Sign.DIVERGING);
+        assertThat(composer.compose(test4)).isEqualTo(Monitors.Sign.DIVERGING);
+
+        // Test that CONVERGING overrides STABLE
+        List<Monitors.Sign> test5 = List.of(Monitors.Sign.STABLE, Monitors.Sign.CONVERGING);
+        assertThat(composer.compose(test5)).isEqualTo(Monitors.Sign.CONVERGING);
+    }
+
+    @Test
+    void testAllStable() {
+        // Given: All children are STABLE
+        List<Monitors.Sign> children = List.of(
+            Monitors.Sign.STABLE,
+            Monitors.Sign.STABLE,
+            Monitors.Sign.STABLE
+        );
+
+        // When: Compose
+        Monitors.Sign result = composer.compose(children);
+
+        // Then: Should return STABLE
+        assertThat(result).isEqualTo(Monitors.Sign.STABLE);
+    }
+}

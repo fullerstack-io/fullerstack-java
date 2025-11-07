@@ -254,20 +254,12 @@ public class CortexRuntime extends CortexProvider implements Cortex {
     return HierarchicalName.of ( member.getDeclaringClass ().getName () ).name ( member );
   }
 
-  // ========== Pool Management (2 methods) ==========
+  // ========== Pool Management (1 method - PREVIEW API) ==========
 
   @Override
-  public < T > Pool < T > pool ( T value ) {
-    Objects.requireNonNull ( value, "Pool value cannot be null" );
-    // Create pool that returns the same value for any name
-    return new ConcurrentPool <> ( name -> value );
-  }
-
-  @Override
-  public < T > Pool < T > pool ( Function < ? super Name, ? extends T > factory ) {
+  public < P extends Percept > Pool < P > pool ( Function < ? super Name, ? extends P > factory ) {
     Objects.requireNonNull ( factory, "Pool factory cannot be null" );
     // Create pool with the provided factory function
-    // API addition - direct factory function support
     return new ConcurrentPool <> ( factory );
   }
 

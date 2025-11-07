@@ -167,8 +167,6 @@ public class JvmDetailedMonitor implements AutoCloseable {
             pollSafepointInfo();
             pollCompilationTime();
 
-            circuit.await();
-
         } catch (Exception e) {
             logger.error("JVM detailed metrics polling failed", e);
         }

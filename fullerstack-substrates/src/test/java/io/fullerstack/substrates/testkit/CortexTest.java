@@ -30,6 +30,27 @@ import static org.junit.jupiter.api.Assertions.*;
 final class CortexTest
   extends TestSupport {
 
+  /**
+   * Helper mock Pipe for testing Pool behavior.
+   */
+  private static class MockPipe<T> implements Pipe<T> {
+    private final T value;
+
+    MockPipe(T value) {
+      this.value = value;
+    }
+
+    public T getValue() {
+      return value;
+    }
+
+    @Override
+    public void emit(T t) {}
+
+    @Override
+    public void flush() {}
+  }
+
   private Cortex cortex;
 
   @BeforeEach
@@ -236,7 +257,7 @@ final class CortexTest
   void testPoolCreationWithSingleton () {
 
     final var singleton = "test-singleton";
-    final Pool < String > pool = cortex.pool ( singleton );
+    final Pool<Pipe<String>> pool = cortex.pool(name -> new MockPipe<>(singleton));
 
     assertNotNull ( pool );
 
@@ -246,14 +267,15 @@ final class CortexTest
   void testPoolGetBySubject () {
 
     final var singleton = 42;
-    final Pool < Integer > pool = cortex.pool ( singleton );
+    final Pool<Pipe<Integer>> pool = cortex.pool(name -> new MockPipe<>(singleton));
 
     final var circuit = cortex.circuit ();
 
     try {
 
       final Subject < ? > subject = circuit.subject ();
-      assertEquals ( singleton, pool.get ( subject ) );
+      MockPipe<Integer> pipe = (MockPipe<Integer>) pool.get ( subject );
+      assertEquals ( singleton, pipe.getValue() );
 
     } finally {
 
@@ -271,13 +293,14 @@ final class CortexTest
   void testPoolGetBySubstrate () {
 
     final var singleton = 3.14159;
-    final Pool < Double > pool = cortex.pool ( singleton );
+    final Pool<Pipe<Double>> pool = cortex.pool(name -> new MockPipe<>(singleton));
 
     final var circuit = cortex.circuit ();
 
     try {
 
-      assertEquals ( singleton, pool.get ( circuit ) );
+      MockPipe<Double> pipe = (MockPipe<Double>) pool.get ( circuit );
+      assertEquals ( singleton, pipe.getValue() );
 
     } finally {
 
@@ -291,14 +314,21 @@ final class CortexTest
   void testPoolReturnsSameSingletonInstance () {
 
     final var singleton = "singleton-value";
-    final Pool < String > pool = cortex.pool ( singleton );
+    final Pool<Pipe<String>> pool = cortex.pool(name -> new MockPipe<>(singleton));
 
     final var name1 = cortex.name ( "pool.test.first" );
     final var name2 = cortex.name ( "pool.test.second" );
 
-    assertSame ( singleton, pool.get ( name1 ) );
-    assertSame ( singleton, pool.get ( name2 ) );
-    assertSame ( singleton, pool.get ( name1 ) );
+    // Pool returns DIFFERENT Pipe instances for different names (each cached)
+    Pipe<String> pipe1a = pool.get ( name1 );
+    Pipe<String> pipe2a = pool.get ( name2 );
+    Pipe<String> pipe1b = pool.get ( name1 );
+
+    // Same name should return same Pipe instance (cached)
+    assertSame ( pipe1a, pipe1b );
+
+    // Different names return different Pipe instances
+    assertNotSame ( pipe1a, pipe2a );
 
   }
 
@@ -814,7 +844,7 @@ final class CortexTest
       @Override
       public void flush () { }
     };
-    final Pool < Pipe < Integer > > pool = cortex.pool ( pipe );
+    final Pool<Pipe<Integer>> pool = cortex.pool(name -> pipe);
 
     final var subscriber =
       cortex.subscriber ( subscriberName, pool );
@@ -910,7 +940,7 @@ final class CortexTest
         @Override
         public void flush () { }
       };
-      final var pool = cortex.pool ( collectorPipe );
+      final var pool = cortex.pool(name -> collectorPipe);
 
       final Subscriber < Integer > subscriber =
         cortex.subscriber (

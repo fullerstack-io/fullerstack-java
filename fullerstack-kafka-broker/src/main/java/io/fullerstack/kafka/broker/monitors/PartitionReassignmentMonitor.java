@@ -203,8 +203,6 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
                 }
             }
 
-            circuit.await();
-
         } catch (TimeoutException e) {
             logger.error("AdminClient query timed out", e);
         } catch (java.lang.Exception e) {

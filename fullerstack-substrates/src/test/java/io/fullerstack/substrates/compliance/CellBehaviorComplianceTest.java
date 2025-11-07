@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>**Transformation Isolation**: Each cell can have its own transformations</li>
  * </ul>
  * <p>
- * **Note**: Tests use correct RC5 API (cell.pipe().emit()) not pseudocode (cell.emit())
+ * **Note**: Tests use correct RC5 API (cell.emit()) not pseudocode (cell.emit())
  */
 class CellBehaviorComplianceTest {
 
@@ -47,7 +47,7 @@ class CellBehaviorComplianceTest {
    *   child2.emit(200);  // → root outlet receives 200
    * </pre>
    * <p>
-   * **RC5 API**: Uses cell.pipe().emit() instead of cell.emit()
+   * **RC5 API**: Uses cell.emit() instead of cell.emit()
    */
   @Test
   void testUpwardFlow_ChildEmissionsPropagateToParentOutlet() throws InterruptedException {
@@ -71,11 +71,11 @@ class CellBehaviorComplianceTest {
     Cell<Integer, Integer> child1 = root.get(cortex().name("child1"));
     Cell<Integer, Integer> child2 = root.get(cortex().name("child2"));
 
-    // Emit from children (RC5 API: cell.pipe().emit())
+    // Emit from children (RC5 API: cell.emit())
     System.out.println("Emitting 100 from child1...");
-    child1.pipe().emit(100);
+    child1.emit(100);
     System.out.println("Emitting 200 from child2...");
-    child2.pipe().emit(200);
+    child2.emit(200);
 
     // Wait for async processing
     System.out.println("Waiting for circuit...");
@@ -122,7 +122,7 @@ class CellBehaviorComplianceTest {
     Cell<Integer, Integer> level2 = level1.get(cortex().name("level2"));
 
     // Emit from deepest level
-    level2.pipe().emit(100);
+    level2.emit(100);
 
     circuit.await();
     assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
@@ -164,8 +164,8 @@ class CellBehaviorComplianceTest {
     Cell<Integer, Integer> child2 = root.get(cortex().name("child2"));
 
     // Emit same value from both children
-    child1.pipe().emit(10);
-    child2.pipe().emit(10);
+    child1.emit(10);
+    child2.emit(10);
 
     circuit.await();
     assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
