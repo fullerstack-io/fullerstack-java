@@ -87,43 +87,49 @@ received.set("hello")
 
 ### Valve: The Virtual CPU Core
 
-Each Circuit contains a **Valve** - the combination of BlockingQueue + Virtual Thread:
+Each Circuit contains a **Valve** - a dual-queue architecture (Ingress + Transit) + Virtual Thread:
 
 **What is a Valve?**
 ```java
 public class Valve implements AutoCloseable {
-    private final BlockingQueue<Runnable> queue;  // FIFO task queue
-    private final Thread processor;                // Virtual thread
-    private final Object idleLock;                 // Event-driven synchronization
+    private final BlockingQueue<Runnable> ingressQueue;  // External emissions (FIFO)
+    private final BlockingDeque<Runnable> transitDeque;  // Recursive emissions (FIFO, priority)
+    private final Thread processor;                       // Virtual thread
+    private final Object idleLock;                        // Event-driven synchronization
 }
 ```
 
 **Architecture**:
 ```
 Circuit
-  └─ Valve ("valve-circuit-name")
-       ├─ BlockingQueue<Runnable>  (FIFO task queue)
-       ├─ Virtual Thread           (parks when empty, unparks on task)
-       └─ Object idleLock          (wait/notify synchronization)
+  └─ Valve ("circuit-name")
+       ├─ Ingress Queue<Runnable>     (External emissions, FIFO)
+       ├─ Transit Deque<Runnable>     (Recursive emissions, FIFO, priority)
+       ├─ Virtual Thread              (parks when both empty, unparks on task)
+       └─ Object idleLock             (wait/notify synchronization)
 
 All Conduits share the same Valve:
-  Conduit 1: Pipes → valve.submit(task)
-  Conduit 2: Pipes → valve.submit(task)
-  Conduit 3: Pipes → valve.submit(task)
+  External Thread:
+    Conduit 1: Pipes → valve.submit(task) → Ingress Queue
+    Conduit 2: Pipes → valve.submit(task) → Ingress Queue
 
-Valve processes tasks sequentially (single-threaded):
-  → Task 1: Conduit1.processEmission(capture)
-  → Task 2: Conduit2.processEmission(capture)
-  → Task 3: Conduit1.processEmission(capture)
+  Circuit Thread (recursive):
+    Conduit 3: Pipes → valve.submit(task) → Transit Deque (priority)
+
+Valve processes tasks with depth-first execution:
+  → Transit Deque checked first (recursive tasks have priority)
+  → Ingress Queue processed when Transit is empty
+  → Single-threaded execution (no concurrent tasks)
 ```
 
 ### Benefits of Async-First Design
 
-1. **Ordered Event Delivery** - FIFO queue guarantees order within Circuit
-2. **Backpressure Management** - Single queue prevents saturation
-3. **No Blocking** - Emitters never block (post and return)
-4. **Simplified Threading** - Single virtual thread per Circuit
-5. **Lock-Free Concurrency** - Single-threaded execution eliminates locks
+1. **Depth-First Execution** - Transit deque has priority for recursive emissions
+2. **Deterministic Ordering** - Dual-queue guarantees predictable order within Circuit
+3. **Backpressure Management** - Queues prevent saturation
+4. **No Blocking** - Emitters never block (post and return)
+5. **Simplified Threading** - Single virtual thread per Circuit
+6. **Lock-Free Concurrency** - Single-threaded execution eliminates locks
 
 ### Emission Flow (Complete Path)
 
@@ -148,17 +154,17 @@ Valve processes tasks sequentially (single-threaded):
      │
      │   [Time passes - Script queued, emitter continues]
      │
-     │   [LinkedBlockingQueue - FIFO]         // Circuit's single queue
+     │   [Dual-Queue Architecture]            // Circuit's Ingress + Transit
      │        │
      │        ↓
-     │   [Virtual Thread Processor]           // Single-threaded, sequential
+     │   [Virtual Thread Processor]           // Single-threaded, depth-first
      │        │
-     │        ├─→ Runnable runnable = queue.take()  // Blocking take (FIFO)
+     │        ├─→ Runnable runnable = transitDeque.pollFirst() || ingressQueue.take()
      │        │
      │        ├─→ script.exec(current)
      │        │
      │        ↓
-     │   [TransformingConduit.processEmission]
+     │   [RoutingConduit.processEmission]
      │        │
      │        ├─→ Resolve Subscriber Pipes (cached or register new)
      │        │
@@ -561,8 +567,8 @@ circuit.await();  // Block until empty
 | Aspect | RxJava (Sync) | Substrates (Async) |
 |--------|---------------|-------------------|
 | **emit() behavior** | Blocks until subscribers complete | Returns immediately |
-| **Subscriber callbacks** | Execute on calling thread | Execute on Queue virtual thread |
-| **Ordering** | Not guaranteed (multi-threaded) | FIFO guarantee (single queue) |
+| **Subscriber callbacks** | Execute on calling thread | Execute on Valve virtual thread |
+| **Ordering** | Not guaranteed (multi-threaded) | Depth-first guarantee (dual-queue) |
 | **Backpressure** | Manual (Flowable) | Built-in (queue monitoring) |
 | **Testing pattern** | No special handling | Must use circuit.await() |
 | **Threading model** | Configurable schedulers | Single virtual thread per Circuit |
@@ -597,4 +603,4 @@ circuit.await();  // Block until empty
 
 ## Key Takeaway
 
-**Substrates is async-first by design**. Every emission posts a Script to the Circuit Queue and returns immediately. Subscriber callbacks execute asynchronously on the Queue's single virtual thread. Use `circuit.await()` in tests to synchronize with async processing, but don't use it after every emit() in production code - leverage the async queue for performance.
+**Substrates is async-first by design**. Every emission posts a task to the Circuit's Valve (dual-queue) and returns immediately. Subscriber callbacks execute asynchronously on the Valve's single virtual thread with depth-first execution. Use `circuit.await()` in tests to synchronize with async processing, but don't use it after every emit() in production code - leverage the async dual-queue for performance.

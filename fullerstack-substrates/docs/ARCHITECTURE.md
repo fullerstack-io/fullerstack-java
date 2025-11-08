@@ -201,7 +201,7 @@ This is **semiotic observability** - meaning arises from the interplay between s
 
 1. **Simplified Design** - Single implementations, no factory abstractions
 2. **RC5 Sealed Hierarchy** - Type-safe API contracts enforced by sealed interfaces
-3. **Valve Pattern** (William's architecture) - BlockingQueue + Virtual Thread per Circuit
+3. **Valve Pattern** (William's architecture) - Dual-queue (Ingress + Transit) + Virtual Thread per Circuit
 4. **Event-Driven Synchronization** - Zero-latency await() using wait/notify (no polling)
 5. **Pipeline Fusion** - JVM-style optimization of adjacent transformations
 6. **Immutable State** - Slot-based state management with value semantics
@@ -213,7 +213,7 @@ This is **semiotic observability** - meaning arises from the interplay between s
 
 ✅ **Pipeline Fusion** - Automatic optimization of adjacent skip/limit operations
 ✅ **Event-Driven Await** - Zero-latency synchronization (no polling)
-✅ **Name Interning** - HierarchicalName identity-based caching
+✅ **Name Interning** - InternedName identity-based caching
 
 ### What We DON'T Do
 
@@ -274,8 +274,8 @@ public class internal subscriber management<E> {
 ```java
 // These extend Context (which extends Source), so they inherit subscribe()
 public class SequentialCircuit implements Circuit { }  // ✅
-public class TransformingConduit<P, E> implements Conduit<P, E> { }  // ✅
-public class SimpleCell<I, E> implements Cell<I, E> { }  // ✅
+public class RoutingConduit<P, E> implements Conduit<P, E> { }  // ✅
+public class CellNode<I, E> implements Cell<I, E> { }  // ✅
 ```
 
 ### Everything is a Subject
@@ -399,31 +399,34 @@ Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
 Clock clock = circuit.clock(cortex().name("timer"));
 ```
 
-**Virtual CPU Core Pattern:**
+**Virtual CPU Core Pattern (Dual-Queue Architecture):**
 
 ```
-Events → BlockingQueue → Single Virtual Thread → FIFO Processing → Subscribers
+External Emissions → Ingress Queue (FIFO) →
+                                            → Valve Processor (Virtual Thread)
+Recursive Emissions → Transit Deque (FIFO) →   → Depth-First Execution
+                     (Priority)
 ```
 
-**Guarantees:** Events processed in exact order received, no race conditions.
+**Guarantees:**
+- Events processed in deterministic order
+- Transit deque has priority (recursive before external)
+- Depth-first execution for nested emissions
+- No race conditions
 
 **Implementation:**
 
 ```java
 public class SequentialCircuit implements Circuit {
-    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
-    private final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final Valve valve;  // Dual-queue + Virtual Thread
     private final Map<Name, Conduit<?, ?>> conduits = new ConcurrentHashMap<>();
-    private final Map<Name, Clock> clocks = new ConcurrentHashMap<>();
 
-    private void startProcessing() {
-        executor.submit(() -> {
-            while (!Thread.currentThread().isInterrupted()) {
-                Runnable task = queue.take();  // Blocks until available
-                task.run();  // Execute in FIFO order
-            }
-        });
+    public SequentialCircuit(Name name) {
+        this.valve = new Valve("circuit-" + name.part());
+    }
+
+    public void schedule(Runnable task) {
+        valve.submit(task);  // Routes to Ingress or Transit based on thread
     }
 }
 ```
@@ -434,11 +437,11 @@ public class SequentialCircuit implements Circuit {
 
 **Purpose:** Dot-notation hierarchical names (e.g., "kafka.broker.1")
 
-**HierarchicalName Implementation:**
+**InternedName Implementation:**
 
 ```java
-public final class HierarchicalName implements Name {
-    private final HierarchicalName parent;       // Parent in hierarchy
+public final class InternedName implements Name {
+    private final InternedName parent;       // Parent in hierarchy
     private final String segment;        // This segment
     private final String cachedPath;     // Full path cached
 
@@ -448,7 +451,7 @@ public final class HierarchicalName implements Name {
 
     @Override
     public Name name(String segment) {
-        return new HierarchicalName(this, segment);  // Create child
+        return new InternedName(this, segment);  // Create child
     }
 }
 ```
@@ -493,7 +496,7 @@ messages.subscribe(
 **Implementation:**
 
 ```java
-public class TransformingConduit<P, E> implements Conduit<P, E> {
+public class RoutingConduit<P, E> implements Conduit<P, E> {
     private final internal subscriber management<E> source;  // Internal subscriber management
     private final Map<Name, EmissionChannel<E>> channels = new ConcurrentHashMap<>();
     private final Consumer<Flow<E>> flowConfigurer;  // Transformations
@@ -644,15 +647,15 @@ brokerCell.input(jmxClient.fetchStats());
 **Implementation:**
 
 ```java
-public class SimpleCell<I, E> implements Cell<I, E> {
+public class CellNode<I, E> implements Cell<I, E> {
     private final Function<I, E> transformer;  // I → E transformation
     private final internal subscriber management<E> source;
-    private final Map<Name, SimpleCell<E, ?>> children = new ConcurrentHashMap<>();
+    private final Map<Name, CellNode<E, ?>> children = new ConcurrentHashMap<>();
 
     @Override
     public <O> Cell<E, O> cell(Name name, Function<E, O> transformer) {
         return children.computeIfAbsent(name, n ->
-            new SimpleCell<>(n, this, transformer, circuit)
+            new CellNode<>(n, this, transformer, circuit)
         );
     }
 
@@ -816,17 +819,18 @@ Circuit Queue (FIFO):
 
 ## Valve Pattern (Virtual CPU Core)
 
-**Core Concept:** Each Circuit contains a Valve - a combination of BlockingQueue + Virtual Thread that processes all emissions serially.
+**Core Concept:** Each Circuit contains a Valve - a dual-queue architecture (Ingress + Transit) + Virtual Thread that processes emissions with depth-first execution.
 
 ### What is a Valve?
 
 ```java
 public class Valve implements AutoCloseable {
-    private final BlockingQueue<Runnable> queue;  // FIFO task queue
-    private final Thread processor;                // Virtual thread
-    private final Object idleLock;                 // Event-driven synchronization
+    private final BlockingQueue<Runnable> ingressQueue;  // External emissions (FIFO)
+    private final BlockingDeque<Runnable> transitDeque;  // Recursive emissions (priority, FIFO)
+    private final Thread processor;                       // Virtual thread
+    private final Object idleLock;                        // Event-driven synchronization
 
-    // Emissions → Tasks (submitted to valve)
+    // Emissions → Tasks (routed based on calling thread)
     public boolean submit(Runnable task);
 
     // Event-driven await (zero-latency, no polling)
@@ -838,18 +842,28 @@ public class Valve implements AutoCloseable {
 
 ```
 Circuit
-  └── Valve ("valve-circuit-name")
-        ├── BlockingQueue<Runnable>  (FIFO task queue)
-        ├── Virtual Thread           (parks when empty, unparks on task)
-        └── Object idleLock          (wait/notify synchronization)
+  └── Valve ("circuit-name")
+        ├── Ingress Queue<Runnable>     (External emissions, FIFO)
+        ├── Transit Deque<Runnable>     (Recursive emissions, FIFO, priority)
+        ├── Virtual Thread              (parks when both empty, unparks on task)
+        └── Object idleLock             (wait/notify synchronization)
 
 Emission Flow:
-  Pipe.emit(value)
-    → Valve.submit(task)              // Add to queue
-      → BlockingQueue.offer(task)     // FIFO enqueue
-        → Virtual Thread.take()       // Unpark and execute
-          → task.run()                // Process emission
-            → notifyAll()             // Wake awaiting threads
+  External Thread:
+    Pipe.emit(value)
+      → Valve.submit(task)              // Route to Ingress
+        → ingressQueue.offer(task)      // FIFO enqueue
+
+  Circuit Thread (recursive):
+    Pipe.emit(value)
+      → Valve.submit(task)              // Route to Transit
+        → transitDeque.offerLast(task)  // Append to Transit (FIFO within batch)
+
+  Processor:
+    → transitDeque.pollFirst()          // Check Transit first (priority)
+    → ingressQueue.take()               // If Transit empty, take from Ingress
+      → task.run()                      // Execute
+        → notifyAll()                   // Wake awaiting threads
 ```
 
 ### Event-Driven Synchronization
@@ -866,14 +880,15 @@ while (running && (executing || !queue.isEmpty())) {
 ```java
 // New approach - wait/notify
 synchronized (idleLock) {
-    while (running && (executing || !queue.isEmpty())) {
+    // Check BOTH queues
+    while (running && (executing || !ingressQueue.isEmpty() || !transitDeque.isEmpty())) {
         idleLock.wait();  // ✅ <1ms latency, zero CPU
     }
 }
 
 // Processor notifies when idle:
 executing = false;
-if (queue.isEmpty()) {
+if (ingressQueue.isEmpty() && transitDeque.isEmpty()) {
     synchronized (idleLock) {
         idleLock.notifyAll();  // Wake all waiters
     }
@@ -888,11 +903,12 @@ if (queue.isEmpty()) {
 
 ### Virtual CPU Core Guarantees
 
-1. **FIFO Ordering** - Tasks execute in submission order
-2. **Single-Threaded** - No concurrent execution within Circuit domain
-3. **Thread Isolation** - Each Circuit has independent Valve
-4. **Lock-Free** - BlockingQueue handles concurrency, no locks in Circuit code
-5. **Event-Driven** - Parking/unparking via BlockingQueue.take() and wait/notify
+1. **Depth-First Execution** - Transit deque has priority over Ingress queue
+2. **Deterministic Ordering** - Tasks execute in predictable order (Transit FIFO, then Ingress FIFO)
+3. **Single-Threaded** - No concurrent execution within Circuit domain
+4. **Thread Isolation** - Each Circuit has independent Valve
+5. **Lock-Free** - Dual-queue handles concurrency, no locks in Circuit code
+6. **Event-Driven** - Parking/unparking via BlockingQueue.take() and wait/notify
 
 ---
 
@@ -1026,14 +1042,14 @@ flow.skip(100)
 Name milesName = cortex().name("Miles");
 
 // SUBJECT = Temporal/contextual instantiation
-Subject<?> milesInCircuitA = HierarchicalSubject.builder()
+Subject<?> milesInCircuitA = ContextualSubject.builder()
     .id(id1)                    // Unique ID
     .name(milesName)            // Same name reference
     .state(stateA)              // Different state (context A)
     .type(Person.class)
     .build();
 
-Subject<?> milesInCircuitB = HierarchicalSubject.builder()
+Subject<?> milesInCircuitB = ContextualSubject.builder()
     .id(id2)                    // Different ID
     .name(milesName)            // Same name reference
     .state(stateB)              // Different state (context B)
@@ -1085,10 +1101,10 @@ SequentialCircuit
 ├── conduits: ConcurrentHashMap<Name, Conduit>
 └── clocks: ConcurrentHashMap<Name, Clock>
 
-TransformingConduit
+RoutingConduit
 └── channels: ConcurrentHashMap<Name, Channel>
 
-SimpleCell
+CellNode
 └── children: ConcurrentHashMap<Name, Cell>
 ```
 
@@ -1128,7 +1144,7 @@ SimpleCell
 
 ### Immutable Components
 
-- **HierarchicalName** - Immutable parent-child structure
+- **InternedName** - Immutable parent-child structure
 - **State/Slot** - Immutable state management
 - **Signal Types** - Immutable records (Serventis)
 
