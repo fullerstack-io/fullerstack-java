@@ -267,14 +267,13 @@ PREVIEW uses sealed interfaces to restrict which classes can implement them:
 ```java
 sealed interface Source<E> permits Context
 sealed interface Context<E, S> permits Component
-sealed interface Component<E, S> permits Circuit, Clock, Container
+sealed interface Component<E, S> permits Circuit, Container
 sealed interface Container<P, E, S> permits Conduit, Cell
 
 // Non-sealed extension points (we implement these)
 non-sealed interface Circuit extends Component
 non-sealed interface Conduit<P, E> extends Container
 non-sealed interface Cell<I, E> extends Container
-non-sealed interface Clock extends Component
 non-sealed interface Channel<E>
 non-sealed interface Pipe<E>
 non-sealed interface Sink<E>
@@ -282,7 +281,7 @@ non-sealed interface Sink<E>
 
 ### What This Means
 
-✅ **You CAN implement:** Circuit, Conduit, Cell, Clock, Channel, Pipe, Sink
+✅ **You CAN implement:** Circuit, Conduit, Cell, Channel, Pipe, Sink
 ❌ **You CANNOT implement:** Source, Context, Component, Container (sealed)
 
 The API controls the type hierarchy to prevent incorrect compositions.
@@ -417,9 +416,9 @@ public class CortexRuntime implements Cortex {
 **Purpose:** Central processing engine with virtual CPU core pattern
 
 **Key Features:**
-- Single virtual thread processes events in FIFO order
-- Contains Conduits and Clocks
-- Shared ScheduledExecutorService for all Clocks
+- Single virtual thread processes events with depth-first execution
+- Contains Conduits and Cells
+- Dual-queue Valve for deterministic ordering
 - Component lifecycle management
 
 ```java
@@ -428,7 +427,12 @@ Circuit circuit = cortex().circuit(cortex().name("kafka.monitoring"));
 Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
     circuit.conduit(cortex().name("monitors"), Composer.pipe());
 
-Clock clock = circuit.clock(cortex().name("timer"));
+// Or use Cells for hierarchical structure
+Cell<Signal, Signal> cell = circuit.cell(
+    Composer.pipe(),
+    Composer.pipe(),
+    outputPipe
+);
 ```
 
 **Virtual CPU Core Pattern (Dual-Queue Architecture):**
@@ -700,40 +704,7 @@ public class CellNode<I, E> implements Cell<I, E> {
 
 ---
 
-### 7. Clock (Scheduled Events)
-
-**Purpose:** Timer utility for time-driven behaviors
-
-```java
-Clock clock = circuit.clock(cortex().name("poller"));
-
-// Poll every second
-clock.consume(
-    cortex().name("jmx-poll"),
-    Clock.Cycle.SECOND,
-    instant -> {
-        BrokerStats stats = jmxClient.fetchStats();
-        statsPipe.emit(stats);
-    }
-);
-```
-
-**Shared Scheduler Optimization:**
-
-All Clocks in a Circuit share one ScheduledExecutorService:
-
-```java
-Circuit circuit = cortex().circuit(cortex().name("kafka"));
-Clock clock1 = circuit.clock(cortex().name("clock-1"));  // Uses circuit scheduler
-Clock clock2 = circuit.clock(cortex().name("clock-2"));  // Same scheduler
-Clock clock3 = circuit.clock(cortex().name("clock-3"));  // Same scheduler
-```
-
-**Benefits:** Reduced thread overhead, better resource utilization.
-
----
-
-### 8. Scope (Resource Lifecycle)
+### 7. Scope (Resource Lifecycle)
 
 **Purpose:** Automatic resource cleanup
 
@@ -1130,8 +1101,7 @@ CortexRuntime
 └── scopes: ConcurrentHashMap<Name, Scope>
 
 SequentialCircuit
-├── conduits: ConcurrentHashMap<Name, Conduit>
-└── clocks: ConcurrentHashMap<Name, Clock>
+└── conduits: ConcurrentHashMap<Name, Conduit>
 
 RoutingConduit
 └── channels: ConcurrentHashMap<Name, Channel>
@@ -1197,10 +1167,8 @@ Scope.close()
   → Circuit.close()
     → Conduit.close()
       → Channel.close()
-    → Clock.close()
-      → Cancel scheduled tasks
-    → Shutdown executor
-    → Shutdown scheduler
+    → Valve.close()
+      → Shutdown virtual thread processor
 ```
 
 **Best Practices:**
