@@ -2,13 +2,13 @@ package io.fullerstack.substrates.circuit;
 
 import io.humainary.substrates.api.Substrates.*;
 import static io.humainary.substrates.api.Substrates.cortex;
-import io.fullerstack.substrates.cell.SimpleCell;
+import io.fullerstack.substrates.cell.CellNode;
 import io.fullerstack.substrates.channel.EmissionChannel;
-import io.fullerstack.substrates.conduit.TransformingConduit;
+import io.fullerstack.substrates.conduit.RoutingConduit;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.pool.ConcurrentPool;
 import io.fullerstack.substrates.state.LinkedState;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.subscription.CallbackSubscription;
 import io.fullerstack.substrates.name.HierarchicalName;
 import io.fullerstack.substrates.valve.Valve;
@@ -23,14 +23,14 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * Single-threaded implementation of Substrates.Circuit using the Virtual CPU Core pattern.
+ * Sequential implementation of Substrates.Circuit using the Virtual CPU Core pattern.
  * <p>
- * < p >This implementation processes all emissions through a single virtual thread with a FIFO queue,
+ * < p >This implementation processes all emissions sequentially through a FIFO queue with a single virtual thread,
  * ensuring ordered execution and eliminating the need for locks within the Circuit domain.
  * <p>
- * < p >< b >Virtual CPU Core Pattern (William's Valve Architecture):</b >
+ * < p >< b >Virtual CPU Core Pattern (Valve Architecture):</b >
  * < ul >
- * < li >Single {@link Valve} processes all emissions (FIFO ordering)</li >
+ * < li >Single {@link Valve} processes all emissions sequentially (FIFO ordering)</li >
  * < li >Valve = BlockingQueue + Virtual Thread processor</li >
  * < li >Emissions → Tasks (submitted to valve)</li >
  * < li >All Conduits share the same valve (isolation per Circuit)</li >
@@ -45,16 +45,15 @@ import java.util.function.Function;
  * </ul >
  * <p>
  * < p >< b >Thread Safety:</b >
- * Single-threaded execution within Circuit domain eliminates need for synchronization.
+ * Sequential execution within Circuit domain eliminates need for synchronization.
  * External callers can emit from any thread - emissions are posted to queue and processed serially.
  *
  * @see Circuit
  * @see Scheduler
  */
-public class SingleThreadCircuit implements Circuit, Scheduler {
+public class SequentialCircuit implements Circuit, Scheduler {
   private final Subject circuitSubject;
 
-  // Valve (William's pattern: BlockingQueue + Virtual Thread)
   private final Valve valve;
 
   private final    Map < Name, ConduitSlot > conduits;
@@ -120,11 +119,11 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
    *
    * @param name circuit name (hierarchical, e.g., "account.region.cluster")
    */
-  public SingleThreadCircuit ( Name name ) {
+  public SequentialCircuit ( Name name ) {
     Objects.requireNonNull ( name, "Circuit name cannot be null" );
     this.conduits = new ConcurrentHashMap <> ();
     Id id = UuidIdentifier.generate ();
-    this.circuitSubject = new HierarchicalSubject <> (
+    this.circuitSubject = new ContextualSubject <> (
       id,
       name,
       LinkedState.empty (),
@@ -150,117 +149,29 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
   // Circuit.await() - public API
   @Override
   public void await () {
-    // Fast path: if circuit is already closed, return immediately
-    if ( closed ) {
-      return;
-    }
-
-    // Delegate to valve's await with "Circuit" context for error messages
+    // Always wait for valve to drain, even if circuit is closed
+    // This ensures pending emissions submitted before close() are processed
     valve.await ( "Circuit" );
+
+    // After draining, close valve if circuit is closed
+    if ( closed ) {
+      valve.close ();
+    }
   }
 
   // Scheduler.schedule() - internal API for components
   @Override
   public void schedule ( Runnable task ) {
-    checkClosed ();
+    // Silently ignore emissions after circuit is closed (TCK requirement)
+    if ( closed ) {
+      return;
+    }
     if ( task != null ) {
       valve.submit ( task );  // Submit to valve
     }
   }
 
-  // ========== Legacy Cell API (BiFunction-based) ==========
-  // These methods are retained for backward compatibility but don't override Circuit interface
-
-  /**
-   * Legacy Cell creation using BiFunction transformers.
-   * Retained for backward compatibility with existing code.
-   *
-   * @deprecated Use {@link #cell(Composer, Composer, Pipe)} instead
-   */
-  @Deprecated
-  public < I, E > Cell < I, E > cell (
-    BiFunction < Subject < Cell < I, E > >, Pipe < E >, Pipe < I > > transformer,
-    BiFunction < Subject < Cell < I, E > >, Pipe < E >, Pipe < E > > aggregator,
-    Pipe < ? super E > pipe ) {
-    return cell ( HierarchicalName.of ( "cell" ), transformer, aggregator, pipe );
-  }
-
-  /**
-   * Legacy Cell creation with name using BiFunction transformers.
-   * Retained for backward compatibility with existing code.
-   *
-   * @deprecated Use {@link #cell(Name, Composer, Composer, Pipe)} instead
-   */
-  @Deprecated
-  public < I, E > Cell < I, E > cell (
-    Name name,
-    BiFunction < Subject < Cell < I, E > >, Pipe < E >, Pipe < I > > transformer,
-    BiFunction < Subject < Cell < I, E > >, Pipe < E >, Pipe < E > > aggregator,
-    Pipe < ? super E > pipe ) {
-    Objects.requireNonNull ( name, "Cell name cannot be null" );
-    Objects.requireNonNull ( transformer, "Transformer cannot be null" );
-    Objects.requireNonNull ( aggregator, "Aggregator cannot be null" );
-    Objects.requireNonNull ( pipe, "Pipe cannot be null" );
-
-    // Create a Conduit for this Cell to manage subscriptions
-    // The conduit type must be Conduit< Pipe< I >, E > to match SimpleCell constructor
-    // We'll cast later after applying transformer
-    Conduit < Pipe < E >, E > tempConduit = conduit ( name, Composer.pipe () );
-
-    // Get the channel from conduit
-    Pipe < E > channelPipe = tempConduit.get ( name );
-
-    // Create Cell Subject
-    Subject < Cell < I, E > > cellSubject = new HierarchicalSubject <> (
-      UuidIdentifier.generate (),
-      name,
-      LinkedState.empty (),
-      (Class < Cell < I, E > >) (Class < ? >) Cell.class,
-      circuitSubject
-    );
-
-    // Apply transformer to create input pipe
-    Pipe < I > inputPipe = transformer.apply ( cellSubject, channelPipe );
-
-    // Apply aggregator to output pipe
-    //  Cast needed for contra-variance (Pipe<? super E > -> Pipe< E >)
-    @SuppressWarnings ( "unchecked" )
-    Pipe < E > outputPipe = aggregator.apply ( cellSubject, (Pipe < E >) pipe );
-
-    // Cast conduit to the correct type for SimpleCell
-    // This is safe because the transformer creates Pipe< I > from the channel's Pipe< E >
-    @SuppressWarnings ( "unchecked" )
-    Conduit < Pipe < I >, E > cellConduit = (Conduit < Pipe < I >, E >) (Conduit < ?, E >) tempConduit;
-
-    // Wrap BiFunction transformations as Composers for child cell creation
-    Composer < E, Pipe < I > > ingressComposer = channel -> {
-      // Cast channel to Pipe<E> for BiFunction
-      @SuppressWarnings ( "unchecked" )
-      Pipe < E > channelAsPipe = (Pipe < E >) channel;
-      return transformer.apply ( cellSubject, channelAsPipe );
-    };
-
-    Composer < E, Pipe < E > > egressComposer = channel -> {
-      // Cast channel to Pipe<E> for BiFunction
-      @SuppressWarnings ( "unchecked" )
-      Pipe < E > channelAsPipe = (Pipe < E >) channel;
-      return aggregator.apply ( cellSubject, channelAsPipe );
-    };
-
-    // Create SimpleCell with explicit type parameters and composers
-    return new SimpleCell < I, E > (
-      null,
-      name,
-      inputPipe,
-      outputPipe,
-      cellConduit,
-      ingressComposer,
-      egressComposer,
-      circuitSubject
-    );
-  }
-
-  // ========== Cell API (Composer-based) ==========
+  // ========== Cell API (PREVIEW) ==========
 
   @Override
   public < I, E > Cell < I, E > cell (
@@ -281,38 +192,74 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
     Objects.requireNonNull ( egress, "Egress composer cannot be null" );
     Objects.requireNonNull ( pipe, "Output pipe cannot be null" );
 
-    // RC7 Pattern: Composers receive Channel<E> and return Percepts (Pipe<I> or Pipe<E>)
-    // Create a conduit using Composer.pipe() which internally creates Channel<E>
+    // PREVIEW Cell Pattern:
+    // Composers signature: Channel<E> → Pipe<X>
+    // - Ingress: Channel<E> → Pipe<I> (cell's input type)
+    // - Egress: Channel<E> → Pipe<E> (transforms before outlet)
+    //
+    // Flow: cell.emit(I) → ingressPipe → egressPipe → channel → outlet
+    //
+    // Both composers receive channel and wrap channel.pipe() with transformation logic:
+    // - Ingress may transform I→E before emitting to its target
+    // - Egress may transform E→E before emitting to channel
+    //
+    // For identity composers (Channel::pipe), no transformation occurs.
+
+    // Create a conduit for subscription infrastructure
     Conduit < Pipe < E >, E > cellConduit = conduit ( name, Composer.pipe () );
 
-    // Create an internal channel by creating it directly (like TransformingConduit does)
-    // Cast to TransformingConduit since that's our implementation type
+    // Create an internal channel
     @SuppressWarnings ( "unchecked" )
-    TransformingConduit < Pipe < E >, E > transformingConduit = (TransformingConduit < Pipe < E >, E >) cellConduit;
+    RoutingConduit < Pipe < E >, E > transformingConduit = (RoutingConduit < Pipe < E >, E >) cellConduit;
     Channel < E > channel = new EmissionChannel <> ( name, transformingConduit, null );
 
-    // Now apply the composers to the channel to get the pipes
-    Pipe < I > inputPipe = ingress.compose ( channel );
-    Pipe < E > outputPipe = egress.compose ( channel );
+    // Apply egress composer: creates a pipe that wraps channel.pipe()
+    // Egress transforms before emitting to channel
+    Pipe < E > egressPipe = egress.compose ( channel );
 
-    // Subscribe the outlet pipe to the conduit so emissions flow upward
+    // Apply ingress composer but pass a FAKE channel that routes to egressPipe
+    // This way ingress will emit to egress instead of directly to the channel
+    Channel < E > ingressChannel = new Channel < E > () {
+      @Override
+      public Subject < Channel < E > > subject () {
+        return channel.subject ();
+      }
+
+      @Override
+      public Pipe < E > pipe () {
+        // Return egressPipe instead of channel.pipe()!
+        // This routes ingress output through egress
+        return egressPipe;
+      }
+
+      @Override
+      public Pipe < E > pipe ( Consumer < Flow < E > > configurer ) {
+        // Not used in tests, but for completeness
+        return SequentialCircuit.this.pipe ( egressPipe, configurer );
+      }
+    };
+
+    // Now apply ingress composer with the fake channel
+    Pipe < I > ingressPipe = ingress.compose ( ingressChannel );
+
+    // Subscribe outlet to channel emissions
     cellConduit.subscribe ( cortex().subscriber (
       cortex().name ( "cell-outlet-" + name ),
       ( Subject < Channel < E > > subject, Registrar < E > registrar ) -> {
-        registrar.register ( emission -> pipe.emit ( emission ) );
+        registrar.register ( pipe::emit );
       }
     ) );
 
-    // Cast conduit for SimpleCell (it expects Conduit<?, E>)
+    // Cast conduit for CellNode
     @SuppressWarnings ( "unchecked" )
     Conduit < ?, E > conduit = (Conduit < ?, E >) cellConduit;
 
-    // Create SimpleCell with explicit type parameters and composers
-    return new SimpleCell < I, E > (
+    // Create CellNode
+    return new CellNode < I, E > (
       null,           // No parent (this is root)
       name,
-      inputPipe,
-      outputPipe,
+      ingressPipe,    // Input: created by ingress composer
+      egressPipe,     // Output: created by egress composer (not used directly by CellNode)
       conduit,
       ingress,        // Pass ingress composer for child creation
       egress,         // Pass egress composer for child creation
@@ -342,9 +289,28 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
   public < E > Pipe < E > pipe ( Pipe < ? super E > target, Consumer < Flow < E > > configurer ) {
     Objects.requireNonNull ( target, "Target pipe cannot be null" );
     Objects.requireNonNull ( configurer, "Flow configurer cannot be null" );
-    // TODO: Implement Flow transformations before dispatching to target
-    // For now, just delegate to the simpler version
-    return pipe ( target );
+
+    // Create Flow regulator and configure it
+    io.fullerstack.substrates.flow.FlowRegulator < E > flow = new io.fullerstack.substrates.flow.FlowRegulator <> ();
+    configurer.accept ( flow );
+
+    // Create a pipe that applies Flow transformations before emitting to target
+    return new Pipe < E > () {
+      @Override
+      public void emit ( E value ) {
+        // Apply Flow transformations
+        E transformed = flow.apply ( value );
+        // If not filtered (null), emit to target
+        if ( transformed != null ) {
+          target.emit ( transformed );
+        }
+      }
+
+      @Override
+      public void flush () {
+        target.flush ();
+      }
+    };
   }
 
   @Override
@@ -375,7 +341,7 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
 
     // COLD PATH: Create new conduit (only on miss)
     // Use simple name - hierarchy is implicit through parent Subject references
-    Conduit < P, E > newConduit = new TransformingConduit <> (
+    Conduit < P, E > newConduit = new RoutingConduit <> (
       name, composer, this  // Pass Circuit as parent
     );
 
@@ -415,7 +381,7 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
 
     // COLD PATH: Create new conduit with flow configurer
     // Use simple name - hierarchy is implicit through parent Subject references
-    Conduit < P, E > newConduit = new TransformingConduit < P, E > (
+    Conduit < P, E > newConduit = new RoutingConduit < P, E > (
       name, composer, this, configurer
     );
 
@@ -436,8 +402,9 @@ public class SingleThreadCircuit implements Circuit, Scheduler {
     if ( !closed ) {
       closed = true;
 
-      // Close valve
-      valve.close ();
+      // Don't close valve immediately - let await() handle it after pending tasks complete
+      // This allows pending emissions submitted before close() to be processed
+      // valve.close ();  // Removed - wait() will close valve after draining
 
       conduits.clear ();
     }

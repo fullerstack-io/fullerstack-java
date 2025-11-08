@@ -2,10 +2,10 @@ package io.fullerstack.substrates.cell;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.channel.EmissionChannel;
-import io.fullerstack.substrates.conduit.TransformingConduit;
+import io.fullerstack.substrates.conduit.RoutingConduit;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.state.LinkedState;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.subscription.CallbackSubscription;
 
 import java.util.Iterator;
@@ -18,16 +18,16 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 /**
- * Simple Cell implementation for Circuit.cell() support (M18 API).
+ * Hierarchical Cell node implementation for Circuit.cell() support (PREVIEW API).
  * <p>
  * < p >Cell< I, E > provides bidirectional signal transformation:
  * < ul >
  * < li >Accepts input type I via emit() - delegates to input Pipe< I ></li >
- * < li >Emits type E to output Pipe< E > (M18 API)</li >
+ * < li >Emits type E to output Pipe< E > (PREVIEW API)</li >
  * < li >Supports hierarchical children via get(Name)</li >
  * </ul >
  * <p>
- * < p >< b >M18 API Design:</b >
+ * < p >< b >PREVIEW API Design:</b >
  * - Input: Pipe< I > created by Composer (receives I values)
  * - Output: Pipe< E > provided by caller (emits E values)
  * - The Conduit provides the Source< E > subscription infrastructure
@@ -38,9 +38,9 @@ import java.util.function.Function;
  * @param < I > input type (what Cell receives)
  * @param < E > emission type (what Cell emits to output pipe)
  */
-public class SimpleCell < I, E > implements Cell < I, E > {
+public class CellNode < I, E > implements Cell < I, E > {
 
-  private final SimpleCell < I, E >         parent;
+  private final CellNode < I, E >           parent;
   private final String                      segment;
   private final Pipe < I >                  inputPipe;                 // Input: created by Composer
   private final Pipe < E >                  outputPipe;                // Output: provided by M18 API
@@ -62,8 +62,8 @@ public class SimpleCell < I, E > implements Cell < I, E > {
    * @param egressComposer  Composer to transform Channel<E> -> Pipe<E> for children
    * @param parentSubject   parent Subject for hierarchy (null for root)
    */
-  public SimpleCell (
-    SimpleCell < I, E > parent,
+  public CellNode (
+    CellNode < I, E > parent,
     Name name,
     Pipe < I > inputPipe,
     Pipe < E > outputPipe,
@@ -79,7 +79,7 @@ public class SimpleCell < I, E > implements Cell < I, E > {
     this.conduit = Objects.requireNonNull ( conduit, "conduit cannot be null" );
     this.ingressComposer = Objects.requireNonNull ( ingressComposer, "ingressComposer cannot be null" );
     this.egressComposer = Objects.requireNonNull ( egressComposer, "egressComposer cannot be null" );
-    this.subject = new HierarchicalSubject <> (
+    this.subject = new ContextualSubject <> (
       UuidIdentifier.generate (),
       name,
       LinkedState.empty (),
@@ -129,8 +129,8 @@ public class SimpleCell < I, E > implements Cell < I, E > {
       // Conduit.get() returns Percept (Pipe), not Channel
       // We need to create Channel and pass it to composers
       @SuppressWarnings ( "unchecked" )
-      TransformingConduit < ?, E > transformingConduit =
-        (TransformingConduit < ?, E >) conduit;
+      RoutingConduit < ?, E > transformingConduit =
+        (RoutingConduit < ?, E >) conduit;
       Channel < E > childChannel = new EmissionChannel <> ( n, transformingConduit, null );
 
       // Apply ingress composer: Channel<E> -> Pipe<I>
@@ -140,7 +140,7 @@ public class SimpleCell < I, E > implements Cell < I, E > {
       Pipe < E > childOutputPipe = egressComposer.compose ( childChannel );
 
       // Create child cell with same composers (all children use same transformation logic)
-      return new SimpleCell <> ( this, n, childInputPipe, childOutputPipe, conduit, ingressComposer, egressComposer, this.subject );
+      return new CellNode <> ( this, n, childInputPipe, childOutputPipe, conduit, ingressComposer, egressComposer, this.subject );
     } );
   }
 

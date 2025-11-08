@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.capture.SubjectCapture;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.state.LinkedState;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.name.HierarchicalName;
 
 import java.util.List;
@@ -50,7 +50,7 @@ public class CollectingSink < E > implements Sink < E > {
     // Using HierarchicalName.of() static factory
     this.source = source;
     Id sinkId = UuidIdentifier.generate ();
-    this.sinkSubject = new HierarchicalSubject <> (
+    this.sinkSubject = new ContextualSubject <> (
       sinkId,
       HierarchicalName.of ( "sink" ).name ( sinkId.toString () ),
       LinkedState.empty (),
@@ -58,7 +58,7 @@ public class CollectingSink < E > implements Sink < E > {
     );
 
     // Create internal subscriber's Subject once
-    this.internalSubscriberSubject = new HierarchicalSubject <> (
+    this.internalSubscriberSubject = new ContextualSubject <> (
       UuidIdentifier.generate (),
       HierarchicalName.of ( "sink-subscriber" ),
       LinkedState.empty (),

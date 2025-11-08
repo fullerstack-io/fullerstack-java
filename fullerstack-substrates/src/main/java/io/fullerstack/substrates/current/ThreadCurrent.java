@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.current;
 
 import io.humainary.substrates.api.Substrates;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.name.HierarchicalName;
 import io.fullerstack.substrates.id.UuidIdentifier;
 
@@ -21,30 +21,47 @@ public final class ThreadCurrent implements Substrates.Current {
   private final Substrates.Subject < Substrates.Current > subject;
 
   // ThreadLocal cache to ensure consistent identity per thread
-  private static final ThreadLocal < Substrates.Subject < Substrates.Current > > THREAD_SUBJECTS =
-    ThreadLocal.withInitial ( ThreadCurrent::createSubjectForCurrentThread );
+  // Cache the ThreadCurrent instance itself, not just the subject
+  private static final ThreadLocal < ThreadCurrent > THREAD_CURRENTS =
+    ThreadLocal.withInitial ( ThreadCurrent::createForCurrentThread );
 
   /**
    * Creates a Current for the current thread.
    * Uses cached subject for the thread to maintain identity consistency.
    */
-  private ThreadCurrent () {
-    this.subject = THREAD_SUBJECTS.get ();
+  private ThreadCurrent ( Substrates.Subject < Substrates.Current > subject ) {
+    this.subject = subject;
   }
 
   /**
    * Factory method to create a Current for the calling thread.
+   * Returns the same instance for the same thread (singleton per thread).
    *
    * @return A Current representing the current execution context
    */
   public static Substrates.Current of () {
-    return new ThreadCurrent ();
+    return THREAD_CURRENTS.get ();
+  }
+
+  /**
+   * Creates a new ThreadCurrent for the calling thread.
+   * Called by ThreadLocal.withInitial() on first access per thread.
+   *
+   * @return A new ThreadCurrent instance for the current thread
+   */
+  private static ThreadCurrent createForCurrentThread () {
+    return new ThreadCurrent ( createSubjectForCurrentThread () );
   }
 
   @SuppressWarnings ( "unchecked" )
   private static Substrates.Subject < Substrates.Current > createSubjectForCurrentThread () {
     Thread thread = Thread.currentThread ();
-    Substrates.Name name = HierarchicalName.of ( thread.getName () );
+    // Handle empty thread names (common with virtual threads)
+    String threadName = thread.getName ();
+    if ( threadName == null || threadName.isBlank () ) {
+      threadName = "thread-" + thread.threadId ();
+    }
+    Substrates.Name name = HierarchicalName.of ( threadName );
 
     // Create a deterministic UUID based on thread ID
     // Using thread ID as the most significant bits ensures different threads get different IDs
@@ -52,7 +69,7 @@ public final class ThreadCurrent implements Substrates.Current {
     java.util.UUID uuid = new java.util.UUID ( threadId, 0L );
     Substrates.Id id = UuidIdentifier.of ( uuid );
 
-    return new HierarchicalSubject < Substrates.Current > (
+    return new ContextualSubject < Substrates.Current > (
       id,
       name,
       null,  // No state for Current

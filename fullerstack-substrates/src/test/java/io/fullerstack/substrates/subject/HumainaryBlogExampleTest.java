@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.subject;
 
-import io.fullerstack.substrates.CortexRuntime;
 import io.humainary.substrates.api.Substrates.*;
+import static io.humainary.substrates.api.Substrates.cortex;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -24,7 +24,7 @@ class HumainaryBlogExampleTest {
    */
   @Test
   void shouldMatchBlogExample_SubjectHierarchy () throws java.lang.Exception {
-    Cortex cortex = CortexRuntime.cortex ();
+    Cortex cortex = cortex();
 
     // Exact blog example code
     var resource = cortex.circuit ( cortex.name ( "Redis" ) );
@@ -98,7 +98,7 @@ class HumainaryBlogExampleTest {
    */
   @Test
   void shouldMatchBlogExample_NameHierarchy () throws java.lang.Exception {
-    Cortex cortex = CortexRuntime.cortex ();
+    Cortex cortex = cortex();
 
     // Blog example: naming percepts with hierarchical names
     var circuit = cortex.circuit ( cortex.name ( "network.5g" ) );
@@ -161,7 +161,7 @@ class HumainaryBlogExampleTest {
    */
   @Test
   void shouldExtendNamesLikeBlogExample () {
-    Cortex cortex = CortexRuntime.cortex ();
+    Cortex cortex = cortex();
 
     // Start with a base name
     Name baseName = cortex.name ( java.lang.String.class );

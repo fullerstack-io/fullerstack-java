@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.function.BiConsumer;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 import static io.humainary.substrates.api.Substrates.Composer.pipe;
 
 /**

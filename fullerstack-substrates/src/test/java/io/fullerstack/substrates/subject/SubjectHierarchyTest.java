@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.subject;
 
-import io.fullerstack.substrates.CortexRuntime;
 import io.humainary.substrates.api.Substrates.*;
+import static io.humainary.substrates.api.Substrates.cortex;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,7 +20,7 @@ class SubjectHierarchyTest {
   @Test
   void shouldBuildSubjectHierarchyViaEnclosure () {
     // Recreate the Humainary blog example
-    Cortex cortex = CortexRuntime.cortex ();
+    Cortex cortex = cortex();
 
     // Create Circuit
     Circuit circuit = cortex.circuit ( cortex.name ( "Redis" ) );
@@ -75,7 +75,7 @@ class SubjectHierarchyTest {
   @Test
   void shouldFormatSubjectPathWithHierarchy () {
     // Recreate the Humainary blog example
-    Cortex cortex = CortexRuntime.cortex ();
+    Cortex cortex = cortex();
 
     // Create Circuit → Conduit → Channel hierarchy
     Circuit circuit = cortex.circuit ( cortex.name ( "Redis" ) );
@@ -120,7 +120,7 @@ class SubjectHierarchyTest {
   @Test
   void shouldFormatSubjectPartWithMetadata () {
     // Subject.part() should return formatted string with name, type, and id
-    Cortex cortex = CortexRuntime.cortex ();
+    Cortex cortex = cortex();
     Circuit circuit = cortex.circuit ( cortex.name ( "Redis" ) );
 
     Subject < ? > circuitSubject = circuit.subject ();

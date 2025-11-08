@@ -10,12 +10,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Tests for SingleThreadCircuit (RC1 API compliant).
+ * Tests for SequentialCircuit (RC1 API compliant).
  * <p>
  * Note: Clock and tap() APIs were removed in RC1, so those tests are deleted.
  */
-class SingleThreadCircuitTest {
-  private SingleThreadCircuit circuit;
+class SequentialCircuitTest {
+  private SequentialCircuit circuit;
 
   @AfterEach
   void cleanup () {
@@ -26,7 +26,7 @@ class SingleThreadCircuitTest {
 
   @Test
   void shouldCreateCircuitWithName () {
-    circuit = new SingleThreadCircuit ( HierarchicalName.of ( "test-circuit" ) );
+    circuit = new SequentialCircuit ( HierarchicalName.of ( "test-circuit" ) );
 
     assertThat ( (Object) circuit ).isNotNull ();
     assertThat ( (Object) circuit.subject () ).isNotNull ();
@@ -39,14 +39,14 @@ class SingleThreadCircuitTest {
 
   @Test
   void shouldRequireNonNullName () {
-    assertThatThrownBy ( () -> new SingleThreadCircuit ( null ) )
+    assertThatThrownBy ( () -> new SequentialCircuit ( null ) )
       .isInstanceOf ( NullPointerException.class )
       .hasMessageContaining ( "Circuit name cannot be null" );
   }
 
   @Test
   void shouldRequireNonNullConduitName () {
-    circuit = new SingleThreadCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
 
     assertThatThrownBy ( () -> circuit.conduit ( null, pipe () ) )
       .isInstanceOf ( NullPointerException.class )
@@ -55,7 +55,7 @@ class SingleThreadCircuitTest {
 
   @Test
   void shouldRequireNonNullComposer () {
-    circuit = new SingleThreadCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
 
     assertThatThrownBy ( () -> circuit.conduit ( HierarchicalName.of ( "test" ), null ) )
       .isInstanceOf ( NullPointerException.class )
@@ -66,7 +66,7 @@ class SingleThreadCircuitTest {
 
   @Test
   void shouldAllowMultipleCloses () {
-    circuit = new SingleThreadCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
 
     circuit.close ();
     circuit.close (); // Should not throw
@@ -76,7 +76,7 @@ class SingleThreadCircuitTest {
 
   @Test
   void shouldCreateDifferentConduitsForDifferentComposers () {
-    circuit = new SingleThreadCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
 
     // Same name, different composers should create DIFFERENT Conduits
     Composer < String, Pipe < String > > composer1 = pipe ();
@@ -90,7 +90,7 @@ class SingleThreadCircuitTest {
 
   @Test
   void shouldCacheConduitsWithSameNameAndComposer () {
-    circuit = new SingleThreadCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
 
     Composer < String, Pipe < String > > composer = pipe ();
 
@@ -102,7 +102,7 @@ class SingleThreadCircuitTest {
 
   @Test
   void shouldProvideAccessToSubject () {
-    circuit = new SingleThreadCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
 
     assertThat ( (Object) circuit.subject () ).isNotNull ();
     assertThat ( (Object) circuit ).isNotNull ();

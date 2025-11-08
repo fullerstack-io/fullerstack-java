@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.channel.EmissionChannel;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.state.LinkedState;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.subscriber.FunctionalSubscriber;
 import io.fullerstack.substrates.subscription.CallbackSubscription;
 import io.fullerstack.substrates.circuit.Scheduler;
@@ -20,7 +20,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
- * Generic implementation of Substrates.Conduit interface with Lombok for getters.
+ * Routing implementation of Substrates.Conduit interface.
  * <p>
  * < p >< b >Type System Foundation:</b >
  * Conduit&lt;P, E&gt; IS-A Subject&lt;Conduit&lt;P, E&gt;&gt; (via sealed hierarchy: Component → Context → Source → Conduit).
@@ -68,7 +68,7 @@ import java.util.function.Consumer;
  * @param < E > the emission type (e.g., MonitorSignal)
  */
 @Getter
-public class TransformingConduit < P extends Percept, E > implements Conduit < P, E > {
+public class RoutingConduit < P extends Percept, E > implements Conduit < P, E > {
 
   private final Circuit                     circuit; // Parent Circuit in hierarchy (provides scheduling + Subject)
   private final Subject                     conduitSubject;
@@ -91,7 +91,7 @@ public class TransformingConduit < P extends Percept, E > implements Conduit < P
    * @param perceptComposer composer for creating percepts from channels
    * @param circuit         parent Circuit (provides scheduling + Subject hierarchy)
    */
-  public TransformingConduit ( Name conduitName, Composer < E, ? extends P > perceptComposer, Circuit circuit ) {
+  public RoutingConduit ( Name conduitName, Composer < E, ? extends P > perceptComposer, Circuit circuit ) {
     this ( conduitName, perceptComposer, circuit, null );
   }
 
@@ -103,9 +103,9 @@ public class TransformingConduit < P extends Percept, E > implements Conduit < P
    * @param circuit         parent Circuit (provides scheduling + Subject hierarchy)
    * @param flowConfigurer  optional transformation pipeline (null if no transformations)
    */
-  public TransformingConduit ( Name conduitName, Composer < E, ? extends P > perceptComposer, Circuit circuit, Consumer < Flow < E > > flowConfigurer ) {
+  public RoutingConduit ( Name conduitName, Composer < E, ? extends P > perceptComposer, Circuit circuit, Consumer < Flow < E > > flowConfigurer ) {
     this.circuit = Objects.requireNonNull ( circuit, "Circuit cannot be null" );
-    this.conduitSubject = new HierarchicalSubject <> (
+    this.conduitSubject = new ContextualSubject <> (
       UuidIdentifier.generate (),
       conduitName,
       LinkedState.empty (),

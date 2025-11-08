@@ -10,7 +10,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 /**
- * Node-based Subject implementation - hierarchical parent-child structure.
+ * Contextual Subject implementation with parent, state, and type information.
  * <p>
  * < p >< b >Design Principles:</b >
  * < ul >
@@ -35,7 +35,7 @@ import lombok.experimental.FieldDefaults;
  * Name milesName = cortex.name("Miles");  // Referent
  * <p>
  * // Circuit A creates a Subject for "Miles" (context A)
- * Subject&lt;?&gt; milesInCircuitA = HierarchicalSubject.builder()
+ * Subject&lt;?&gt; milesInCircuitA = ContextualSubject.builder()
  * .id(UuidIdentifier.generate())
  * .name(milesName)                    // Same name reference
  * .state(cortex.state()
@@ -45,7 +45,7 @@ import lombok.experimental.FieldDefaults;
  * .build();
  * <p>
  * // Circuit B creates a different Subject for "Miles" (context B)
- * Subject&lt;?&gt; milesInCircuitB = HierarchicalSubject.builder()
+ * Subject&lt;?&gt; milesInCircuitB = ContextualSubject.builder()
  * .id(UuidIdentifier.generate())
  * .name(milesName)                    // Same name reference
  * .state(cortex.state()
@@ -63,7 +63,7 @@ import lombok.experimental.FieldDefaults;
  * < p >< b >Comparison with HierarchicalName:</b >
  * < ul >
  * < li >HierarchicalName: Hierarchical identifiers (strings)</li >
- * < li >HierarchicalSubject: Hierarchical runtime entities (identity + state)</li >
+ * < li >ContextualSubject: Hierarchical runtime entities (identity + state)</li >
  * < li >Both use parent-child links for hierarchy</li >
  * < li >Both implement Extent interface with enclosure()</li >
  * </ul >
@@ -71,12 +71,12 @@ import lombok.experimental.FieldDefaults;
  * @param < S > The substrate type this subject represents
  * @see Subject
  * @see HierarchicalName
- * @see SimpleCell
+ * @see CellNode
  */
 @Getter
 @EqualsAndHashCode
 @Builder ( toBuilder = true )
-public class HierarchicalSubject < S extends Substrate < S > > implements Subject < S >, Comparable < Subject < ? > > {
+public class ContextualSubject < S extends Substrate < S > > implements Subject < S >, Comparable < Subject < ? > > {
   /**
    * Unique identifier for this subject.
    */
@@ -105,14 +105,14 @@ public class HierarchicalSubject < S extends Substrate < S > > implements Subjec
   /**
    * Creates a Subject node with all fields (no parent - root node).
    */
-  public HierarchicalSubject ( @NonNull Id id, @NonNull Name name, State state, @NonNull Class < S > type ) {
+  public ContextualSubject ( @NonNull Id id, @NonNull Name name, State state, @NonNull Class < S > type ) {
     this ( id, name, state, type, null );
   }
 
   /**
    * Creates a Subject node with parent reference for hierarchy.
    */
-  public HierarchicalSubject ( @NonNull Id id, @NonNull Name name, State state, @NonNull Class < S > type, Subject < ? > parent ) {
+  public ContextualSubject ( @NonNull Id id, @NonNull Name name, State state, @NonNull Class < S > type, Subject < ? > parent ) {
     this.id = id;
     this.name = name;
     this.state = state;

@@ -3,7 +3,7 @@ package io.fullerstack.substrates.subscriber;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.state.LinkedState;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subject.ContextualSubject;
 
 import java.util.Objects;
 import java.util.function.BiConsumer;
@@ -37,7 +37,7 @@ import java.util.function.BiConsumer;
  * Subscriber&lt;String&gt; subscriber = cortex.subscriber(name, pipePool);
  * </pre >
  * <p>
- * < p >The runtime (TransformingConduit) retrieves the callback via {@link #getCallback()}
+ * < p >The runtime (RoutingConduit) retrieves the callback via {@link #getCallback()}
  * and invokes it when new Channels are created.
  *
  * @param < E > the emission type
@@ -92,7 +92,7 @@ public class FunctionalSubscriber < E > implements Subscriber < E > {
 
   @SuppressWarnings ( "unchecked" )
   private Subject < Subscriber < E > > createSubject ( Name name ) {
-    return new HierarchicalSubject <> (
+    return new ContextualSubject <> (
       UuidIdentifier.generate (),
       name,
       LinkedState.empty (),
@@ -109,7 +109,7 @@ public class FunctionalSubscriber < E > implements Subscriber < E > {
    * Returns the callback for this subscriber (pattern).
    * <p>
    * < p >In , the Subscriber interface is a marker with no methods. The runtime
-   * (TransformingConduit) retrieves the callback via this method and invokes it
+   * (RoutingConduit) retrieves the callback via this method and invokes it
    * when new Channels are created.
    *
    * @return the BiConsumer callback that handles (Subject, Registrar) notifications

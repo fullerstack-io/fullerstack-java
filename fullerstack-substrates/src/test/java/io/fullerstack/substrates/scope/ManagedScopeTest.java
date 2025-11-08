@@ -3,7 +3,7 @@ package io.fullerstack.substrates.scope;
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.state.LinkedState;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.name.HierarchicalName;
 import org.junit.jupiter.api.Test;
 
@@ -128,7 +128,7 @@ class ManagedScopeTest {
     @Override
     @SuppressWarnings ( "unchecked" )
     public Subject < Subscription > subject () {
-      return new HierarchicalSubject <> (
+      return new ContextualSubject <> (
         UuidIdentifier.generate (),
         HierarchicalName.of ( "test-resource" ),
         LinkedState.empty (),

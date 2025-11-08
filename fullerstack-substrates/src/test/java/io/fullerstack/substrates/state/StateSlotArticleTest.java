@@ -1,6 +1,5 @@
 package io.fullerstack.substrates.state;
 
-import io.fullerstack.substrates.CortexRuntime;
 import io.fullerstack.substrates.slot.TypedSlot;
 import io.humainary.substrates.api.Substrates.Cortex;
 import io.humainary.substrates.api.Substrates.Name;
@@ -12,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static io.humainary.substrates.api.Substrates.cortex;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -31,7 +31,7 @@ class StateSlotArticleTest {
 
   @BeforeEach
   void setUp () {
-    cortex = CortexRuntime.cortex ();
+    cortex = cortex();
     XYZ = cortex.name ( "x.y.z" );
     ABC = cortex.name ( "a.b.c" );
     NAME = cortex.name ( "name" );

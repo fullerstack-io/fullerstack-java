@@ -5,8 +5,8 @@ import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.pipe.ProducerPipe;
 import io.fullerstack.substrates.flow.FlowRegulator;
 import io.fullerstack.substrates.state.LinkedState;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
-import io.fullerstack.substrates.conduit.TransformingConduit;
+import io.fullerstack.substrates.subject.ContextualSubject;
+import io.fullerstack.substrates.conduit.RoutingConduit;
 import io.fullerstack.substrates.circuit.Scheduler;
 
 import lombok.Getter;
@@ -55,7 +55,7 @@ import java.util.function.Consumer;
  */
 public class EmissionChannel < E > implements Channel < E > {
 
-  private final TransformingConduit < ?, E > conduit; // Parent Conduit in hierarchy (provides Circuit + Subject)
+  private final RoutingConduit < ?, E > conduit; // Parent Conduit in hierarchy (provides Circuit + Subject)
   private final Subject < Channel < E > >    channelSubject;
   private final Consumer < Flow < E > >      flowConfigurer; // Optional transformation pipeline (nullable)
 
@@ -70,9 +70,9 @@ public class EmissionChannel < E > implements Channel < E > {
    * @param conduit        parent Conduit (provides Circuit, scheduling, subscribers, and Subject hierarchy)
    * @param flowConfigurer optional transformation pipeline (null if no transformations)
    */
-  public EmissionChannel ( Name channelName, TransformingConduit < ?, E > conduit, Consumer < Flow < E > > flowConfigurer ) {
+  public EmissionChannel ( Name channelName, RoutingConduit < ?, E > conduit, Consumer < Flow < E > > flowConfigurer ) {
     this.conduit = Objects.requireNonNull ( conduit, "Conduit cannot be null" );
-    this.channelSubject = new HierarchicalSubject <> (
+    this.channelSubject = new ContextualSubject <> (
       UuidIdentifier.generate (),
       channelName,  // Simple name - hierarchy implicit through Extent.enclosure()
       LinkedState.empty (),
@@ -98,7 +98,7 @@ public class EmissionChannel < E > implements Channel < E > {
             cachedPipe = pipe ( flowConfigurer );
           } else {
             // Otherwise, create a plain ProducerPipe with parent Conduit's capabilities
-            // Note: Circuit also implements Scheduler in our implementation (SingleThreadCircuit)
+            // Note: Circuit also implements Scheduler in our implementation (SequentialCircuit)
             cachedPipe = new ProducerPipe < E > (
               (Scheduler) conduit.getCircuit (), // Cast Circuit to Scheduler
               channelSubject,
@@ -121,7 +121,7 @@ public class EmissionChannel < E > implements Channel < E > {
     configurer.accept ( flow );
 
     // Return a ProducerPipe with parent Conduit's capabilities and Flow transformations
-    // Note: Circuit also implements Scheduler in our implementation (SingleThreadCircuit)
+    // Note: Circuit also implements Scheduler in our implementation (SequentialCircuit)
     return new ProducerPipe < E > (
       (Scheduler) conduit.getCircuit (), // Cast Circuit to Scheduler
       channelSubject,

@@ -1,16 +1,15 @@
 package io.fullerstack.substrates;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.humainary.substrates.spi.CortexProvider;
 import io.fullerstack.substrates.capture.SubjectCapture;
-import io.fullerstack.substrates.circuit.SingleThreadCircuit;
+import io.fullerstack.substrates.circuit.SequentialCircuit;
 import io.fullerstack.substrates.current.ThreadCurrent;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.pool.ConcurrentPool;
 import io.fullerstack.substrates.scope.ManagedScope;
 import io.fullerstack.substrates.slot.TypedSlot;
 import io.fullerstack.substrates.state.LinkedState;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.subscriber.FunctionalSubscriber;
 import io.fullerstack.substrates.name.HierarchicalName;
 import io.fullerstack.substrates.sink.CollectingSink;
@@ -27,61 +26,40 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
- * Complete implementation of Substrates.Cortex interface via CortexProvider SPI.
+ * Complete implementation of Substrates.Cortex interface.
  * <p>
- * < p >API requires provider classes to extend CortexProvider and implement create().
- * < p >This class implements ALL 38 methods of the Cortex interface,
+ * This class implements ALL methods of the Cortex interface,
  * providing full Humainary Substrates API compliance.
  * <p>
- * < p >Methods include:
- * < ul >
- * < li >Circuit management (2 methods)</li >
- * < li >Name factory (8 methods)</li >
- * < li >Pool management (1 method)</li >
- * < li >Scope management (2 methods)</li >
- * < li >State factory (9 methods)</li >
- * < li >Sink creation (2 methods)</li >
- * < li >Slot management (8 methods)</li >
- * < li >Subscriber management (2 methods)</li >
- * < li >Capture creation (1 method)</li >
- * </ul >
+ * Methods include:
+ * <ul>
+ * <li>Circuit management (2 methods)</li>
+ * <li>Name factory (8 methods)</li>
+ * <li>Pool management (2 methods)</li>
+ * <li>Scope management (2 methods)</li>
+ * <li>State factory (1 method)</li>
+ * <li>Sink creation (1 method)</li>
+ * <li>Slot management (9 methods)</li>
+ * <li>Subscriber management (2 methods)</li>
+ * <li>Pipe factory (5 methods)</li>
+ * <li>Current management (1 method)</li>
+ * </ul>
+ * <p>
+ * This class is instantiated by CortexRuntimeProvider via the SPI mechanism.
  *
  * @see Cortex
- * @see CortexProvider
+ * @see CortexRuntimeProvider
  */
-public class CortexRuntime extends CortexProvider implements Cortex {
+public class CortexRuntime implements Cortex {
 
   private final Map < Name, Scope > scopes;
 
   /**
-   * Public constructor for SPI instantiation.
-   * CortexProvider will call create() which instantiates this class.
-   * The singleton pattern is enforced by CortexProvider.
+   * Package-private constructor for SPI instantiation.
+   * Only CortexRuntimeProvider should instantiate this class.
    */
-  public CortexRuntime () {
+  CortexRuntime () {
     this.scopes = new ConcurrentHashMap <> ();
-  }
-
-  /**
-   * SPI provider method required by CortexProvider base class.
-   * Called by CortexProvider.cortex() to create the singleton instance.
-   * CortexProvider caches the result, so this is only called once.
-   *
-   * @return A new Cortex instance (cached by CortexProvider)
-   */
-  @Override
-  protected Cortex create () {
-    return new CortexRuntime();
-  }
-
-  /**
-   * Static accessor for tests and direct usage.
-   * Delegates to CortexProvider.cortex() which handles caching.
-   *
-   * @return The singleton Cortex instance
-   */
-  public static Cortex cortex () {
-    return CortexProvider.cortex();
   }
 
   // ========== Circuit Management (2 methods) ==========
@@ -102,7 +80,7 @@ public class CortexRuntime extends CortexProvider implements Cortex {
   }
 
   private Circuit createCircuit ( Name name ) {
-    return new SingleThreadCircuit ( name );
+    return new SequentialCircuit ( name );
   }
 
   // ========== Current Management (1 method) ==========
@@ -173,6 +151,8 @@ public class CortexRuntime extends CortexProvider implements Cortex {
 
   @Override
   public < I, E > Pipe < I > pipe ( Function < ? super I, ? extends E > transformer, Pipe < ? super E > target ) {
+    Objects.requireNonNull ( transformer, "Transformer function cannot be null" );
+    Objects.requireNonNull ( target, "Target pipe cannot be null" );
     // Factory method for creating a transforming pipe
     return new Pipe < I > () {
       @Override

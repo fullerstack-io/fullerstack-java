@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.name.HierarchicalName;
 import io.fullerstack.substrates.state.LinkedState;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subject.ContextualSubject;
 
 import java.util.Objects;
 
@@ -36,7 +36,7 @@ public class CallbackSubscription implements Subscription {
     this.onClose = Objects.requireNonNull ( onClose, "onClose cannot be null" );
     Objects.requireNonNull ( parentSubject, "parentSubject cannot be null" );
     this.subscriptionId = UuidIdentifier.generate ();
-    this.subscriptionSubject = new HierarchicalSubject <> (
+    this.subscriptionSubject = new ContextualSubject <> (
       subscriptionId,
       HierarchicalName.of ( "subscription" ).name ( subscriptionId.toString () ),
       LinkedState.empty (),

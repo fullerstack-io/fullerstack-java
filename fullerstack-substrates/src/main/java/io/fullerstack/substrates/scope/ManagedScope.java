@@ -2,7 +2,7 @@ package io.fullerstack.substrates.scope;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.UuidIdentifier;
-import io.fullerstack.substrates.subject.HierarchicalSubject;
+import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.closure.AutoClosingResource;
 import io.fullerstack.substrates.name.HierarchicalName;
@@ -56,7 +56,7 @@ public class ManagedScope implements Scope {
     this.parent = parent;
     this.childScopes = new ConcurrentHashMap <> ();
     // Create Subject once - represents persistent identity of this Scope
-    this.scopeSubject = new HierarchicalSubject <> (
+    this.scopeSubject = new ContextualSubject <> (
       UuidIdentifier.generate (),
       name,
       LinkedState.empty (),
