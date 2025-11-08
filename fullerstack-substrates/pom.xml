@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
 
     <name>Substrates (Java)</name>
-    <description>Event-driven runtime implementation of Humainary Substrates API for Java 24</description>
+    <description>Event-driven runtime implementation of Humainary Substrates API for Java 25</description>
 
     <url>https://github.com/fullerstack-io/fullerstack-java</url>
 
@@ -67,7 +67,7 @@
             <artifactId>humainary-substrates-api</artifactId>
         </dependency>
 
-        <!-- Serventis Extension (ext/serventis) - bundled with Substrates API RC5 -->
+        <!-- Serventis Extension (ext/serventis) - part of Substrates API repo -->
         <dependency>
             <groupId>io.humainary.substrates.ext</groupId>
             <artifactId>humainary-substrates-ext-serventis</artifactId>

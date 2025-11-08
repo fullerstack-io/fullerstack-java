@@ -48,9 +48,9 @@ All classes implement the interfaces defined in `io.humainary.substrates.api.Sub
 
 ### Infrastructure Classes
 
-- **Valve** - Virtual CPU Core pattern (BlockingQueue + Virtual Thread)
+- **Valve** - Virtual CPU Core pattern (Dual-queue: Ingress + Transit + Virtual Thread)
 - **EmissionChannel** - Named emission ports within conduits
-- **HierarchicalName** - Dot-notation hierarchical names
+- **InternedName** - Dot-notation hierarchical names with identity-based equality
 - **LinkedState** - Immutable state management
 - **ConcurrentPool** - Thread-safe instance pooling
 - **ManagedScope** - Resource lifecycle management
@@ -131,24 +131,20 @@ Our documentation covers implementation details only:
 Install the Humainary APIs locally (not yet published to Maven Central):
 
 ```bash
-# 1. Install Substrates API
+# Install Substrates API (includes Serventis extensions in ext/serventis)
 git clone https://github.com/humainary-io/substrates-api-java.git
 cd substrates-api-java
 mvn clean install
 cd ..
-
-# 2. Install Serventis Extensions (optional, for instrument APIs)
-git clone https://github.com/humainary-io/substrates-ext-serventis-java.git
-cd substrates-ext-serventis-java
-mvn clean install
-cd ..
 ```
+
+**Note:** Serventis extensions are included in the substrates-api-java repository under `ext/serventis/`, not a separate repository.
 
 ### Build This Implementation
 
 ```bash
-git clone https://github.com/fullerstack-io/fullerstack-java.git
-cd fullerstack-java/fullerstack-substrates
+git clone https://github.com/fullerstack-io/fullerstack-humainary.git
+cd fullerstack-humainary/fullerstack-substrates
 mvn clean install
 ```
 
