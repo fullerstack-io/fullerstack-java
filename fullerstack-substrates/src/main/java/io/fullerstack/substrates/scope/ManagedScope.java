@@ -5,7 +5,7 @@ import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.closure.AutoClosingResource;
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 
 import java.util.Deque;
 import java.util.Map;
@@ -74,7 +74,7 @@ public class ManagedScope implements Scope {
     checkClosed ();
     // Create anonymous scope with generated name and add to child scopes
     // so it gets closed when parent closes
-    Name anonymousName = HierarchicalName.of ( "scope-" + UuidIdentifier.generate () );
+    Name anonymousName = InternedName.of ( "scope-" + UuidIdentifier.generate () );
     ManagedScope childScope = new ManagedScope ( anonymousName, this );
     childScopes.put ( anonymousName, childScope );
     return childScope;

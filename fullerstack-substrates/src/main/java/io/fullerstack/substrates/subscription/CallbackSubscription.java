@@ -2,7 +2,7 @@ package io.fullerstack.substrates.subscription;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.UuidIdentifier;
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.subject.ContextualSubject;
 
@@ -38,7 +38,7 @@ public class CallbackSubscription implements Subscription {
     this.subscriptionId = UuidIdentifier.generate ();
     this.subscriptionSubject = new ContextualSubject <> (
       subscriptionId,
-      HierarchicalName.of ( "subscription" ).name ( subscriptionId.toString () ),
+      InternedName.of ( "subscription" ).name ( subscriptionId.toString () ),
       LinkedState.empty (),
       Subscription.class,
       parentSubject  // Parent Subject for hierarchy

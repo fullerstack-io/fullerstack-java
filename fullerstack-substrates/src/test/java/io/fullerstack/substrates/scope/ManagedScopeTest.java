@@ -4,7 +4,7 @@ import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.subject.ContextualSubject;
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -16,7 +16,7 @@ class ManagedScopeTest {
 
   @Test
   void shouldCreateScopeWithName () {
-    Scope scope = new ManagedScope ( HierarchicalName.of ( "test" ) );
+    Scope scope = new ManagedScope ( InternedName.of ( "test" ) );
 
     assertThat ( (Object) scope ).isNotNull ();
     assertThat ( (Object) scope.subject () ).isNotNull ();
@@ -25,8 +25,8 @@ class ManagedScopeTest {
 
   @Test
   void shouldCreateChildScope () {
-    Scope parent = new ManagedScope ( HierarchicalName.of ( "parent" ) );
-    Scope child = parent.scope ( HierarchicalName.of ( "child" ) );
+    Scope parent = new ManagedScope ( InternedName.of ( "parent" ) );
+    Scope child = parent.scope ( InternedName.of ( "child" ) );
 
     assertThat ( (Object) child ).isNotNull ();
     assertThat ( child.part () ).isEqualTo ( "child" );
@@ -34,17 +34,17 @@ class ManagedScopeTest {
 
   @Test
   void shouldCacheChildScopesByName () {
-    Scope parent = new ManagedScope ( HierarchicalName.of ( "parent" ) );
+    Scope parent = new ManagedScope ( InternedName.of ( "parent" ) );
 
-    Scope child1 = parent.scope ( HierarchicalName.of ( "child" ) );
-    Scope child2 = parent.scope ( HierarchicalName.of ( "child" ) );
+    Scope child1 = parent.scope ( InternedName.of ( "child" ) );
+    Scope child2 = parent.scope ( InternedName.of ( "child" ) );
 
     assertThat ( (Object) child1 ).isSameAs ( child2 );
   }
 
   @Test
   void shouldRegisterResource () {
-    Scope scope = new ManagedScope ( HierarchicalName.of ( "test" ) );
+    Scope scope = new ManagedScope ( InternedName.of ( "test" ) );
     TestResource resource = new TestResource ();
 
     TestResource registered = scope.register ( resource );
@@ -54,7 +54,7 @@ class ManagedScopeTest {
 
   @Test
   void shouldCloseRegisteredResources () {
-    Scope scope = new ManagedScope ( HierarchicalName.of ( "test" ) );
+    Scope scope = new ManagedScope ( InternedName.of ( "test" ) );
     TestResource resource1 = new TestResource ();
     TestResource resource2 = new TestResource ();
 
@@ -68,8 +68,8 @@ class ManagedScopeTest {
 
   @Test
   void shouldCloseChildScopes () {
-    Scope parent = new ManagedScope ( HierarchicalName.of ( "parent" ) );
-    Scope child = parent.scope ( HierarchicalName.of ( "child" ) );
+    Scope parent = new ManagedScope ( InternedName.of ( "parent" ) );
+    Scope child = parent.scope ( InternedName.of ( "child" ) );
     TestResource childResource = new TestResource ();
 
     child.register ( childResource );
@@ -80,7 +80,7 @@ class ManagedScopeTest {
 
   @Test
   void shouldSupportClosure () {
-    Scope scope = new ManagedScope ( HierarchicalName.of ( "test" ) );
+    Scope scope = new ManagedScope ( InternedName.of ( "test" ) );
     TestResource resource = new TestResource ();
     AtomicBoolean consumed = new AtomicBoolean ( false );
 
@@ -95,7 +95,7 @@ class ManagedScopeTest {
 
   @Test
   void shouldPreventOperationsAfterClose () {
-    Scope scope = new ManagedScope ( HierarchicalName.of ( "test" ) );
+    Scope scope = new ManagedScope ( InternedName.of ( "test" ) );
     scope.close ();
 
     assertThatThrownBy ( () -> scope.scope () )
@@ -109,7 +109,7 @@ class ManagedScopeTest {
 
   @Test
   void shouldAllowMultipleCloses () {
-    Scope scope = new ManagedScope ( HierarchicalName.of ( "test" ) );
+    Scope scope = new ManagedScope ( InternedName.of ( "test" ) );
 
     scope.close ();
     scope.close (); // Should not throw
@@ -130,7 +130,7 @@ class ManagedScopeTest {
     public Subject < Subscription > subject () {
       return new ContextualSubject <> (
         UuidIdentifier.generate (),
-        HierarchicalName.of ( "test-resource" ),
+        InternedName.of ( "test-resource" ),
         LinkedState.empty (),
         Subscription.class
       );

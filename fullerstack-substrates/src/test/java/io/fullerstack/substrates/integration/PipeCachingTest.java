@@ -2,7 +2,7 @@ package io.fullerstack.substrates.integration;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.fullerstack.substrates.circuit.SequentialCircuit;
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -47,17 +47,17 @@ class PipeCachingTest {
 
   @Test
   void shouldReturnSamePipeInstanceOnMultipleCalls () {
-    circuit = new SequentialCircuit ( HierarchicalName.of ( "test-circuit" ) );
+    circuit = new SequentialCircuit ( InternedName.of ( "test-circuit" ) );
 
     // Create conduit with limit transformation
     Conduit < Pipe < Integer >, Integer > conduit = circuit.conduit (
-      HierarchicalName.of ( "test-conduit" ),
+      InternedName.of ( "test-conduit" ),
       Composer.pipe ( path -> path.limit ( 3 ) )
     );
 
     // Get the same channel twice - should be same instance (cached by Conduit)
-    Pipe < Integer > pipe1 = conduit.get ( HierarchicalName.of ( "channel-1" ) );
-    Pipe < Integer > pipe2 = conduit.get ( HierarchicalName.of ( "channel-1" ) );
+    Pipe < Integer > pipe1 = conduit.get ( InternedName.of ( "channel-1" ) );
+    Pipe < Integer > pipe2 = conduit.get ( InternedName.of ( "channel-1" ) );
 
     // Should return the SAME Pipe instance (cached by Conduit)
     assertThat ( pipe1 ).isSameAs ( pipe2 );
@@ -65,22 +65,22 @@ class PipeCachingTest {
 
   @Test
   void shouldShareSegmentStateAcrossMultiplePipeCalls () throws InterruptedException {
-    circuit = new SequentialCircuit ( HierarchicalName.of ( "test-circuit" ) );
+    circuit = new SequentialCircuit ( InternedName.of ( "test-circuit" ) );
 
     List < Integer > received = new ArrayList <> ();
     CountDownLatch latch = new CountDownLatch ( 3 );
 
     // Create conduit with limit(3)
     Conduit < Pipe < Integer >, Integer > conduit = circuit.conduit (
-      HierarchicalName.of ( "test-conduit" ),
+      InternedName.of ( "test-conduit" ),
       Composer.pipe ( path -> path.limit ( 3 ) )
     );
 
-    conduit.subscribe ( subscriber ( HierarchicalName.of ( "subscriber" ), received, latch ) );
+    conduit.subscribe ( subscriber ( InternedName.of ( "subscriber" ), received, latch ) );
 
     // Get pipe and verify it's the same instance on multiple calls
-    Pipe < Integer > pipe1 = conduit.get ( HierarchicalName.of ( "channel-1" ) );
-    Pipe < Integer > pipe2 = conduit.get ( HierarchicalName.of ( "channel-1" ) );
+    Pipe < Integer > pipe1 = conduit.get ( InternedName.of ( "channel-1" ) );
+    Pipe < Integer > pipe2 = conduit.get ( InternedName.of ( "channel-1" ) );
 
     assertThat ( pipe1 ).isSameAs ( pipe2 );
 
@@ -97,22 +97,22 @@ class PipeCachingTest {
 
   @Test
   void shouldShareReduceAccumulatorState () throws InterruptedException {
-    circuit = new SequentialCircuit ( HierarchicalName.of ( "test-circuit" ) );
+    circuit = new SequentialCircuit ( InternedName.of ( "test-circuit" ) );
 
     List < Integer > received = new ArrayList <> ();
     CountDownLatch latch = new CountDownLatch ( 4 );
 
     // Create conduit with reduce (accumulating sum)
     Conduit < Pipe < Integer >, Integer > conduit = circuit.conduit (
-      HierarchicalName.of ( "test-conduit" ),
+      InternedName.of ( "test-conduit" ),
       Composer.pipe ( path -> path.reduce ( 0, Integer::sum ) )
     );
 
-    conduit.subscribe ( subscriber ( HierarchicalName.of ( "subscriber" ), received, latch ) );
+    conduit.subscribe ( subscriber ( InternedName.of ( "subscriber" ), received, latch ) );
 
     // Get pipe twice - should be same instance
-    Pipe < Integer > pipe1 = conduit.get ( HierarchicalName.of ( "accumulator" ) );
-    Pipe < Integer > pipe2 = conduit.get ( HierarchicalName.of ( "accumulator" ) );
+    Pipe < Integer > pipe1 = conduit.get ( InternedName.of ( "accumulator" ) );
+    Pipe < Integer > pipe2 = conduit.get ( InternedName.of ( "accumulator" ) );
 
     assertThat ( pipe1 ).isSameAs ( pipe2 );
 

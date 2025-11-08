@@ -3,7 +3,7 @@ package io.fullerstack.substrates.pool;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Pipe;
 import io.humainary.substrates.api.Substrates.Pool;
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -46,7 +46,7 @@ class ConcurrentPoolTest {
   void shouldReturnSameInstanceForSameName () {
     Pool<Pipe<String>> pool = new ConcurrentPool<>( name -> new MockPipe<>("value-" + name.value()) );
 
-    Name name = HierarchicalName.of ( "test" );
+    Name name = InternedName.of ( "test" );
     Pipe<String> value1 = pool.get ( name );
     Pipe<String> value2 = pool.get ( name );
 
@@ -57,8 +57,8 @@ class ConcurrentPoolTest {
   void shouldReturnDifferentInstancesForDifferentNames () {
     Pool<Pipe<String>> pool = new ConcurrentPool<>( name -> new MockPipe<>("value-" + name.value()) );
 
-    Pipe<String> value1 = pool.get ( HierarchicalName.of ( "test1" ) );
-    Pipe<String> value2 = pool.get ( HierarchicalName.of ( "test2" ) );
+    Pipe<String> value1 = pool.get ( InternedName.of ( "test1" ) );
+    Pipe<String> value2 = pool.get ( InternedName.of ( "test2" ) );
 
     assertThat ( value1 ).isNotEqualTo ( value2 );
     assertThat ( value1.toString() ).isEqualTo ( "value-test1" );
@@ -73,7 +73,7 @@ class ConcurrentPoolTest {
       return new MockPipe<>("value");
     } );
 
-    Name name = HierarchicalName.of ( "test" );
+    Name name = InternedName.of ( "test" );
     pool.get ( name );
     pool.get ( name );
     pool.get ( name );
@@ -86,7 +86,7 @@ class ConcurrentPoolTest {
     // Use path() to get full hierarchical name, not just value() which returns the last segment
     Pool<ComplexPipe> pool = new ConcurrentPool<>( name -> new ComplexPipe( name.path ().toString () ) );
 
-    Name name = HierarchicalName.of ( "kafka.broker.1" );
+    Name name = InternedName.of ( "kafka.broker.1" );
     ComplexPipe obj = pool.get ( name );
 
     assertThat ( obj.value ).isEqualTo ( "kafka.broker.1" );
@@ -96,7 +96,7 @@ class ConcurrentPoolTest {
   void shouldHandleNullFactory () {
     Pool<Pipe<String>> pool = new ConcurrentPool<>( name -> null );
 
-    Pipe<String> value = pool.get ( HierarchicalName.of ( "test" ) );
+    Pipe<String> value = pool.get ( InternedName.of ( "test" ) );
 
     assertThat ( value ).isNull ();
   }
@@ -104,7 +104,7 @@ class ConcurrentPoolTest {
   @Test
   void shouldSupportConcurrentAccess () throws Exception {
     Pool<Pipe<String>> pool = new ConcurrentPool<>( name -> new MockPipe<>("value-" + name.value()) );
-    Name name = HierarchicalName.of ( "concurrent" );
+    Name name = InternedName.of ( "concurrent" );
 
     Thread[] threads = new Thread[10];
     Pipe<String>[] results = new Pipe[10];

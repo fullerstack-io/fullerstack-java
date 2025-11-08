@@ -10,7 +10,7 @@ import io.fullerstack.substrates.pool.ConcurrentPool;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.subscription.CallbackSubscription;
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 import io.fullerstack.substrates.valve.Valve;
 
 import java.util.List;
@@ -178,7 +178,7 @@ public class SequentialCircuit implements Circuit, Scheduler {
     Composer < E, Pipe < I > > ingress,
     Composer < E, Pipe < E > > egress,
     Pipe < ? super E > pipe ) {
-    return cell ( HierarchicalName.of ( "cell" ), ingress, egress, pipe );
+    return cell ( InternedName.of ( "cell" ), ingress, egress, pipe );
   }
 
   @Override
@@ -316,7 +316,7 @@ public class SequentialCircuit implements Circuit, Scheduler {
   @Override
   public < P extends Percept, E > Conduit < P, E > conduit ( Composer < E, ? extends P > composer ) {
     // Generate unique name for unnamed conduits to avoid caching collisions
-    return conduit ( HierarchicalName.of ( "conduit-" + UuidIdentifier.generate ().toString () ), composer );
+    return conduit ( InternedName.of ( "conduit-" + UuidIdentifier.generate ().toString () ), composer );
   }
 
   @Override
@@ -328,7 +328,7 @@ public class SequentialCircuit implements Circuit, Scheduler {
     Class < ? > composerClass = composer.getClass ();
 
     // FAST PATH: Try to get existing slot (identity map lookup)
-    ConduitSlot slot = conduits.get ( name );  // ~4ns with HierarchicalName identity map
+    ConduitSlot slot = conduits.get ( name );  // ~4ns with InternedName identity map
 
     if ( slot != null ) {
       // Check if composer exists in slot

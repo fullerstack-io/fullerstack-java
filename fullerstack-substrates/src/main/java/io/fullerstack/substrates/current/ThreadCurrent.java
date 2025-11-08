@@ -2,7 +2,7 @@ package io.fullerstack.substrates.current;
 
 import io.humainary.substrates.api.Substrates;
 import io.fullerstack.substrates.subject.ContextualSubject;
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 import io.fullerstack.substrates.id.UuidIdentifier;
 
 import java.util.Objects;
@@ -61,7 +61,7 @@ public final class ThreadCurrent implements Substrates.Current {
     if ( threadName == null || threadName.isBlank () ) {
       threadName = "thread-" + thread.threadId ();
     }
-    Substrates.Name name = HierarchicalName.of ( threadName );
+    Substrates.Name name = InternedName.of ( threadName );
 
     // Create a deterministic UUID based on thread ID
     // Using thread ID as the most significant bits ensures different threads get different IDs

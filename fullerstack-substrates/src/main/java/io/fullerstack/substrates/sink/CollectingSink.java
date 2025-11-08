@@ -5,7 +5,7 @@ import io.fullerstack.substrates.capture.SubjectCapture;
 import io.fullerstack.substrates.id.UuidIdentifier;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.subject.ContextualSubject;
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 
 import java.util.List;
 import java.util.Objects;
@@ -47,12 +47,12 @@ public class CollectingSink < E > implements Sink < E > {
   public CollectingSink ( Source < E, ? > source ) {
     Objects.requireNonNull ( source, "Source cannot be null" );
 
-    // Using HierarchicalName.of() static factory
+    // Using InternedName.of() static factory
     this.source = source;
     Id sinkId = UuidIdentifier.generate ();
     this.sinkSubject = new ContextualSubject <> (
       sinkId,
-      HierarchicalName.of ( "sink" ).name ( sinkId.toString () ),
+      InternedName.of ( "sink" ).name ( sinkId.toString () ),
       LinkedState.empty (),
       (Class < Sink < E > >) (Class < ? >) Sink.class
     );
@@ -60,7 +60,7 @@ public class CollectingSink < E > implements Sink < E > {
     // Create internal subscriber's Subject once
     this.internalSubscriberSubject = new ContextualSubject <> (
       UuidIdentifier.generate (),
-      HierarchicalName.of ( "sink-subscriber" ),
+      InternedName.of ( "sink-subscriber" ),
       LinkedState.empty (),
       (Class < Subscriber < E > >) (Class < ? >) Subscriber.class
     );
@@ -69,7 +69,7 @@ public class CollectingSink < E > implements Sink < E > {
     //  Use FunctionalSubscriber with callback
     this.subscription = source.subscribe (
       new io.fullerstack.substrates.subscriber.FunctionalSubscriber < E > (
-        HierarchicalName.of ( "sink-subscriber" ),
+        InternedName.of ( "sink-subscriber" ),
         ( subject, registrar ) -> {
           // Register a pipe that captures emissions into the buffer
           registrar.register ( emission -> {

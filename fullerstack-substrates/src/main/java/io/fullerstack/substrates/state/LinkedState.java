@@ -1,6 +1,6 @@
 package io.fullerstack.substrates.state;
 
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 import io.fullerstack.substrates.slot.TypedSlot;
 import io.humainary.substrates.api.Substrates.Name;
 import io.humainary.substrates.api.Substrates.Slot;
@@ -167,9 +167,9 @@ public class LinkedState implements State {
     // and the enum value as a hierarchical Name: className.enumConstant
     // Convert $ to . for proper hierarchical names
     String className = value.getDeclaringClass ().getName ().replace ( '$', '.' );
-    Name enumClassName = HierarchicalName.of ( className );
+    Name enumClassName = InternedName.of ( className );
     // Append just the enum constant name (not the full Enum path)
-    Name enumValueName = HierarchicalName.of ( className ).name ( value.name () );
+    Name enumValueName = InternedName.of ( className ).name ( value.name () );
 
     return addSlot ( TypedSlot.of ( enumClassName, enumValueName, Name.class ) );
   }

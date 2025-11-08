@@ -60,9 +60,9 @@ import lombok.experimental.FieldDefaults;
  * // milesInCircuitA.state() != milesInCircuitB.state()  // Different states
  * </pre >
  * <p>
- * < p >< b >Comparison with HierarchicalName:</b >
+ * < p >< b >Comparison with InternedName:</b >
  * < ul >
- * < li >HierarchicalName: Hierarchical identifiers (strings)</li >
+ * < li >InternedName: Hierarchical identifiers (strings)</li >
  * < li >ContextualSubject: Hierarchical runtime entities (identity + state)</li >
  * < li >Both use parent-child links for hierarchy</li >
  * < li >Both implement Extent interface with enclosure()</li >
@@ -70,7 +70,7 @@ import lombok.experimental.FieldDefaults;
  *
  * @param < S > The substrate type this subject represents
  * @see Subject
- * @see HierarchicalName
+ * @see InternedName
  * @see CellNode
  */
 @Getter

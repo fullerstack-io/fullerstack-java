@@ -11,7 +11,7 @@ import io.fullerstack.substrates.slot.TypedSlot;
 import io.fullerstack.substrates.state.LinkedState;
 import io.fullerstack.substrates.subject.ContextualSubject;
 import io.fullerstack.substrates.subscriber.FunctionalSubscriber;
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 import io.fullerstack.substrates.sink.CollectingSink;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,7 +68,7 @@ public class CortexRuntime implements Cortex {
   public Circuit circuit () {
     // Generate unique name for each unnamed circuit (do NOT intern)
     // This ensures each call creates a new circuit with unique subject
-    return createCircuit ( HierarchicalName.of ( "circuit." + UuidIdentifier.generate () ) );
+    return createCircuit ( InternedName.of ( "circuit." + UuidIdentifier.generate () ) );
   }
 
   @Override
@@ -169,19 +169,19 @@ public class CortexRuntime implements Cortex {
   }
 
   // ========== Name Factory (8 methods) ==========
-  // All delegate directly to HierarchicalName.of() overloaded methods
+  // All delegate directly to InternedName.of() overloaded methods
 
   @Override
   public Name name ( String s ) {
     // Create root name - no path parsing
-    return HierarchicalName.of ( s );
+    return InternedName.of ( s );
   }
 
   @Override
   public Name name ( Enum < ? > e ) {
     // Convert $ to . for proper hierarchical name, then append enum constant
     String className = e.getDeclaringClass ().getName ().replace ( '$', '.' );
-    return HierarchicalName.of ( className ).name ( e.name () );
+    return InternedName.of ( className ).name ( e.name () );
   }
 
   @Override
@@ -191,7 +191,7 @@ public class CortexRuntime implements Cortex {
     if ( !it.hasNext () ) {
       throw new IllegalArgumentException ( "parts cannot be empty" );
     }
-    return HierarchicalName.of ( it.next () ).name ( it );
+    return InternedName.of ( it.next () ).name ( it );
   }
 
   @Override
@@ -201,7 +201,7 @@ public class CortexRuntime implements Cortex {
     if ( !it.hasNext () ) {
       throw new IllegalArgumentException ( "items cannot be empty" );
     }
-    return HierarchicalName.of ( mapper.apply ( it.next () ) ).name ( it, mapper );
+    return InternedName.of ( mapper.apply ( it.next () ) ).name ( it, mapper );
   }
 
   @Override
@@ -210,7 +210,7 @@ public class CortexRuntime implements Cortex {
     if ( !parts.hasNext () ) {
       throw new IllegalArgumentException ( "parts cannot be empty" );
     }
-    return HierarchicalName.of ( parts.next () ).name ( parts );
+    return InternedName.of ( parts.next () ).name ( parts );
   }
 
   @Override
@@ -219,19 +219,19 @@ public class CortexRuntime implements Cortex {
     if ( !items.hasNext () ) {
       throw new IllegalArgumentException ( "items cannot be empty" );
     }
-    return HierarchicalName.of ( mapper.apply ( items.next () ) ).name ( items, mapper );
+    return InternedName.of ( mapper.apply ( items.next () ) ).name ( items, mapper );
   }
 
   @Override
   public Name name ( Class < ? > clazz ) {
     // Convert $ to . for proper hierarchical name with inner classes
-    return HierarchicalName.of ( clazz.getName ().replace ( '$', '.' ) );
+    return InternedName.of ( clazz.getName ().replace ( '$', '.' ) );
   }
 
   @Override
   public Name name ( Member member ) {
     // Create root, let Name.name() handle the hierarchy
-    return HierarchicalName.of ( member.getDeclaringClass ().getName () ).name ( member );
+    return InternedName.of ( member.getDeclaringClass ().getName () ).name ( member );
   }
 
   // ========== Pool Management (2 methods - PREVIEW API) ==========
@@ -258,7 +258,7 @@ public class CortexRuntime implements Cortex {
   public Scope scope () {
     // Create a new scope with a unique name each time
     // Each scope is independent and can be closed without affecting others
-    return new ManagedScope ( HierarchicalName.of ( "scope." + UuidIdentifier.generate ().toString () ) );
+    return new ManagedScope ( InternedName.of ( "scope." + UuidIdentifier.generate ().toString () ) );
   }
 
   @Override

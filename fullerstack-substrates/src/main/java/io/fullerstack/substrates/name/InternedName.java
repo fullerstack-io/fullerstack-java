@@ -10,15 +10,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
- * Node-based Name implementation - hierarchical parent-child structure.
+ * Interned Name implementation with identity-based equality.
  * <p>
  * < p >< b >Design Principles:</b >
  * < ul >
- * < li >Cortex creates root names only: new HierarchicalName(null, "root")</li >
+ * < li >Cortex creates root names only: new InternedName(null, "root")</li >
  * < li >Hierarchy built by name() methods: parent.name("child")</li >
  * < li >Parent-child links via constructor (node structure)</li >
  * < li >All Extent methods use defaults (path, depth, iterator)</li >
  * < li >< b >Name Interning:</b > Names with identical paths return same instance (like String.intern())</li >
+ * < li >< b >Identity Equality:</b > Use == for comparison, not equals()</li >
  * </ul >
  * <p>
  * < p >< b >Required implementations:</b >
@@ -28,28 +29,28 @@ import java.util.function.Function;
  * < li >name() methods - create children with parent reference</li >
  * </ul >
  */
-public final class HierarchicalName implements Name {
+public final class InternedName implements Name {
 
   /**
    * Global cache for name interning.
-   * Key: (parent, segment), Value: HierarchicalName instance
+   * Key: (parent, segment), Value: InternedName instance
    * Ensures identical paths return same instance across entire JVM.
    */
-  private static final ConcurrentHashMap < NameKey, HierarchicalName > INTERN_CACHE = new ConcurrentHashMap <> ();
+  private static final ConcurrentHashMap < NameKey, InternedName > INTERN_CACHE = new ConcurrentHashMap <> ();
 
-  private final HierarchicalName parent;
-  private final String           segment;
+  private final InternedName parent;
+  private final String       segment;
 
   /**
    * Composite key for interning cache: (parent, segment) uniquely identifies a Name.
    */
-  private record NameKey( HierarchicalName parent, String segment ) {
+  private record NameKey( InternedName parent, String segment ) {
   }
 
   /**
    * Private constructor - use static factory methods or name() methods.
    */
-  private HierarchicalName ( HierarchicalName parent, String segment ) {
+  private InternedName ( InternedName parent, String segment ) {
     this.parent = parent;
     this.segment = Objects.requireNonNull ( segment, "segment cannot be null" );
   }
@@ -57,9 +58,9 @@ public final class HierarchicalName implements Name {
   /**
    * Intern a name - returns cached instance if exists, creates new if not.
    */
-  private static HierarchicalName intern ( HierarchicalName parent, String segment ) {
+  private static InternedName intern ( InternedName parent, String segment ) {
     NameKey key = new NameKey ( parent, segment );
-    return INTERN_CACHE.computeIfAbsent ( key, k -> new HierarchicalName ( parent, segment ) );
+    return INTERN_CACHE.computeIfAbsent ( key, k -> new InternedName ( parent, segment ) );
   }
 
   /**
@@ -146,7 +147,7 @@ public final class HierarchicalName implements Name {
       // Build hierarchy
       Name current = this;
       for ( String part : parts ) {
-        current = intern ( (HierarchicalName) current, part );
+        current = intern ( (InternedName) current, part );
       }
       return current;
     }
@@ -174,14 +175,14 @@ public final class HierarchicalName implements Name {
   @Override
   public Name name ( Member member ) {
     Objects.requireNonNull ( member, "member" );
-    // Delegate to name(String) - don't force HierarchicalName
+    // Delegate to name(String) - don't force InternedName
     return name ( member.getDeclaringClass ().getName () ).name ( member.getName () );
   }
 
   @Override
   public Name name ( Iterable < String > parts ) {
     Objects.requireNonNull ( parts, "parts" );
-    // Delegate to name(String) - don't force HierarchicalName
+    // Delegate to name(String) - don't force InternedName
     Name current = this;
     for ( String part : parts ) {
       current = current.name ( Objects.requireNonNull ( part ) );
@@ -193,7 +194,7 @@ public final class HierarchicalName implements Name {
   public < T > Name name ( Iterable < ? extends T > parts, Function < T, String > mapper ) {
     Objects.requireNonNull ( parts, "parts" );
     Objects.requireNonNull ( mapper, "mapper" );
-    // Delegate to name(String) - don't force HierarchicalName
+    // Delegate to name(String) - don't force InternedName
     Name current = this;
     for ( T item : parts ) {
       current = current.name ( Objects.requireNonNull ( mapper.apply ( item ) ) );
@@ -204,7 +205,7 @@ public final class HierarchicalName implements Name {
   @Override
   public Name name ( Iterator < String > parts ) {
     Objects.requireNonNull ( parts, "parts" );
-    // Delegate to name(String) - don't force HierarchicalName
+    // Delegate to name(String) - don't force InternedName
     Name current = this;
     while ( parts.hasNext () ) {
       current = current.name ( Objects.requireNonNull ( parts.next () ) );
@@ -216,7 +217,7 @@ public final class HierarchicalName implements Name {
   public < T > Name name ( Iterator < ? extends T > parts, Function < T, String > mapper ) {
     Objects.requireNonNull ( parts, "parts" );
     Objects.requireNonNull ( mapper, "mapper" );
-    // Delegate to name(String) - don't force HierarchicalName
+    // Delegate to name(String) - don't force InternedName
     Name current = this;
     while ( parts.hasNext () ) {
       current = current.name ( Objects.requireNonNull ( mapper.apply ( parts.next () ) ) );

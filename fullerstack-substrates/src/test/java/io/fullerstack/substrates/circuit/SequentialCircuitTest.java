@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.circuit;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.name.HierarchicalName;
+import io.fullerstack.substrates.name.InternedName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +26,7 @@ class SequentialCircuitTest {
 
   @Test
   void shouldCreateCircuitWithName () {
-    circuit = new SequentialCircuit ( HierarchicalName.of ( "test-circuit" ) );
+    circuit = new SequentialCircuit ( InternedName.of ( "test-circuit" ) );
 
     assertThat ( (Object) circuit ).isNotNull ();
     assertThat ( (Object) circuit.subject () ).isNotNull ();
@@ -46,7 +46,7 @@ class SequentialCircuitTest {
 
   @Test
   void shouldRequireNonNullConduitName () {
-    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( InternedName.of ( "test" ) );
 
     assertThatThrownBy ( () -> circuit.conduit ( null, pipe () ) )
       .isInstanceOf ( NullPointerException.class )
@@ -55,9 +55,9 @@ class SequentialCircuitTest {
 
   @Test
   void shouldRequireNonNullComposer () {
-    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( InternedName.of ( "test" ) );
 
-    assertThatThrownBy ( () -> circuit.conduit ( HierarchicalName.of ( "test" ), null ) )
+    assertThatThrownBy ( () -> circuit.conduit ( InternedName.of ( "test" ), null ) )
       .isInstanceOf ( NullPointerException.class )
       .hasMessageContaining ( "Composer cannot be null" );
   }
@@ -66,7 +66,7 @@ class SequentialCircuitTest {
 
   @Test
   void shouldAllowMultipleCloses () {
-    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( InternedName.of ( "test" ) );
 
     circuit.close ();
     circuit.close (); // Should not throw
@@ -76,33 +76,33 @@ class SequentialCircuitTest {
 
   @Test
   void shouldCreateDifferentConduitsForDifferentComposers () {
-    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( InternedName.of ( "test" ) );
 
     // Same name, different composers should create DIFFERENT Conduits
     Composer < String, Pipe < String > > composer1 = pipe ();
     Composer < String, Pipe < String > > composer2 = channel -> channel.pipe ();
 
-    Conduit < Pipe < String >, String > conduit1 = circuit.conduit ( HierarchicalName.of ( "shared" ), composer1 );
-    Conduit < Pipe < String >, String > conduit2 = circuit.conduit ( HierarchicalName.of ( "shared" ), composer2 );
+    Conduit < Pipe < String >, String > conduit1 = circuit.conduit ( InternedName.of ( "shared" ), composer1 );
+    Conduit < Pipe < String >, String > conduit2 = circuit.conduit ( InternedName.of ( "shared" ), composer2 );
 
     assertThat ( (Object) conduit1 ).isNotSameAs ( conduit2 );
   }
 
   @Test
   void shouldCacheConduitsWithSameNameAndComposer () {
-    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( InternedName.of ( "test" ) );
 
     Composer < String, Pipe < String > > composer = pipe ();
 
-    Conduit < Pipe < String >, String > conduit1 = circuit.conduit ( HierarchicalName.of ( "cached" ), composer );
-    Conduit < Pipe < String >, String > conduit2 = circuit.conduit ( HierarchicalName.of ( "cached" ), composer );
+    Conduit < Pipe < String >, String > conduit1 = circuit.conduit ( InternedName.of ( "cached" ), composer );
+    Conduit < Pipe < String >, String > conduit2 = circuit.conduit ( InternedName.of ( "cached" ), composer );
 
     assertThat ( (Object) conduit1 ).isSameAs ( conduit2 );
   }
 
   @Test
   void shouldProvideAccessToSubject () {
-    circuit = new SequentialCircuit ( HierarchicalName.of ( "test" ) );
+    circuit = new SequentialCircuit ( InternedName.of ( "test" ) );
 
     assertThat ( (Object) circuit.subject () ).isNotNull ();
     assertThat ( (Object) circuit ).isNotNull ();
