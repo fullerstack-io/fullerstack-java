@@ -1195,48 +1195,58 @@ try {
 
 ---
 
-## Integration with Serventis
+## Serventis Integration Example
 
-**Example: Kafka Broker Monitoring**
+**Example: Kafka Broker Health Monitoring (PREVIEW API)**
 
 ```java
+import static io.humainary.substrates.api.Substrates.*;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+
 // Create Circuit
-Circuit circuit = cortex().circuit(cortex().name("kafka.broker.health"));
+Circuit circuit = cortex().circuit(cortex().name("kafka.monitoring"));
 
-// Create Conduit for MonitorSignals
-Conduit<Pipe<MonitorSignal>, MonitorSignal> monitors =
-    circuit.conduit(cortex().name("monitors"), Composer.pipe());
-
-// Get Pipe for specific subject
-Pipe<MonitorSignal> heapPipe =
-    monitors.get(cortex().name("broker-1.jvm.heap"));
-
-// Emit MonitorSignal
-MonitorSignal signal = new MonitorSignal(
-    UUID.randomUUID(),
-    "kafka.broker.health",        // circuit
-    "broker-1.jvm.heap",          // subject
-    Instant.now(),
-    new VectorClock(Map.of("broker-1", 42L)),
-    MonitorStatus.DEGRADED,
-    Map.of("heapUsed", "85%")
+// Create Conduit using Serventis Monitors composer
+Conduit<Monitor, Monitors.Status> monitors = circuit.conduit(
+    cortex().name("monitors"),
+    Monitors::composer  // Uses Serventis composer
 );
-heapPipe.emit(signal);
 
-// Subscribe to observe signals
+// Get Monitor instrument for JVM heap
+Monitor heapMonitor = monitors.get(cortex().name("broker-1.jvm.heap"));
+
+// Emit status using Monitor methods (no manual signal construction!)
+if (heapUsagePercent > 85) {
+    heapMonitor.degraded(Monitors.Confidence.HIGH);  // Convenience method
+    // Or: heapMonitor.status(Monitors.Condition.DEGRADED, Monitors.Confidence.HIGH);
+}
+
+// Subscribe to all monitor statuses
 monitors.subscribe(
     cortex().subscriber(
         cortex().name("health-aggregator"),
-        (subject, registrar) -> {
-            registrar.register(s -> {
-                if (s.status() == MonitorStatus.DEGRADED) {
-                    // Take action
+        (Subject<Channel<Monitors.Status>> subject, Registrar<Monitors.Status> registrar) -> {
+            registrar.register(status -> {
+                // status is Monitors.Status record with condition and confidence
+                if (status.condition() == Monitors.Condition.DEGRADED) {
+                    log.warn("Degraded: {} (confidence: {})",
+                        subject.name(), status.confidence());
                 }
             });
         }
     )
 );
+
+circuit.await();  // Wait for async processing in tests
+circuit.close();
 ```
+
+**Key Points:**
+- Use Serventis composer methods: `Monitors::composer`, `Queues::composer`, etc.
+- Call instrument methods, don't construct signals manually
+- Instruments emit signs/statuses automatically
+- Subject context comes from `monitors.get(name)` - it's in the Channel
+- Subscribers receive typed signs/statuses, not generic signals
 
 ---
 
@@ -1245,9 +1255,9 @@ monitors.subscribe(
 **Fullerstack Substrates:**
 
 ✅ **Simple** - No complex optimizations, easy to understand
-✅ **Correct** - 247 tests passing, proper PREVIEW sealed interface usage
-✅ **Fast Enough** - Handles 100k+ metrics @ 1Hz
-✅ **Thread-Safe** - Proper concurrent collections
+✅ **Correct** - 381/381 TCK tests passing (100% Humainary API compliance)
+✅ **Lean** - Core implementation only, no application frameworks
+✅ **Thread-Safe** - Dual-queue Valve pattern, proper concurrent collections
 ✅ **Clean** - Explicit resource lifecycle management
 ✅ **Maintainable** - Clear architecture, good documentation
 
