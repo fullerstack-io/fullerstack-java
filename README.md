@@ -8,36 +8,42 @@ This repository serves as a monorepo for various Java-based projects and librari
 
 ## Current Projects
 
-### [Fullerstack Substrates](fullerstack-substrates/)
+### Fullerstack Kafka
+
+Kafka client libraries and observability extensions using Substrates/Serventis APIs.
+
+**Modules:**
+- `fullerstack-kafka-core` - Core Kafka client abstractions
+- `fullerstack-kafka-broker` - Broker monitoring and management
+- `fullerstack-kafka-producer` - Producer implementations
+- `fullerstack-kafka-consumer` - Consumer implementations
+- `fullerstack-kafka-runtime` - Runtime and observability
+- `fullerstack-kafka-msk` - AWS MSK integration
+
+**Dependencies:**
+- [Fullerstack Substrates](https://github.com/fullerstack-io/fullerstack-humainary/tree/main/fullerstack-substrates) - Event-driven infrastructure (separate repo)
+- Apache Kafka 3.8.0
+
+**Status:** In Development
+
+---
+
+## Related Projects
+
+### [Fullerstack Substrates](https://github.com/fullerstack-io/fullerstack-humainary)
+
+**Moved to separate repository:** https://github.com/fullerstack-io/fullerstack-humainary
 
 Java implementation of the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java) for building event-driven observability systems.
 
 **Features:**
-- Circuit-based event orchestration with virtual CPU core pattern
-- Hierarchical naming with dot notation (HierarchicalName)
-- Observable event streams (subscriber management)
-- Transformation pipelines (Flow/Sift)
-- Hierarchical state transformation (SimpleCell)
-- Immutable state with slots
-- Shared scheduler optimization for Clocks
+- 100% TCK compliance (381/381 tests passing)
+- Sequential processing with Virtual CPU Core pattern
+- Dual-queue Valve architecture
+- Dynamic routing with on-demand channels
+- SPI-based provider loading
 
-**Status:** ✅ 540 tests passing | Apache 2.0
-
-**Documentation:** [View README](fullerstack-substrates/README.md)
-
-### [Fullerstack Serventis](fullerstack-serventis/)
-
-Concrete signal implementations for the [Humainary Serventis API](https://github.com/humainary-io/serventis-api-java) - semiotic intelligence for observability.
-
-**Features:**
-- Immutable signal records (Monitor, Service, Queue, Reporter, Probe, Resource)
-- Vector clock state management
-- Zero-allocation signal types
-- Full Serventis API M18 support
-
-**Status:** ✅ 36 tests passing | Apache 2.0
-
-**Documentation:** [View README](fullerstack-serventis/README.md)
+**Status:** ✅ Production-ready | Apache 2.0
 
 ---
 
@@ -50,42 +56,38 @@ Concrete signal implementations for the [Humainary Serventis API](https://github
 
 ### Prerequisites
 
-**Note:** This project uses Humainary API version **1.0.0-M18**. The Humainary APIs are not yet published to Maven Central.
+**Note:** This project uses Humainary API version **1.0.0-PREVIEW**. The Humainary APIs are not yet published to Maven Central.
 
 **Dependency Status:**
-- **This project uses**: v1.0.0-M18 - Latest with static Cortex access (Java 25 required)
-- **Installation required**: M18 artifacts must be built from source
+- **This project uses**: v1.0.0-PREVIEW - Latest stable API
+- **Installation required**: PREVIEW artifacts must be built from source
 
-**Building Humainary M18 Dependencies:**
+**Building Humainary PREVIEW Dependencies:**
 
-Before building this project, you must install the Humainary M18 dependencies to your local Maven repository:
+Before building this project, you must install the Humainary PREVIEW dependencies to your local Maven repository:
 
 ```bash
-# Clone and build Substrates API M18
+# Clone and build Substrates API (includes Serventis extensions)
 git clone https://github.com/humainary-io/substrates-api-java.git
 cd substrates-api-java
-# Main branch is currently at M18
 mvn clean install -DskipTests
 cd ..
 
-# Clone and build Serventis API M18
-git clone https://github.com/humainary-io/serventis-api-java.git
-cd serventis-api-java
-# Main branch is currently at M18
+# Clone and build Fullerstack Substrates implementation
+git clone https://github.com/fullerstack-io/fullerstack-humainary.git
+cd fullerstack-humainary/fullerstack-substrates
 mvn clean install -DskipTests
-cd ..
+cd ../..
 ```
 
-**M18 Key Features:**
-M18 introduces major improvements:
-- **Static Cortex access** - `Cortex.circuit()`, `Cortex.name()`, etc. (no more instance creation)
-- **Cell hierarchy** - Cells can contain child cells via `Container.get(name)`
-- **Conduit creation** - Three variants for creating conduits
-- **Flow.skip()** - New skip transformation
-- Sealed interfaces for type safety (`Source`, `Context`, `Component`, `Container`)
-- See [API-ANALYSIS.md](API-ANALYSIS.md) for migration details
+**PREVIEW Key Features:**
+PREVIEW introduces major improvements:
+- **Static Cortex access** - `cortex().circuit()`, `cortex().name()`, etc.
+- **Cell extends Pipe** - Cells can emit directly (no .pipe() call needed)
+- **Sealed interfaces** - Type safety with restricted implementations
+- **12 Serventis instruments** - Full OODA loop coverage (Observe, Orient, Decide, Act)
 
-### Building Fullerstack Projects
+### Building Fullerstack Kafka Projects
 
 ```bash
 # Clone the repository
@@ -102,51 +104,29 @@ mvn test
 mvn clean install -DskipTests
 ```
 
-## Building Individual Projects
-
-Each project can be built independently:
-
-```bash
-cd fullerstack-substrates
-mvn clean install
-```
-
 ## Project Structure
 
 ```
 fullerstack-java/
-├── fullerstack-substrates/         # Substrates API implementation
-├── fullerstack-serventis/          # Serventis signals implementation
-├── API-ANALYSIS.md                 # API version analysis and migration notes
-├── CELL-IMPLEMENTATION-PLAN.md     # Cell architecture documentation
-└── pom.xml                         # Parent POM (manages M18 versions)
+├── fullerstack-kafka-core/         # Core Kafka abstractions
+├── fullerstack-kafka-broker/       # Broker monitoring
+├── fullerstack-kafka-producer/     # Producer implementations
+├── fullerstack-kafka-consumer/     # Consumer implementations
+├── fullerstack-kafka-runtime/      # Runtime and observability
+├── fullerstack-kafka-msk/          # AWS MSK integration
+└── pom.xml                         # Parent POM (manages versions)
 ```
 
 ## Architecture Highlights
 
-### Simplified Design (Post-Refactoring)
+### Kafka Observability with Substrates
 
-The implementation has been significantly simplified:
-- **Single Name implementation**: HierarchicalName (removed 4 alternative implementations)
-- **No registry abstractions**: Removed 8 registry implementations (API provides Registry)
-- **Lean dependencies**: Removed benchmark and queue packages
-- **Optimized Clocks**: Shared ScheduledExecutorService across all Clocks in a Circuit
-- **Direct API usage**: Removed unnecessary abstraction layers
+This project uses Fullerstack Substrates (separate repo) to provide event-driven observability for Apache Kafka:
 
-### Key Implementation Classes
-
-| Package | Class | Purpose |
-|---------|-------|---------|
-| circuit | SequentialCircuit | Event orchestration with Valve (virtual CPU core pattern) |
-| conduit | TransformingConduit | Channel/Source coordination with type transformation |
-| cell | SimpleCell | Hierarchical state transformation with child cell support |
-| clock | ScheduledClock | Scheduled event emission with shared executor |
-| name | HierarchicalName | Hierarchical dot-notation names with parent/child structure |
-| source | SourceSupport | Internal subscriber management utility |
-| channel | EmissionChannel | Named emission ports for signal flow |
-| pipe | ConsumerPipe, ProducerPipe | Event transformation and routing |
-| sink | CollectingSink | Event capture for testing and debugging |
-| capture | SubjectCapture | Pairs Subject with emission for queue processing |
+- **Semiotic Intelligence**: Transforms raw Kafka metrics into meaningful signs and symptoms
+- **OODA Loop**: Implements Boyd's Observe-Orient-Decide-Act pattern
+- **12 Serventis Instruments**: Covers full observability spectrum (Probes, Monitors, Services, etc.)
+- **Causal Analysis**: Vector clocks track relationships across distributed sensors
 
 ## Adding New Projects
 
@@ -169,11 +149,7 @@ Contributions are welcome! Please:
 
 ## License
 
-Each project in this repository may have its own license. Please refer to individual project directories for specific license information.
-
-Currently:
-- **fullerstack-substrates:** Apache License 2.0
-- **fullerstack-serventis:** Apache License 2.0
+Apache License 2.0 - All Kafka modules
 
 ## Links
 
@@ -187,19 +163,16 @@ Currently:
 
 ---
 
-## Project Acknowledgments
+## Acknowledgments
 
-### Fullerstack Substrates & Serventis
-
-Based on the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java) and [Serventis API](https://github.com/humainary-io/serventis-api-java) designed by [William Louth](https://humainary.io/).
+This project builds on the [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java) and [Serventis Extensions](https://github.com/humainary-io/substrates-api-java/tree/main/ext/serventis) designed by [William Louth](https://humainary.io/).
 
 - **API Design:** [William Louth](https://humainary.io/) ([Humainary](https://github.com/humainary-io))
-- **Implementation:** Fullerstack
-- **License:** Apache 2.0
+- **Substrates Implementation:** [Fullerstack Humainary](https://github.com/fullerstack-io/fullerstack-humainary)
+- **Kafka Extensions:** Fullerstack
 
 **Learn more:**
 - Humainary: https://humainary.io/
-- Substrates API (Java): https://github.com/humainary-io/substrates-api-java
-- Serventis API (Java): https://github.com/humainary-io/serventis-api-java
+- Substrates API: https://github.com/humainary-io/substrates-api-java
+- Fullerstack Substrates: https://github.com/fullerstack-io/fullerstack-humainary
 - Observability X Blog: https://humainary.io/blog/category/observability-x/
-- William Louth's Articles: https://humainary.io/blog/

@@ -15,7 +15,6 @@
     <url>https://github.com/fullerstack-io/fullerstack-java</url>
 
     <modules>
-        <module>fullerstack-substrates</module>
         <module>fullerstack-kafka-core</module>
         <module>fullerstack-kafka-broker</module>
         <module>fullerstack-kafka-producer</module>
@@ -63,12 +62,14 @@
                 <version>${serventis-api.version}</version>
             </dependency>
 
-            <!-- Fullerstack modules -->
+            <!-- Fullerstack Substrates (now in separate repo) -->
             <dependency>
                 <groupId>io.fullerstack</groupId>
                 <artifactId>fullerstack-substrates</artifactId>
-                <version>${project.version}</version>
+                <version>1.0.0-SNAPSHOT</version>
             </dependency>
+
+            <!-- Fullerstack Kafka modules -->
             <dependency>
                 <groupId>io.fullerstack</groupId>
                 <artifactId>fullerstack-kafka-core</artifactId>
