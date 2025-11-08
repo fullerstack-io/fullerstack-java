@@ -1,9 +1,9 @@
 # Fullerstack Substrates - Architecture & Core Concepts
 
-**Substrates API:** RC5 (RC5 + sealed hierarchy + Cell API + Flow.skip)
-**Serventis API:** RC5 (Queues, Monitors, Probes, Services, Resources, Reporters)
+**Substrates API:** 1.0.0-PREVIEW (sealed hierarchy + Cell API + Flow)
+**Serventis API:** 1.0.0-PREVIEW (12 Instrument APIs for semiotic observability)
 **Java Version:** 25 (Virtual Threads)
-**Status:** 502 tests passing (38 API compliance tests)
+**Status:** 381 TCK tests passing (100% compliance)
 
 ---
 
@@ -12,7 +12,7 @@
 1. [What is Substrates?](#what-is-substrates)
 2. [Serventis Integration](#serventis-integration)
 3. [Design Philosophy](#design-philosophy)
-4. [RC5 Sealed Hierarchy](#rc5-sealed-hierarchy)
+4. [Sealed Hierarchy](#sealed-hierarchy)
 5. [Core Entities](#core-entities)
 6. [Data Flow](#data-flow)
 7. [Implementation Details](#implementation-details)
@@ -49,7 +49,7 @@ Steering (automated responses)
 
 Serventis extends Substrates with **typed instrument APIs** for building semiotic observability systems. Each instrument emits domain-specific signals that gain meaning through their Subject context.
 
-### The Nine Instrument APIs (RC5)
+### The Twelve Instrument APIs (PREVIEW)
 
 #### OBSERVE Phase (Sensing)
 
@@ -70,15 +70,15 @@ service.succeeded();  // or service.failed()
 
 **3. Queues** - Flow control events
 ```java
-Conduit<Queue, Queues.Signal> queues = circuit.conduit(name, Queues::composer);
+Conduit<Queue, Queues.Sign> queues = circuit.conduit(name, Queues::composer);
 Queue queue = queues.get(cortex().name("producer-1.buffer"));
-queue.enqueue();  // Item added to queue
-queue.dequeue();  // Item removed from queue
-queue.overflow(95L);  // Buffer capacity exceeded
+queue.enqueue();    // Item added to queue
+queue.dequeue();    // Item removed from queue
+queue.overflow();   // Buffer capacity exceeded
 queue.underflow();  // Take from empty queue
 ```
 
-**4. Gauges** - Bidirectional metrics (NEW in RC5)
+**4. Gauges** - Bidirectional metrics 
 ```java
 Conduit<Gauge, Gauges.Sign> gauges = circuit.conduit(name, Gauges::composer);
 Gauge gauge = gauges.get(cortex().name("broker-1.connections"));
@@ -89,7 +89,7 @@ gauge.underflow();  // Min threshold breached
 gauge.reset();      // Reset to baseline
 ```
 
-**5. Counters** - Monotonic metrics (NEW in RC5)
+**5. Counters** - Monotonic metrics 
 ```java
 Conduit<Counter, Counters.Sign> counters = circuit.conduit(name, Counters::composer);
 Counter counter = counters.get(cortex().name("broker-1.requests"));
@@ -99,7 +99,7 @@ counter.underflow();  // Invalid decrement attempted
 counter.reset();      // Explicitly zeroed
 ```
 
-**6. Caches** - Hit/miss tracking (NEW in RC5)
+**6. Caches** - Hit/miss tracking 
 ```java
 Conduit<Cache, Caches.Sign> caches = circuit.conduit(name, Caches::composer);
 Cache cache = caches.get(cortex().name("metadata-cache"));
@@ -145,6 +145,38 @@ reporter.critical();  // Serious situation demanding intervention
 // Or: reporter.normal(), reporter.warning()
 ```
 
+#### ACT Phase (Promise Theory & Speech Act Theory)
+
+**10. Agents** - Promise-based autonomy (Promise Theory)
+```java
+Conduit<Agent, Agents.Promise> agents = circuit.conduit(name, Agents::composer);
+Agent agent = agents.get(cortex().name("auto-scaler"));
+agent.promise();   // Agent commits to maintaining a promise
+agent.kept();      // Promise successfully maintained
+agent.broken();    // Promise violated, action needed
+```
+
+**11. Actors** - Message-based interaction (Speech Act Theory)
+```java
+Conduit<Actor, Actors.Act> actors = circuit.conduit(name, Actors::composer);
+Actor actor = actors.get(cortex().name("remediation-service"));
+actor.request();   // Initiate action request
+actor.commit();    // Commit to performing action
+actor.execute();   // Perform the action
+actor.confirm();   // Acknowledge completion
+actor.cancel();    // Cancel pending action
+```
+
+**12. Routers** - Message routing decisions
+```java
+Conduit<Router, Routers.Route> routers = circuit.conduit(name, Routers::composer);
+Router router = routers.get(cortex().name("message-router"));
+router.route();    // Route message to destination
+router.deliver();  // Successful delivery
+router.drop();     // Message dropped
+router.redirect(); // Reroute to alternate path
+```
+
 ### Context Creates Meaning
 
 The **key insight**: The same signal means different things depending on its Subject (entity context).
@@ -154,16 +186,16 @@ The **key insight**: The same signal means different things depending on its Sub
 Queue producerBuffer = queues.get(cortex().name("producer.buffer"));
 Queue consumerLag = queues.get(cortex().name("consumer.lag"));
 
-producerBuffer.overflow(95L);  // → Backpressure (annoying)
-consumerLag.overflow(95L);     // → Data loss risk (critical!)
+producerBuffer.overflow();  // → Backpressure (annoying)
+consumerLag.overflow();     // → Data loss risk (critical!)
 
 // Subscribers interpret based on Subject:
 queues.subscribe(cortex().subscriber(
     cortex().name("assessor"),
-    (Subject<Channel<Queues.Signal>> subject, Registrar<Queues.Signal> registrar) -> {
+    (Subject<Channel<Queues.Sign>> subject, Registrar<Queues.Sign> registrar) -> {
         Monitor monitor = monitors.get(subject.name());
-        registrar.register(signal -> {
-            if (signal == Queues.Signal.OVERFLOW) {
+        registrar.register(sign -> {
+            if (sign == Queues.Sign.OVERFLOW) {
                 if (subject.name().toString().contains("producer")) {
                     monitor.status(DEGRADED, HIGH);  // Backpressure
                 } else if (subject.name().toString().contains("consumer")) {
@@ -200,7 +232,7 @@ This is **semiotic observability** - meaning arises from the interplay between s
 ### Architecture Principles
 
 1. **Simplified Design** - Single implementations, no factory abstractions
-2. **RC5 Sealed Hierarchy** - Type-safe API contracts enforced by sealed interfaces
+2. **PREVIEW Sealed Hierarchy** - Type-safe API contracts enforced by sealed interfaces
 3. **Valve Pattern** (William's architecture) - Dual-queue (Ingress + Transit) + Virtual Thread per Circuit
 4. **Event-Driven Synchronization** - Zero-latency await() using wait/notify (no polling)
 5. **Pipeline Fusion** - JVM-style optimization of adjacent transformations
@@ -226,11 +258,11 @@ This is **semiotic observability** - meaning arises from the interplay between s
 
 ---
 
-## RC5 Sealed Hierarchy
+## PREVIEW Sealed Hierarchy
 
 ### Sealed Interfaces (Java JEP 409)
 
-RC5 uses sealed interfaces to restrict which classes can implement them:
+PREVIEW uses sealed interfaces to restrict which classes can implement them:
 
 ```java
 sealed interface Source<E> permits Context
@@ -362,7 +394,7 @@ Circuit circuit = cortex().circuit(cortex().name("kafka"));
 Name brokerName = cortex().name("kafka.broker.1");
 ```
 
-**RC5 Change:** Cortex is now accessed statically via `Substrates.Cortex`, not instantiated.
+**PREVIEW Change:** Cortex is now accessed statically via `Substrates.Cortex`, not instantiated.
 
 **Implementation:**
 
@@ -484,7 +516,7 @@ Conduit<Pipe<String>, String> messages =
 Pipe<String> pipe = messages.get(cortex().name("user.login"));
 pipe.emit("User logged in");
 
-// Subscribe to all subjects (Conduit IS-A Source in RC5)
+// Subscribe to all subjects (Conduit IS-A Source in PREVIEW)
 messages.subscribe(
     cortex().subscriber(
         cortex().name("logger"),
@@ -1245,7 +1277,7 @@ monitors.subscribe(
 **Fullerstack Substrates:**
 
 ✅ **Simple** - No complex optimizations, easy to understand
-✅ **Correct** - 247 tests passing, proper RC5 sealed interface usage
+✅ **Correct** - 247 tests passing, proper PREVIEW sealed interface usage
 ✅ **Fast Enough** - Handles 100k+ metrics @ 1Hz
 ✅ **Thread-Safe** - Proper concurrent collections
 ✅ **Clean** - Explicit resource lifecycle management
@@ -1259,6 +1291,6 @@ monitors.subscribe(
 
 - [Humainary Substrates API](https://github.com/humainary-io/substrates-api-java)
 - [Observability X Blog Series](https://humainary.io/blog/category/observability-x/)
-- [RC5 Migration Guide](../../API-ANALYSIS.md)
+- [PREVIEW Migration Guide](../../API-ANALYSIS.md)
 - [Developer Guide](DEVELOPER-GUIDE.md)
 - [Async Architecture](ASYNC-ARCHITECTURE.md)
