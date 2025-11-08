@@ -1,4 +1,4 @@
-package io.fullerstack.substrates.segment;
+package io.fullerstack.substrates.sift;
 
 import io.humainary.substrates.api.Substrates.Sift;
 
@@ -7,11 +7,11 @@ import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
- * Implementation of Substrates.Sift for comparator-based filtering.
+ * Comparator-based implementation of Substrates.Sift interface.
  * <p>
- * < p >Sift provides comparison-based filtering operations (above, below, range, min, max, high, low)
- * using a Comparator. It's used in combination with Segment.sift() to create sophisticated
- * filtering logic based on ordering.
+ * < p >Provides comparison-based filtering operations (above, below, range, min, max, high, low)
+ * using a Comparator for ordering-based sifting. Builds up predicate chains for sophisticated
+ * filtering logic based on element ordering.
  * <p>
  * < p >Usage (from blog example):
  * < pre >
@@ -23,12 +23,12 @@ import java.util.function.Predicate;
  *
  * @param < E > emission type
  */
-public class FilteringSegment < E > implements Sift < E > {
+public class ComparatorSift < E > implements Sift < E > {
 
   private final Comparator < ? super E > comparator;
   private       Predicate < E >          predicate = value -> true; // Default: pass all
 
-  public FilteringSegment ( Comparator < ? super E > comparator ) {
+  public ComparatorSift ( Comparator < ? super E > comparator ) {
     this.comparator = Objects.requireNonNull ( comparator, "Comparator cannot be null" );
   }
 

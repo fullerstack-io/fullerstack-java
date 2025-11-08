@@ -1,7 +1,7 @@
 package io.fullerstack.substrates.flow;
 
 import io.humainary.substrates.api.Substrates.*;
-import io.fullerstack.substrates.segment.FilteringSegment;
+import io.fullerstack.substrates.sift.ComparatorSift;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -273,7 +273,7 @@ public class FlowRegulator < E > implements Flow < E > {
     Objects.requireNonNull ( comparator, "Comparator cannot be null" );
     Objects.requireNonNull ( configurer, "Configurer cannot be null" );
 
-    FilteringSegment < E > sift = new FilteringSegment <> ( comparator );
+    ComparatorSift < E > sift = new ComparatorSift <> ( comparator );
     configurer.accept ( sift );
 
     return addTransformation ( value ->
