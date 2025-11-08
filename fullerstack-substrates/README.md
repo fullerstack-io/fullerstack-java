@@ -171,9 +171,9 @@ mvn test \
 ### Sequential Processing (Virtual CPU Core)
 
 Our `SequentialCircuit` uses the **Valve pattern**:
-- Single `BlockingQueue` for all emissions
-- One virtual thread processes events sequentially
-- **Deterministic ordering** - events processed in FIFO order
+- **Dual-queue architecture**: Ingress queue (external emissions) + Transit deque (recursive emissions)
+- One virtual thread processes events with depth-first execution
+- **Deterministic ordering** - Transit deque has priority for true depth-first processing
 - **No locks needed** - single-threaded execution eliminates race conditions
 
 ### Routing Architecture
@@ -193,7 +193,7 @@ The `CortexRuntimeProvider` implements the Service Provider Interface:
 
 ## Requirements
 
-- Java 21+ (uses Virtual Threads)
+- Java 25 (uses Virtual Threads)
 - Maven 3.9+
 
 ## License
