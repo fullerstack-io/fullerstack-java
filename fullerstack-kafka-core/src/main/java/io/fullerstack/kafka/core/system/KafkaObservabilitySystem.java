@@ -8,9 +8,7 @@ import io.fullerstack.kafka.core.reporters.ClusterHealthReporter;
 import io.fullerstack.kafka.core.reporters.ConsumerHealthReporter;
 import io.fullerstack.kafka.core.reporters.ProducerHealthReporter;
 import io.humainary.substrates.api.Substrates.*;
-import io.humainary.substrates.ext.serventis.ext.Actors;
-import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,11 +80,21 @@ public class KafkaObservabilitySystem implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(KafkaObservabilitySystem.class);
 
     // Circuits
+    private final Circuit layer1Circuit;  // Layer 1 instruments
     private final Circuit monitorCircuit;
     private final Circuit reporterCircuit;
     private final Circuit actorCircuit;
 
-    // Layer 1-2: Monitors + Cells (Upward Flow)
+    // Layer 1: Raw instrument signals (OBSERVE)
+    private final Conduit<Queues.Queue, Queues.Sign> queues;
+    private final Conduit<Probes.Probe, Probes.Signal> probes;
+    private final Conduit<Services.Service, Services.Signal> services;
+    private final Conduit<Gauges.Gauge, Gauges.Sign> gauges;
+    private final Conduit<Counters.Counter, Counters.Sign> counters;
+    private final Conduit<Resources.Resource, Resources.Sign> resources;
+    private final Conduit<Caches.Cache, Caches.Sign> caches;
+
+    // Layer 2: Monitors + Cells (ORIENT - Upward Flow)
     private final Conduit<Monitors.Monitor, Monitors.Signal> monitors;
     private final HierarchyManager hierarchy;
     private final MonitorCellBridge bridge;
@@ -121,7 +129,23 @@ public class KafkaObservabilitySystem implements AutoCloseable {
 
         logger.info("Initializing KafkaObservabilitySystem for cluster: {}", clusterName);
 
-        // ===== Layer 1-2: OBSERVE + ORIENT =====
+        // ===== Layer 1: OBSERVE (Raw Signals) =====
+
+        // Create Layer 1 circuit for all raw instrument signals
+        this.layer1Circuit = cortex().circuit(cortex().name(clusterName + "-layer1"));
+
+        // Create conduits for each instrument type
+        this.queues = layer1Circuit.<Queues.Queue, Queues.Sign>conduit(cortex().name("queues"), Queues::composer);
+        this.probes = layer1Circuit.<Probes.Probe, Probes.Signal>conduit(cortex().name("probes"), Probes::composer);
+        this.services = layer1Circuit.<Services.Service, Services.Signal>conduit(cortex().name("services"), Services::composer);
+        this.gauges = layer1Circuit.<Gauges.Gauge, Gauges.Sign>conduit(cortex().name("gauges"), Gauges::composer);
+        this.counters = layer1Circuit.<Counters.Counter, Counters.Sign>conduit(cortex().name("counters"), Counters::composer);
+        this.resources = layer1Circuit.<Resources.Resource, Resources.Sign>conduit(cortex().name("resources"), Resources::composer);
+        this.caches = layer1Circuit.<Caches.Cache, Caches.Sign>conduit(cortex().name("caches"), Caches::composer);
+
+        logger.debug("Created Layer 1 instrument conduits (Queues, Probes, Services, Gauges, Counters, Resources, Caches)");
+
+        // ===== Layer 2: ORIENT (Condition Assessment) =====
 
         // Create monitor circuit
         this.monitorCircuit = cortex().circuit(cortex().name(clusterName + "-monitors"));
@@ -238,6 +262,77 @@ public class KafkaObservabilitySystem implements AutoCloseable {
         logger.info("   Monitor signals will now flow: Monitor → Cell → Reporter → Actor");
     }
 
+    // ========================================
+    // Layer 1 Instrument Accessors (OBSERVE)
+    // ========================================
+
+    /**
+     * Returns the Queue conduit for buffer/queue signals.
+     *
+     * @return the queue conduit
+     */
+    public Conduit<Queues.Queue, Queues.Sign> getQueues() {
+        return queues;
+    }
+
+    /**
+     * Returns the Probe conduit for communication signals.
+     *
+     * @return the probe conduit
+     */
+    public Conduit<Probes.Probe, Probes.Signal> getProbes() {
+        return probes;
+    }
+
+    /**
+     * Returns the Service conduit for interaction lifecycle signals.
+     *
+     * @return the service conduit
+     */
+    public Conduit<Services.Service, Services.Signal> getServices() {
+        return services;
+    }
+
+    /**
+     * Returns the Gauge conduit for threshold signals.
+     *
+     * @return the gauge conduit
+     */
+    public Conduit<Gauges.Gauge, Gauges.Sign> getGauges() {
+        return gauges;
+    }
+
+    /**
+     * Returns the Counter conduit for count signals.
+     *
+     * @return the counter conduit
+     */
+    public Conduit<Counters.Counter, Counters.Sign> getCounters() {
+        return counters;
+    }
+
+    /**
+     * Returns the Resource conduit for capacity signals.
+     *
+     * @return the resource conduit
+     */
+    public Conduit<Resources.Resource, Resources.Sign> getResources() {
+        return resources;
+    }
+
+    /**
+     * Returns the Cache conduit for cache hit/miss signals.
+     *
+     * @return the cache conduit
+     */
+    public Conduit<Caches.Cache, Caches.Sign> getCaches() {
+        return caches;
+    }
+
+    // ========================================
+    // Layer 2+ Accessors (ORIENT, DECIDE, ACT)
+    // ========================================
+
     /**
      * Returns the Monitor conduit for emitting signals.
      *
@@ -308,6 +403,7 @@ public class KafkaObservabilitySystem implements AutoCloseable {
      * <p>Useful in tests to ensure signals have fully propagated.
      */
     public void await() {
+        layer1Circuit.await();
         monitorCircuit.await();
         reporterCircuit.await();
         actorCircuit.await();
@@ -345,6 +441,7 @@ public class KafkaObservabilitySystem implements AutoCloseable {
         if (actorCircuit != null) actorCircuit.close();
         if (reporterCircuit != null) reporterCircuit.close();
         if (monitorCircuit != null) monitorCircuit.close();
+        if (layer1Circuit != null) layer1Circuit.close();
 
         logger.info("✅ KafkaObservabilitySystem shutdown complete");
     }

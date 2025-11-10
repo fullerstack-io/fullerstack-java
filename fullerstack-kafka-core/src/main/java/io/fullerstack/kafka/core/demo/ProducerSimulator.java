@@ -142,4 +142,8 @@ public class ProducerSimulator {
     public boolean isThrottled() {
         return throttled.get();
     }
+
+    public boolean isCircuitOpen() {
+        return currentRate.get() == 0 && !running.get();
+    }
 }

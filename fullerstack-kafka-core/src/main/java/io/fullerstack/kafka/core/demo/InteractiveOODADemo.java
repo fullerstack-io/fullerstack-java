@@ -54,6 +54,7 @@ public class InteractiveOODADemo {
 
     private KafkaClusterSimulator simulator;
     private KafkaObservabilitySystem ooda;
+    private KafkaMetricsSimulator metricsSimulator;
     private ScheduledExecutorService monitoringScheduler;
 
     public static void main(String[] args) {
@@ -68,11 +69,13 @@ public class InteractiveOODADemo {
             // Setup
             setupSimulator();
             setupOODASystem();
+            setupMetricsSimulator();
             setupMonitoring();
 
             // Start
             simulator.start();
             ooda.start();
+            metricsSimulator.start();
 
             // Run scenarios
             runInteractiveDemo();
@@ -124,6 +127,22 @@ public class InteractiveOODADemo {
         registerCommandHandlers();
 
         System.out.println("✅ OODA system configured");
+    }
+
+    private void setupMetricsSimulator() {
+        System.out.println("\n🏗️  STEP 2.5: Setting up Serventis metrics simulator...\n");
+
+        monitoringScheduler = Executors.newScheduledThreadPool(2);
+        metricsSimulator = new KafkaMetricsSimulator(ooda, simulator, monitoringScheduler);
+
+        System.out.println("✅ Metrics simulator configured");
+        System.out.println("   → Feeding all Serventis instrument types:");
+        System.out.println("      • Queues (buffer overflow/underflow)");
+        System.out.println("      • Probes (connection success/failure)");
+        System.out.println("      • Services (request lifecycle)");
+        System.out.println("      • Gauges (JVM heap, CPU, disk)");
+        System.out.println("      • Counters (message counts, errors)");
+        System.out.println("      → Aggregating into Monitors (condition assessment)");
     }
 
     private void registerCommandHandlers() {
@@ -190,8 +209,6 @@ public class InteractiveOODADemo {
     private void setupMonitoring() {
         System.out.println("\n🏗️  STEP 3: Setting up real-time monitoring...\n");
 
-        monitoringScheduler = Executors.newScheduledThreadPool(1);
-
         // Monitor partition queues and broker health, emit signals
         monitoringScheduler.scheduleAtFixedRate(() -> {
             // Check all partition queues
@@ -246,11 +263,12 @@ public class InteractiveOODADemo {
 
             switch (choice) {
                 case "1" -> simulator.printStatus();
-                case "2" -> issueThrottleCommand();
-                case "3" -> issueResumeCommand();
-                case "4" -> issueCircuitBreakerCommand();
-                case "5" -> runAutomatedScenario();
-                case "6" -> {
+                case "2" -> metricsSimulator.printInstrumentMetrics();
+                case "3" -> issueThrottleCommand();
+                case "4" -> issueResumeCommand();
+                case "5" -> issueCircuitBreakerCommand();
+                case "6" -> runAutomatedScenario();
+                case "7" -> {
                     System.out.println("\n👋 Exiting demo...");
                     return;
                 }
@@ -262,12 +280,13 @@ public class InteractiveOODADemo {
     private void printMenu() {
         System.out.println("\n" + "─".repeat(80));
         System.out.println("📋 MENU:");
-        System.out.println("  1. Show cluster status");
-        System.out.println("  2. Issue THROTTLE command (reduce load 50%)");
-        System.out.println("  3. Issue RESUME command (restore normal rates)");
-        System.out.println("  4. Issue CIRCUIT_OPEN command (stop all traffic)");
-        System.out.println("  5. Run automated degradation → recovery scenario");
-        System.out.println("  6. Exit");
+        System.out.println("  1. Show cluster status (brokers, partitions, producers)");
+        System.out.println("  2. Show instrument metrics (Queues, Probes, Services, Gauges, Counters)");
+        System.out.println("  3. Issue THROTTLE command (reduce load 50%)");
+        System.out.println("  4. Issue RESUME command (restore normal rates)");
+        System.out.println("  5. Issue CIRCUIT_OPEN command (stop all traffic)");
+        System.out.println("  6. Run automated degradation → recovery scenario");
+        System.out.println("  7. Exit");
         System.out.print("\nChoice: ");
     }
 
@@ -361,6 +380,9 @@ public class InteractiveOODADemo {
 
     private void cleanup() {
         System.out.println("\n🧹 Cleaning up...");
+        if (metricsSimulator != null) {
+            metricsSimulator.close();
+        }
         if (monitoringScheduler != null) {
             monitoringScheduler.shutdown();
         }
