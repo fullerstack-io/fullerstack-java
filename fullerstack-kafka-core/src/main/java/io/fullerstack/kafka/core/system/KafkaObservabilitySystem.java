@@ -2,6 +2,7 @@ package io.fullerstack.kafka.core.system;
 
 import io.fullerstack.kafka.core.actors.*;
 import io.fullerstack.kafka.core.bridge.MonitorCellBridge;
+import io.fullerstack.kafka.core.command.CommandHierarchy;
 import io.fullerstack.kafka.core.hierarchy.HierarchyManager;
 import io.fullerstack.kafka.core.reporters.ClusterHealthReporter;
 import io.fullerstack.kafka.core.reporters.ConsumerHealthReporter;
@@ -16,20 +17,25 @@ import org.slf4j.LoggerFactory;
 import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
- * Complete Kafka Observability System - Full OODA Loop Integration.
+ * Complete Kafka Observability System - Full OODA Loop Integration with Bidirectional Flow.
  *
  * <p>This class assembles all layers of the observability system:
  * <ul>
- *   <li><b>Layer 1-2 (OBSERVE/ORIENT)</b>: Monitor conduits + Cell hierarchy</li>
+ *   <li><b>Layer 1-2 (OBSERVE/ORIENT)</b>: Monitor conduits + Cell hierarchy (upward)</li>
  *   <li><b>Bridge</b>: Connects Monitor emissions to Cell hierarchy</li>
  *   <li><b>Layer 3 (DECIDE)</b>: Reporters for urgency assessment</li>
- *   <li><b>Layer 4 (ACT)</b>: Actors for automated responses</li>
+ *   <li><b>Layer 4 (ACT)</b>: Actors for automated responses + Command hierarchy (downward)</li>
  * </ul>
  *
- * <h3>Complete Signal Flow:</h3>
+ * <h3>Bidirectional Flow:</h3>
  * <pre>
+ * UPWARD (Sensing):
  * Monitor.status(DEGRADED) → MonitorCellBridge → Cell hierarchy aggregation
- *     → Reporter.critical() → Actor.throttle() or Actor.alert()
+ *     → Reporter.critical() → Actor observes
+ *
+ * DOWNWARD (Control):
+ * Actor.command(THROTTLE) → CommandHierarchy → Cascades to all partitions
+ *     → Partition handlers execute physical action
  * </pre>
  *
  * <h3>Usage Example:</h3>
@@ -80,10 +86,13 @@ public class KafkaObservabilitySystem implements AutoCloseable {
     private final Circuit reporterCircuit;
     private final Circuit actorCircuit;
 
-    // Layer 1-2: Monitors + Cells
+    // Layer 1-2: Monitors + Cells (Upward Flow)
     private final Conduit<Monitors.Monitor, Monitors.Signal> monitors;
     private final HierarchyManager hierarchy;
     private final MonitorCellBridge bridge;
+
+    // Command Hierarchy (Downward Flow)
+    private final CommandHierarchy commandHierarchy;
 
     // Layer 3: Reporters
     private final Conduit<Reporters.Reporter, Reporters.Sign> reporters;
@@ -129,7 +138,10 @@ public class KafkaObservabilitySystem implements AutoCloseable {
         // Create bridge to connect monitors → cells
         this.bridge = new MonitorCellBridge(monitors, hierarchy);
 
-        logger.info("Layer 1-2 initialized: Monitors conduit + Cell hierarchy + Bridge");
+        // Create command hierarchy for downward control flow
+        this.commandHierarchy = new CommandHierarchy(clusterName);
+
+        logger.info("Layer 1-2 initialized: Monitors conduit + Cell hierarchy + Bridge + Command hierarchy");
 
         // ===== Layer 3: DECIDE =====
 
@@ -271,6 +283,17 @@ public class KafkaObservabilitySystem implements AutoCloseable {
     }
 
     /**
+     * Returns the Command hierarchy for issuing control commands.
+     *
+     * <p>Use this to broadcast commands downward through the hierarchy.
+     *
+     * @return the command hierarchy
+     */
+    public CommandHierarchy getCommandHierarchy() {
+        return commandHierarchy;
+    }
+
+    /**
      * Returns the cluster name.
      *
      * @return the cluster name
@@ -288,6 +311,7 @@ public class KafkaObservabilitySystem implements AutoCloseable {
         monitorCircuit.await();
         reporterCircuit.await();
         actorCircuit.await();
+        commandHierarchy.await();
     }
 
     /**
@@ -315,6 +339,7 @@ public class KafkaObservabilitySystem implements AutoCloseable {
         if (producerHealthReporter != null) producerHealthReporter.close();
 
         if (bridge != null) bridge.close();
+        if (commandHierarchy != null) commandHierarchy.close();
         if (hierarchy != null) hierarchy.close();
 
         if (actorCircuit != null) actorCircuit.close();

@@ -72,11 +72,11 @@ public class ClusterHealthReporter implements AutoCloseable {
     ) {
         this.clusterCell = clusterCell;
         this.reporters = reporters;
-        this.reporter = reporters.get(cortex().name("cluster-health"));
+        this.reporter = reporters.get(cortex().name("cluster.health"));
 
         // Subscribe to cluster cell outlet
         this.subscription = clusterCell.subscribe(cortex().subscriber(
-            cortex().name("cluster-health-reporter"),
+            cortex().name("cluster.health.reporter"),
             this::handleClusterSign
         ));
     }
