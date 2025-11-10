@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
  * Layer 3 (DECIDE phase) reporter for consumer health assessment.

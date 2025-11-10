@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.core.config;
 
-import io.fullerstack.substrates.CortexRuntime;
 import io.humainary.substrates.api.Substrates.Cortex;
 import io.humainary.substrates.api.Substrates.Name;
+import static io.humainary.substrates.api.Substrates.cortex;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -277,7 +277,7 @@ class ClusterConfigTest {
 
     @Test
     void testGetClusterName() {
-        Cortex cortex = CortexRuntime.cortex();
+        Cortex cortex = cortex();
         ClusterConfig config = new ClusterConfig(
                 "prod-account",
                 "us-east-1",
@@ -328,7 +328,7 @@ class ClusterConfigTest {
 
     @Test
     void testGetBrokerName() {
-        Cortex cortex = CortexRuntime.cortex();
+        Cortex cortex = cortex();
         ClusterConfig config = new ClusterConfig(
                 "prod-account",
                 "us-east-1",
@@ -350,7 +350,7 @@ class ClusterConfigTest {
 
     @Test
     void testGetBrokerName_MultipleAccounts() {
-        Cortex cortex = CortexRuntime.cortex();
+        Cortex cortex = cortex();
 
         ClusterConfig prodConfig = new ClusterConfig(
                 "prod-account",

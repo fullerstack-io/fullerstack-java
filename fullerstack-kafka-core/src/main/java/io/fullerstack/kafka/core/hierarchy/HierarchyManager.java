@@ -48,30 +48,38 @@ public class HierarchyManager implements AutoCloseable {
     /**
      * Returns the broker cell for the specified broker ID.
      *
-     * @param brokerId the broker ID
+     * <p>Uses hierarchical Name: "{broker-id}" (child of cluster)
+     *
+     * @param brokerId the broker ID (e.g., "broker-1")
      * @return the broker cell
      */
     public Cell<Monitors.Sign, Monitors.Sign> getBrokerCell(String brokerId) {
+        // Hierarchical name: broker-1 (child of cluster)
         return clusterCell.get(cortex().name(brokerId));
     }
 
     /**
      * Returns the topic cell for the specified broker and topic.
      *
-     * @param brokerId the broker ID
-     * @param topicName the topic name
+     * <p>Uses hierarchical Name: "{broker-id}.{topic-name}"
+     *
+     * @param brokerId the broker ID (e.g., "broker-1")
+     * @param topicName the topic name (e.g., "orders")
      * @return the topic cell
      */
     public Cell<Monitors.Sign, Monitors.Sign> getTopicCell(String brokerId, String topicName) {
-        return getBrokerCell(brokerId).get(cortex().name(topicName));
+        // Hierarchical name: broker-1.orders
+        return getBrokerCell(brokerId).get(cortex().name(brokerId + "." + topicName));
     }
 
     /**
      * Returns the partition cell for the specified broker, topic, and partition.
      *
-     * @param brokerId the broker ID
-     * @param topicName the topic name
-     * @param partitionId the partition ID
+     * <p>Uses hierarchical Name: "{broker-id}.{topic-name}.{partition-id}"
+     *
+     * @param brokerId the broker ID (e.g., "broker-1")
+     * @param topicName the topic name (e.g., "orders")
+     * @param partitionId the partition ID (e.g., "p0")
      * @return the partition cell
      */
     public Cell<Monitors.Sign, Monitors.Sign> getPartitionCell(
@@ -79,7 +87,10 @@ public class HierarchyManager implements AutoCloseable {
         String topicName,
         String partitionId
     ) {
-        return getTopicCell(brokerId, topicName).get(cortex().name(partitionId));
+        // Hierarchical name: broker-1.orders.p0
+        return getTopicCell(brokerId, topicName).get(
+            cortex().name(brokerId + "." + topicName + "." + partitionId)
+        );
     }
 
     /**

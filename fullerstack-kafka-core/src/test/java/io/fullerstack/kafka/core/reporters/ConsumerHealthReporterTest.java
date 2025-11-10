@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
