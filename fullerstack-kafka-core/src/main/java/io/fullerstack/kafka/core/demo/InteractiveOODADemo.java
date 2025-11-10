@@ -136,12 +136,11 @@ public class InteractiveOODADemo {
         metricsSimulator = new KafkaMetricsSimulator(ooda, simulator, monitoringScheduler);
 
         System.out.println("✅ Metrics simulator configured");
-        System.out.println("   → Feeding all Serventis instrument types:");
-        System.out.println("      • Queues (buffer overflow/underflow)");
-        System.out.println("      • Probes (connection success/failure)");
-        System.out.println("      • Services (request lifecycle)");
-        System.out.println("      • Gauges (JVM heap, CPU, disk)");
-        System.out.println("      • Counters (message counts, errors)");
+        System.out.println("   → Using REAL production observer classes:");
+        System.out.println("      • LocalProducerBufferMonitor (from ProducerBufferMonitor)");
+        System.out.println("      • LocalProducerSendObserver (from ProducerSendObserver)");
+        System.out.println("   → Feeding all 7 Serventis instrument types:");
+        System.out.println("      • Queues, Probes, Services, Gauges, Counters, Resources, Caches");
         System.out.println("      → Aggregating into Monitors (condition assessment)");
     }
 

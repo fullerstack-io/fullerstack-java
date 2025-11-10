@@ -3,6 +3,8 @@ package io.fullerstack.kafka.core.demo;
 import io.fullerstack.kafka.core.system.KafkaObservabilitySystem;
 import io.humainary.substrates.ext.serventis.ext.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -12,39 +14,34 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
- * Emits realistic metrics using all Serventis instrument types (REAL production APIs).
+ * Integrates REAL Observer classes with simulated JMX endpoints.
  *
- * <p>Demonstrates the complete semiotic hierarchy:
+ * <p>Demonstrates the complete semiotic hierarchy using PRODUCTION observer logic:
  * <pre>
- * LAYER 1 (OBSERVE - Raw Signals):
- *   Queues    → Producer buffer overflow, consumer lag
- *   Probes    → Network connection success/failure
- *   Services  → Request/response lifecycle
- *   Gauges    → JVM heap usage, disk usage
- *   Counters  → Message counts, error counts
- *   Resources → Thread pool capacity
- *   Caches    → Metadata cache hits/misses
- *
- * LAYER 2 (ORIENT - Condition Assessment):
- *   Monitors  → Aggregate raw signals into health conditions
- *
- * LAYER 3 (DECIDE - Urgency Assessment):
- *   Reporters → Assess urgency (WARNING, CRITICAL)
- *
- * LAYER 4 (ACT - Response):
- *   Actors    → Take automated actions
+ * JmxSimulator (fake MBeans)
+ *     ↓ JMX queries
+ * REAL Observers (LocalProducerBufferMonitor, etc.)
+ *     ↓ Call REAL production emission logic
+ * REAL Serventis Instruments (Queues, Probes, Services, Gauges, Counters)
+ *     ↓ Emit signals
+ * REAL OODA Loop (Monitors → Reporters → Actors)
  * </pre>
  *
- * <p>This feeds realistic metrics into the OODA system to trigger
- * actual Monitor condition assessments and Actor responses.
+ * <p>This uses the ACTUAL production signal emission logic from the observer classes,
+ * just with local MBeanServer access instead of remote JMX connections.
  */
 public class KafkaMetricsSimulator implements AutoCloseable {
 
     private final KafkaObservabilitySystem ooda;
     private final KafkaClusterSimulator cluster;
+    private final JmxSimulator jmxSimulator;
     private final ScheduledExecutorService scheduler;
     private final Random random = new Random();
     private final AtomicBoolean running = new AtomicBoolean(false);
+
+    // REAL production observer classes (using local MBeanServer)
+    private final List<LocalProducerBufferMonitor> bufferMonitors = new ArrayList<>();
+    private final List<LocalProducerSendObserver> sendObservers = new ArrayList<>();
 
     private ScheduledFuture<?> metricsTask;
 
@@ -55,26 +52,124 @@ public class KafkaMetricsSimulator implements AutoCloseable {
     ) {
         this.ooda = ooda;
         this.cluster = cluster;
+        this.jmxSimulator = new JmxSimulator(cluster);
         this.scheduler = scheduler;
     }
 
     /**
-     * Starts emitting realistic metrics using all Serventis instruments.
+     * Starts REAL production observers with simulated JMX endpoints.
      */
-    public void start() {
+    public void start() throws Exception {
         if (running.compareAndSet(false, true)) {
-            System.out.println("\n📊 Starting metrics emission (ALL Serventis instruments)...");
+            System.out.println("\n📊 Starting REAL production observers...");
 
-            // Emit metrics every second
-            metricsTask = scheduler.scheduleAtFixedRate(
-                this::emitMetrics,
-                0,
-                1,
-                TimeUnit.SECONDS
+            // Register simulated JMX MBeans
+            jmxSimulator.registerAll();
+
+            // Start REAL observer classes
+            setupRealObservers();
+
+            // Also emit some manual signals for instruments not covered by observers
+            startManualEmission();
+
+            System.out.println("✅ Real observers started");
+        }
+    }
+
+    /**
+     * Sets up REAL production observer classes using local MBeanServer.
+     */
+    private void setupRealObservers() {
+        System.out.println("\n🔍 Setting up REAL production observers...");
+
+        String[] producerIds = {"producer-1", "producer-2", "producer-3", "producer-4"};
+
+        for (String producerId : producerIds) {
+            // Create instruments for buffer monitoring
+            Queues.Queue bufferQueue = ooda.getQueues().get(
+                cortex().name(producerId + ".buffer")
+            );
+            Gauges.Gauge totalBytesGauge = ooda.getGauges().get(
+                cortex().name(producerId + ".buffer.total-bytes")
+            );
+            Counters.Counter exhaustedCounter = ooda.getCounters().get(
+                cortex().name(producerId + ".buffer.exhausted")
+            );
+            Gauges.Gauge batchSizeGauge = ooda.getGauges().get(
+                cortex().name(producerId + ".batch-size")
+            );
+            Gauges.Gauge recordsPerRequestGauge = ooda.getGauges().get(
+                cortex().name(producerId + ".records-per-request")
             );
 
-            System.out.println("✅ Metrics emission started");
+            // Create REAL buffer monitor with production logic
+            LocalProducerBufferMonitor bufferMonitor = new LocalProducerBufferMonitor(
+                producerId,
+                bufferQueue,
+                totalBytesGauge,
+                exhaustedCounter,
+                batchSizeGauge,
+                recordsPerRequestGauge
+            );
+
+            bufferMonitor.start();
+            bufferMonitors.add(bufferMonitor);
+
+            // Create instruments for send monitoring
+            Counters.Counter sendRateCounter = ooda.getCounters().get(
+                cortex().name(producerId + ".send-rate")
+            );
+            Counters.Counter sendTotalCounter = ooda.getCounters().get(
+                cortex().name(producerId + ".send-total")
+            );
+            Probes.Probe sendProbe = ooda.getProbes().get(
+                cortex().name(producerId + ".send")
+            );
+            Counters.Counter errorCounter = ooda.getCounters().get(
+                cortex().name(producerId + ".errors")
+            );
+            Services.Service retryService = ooda.getServices().get(
+                cortex().name(producerId + ".retry")
+            );
+            Counters.Counter retryCounter = ooda.getCounters().get(
+                cortex().name(producerId + ".retries")
+            );
+            Gauges.Gauge latencyGauge = ooda.getGauges().get(
+                cortex().name(producerId + ".latency")
+            );
+
+            // Create REAL send observer with production logic
+            LocalProducerSendObserver sendObserver = new LocalProducerSendObserver(
+                producerId,
+                sendRateCounter,
+                sendTotalCounter,
+                sendProbe,
+                errorCounter,
+                retryService,
+                retryCounter,
+                latencyGauge
+            );
+
+            sendObserver.start();
+            sendObservers.add(sendObserver);
         }
+
+        System.out.printf("   ✓ Started %d ProducerBufferMonitors (REAL production code)%n",
+            bufferMonitors.size());
+        System.out.printf("   ✓ Started %d ProducerSendObservers (REAL production code)%n",
+            sendObservers.size());
+    }
+
+    /**
+     * Starts manual emission for instruments not yet covered by real observers.
+     */
+    private void startManualEmission() {
+        metricsTask = scheduler.scheduleAtFixedRate(
+            this::emitMetrics,
+            0,
+            1,
+            TimeUnit.SECONDS
+        );
     }
 
     /**
@@ -92,24 +187,10 @@ public class KafkaMetricsSimulator implements AutoCloseable {
     }
 
     /**
-     * Emits Queue metrics (buffer overflow, consumer lag).
+     * Emits Queue metrics (partition queues only - producer buffers handled by real observers).
      */
     private void emitQueueMetrics() {
-        // Producer-1 buffer
-        ProducerSimulator p1 = cluster.getProducer("producer-1");
-        if (p1 != null) {
-            Queues.Queue queue = ooda.getQueues().get(cortex().name("producer-1.buffer"));
-
-            if (p1.isThrottled()) {
-                queue.underflow();  // Buffer draining
-            } else if (random.nextDouble() > 0.7) {
-                queue.overflow();  // Buffer filling
-            } else {
-                queue.enqueue();  // Normal enqueue
-            }
-        }
-
-        // Partition queue depths
+        // Partition queue depths (not covered by observers yet)
         PartitionSimulator part = cluster.getPartition("broker-1.orders.p0");
         if (part != null && part.isOverflowing()) {
             Queues.Queue partQueue = ooda.getQueues().get(cortex().name("broker-1.orders.p0.queue"));
@@ -118,10 +199,11 @@ public class KafkaMetricsSimulator implements AutoCloseable {
     }
 
     /**
-     * Emits Probe metrics (connection health).
+     * Emits Probe metrics (connection health) - only for entities not covered by observers.
+     * NOTE: Producer send probes are handled by LocalProducerSendObserver.
      */
     private void emitProbeMetrics() {
-        // Broker connection probes
+        // Broker connection probes (not covered by observers yet)
         BrokerSimulator broker = cluster.getBroker("broker-1");
         if (broker != null) {
             Probes.Probe brokerProbe = ooda.getProbes().get(cortex().name("broker-1.connection"));
@@ -134,30 +216,14 @@ public class KafkaMetricsSimulator implements AutoCloseable {
                 brokerProbe.transmitted();
             }
         }
-
-        // Producer → Broker connection
-        Probes.Probe producerProbe = ooda.getProbes().get(cortex().name("producer-1.broker.connection"));
-        producerProbe.transmitted();
     }
 
     /**
-     * Emits Service metrics (request/response lifecycle).
+     * Emits Service metrics (request/response lifecycle) - only for entities not covered by observers.
+     * NOTE: Producer send/retry services are handled by LocalProducerSendObserver.
      */
     private void emitServiceMetrics() {
-        // Producer send request
-        Services.Service producerService = ooda.getServices().get(cortex().name("producer-1.send"));
-
-        producerService.called();  // Request started
-
-        // Simulate request completion based on broker health
-        BrokerSimulator broker = cluster.getBroker("broker-1");
-        if (broker != null && broker.getHealth() == BrokerSimulator.BrokerHealth.CRITICAL) {
-            producerService.failed();  // Request failed
-        } else {
-            producerService.succeeded();  // Request succeeded
-        }
-
-        // Consumer fetch request
+        // Consumer fetch request (not covered by observers yet)
         Services.Service consumerService = ooda.getServices().get(cortex().name("consumer-1.fetch"));
         consumerService.called();
         consumerService.succeeded();  // Usually succeeds
@@ -310,6 +376,11 @@ public class KafkaMetricsSimulator implements AutoCloseable {
         System.out.println("  • Resources → Thread pool capacity");
         System.out.println("  • Caches    → Metadata cache hit/miss");
 
+        System.out.println("\n→ Signal Emission:");
+        System.out.println("  REAL OBSERVERS:     ProducerBufferMonitor, ProducerSendObserver (production code!)");
+        System.out.println("         ↓ Query JMX MBeans");
+        System.out.println("  SERVENTIS APIS:     Emit using Queues, Probes, Services, Gauges, Counters methods");
+        System.out.println("         ↓ Aggregate into Monitors");
         System.out.println("\n→ Complete Semiotic Hierarchy:");
         System.out.println("  LAYER 1 (OBSERVE):  Queues/Probes/Services/Gauges/Counters/Resources/Caches");
         System.out.println("         ↓ Aggregate signals");
@@ -337,5 +408,20 @@ public class KafkaMetricsSimulator implements AutoCloseable {
     @Override
     public void close() {
         stop();
+
+        // Stop and close all real observers
+        for (LocalProducerBufferMonitor monitor : bufferMonitors) {
+            monitor.close();
+        }
+        for (LocalProducerSendObserver observer : sendObservers) {
+            observer.close();
+        }
+
+        // Close JMX simulator
+        try {
+            jmxSimulator.close();
+        } catch (Exception e) {
+            System.err.println("Error closing JMX simulator: " + e.getMessage());
+        }
     }
 }
