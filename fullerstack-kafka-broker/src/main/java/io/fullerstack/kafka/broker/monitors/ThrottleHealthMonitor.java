@@ -73,7 +73,7 @@ public class ThrottleHealthMonitor implements AutoCloseable {
      */
     public ThrottleHealthMonitor(
         Circuit circuit,
-        Conduit<Gauges.Gauge, Gauges.Signal> gauges
+        Conduit<Gauges.Gauge, Gauges.Sign> gauges
     ) {
         this.circuit = Objects.requireNonNull(circuit, "circuit cannot be null");
         Objects.requireNonNull(gauges, "gauges cannot be null");

@@ -57,7 +57,7 @@ public class NetworkSituationReporter implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(NetworkSituationReporter.class);
 
     private final Circuit circuit;
-    private final Conduit<Reporter, Reporters.Signal> reporters;
+    private final Conduit<Reporter, Reporters.Sign> reporters;
     private final Subscription monitorSubscription;
 
     // Reporter instances per entity (throttle type, client, etc.)
@@ -107,8 +107,8 @@ public class NetworkSituationReporter implements AutoCloseable {
      * Dimension information is no longer available in subscribers - decision logic is simplified
      * to sign-based urgency assessment.
      */
-    private void handleMonitorSignal(Subject<Channel<Monitors.Sign>> subject, Registrar<Monitors.Sign> registrar) {
-        registrar.register(sign -> {
+    private void handleMonitorSignal(Subject<Channel<Monitors.Signal>> subject, Registrar<Monitors.Signal> registrar) {
+        registrar.register(signal -> {
             // Extract entity name from Subject (e.g., "monitor.throttle.produce" or "monitor.quota.health.client-1")
             String monitorName = subject.name().toString();
 
@@ -116,9 +116,9 @@ public class NetworkSituationReporter implements AutoCloseable {
             Reporter reporter = entityReporters.computeIfAbsent(monitorName,
                 name -> reporters.percept(cortex().name(name.replace("monitor.", "reporter."))));
 
-            // Decision logic: Map Sign → Urgency (simplified - no dimension info)
-            // Sign represents the condition type emitted by Monitor
-            switch (sign) {
+            // Decision logic: Map Signal sign → Urgency
+            // Extract sign from Signal record (Monitors.Signal has sign() and dimension())
+            switch (signal.sign()) {
                 case DEGRADED -> {
                     // Degraded state → CRITICAL urgency
                     // (Monitor already filtered by dimension before emitting)
@@ -129,7 +129,7 @@ public class NetworkSituationReporter implements AutoCloseable {
                 case DEFECTIVE, DOWN -> {
                     // System failure → CRITICAL urgency
                     reporter.critical();
-                    logger.error("CRITICAL situation: {} - {} condition detected", monitorName, sign);
+                    logger.error("CRITICAL situation: {} - {} condition detected", monitorName, signal.sign());
                 }
 
                 case DIVERGING -> {
@@ -158,7 +158,7 @@ public class NetworkSituationReporter implements AutoCloseable {
 
                 default -> {
                     // Unknown sign - log but don't emit
-                    logger.trace("Unknown sign: {} - {}", monitorName, sign);
+                    logger.trace("Unknown sign: {} - {}", monitorName, signal.sign());
                 }
             }
         });
@@ -169,7 +169,7 @@ public class NetworkSituationReporter implements AutoCloseable {
      *
      * @return Reporters conduit
      */
-    public Conduit<Reporter, Reporters.Signal> reporters() {
+    public Conduit<Reporter, Reporters.Sign> reporters() {
         return reporters;
     }
 

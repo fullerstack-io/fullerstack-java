@@ -97,10 +97,10 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
     private final ScheduledExecutorService scheduler;
 
     // Conduits
-    private final Conduit<Router, Routers.Signal> routers;
+    private final Conduit<Router, Routers.Sign> routers;
     private final Conduit<Monitor, Monitors.Signal> monitors;
-    private final Conduit<Counter, Counters.Signal> counters;
-    private final Conduit<Gauge, Gauges.Signal> gauges;
+    private final Conduit<Counter, Counters.Sign> counters;
+    private final Conduit<Gauge, Gauges.Sign> gauges;
 
     // Tracking state
     private final Map<TopicPartition, ReassignmentState> activeReassignments;

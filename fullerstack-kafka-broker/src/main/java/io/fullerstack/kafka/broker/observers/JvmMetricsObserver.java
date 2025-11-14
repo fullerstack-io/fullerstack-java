@@ -79,8 +79,8 @@ public class JvmMetricsObserver implements AutoCloseable {
     private static final int GC_STORM_THRESHOLD = 10;  // GCs per second
 
     private final Circuit circuit;
-    private final Conduit<Gauges.Gauge, Gauges.Signal> gauges;
-    private final Conduit<Counters.Counter, Counters.Signal> counters;
+    private final Conduit<Gauges.Gauge, Gauges.Sign> gauges;
+    private final Conduit<Counters.Counter, Counters.Sign> counters;
 
     // Previous values for delta calculation (per entity)
     private final Map<String, Double> previousHeapUtil = new ConcurrentHashMap<>();
@@ -97,8 +97,8 @@ public class JvmMetricsObserver implements AutoCloseable {
         this.circuit = Objects.requireNonNull(circuit, "circuit cannot be null");
 
         // Create Conduits for raw signals
-        this.gauges = circuit.conduit(cortex().name("gauges"), Gauges::composer);
-        this.counters = circuit.conduit(cortex().name("counters"), Counters::composer);
+        this.gauges = circuit.<Gauges.Gauge, Gauges.Sign>conduit(cortex().name("gauges"), Gauges::composer);
+        this.counters = circuit.<Counters.Counter, Counters.Sign>conduit(cortex().name("counters"), Counters::composer);
 
         logger.info("JvmMetricsObserver created (Layer 1 - OBSERVE)");
     }
@@ -221,7 +221,7 @@ public class JvmMetricsObserver implements AutoCloseable {
      *
      * @return Gauges conduit emitting raw gauge signals
      */
-    public Conduit<Gauges.Gauge, Gauges.Signal> gauges() {
+    public Conduit<Gauges.Gauge, Gauges.Sign> gauges() {
         return gauges;
     }
 
@@ -230,7 +230,7 @@ public class JvmMetricsObserver implements AutoCloseable {
      *
      * @return Counters conduit emitting raw counter signals
      */
-    public Conduit<Counters.Counter, Counters.Signal> counters() {
+    public Conduit<Counters.Counter, Counters.Sign> counters() {
         return counters;
     }
 

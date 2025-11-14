@@ -51,8 +51,8 @@ public class JvmDetailedMonitor implements AutoCloseable {
     private final ScheduledExecutorService scheduler;
 
     // Conduits (for dynamic instrument creation)
-    private final Conduit<Gauges.Gauge, Gauges.Signal> gaugesConduit;
-    private final Conduit<Counters.Counter, Counters.Signal> countersConduit;
+    private final Conduit<Gauges.Gauge, Gauges.Sign> gaugesConduit;
+    private final Conduit<Counters.Counter, Counters.Sign> countersConduit;
 
     // Instruments - Thread state gauges
     private final Map<Thread.State, Gauges.Gauge> threadStateGauges;
@@ -98,10 +98,10 @@ public class JvmDetailedMonitor implements AutoCloseable {
     public JvmDetailedMonitor(MBeanServerConnection mbsc, Circuit circuit,
                               long interval, TimeUnit unit) {
         // Create conduits from circuit
-        Conduit<Gauges.Gauge, Gauges.Signal> gauges =
-            circuit.conduit(cortex().name("gauges"), Gauges::composer);
-        Conduit<Counters.Counter, Counters.Signal> counters =
-            circuit.conduit(cortex().name("counters"), Counters::composer);
+        Conduit<Gauges.Gauge, Gauges.Sign> gauges =
+            circuit.<Gauges.Gauge, Gauges.Sign>conduit(cortex().name("gauges"), Gauges::composer);
+        Conduit<Counters.Counter, Counters.Sign> counters =
+            circuit.<Counters.Counter, Counters.Sign>conduit(cortex().name("counters"), Counters::composer);
 
         // Delegate to main constructor
         this(mbsc, circuit, gauges, counters, interval, unit);
@@ -118,8 +118,8 @@ public class JvmDetailedMonitor implements AutoCloseable {
      * @param unit     Time unit for interval
      */
     public JvmDetailedMonitor(MBeanServerConnection mbsc, Circuit circuit,
-                              Conduit<Gauges.Gauge, Gauges.Signal> gauges,
-                              Conduit<Counters.Counter, Counters.Signal> counters,
+                              Conduit<Gauges.Gauge, Gauges.Sign> gauges,
+                              Conduit<Counters.Counter, Counters.Sign> counters,
                               long interval, TimeUnit unit) {
         this.mbsc = Objects.requireNonNull(mbsc, "mbsc cannot be null");
         this.circuit = Objects.requireNonNull(circuit, "circuit cannot be null");

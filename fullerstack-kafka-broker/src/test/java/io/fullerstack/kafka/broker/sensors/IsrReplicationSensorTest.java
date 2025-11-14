@@ -52,12 +52,12 @@ class IsrReplicationSensorTest {
         // Mock Routers Conduit
         mockRoutersConduit = mock(Conduit.class);
         Router mockRouter = mock(Router.class);
-        when(mockRoutersConduit.get(any(Name.class))).thenReturn(mockRouter);
+        when(mockRoutersConduit.percept(any(Name.class))).thenReturn(mockRouter);
 
         // Mock Monitors Conduit
         mockMonitorsConduit = mock(Conduit.class);
         Monitor mockMonitor = mock(Monitor.class);
-        when(mockMonitorsConduit.get(any(Name.class))).thenReturn(mockMonitor);
+        when(mockMonitorsConduit.percept(any(Name.class))).thenReturn(mockMonitor);
     }
 
     @AfterEach
@@ -479,7 +479,7 @@ class IsrReplicationSensorTest {
             doThrow(new RuntimeException("Emission failed"))
                 .when(throwingRouter).drop();
 
-            when(mockRoutersConduit.get(any(Name.class))).thenReturn(throwingRouter);
+            when(mockRoutersConduit.percept(any(Name.class))).thenReturn(throwingRouter);
 
             sensor = new IsrReplicationSensor(
                 config,

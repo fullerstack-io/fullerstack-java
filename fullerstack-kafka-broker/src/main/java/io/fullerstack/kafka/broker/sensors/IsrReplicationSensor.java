@@ -64,7 +64,7 @@ import java.util.concurrent.TimeUnit;
  * <pre>{@code
  * // Runtime creates conduits for Routers.Signal and Monitors.Signal
  * Circuit circuit = cortex().circuit(cortex().name("isr-replication"));
- * Conduit<Router, Routers.Signal> routersConduit = circuit.conduit(
+ * Conduit<Router, Routers.Sign> routersConduit = circuit.conduit(
  *     cortex().name("routers"),
  *     Routers::composer
  * );
@@ -138,7 +138,7 @@ public class IsrReplicationSensor implements AutoCloseable {
      */
     public IsrReplicationSensor(
         final BrokerSensorConfig config,
-        final Conduit<Router, Routers.Signal> routersConduit,
+        final Conduit<Router, Routers.Sign> routersConduit,
         final Conduit<Monitor, Monitors.Signal> monitorsConduit,
         final Name circuitName,
         final String clusterId
