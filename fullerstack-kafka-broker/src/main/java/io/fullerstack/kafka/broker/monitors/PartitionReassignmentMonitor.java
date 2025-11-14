@@ -97,10 +97,10 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
     private final ScheduledExecutorService scheduler;
 
     // Conduits
-    private final Conduit<Router, Routers.Sign> routers;
-    private final Conduit<Monitor, Monitors.Sign> monitors;
-    private final Conduit<Counter, Counters.Sign> counters;
-    private final Conduit<Gauge, Gauges.Sign> gauges;
+    private final Conduit<Router, Routers.Signal> routers;
+    private final Conduit<Monitor, Monitors.Signal> monitors;
+    private final Conduit<Counter, Counters.Signal> counters;
+    private final Conduit<Gauge, Gauges.Signal> gauges;
 
     // Tracking state
     private final Map<TopicPartition, ReassignmentState> activeReassignments;
@@ -227,8 +227,8 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
             tp, r.addingReplicas(), r.removingReplicas());
 
         // Create routers for old and new leaders
-        Router oldLeader = routers.get(cortex().name("partition-" + tp + "-old"));
-        Router newLeader = routers.get(cortex().name("partition-" + tp + "-new"));
+        Router oldLeader = routers.percept(cortex().name("partition-" + tp + "-old"));
+        Router newLeader = routers.percept(cortex().name("partition-" + tp + "-new"));
 
         oldLeaders.put(tp, oldLeader);
         newLeaders.put(tp, newLeader);

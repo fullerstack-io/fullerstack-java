@@ -93,8 +93,8 @@ public class LogCompactionMonitor implements AutoCloseable {
     private final ScheduledExecutorService scheduler;
 
     // Conduits
-    private final Conduit<Counter, Counters.Sign> counters;
-    private final Conduit<Gauge, Gauges.Sign> gauges;
+    private final Conduit<Counter, Counters.Signal> counters;
+    private final Conduit<Gauge, Gauges.Signal> gauges;
 
     // Instruments
     private final Counter compactionRateCounter;

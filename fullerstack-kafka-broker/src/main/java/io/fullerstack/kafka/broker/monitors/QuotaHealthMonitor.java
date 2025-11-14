@@ -55,7 +55,7 @@ public class QuotaHealthMonitor implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(QuotaHealthMonitor.class);
 
     private final Circuit circuit;
-    private final Conduit<Monitor, Monitors.Sign> monitors;
+    private final Conduit<Monitor, Monitors.Signal> monitors;
     private final Subscription gaugeSubscription;
 
     // Track violation counts per client (for pattern detection)
@@ -73,7 +73,7 @@ public class QuotaHealthMonitor implements AutoCloseable {
      */
     public QuotaHealthMonitor(
         Circuit circuit,
-        Conduit<Gauges.Gauge, Gauges.Sign> gauges
+        Conduit<Gauges.Gauge, Gauges.Signal> gauges
     ) {
         this.circuit = Objects.requireNonNull(circuit, "circuit cannot be null");
         Objects.requireNonNull(gauges, "gauges cannot be null");
@@ -111,8 +111,8 @@ public class QuotaHealthMonitor implements AutoCloseable {
             Monitor monitor = quotaMonitors.computeIfAbsent(clientId,
                 id -> monitors.percept(cortex().name("monitor.quota.health." + id)));
 
-            // Pattern detection based on signal type
-            switch (signal.sign()) {
+            // Pattern detection based on signal type (signal IS the Sign enum)
+            switch (signal) {
                 case OVERFLOW -> {
                     // Quota violation detected (>100% usage)
                     int count = violationCounts.compute(clientId, (k, v) -> (v == null) ? 1 : v + 1);
@@ -175,7 +175,7 @@ public class QuotaHealthMonitor implements AutoCloseable {
 
                 default -> {
                     // Other signals - no action
-                    logger.trace("Quota signal ignored: client {} - {}", clientId, signal.sign());
+                    logger.trace("Quota signal ignored: client {} - {}", clientId, signal);
                 }
             }
         });
@@ -186,7 +186,7 @@ public class QuotaHealthMonitor implements AutoCloseable {
      *
      * @return Monitors conduit
      */
-    public Conduit<Monitor, Monitors.Sign> monitors() {
+    public Conduit<Monitor, Monitors.Signal> monitors() {
         return monitors;
     }
 

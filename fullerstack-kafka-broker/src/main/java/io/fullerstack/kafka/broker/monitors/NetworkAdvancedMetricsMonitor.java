@@ -227,11 +227,11 @@ public class NetworkAdvancedMetricsMonitor implements AutoCloseable {
                     // Get or create instruments for this client
                     Counter violationCounter = quotaViolationCounters.computeIfAbsent(clientId,
                         id -> circuit.conduit(cortex().name("counters"), Counters::composer)
-                            .get(cortex().name("quota.violations." + id)));
+                            .percept(cortex().name("quota.violations." + id)));
 
                     Monitor quotaMonitor = quotaMonitors.computeIfAbsent(clientId,
                         id -> circuit.conduit(cortex().name("monitors"), Monitors::composer)
-                            .get(cortex().name("quota.health." + id)));
+                            .percept(cortex().name("quota.health." + id)));
 
                     // Emit signals based on quota usage
                     if (quotaPct > 100.0) {

@@ -77,10 +77,10 @@ public class NetworkMetricsObserver implements AutoCloseable {
     private final ScheduledExecutorService scheduler;
 
     // Layer 1 Conduits
-    private final Conduit<Gauge, Gauges.Sign> gauges;
-    private final Conduit<Counter, Counters.Sign> counters;
-    private final Conduit<Probe, Probes.Sign> probes;
-    private final Conduit<Resource, Resources.Sign> resources;
+    private final Conduit<Gauge, Gauges.Signal> gauges;
+    private final Conduit<Counter, Counters.Signal> counters;
+    private final Conduit<Probe, Probes.Signal> probes;
+    private final Conduit<Resource, Resources.Signal> resources;
 
     // Instruments - Throttle time per request type
     private final Map<String, Gauge> throttleTimeGauges = new ConcurrentHashMap<>();
@@ -350,7 +350,7 @@ public class NetworkMetricsObserver implements AutoCloseable {
      *
      * @return Gauges conduit
      */
-    public Conduit<Gauge, Gauges.Sign> gauges() {
+    public Conduit<Gauge, Gauges.Signal> gauges() {
         return gauges;
     }
 
@@ -359,7 +359,7 @@ public class NetworkMetricsObserver implements AutoCloseable {
      *
      * @return Counters conduit
      */
-    public Conduit<Counter, Counters.Sign> counters() {
+    public Conduit<Counter, Counters.Signal> counters() {
         return counters;
     }
 
@@ -368,7 +368,7 @@ public class NetworkMetricsObserver implements AutoCloseable {
      *
      * @return Probes conduit
      */
-    public Conduit<Probe, Probes.Sign> probes() {
+    public Conduit<Probe, Probes.Signal> probes() {
         return probes;
     }
 
@@ -377,7 +377,7 @@ public class NetworkMetricsObserver implements AutoCloseable {
      *
      * @return Resources conduit
      */
-    public Conduit<Resource, Resources.Sign> resources() {
+    public Conduit<Resource, Resources.Signal> resources() {
         return resources;
     }
 

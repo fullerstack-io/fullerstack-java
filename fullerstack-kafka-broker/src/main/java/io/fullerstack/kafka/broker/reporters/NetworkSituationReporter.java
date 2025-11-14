@@ -57,7 +57,7 @@ public class NetworkSituationReporter implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(NetworkSituationReporter.class);
 
     private final Circuit circuit;
-    private final Conduit<Reporter, Reporters.Sign> reporters;
+    private final Conduit<Reporter, Reporters.Signal> reporters;
     private final Subscription monitorSubscription;
 
     // Reporter instances per entity (throttle type, client, etc.)
@@ -73,7 +73,7 @@ public class NetworkSituationReporter implements AutoCloseable {
     @SafeVarargs
     public NetworkSituationReporter(
         Circuit circuit,
-        Conduit<Monitors.Monitor, Monitors.Sign>... monitors
+        Conduit<Monitors.Monitor, Monitors.Signal>... monitors
     ) {
         this.circuit = Objects.requireNonNull(circuit, "circuit cannot be null");
         Objects.requireNonNull(monitors, "monitors cannot be null");
@@ -169,7 +169,7 @@ public class NetworkSituationReporter implements AutoCloseable {
      *
      * @return Reporters conduit
      */
-    public Conduit<Reporter, Reporters.Sign> reporters() {
+    public Conduit<Reporter, Reporters.Signal> reporters() {
         return reporters;
     }
 

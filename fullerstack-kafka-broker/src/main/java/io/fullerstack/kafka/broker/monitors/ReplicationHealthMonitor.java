@@ -75,7 +75,7 @@ public class ReplicationHealthMonitor {
      */
     public ReplicationHealthMonitor(
         Name circuitName,
-        Conduit<Monitor, Monitors.Sign> conduit,
+        Conduit<Monitor, Monitors.Signal> conduit,
         String clusterId
     ) {
         this.circuitName = Objects.requireNonNull(circuitName, "circuitName cannot be null");

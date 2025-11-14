@@ -74,7 +74,7 @@ public class IsrReplicationRouterMonitor {
      */
     public IsrReplicationRouterMonitor(
         Name circuitName,
-        Conduit<Router, Routers.Sign> conduit,
+        Conduit<Router, Routers.Signal> conduit,
         String brokerId
     ) {
         this.circuitName = Objects.requireNonNull(circuitName, "circuitName cannot be null");

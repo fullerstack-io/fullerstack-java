@@ -79,8 +79,8 @@ public class JvmMetricsObserver implements AutoCloseable {
     private static final int GC_STORM_THRESHOLD = 10;  // GCs per second
 
     private final Circuit circuit;
-    private final Conduit<Gauges.Gauge, Gauges.Sign> gauges;
-    private final Conduit<Counters.Counter, Counters.Sign> counters;
+    private final Conduit<Gauges.Gauge, Gauges.Signal> gauges;
+    private final Conduit<Counters.Counter, Counters.Signal> counters;
 
     // Previous values for delta calculation (per entity)
     private final Map<String, Double> previousHeapUtil = new ConcurrentHashMap<>();
@@ -125,7 +125,7 @@ public class JvmMetricsObserver implements AutoCloseable {
                 heapGauge.overflow();
             } else {
                 // Report direction of change
-                Double prevUtil = previousHeapUtil.percept(brokerId);
+                Double prevUtil = previousHeapUtil.get(brokerId);
                 if (prevUtil != null) {
                     if (heapUtil > prevUtil) {
                         heapGauge.increment();  // "heap is increasing"
@@ -169,8 +169,8 @@ public class JvmMetricsObserver implements AutoCloseable {
             Counters.Counter gcCounter = counters.percept(cortex().name("jvm.gc.count." + entityId));
 
             // Check for GC storm (raw threshold, not assessment)
-            Long prevCount = previousGcCount.percept(entityId);
-            Long prevTs = previousTimestamp.percept(entityId);
+            Long prevCount = previousGcCount.get(entityId);
+            Long prevTs = previousTimestamp.get(entityId);
 
             if (prevCount != null && prevTs != null) {
                 long intervalMs = metrics.timestamp() - prevTs;
@@ -198,7 +198,7 @@ public class JvmMetricsObserver implements AutoCloseable {
             // GC time counter
             Counters.Counter gcTimeCounter = counters.percept(cortex().name("jvm.gc.time." + entityId));
 
-            Long prevTime = previousGcTime.percept(entityId);
+            Long prevTime = previousGcTime.get(entityId);
             if (prevTime != null) {
                 long timeDelta = metrics.collectionTime() - prevTime;
                 if (timeDelta > 0) {
@@ -221,7 +221,7 @@ public class JvmMetricsObserver implements AutoCloseable {
      *
      * @return Gauges conduit emitting raw gauge signals
      */
-    public Conduit<Gauges.Gauge, Gauges.Sign> gauges() {
+    public Conduit<Gauges.Gauge, Gauges.Signal> gauges() {
         return gauges;
     }
 
@@ -230,7 +230,7 @@ public class JvmMetricsObserver implements AutoCloseable {
      *
      * @return Counters conduit emitting raw counter signals
      */
-    public Conduit<Counters.Counter, Counters.Sign> counters() {
+    public Conduit<Counters.Counter, Counters.Signal> counters() {
         return counters;
     }
 

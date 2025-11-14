@@ -55,7 +55,7 @@ public class ThrottleHealthMonitor implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(ThrottleHealthMonitor.class);
 
     private final Circuit circuit;
-    private final Conduit<Monitor, Monitors.Sign> monitors;
+    private final Conduit<Monitor, Monitors.Signal> monitors;
     private final Subscription gaugeSubscription;
 
     // Track overflow counts per throttle gauge (for pattern detection)
@@ -73,7 +73,7 @@ public class ThrottleHealthMonitor implements AutoCloseable {
      */
     public ThrottleHealthMonitor(
         Circuit circuit,
-        Conduit<Gauges.Gauge, Gauges.Sign> gauges
+        Conduit<Gauges.Gauge, Gauges.Signal> gauges
     ) {
         this.circuit = Objects.requireNonNull(circuit, "circuit cannot be null");
         Objects.requireNonNull(gauges, "gauges cannot be null");
@@ -109,7 +109,7 @@ public class ThrottleHealthMonitor implements AutoCloseable {
                 name -> monitors.percept(cortex().name(name.replace("gauges/network.throttle.", "monitor.throttle."))));
 
             // Pattern detection based on signal type
-            switch (signal.sign()) {
+            switch (signal) {
                 case OVERFLOW -> {
                     // Increment overflow counter for pattern detection
                     int count = overflowCounts.compute(gaugeName, (k, v) -> (v == null) ? 1 : v + 1);
@@ -172,7 +172,7 @@ public class ThrottleHealthMonitor implements AutoCloseable {
 
                 default -> {
                     // Other signals - no action
-                    logger.trace("Throttle signal ignored: {} - {}", gaugeName, signal.sign());
+                    logger.trace("Throttle signal ignored: {} - {}", gaugeName, signal);
                 }
             }
         });
@@ -183,7 +183,7 @@ public class ThrottleHealthMonitor implements AutoCloseable {
      *
      * @return Monitors conduit
      */
-    public Conduit<Monitor, Monitors.Sign> monitors() {
+    public Conduit<Monitor, Monitors.Signal> monitors() {
         return monitors;
     }
 
