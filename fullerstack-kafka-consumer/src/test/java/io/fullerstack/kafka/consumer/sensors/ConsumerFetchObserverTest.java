@@ -55,7 +55,7 @@ class ConsumerFetchObserverTest {
     @Test
     void testConstructorWithValidParameters() {
         // When
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -66,16 +66,16 @@ class ConsumerFetchObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testConstructorDoesNotStartMonitoring() {
         // When
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -93,7 +93,7 @@ class ConsumerFetchObserverTest {
         verifyNoInteractions(mockFetchLatencyGauge);
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -103,7 +103,7 @@ class ConsumerFetchObserverTest {
     @Test
     void testCloseWithoutStart() {
         // Given
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -114,13 +114,13 @@ class ConsumerFetchObserverTest {
         );
 
         // When / Then - should not throw
-        assertThatCode(observer::close).doesNotThrowAnyException();
+        assertThatCode(receptor::close).doesNotThrowAnyException();
     }
 
     @Test
     void testStopWithoutStart() {
         // Given
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -131,10 +131,10 @@ class ConsumerFetchObserverTest {
         );
 
         // When / Then - should not throw
-        assertThatCode(observer::stop).doesNotThrowAnyException();
+        assertThatCode(receptor::stop).doesNotThrowAnyException();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // Note: Cannot test start() without actual JMX server
@@ -147,7 +147,7 @@ class ConsumerFetchObserverTest {
     @Test
     void testFetchRateCounterIsProvided() {
         // When
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -158,16 +158,16 @@ class ConsumerFetchObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testBytesConsumedCounterIsProvided() {
         // When
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -178,16 +178,16 @@ class ConsumerFetchObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testRecordsConsumedCounterIsProvided() {
         // When
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -198,16 +198,16 @@ class ConsumerFetchObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testFetchSizeGaugeIsProvided() {
         // When
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -218,16 +218,16 @@ class ConsumerFetchObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testFetchLatencyGaugeIsProvided() {
         // When
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -238,10 +238,10 @@ class ConsumerFetchObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -251,7 +251,7 @@ class ConsumerFetchObserverTest {
     @Test
     void testConsumerIdIsStored() {
         // When
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "test-consumer-id",
             "localhost:11001",
             mockFetchRateCounter,
@@ -262,16 +262,16 @@ class ConsumerFetchObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testJmxEndpointIsStored() {
         // When
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "test-jmx-endpoint:9999",
             mockFetchRateCounter,
@@ -282,10 +282,10 @@ class ConsumerFetchObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -295,7 +295,7 @@ class ConsumerFetchObserverTest {
     @Test
     void testMultipleCloseCallsAreIdempotent() {
         // Given
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -307,16 +307,16 @@ class ConsumerFetchObserverTest {
 
         // When / Then - multiple closes should not throw
         assertThatCode(() -> {
-            observer.close();
-            observer.close();
-            observer.close();
+            receptor.close();
+            receptor.close();
+            receptor.close();
         }).doesNotThrowAnyException();
     }
 
     @Test
     void testMultipleStopCallsAreIdempotent() {
         // Given
-        ConsumerFetchObserver observer = new ConsumerFetchObserver(
+        ConsumerFetchObserver receptor = new ConsumerFetchObserver(
             "consumer-1",
             "localhost:11001",
             mockFetchRateCounter,
@@ -328,13 +328,13 @@ class ConsumerFetchObserverTest {
 
         // When / Then - multiple stops should not throw
         assertThatCode(() -> {
-            observer.stop();
-            observer.stop();
-            observer.stop();
+            receptor.stop();
+            receptor.stop();
+            receptor.stop();
         }).doesNotThrowAnyException();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================

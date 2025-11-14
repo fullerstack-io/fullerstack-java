@@ -69,7 +69,7 @@ class ProducerBufferOverflowIT {
         // Track reporter emissions
         reporterEmissions = new ArrayList<>();
         reporters.subscribe(cortex().subscriber(
-            cortex().name("test-observer"),
+            cortex().name("test-receptor"),
             (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
                 registrar.register(reporterEmissions::add);
             }

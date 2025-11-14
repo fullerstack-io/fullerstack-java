@@ -66,7 +66,7 @@ public class LocalProducerSendObserver implements AutoCloseable {
         this.retryCounter = retryCounter;
         this.latencyGauge = latencyGauge;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "local-send-observer-" + producerId);
+            Thread t = new Thread(r, "local-send-receptor-" + producerId);
             t.setDaemon(true);
             return t;
         });
@@ -77,7 +77,7 @@ public class LocalProducerSendObserver implements AutoCloseable {
      */
     public void start() {
         if (running) {
-            System.out.println("⚠️  Send observer for " + producerId + " already running");
+            System.out.println("⚠️  Send receptor for " + producerId + " already running");
             return;
         }
 

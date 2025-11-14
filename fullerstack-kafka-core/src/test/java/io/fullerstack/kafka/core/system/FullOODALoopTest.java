@@ -67,7 +67,7 @@ class FullOODALoopTest {
         // Subscribe to actor signs for verification
         actorSigns = new ArrayList<>();
         system.getActors().subscribe(cortex().subscriber(
-            cortex().name("test-observer"),
+            cortex().name("test-receptor"),
             (Subject<Channel<Actors.Sign>> subject, Registrar<Actors.Sign> registrar) -> {
                 registrar.register(actorSigns::add);
             }
@@ -90,7 +90,7 @@ class FullOODALoopTest {
 
         // Layer 1 (OBSERVE): Get Monitor instrument and emit DEGRADED signal
         System.out.println("\n[Layer 1: OBSERVE] Emitting Monitor.degraded() signal...");
-        Monitors.Monitor brokerMonitor = system.getMonitors().get(
+        Monitors.Monitor brokerMonitor = system.getMonitors().percept(
             cortex().name("broker-1.jvm.heap")
         );
         brokerMonitor.degraded(Monitors.Dimension.MEASURED);
@@ -128,7 +128,7 @@ class FullOODALoopTest {
 
         // Layer 1: Emit DEGRADED from partition monitor
         System.out.println("\n[Layer 1] Emitting DEGRADED from partition monitor...");
-        Monitors.Monitor partitionMonitor = system.getMonitors().get(
+        Monitors.Monitor partitionMonitor = system.getMonitors().percept(
             cortex().name("broker-1.orders.p0")  // depth=3, partition level
         );
         partitionMonitor.degraded(Monitors.Dimension.CONFIRMED);
@@ -159,7 +159,7 @@ class FullOODALoopTest {
 
         // Layer 1: Emit STABLE
         System.out.println("\n[Layer 1] Emitting STABLE signal...");
-        Monitors.Monitor brokerMonitor = system.getMonitors().get(
+        Monitors.Monitor brokerMonitor = system.getMonitors().percept(
             cortex().name("broker-1.jvm.heap")
         );
         brokerMonitor.stable(Monitors.Dimension.CONFIRMED);
@@ -189,8 +189,8 @@ class FullOODALoopTest {
 
         // Layer 1: Emit DEGRADED from multiple broker monitors
         System.out.println("\n[Layer 1] Emitting DEGRADED from 2 brokers...");
-        Monitors.Monitor broker1 = system.getMonitors().get(cortex().name("broker-1.cpu.usage"));
-        Monitors.Monitor broker2 = system.getMonitors().get(cortex().name("broker-2.disk.io"));
+        Monitors.Monitor broker1 = system.getMonitors().percept(cortex().name("broker-1.cpu.usage"));
+        Monitors.Monitor broker2 = system.getMonitors().percept(cortex().name("broker-2.disk.io"));
 
         broker1.degraded(Monitors.Dimension.MEASURED);
         broker2.degraded(Monitors.Dimension.MEASURED);
@@ -220,7 +220,7 @@ class FullOODALoopTest {
 
         // Layer 1: Emit DOWN from cluster-level monitor
         System.out.println("\n[Layer 1] Emitting DOWN from cluster monitor...");
-        Monitors.Monitor clusterMonitor = system.getMonitors().get(
+        Monitors.Monitor clusterMonitor = system.getMonitors().percept(
             cortex().name("cluster")  // depth=1, cluster level
         );
         clusterMonitor.down(Monitors.Dimension.CONFIRMED);
@@ -234,7 +234,7 @@ class FullOODALoopTest {
 
         // Verify alerts
         assertThat(pagerDutyClient.getAlertCount()).isEqualTo(1);
-        assertThat(pagerDutyClient.getAlerts().get(0).severity).isEqualTo("critical");
+        assertThat(pagerDutyClient.getAlerts().percept(0).severity).isEqualTo("critical");
 
         System.out.println("\n✅ Cluster-level monitor routing working!");
         System.out.println("=".repeat(70) + "\n");
@@ -248,7 +248,7 @@ class FullOODALoopTest {
         System.out.println("=".repeat(70));
 
         // Measure complete OODA loop latency
-        Monitors.Monitor brokerMonitor = system.getMonitors().get(
+        Monitors.Monitor brokerMonitor = system.getMonitors().percept(
             cortex().name("broker-1.jvm.heap")
         );
 

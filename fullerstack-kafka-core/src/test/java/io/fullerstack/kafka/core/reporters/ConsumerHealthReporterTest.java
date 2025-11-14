@@ -77,7 +77,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testConsumerDownEmitsCritical() {
         // Given: Consumer monitor
-        Monitors.Monitor consumerMonitor = monitors.get(cortex().name("order-processor"));
+        Monitors.Monitor consumerMonitor = monitors.percept(cortex().name("order-processor"));
 
         // When: Consumer goes DOWN
         consumerMonitor.down(Monitors.Dimension.CONFIRMED);
@@ -91,7 +91,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testConsumerDefectiveEmitsCritical() {
         // Given: Consumer monitor
-        Monitors.Monitor consumerMonitor = monitors.get(cortex().name("payment-processor"));
+        Monitors.Monitor consumerMonitor = monitors.percept(cortex().name("payment-processor"));
 
         // When: Consumer becomes DEFECTIVE
         consumerMonitor.defective(Monitors.Dimension.CONFIRMED);
@@ -105,7 +105,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testSustainedLagGrowthEmitsCritical() {
         // Given: Consumer monitor
-        Monitors.Monitor lagMonitor = monitors.get(cortex().name("analytics-consumer.lag"));
+        Monitors.Monitor lagMonitor = monitors.percept(cortex().name("analytics-consumer.lag"));
 
         // When: Consumer shows sustained lag growth (3 consecutive DIVERGING)
         emittedSigns.clear();
@@ -141,7 +141,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testDivergingCountResetsOnOtherSign() {
         // Given: Consumer monitor with 2 consecutive DIVERGING
-        Monitors.Monitor lagMonitor = monitors.get(cortex().name("inventory-consumer.lag"));
+        Monitors.Monitor lagMonitor = monitors.percept(cortex().name("inventory-consumer.lag"));
 
         lagMonitor.diverging(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
@@ -173,7 +173,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testConsumerDegradedEmitsWarning() {
         // Given: Consumer monitor
-        Monitors.Monitor consumerMonitor = monitors.get(cortex().name("notification-consumer"));
+        Monitors.Monitor consumerMonitor = monitors.percept(cortex().name("notification-consumer"));
 
         // When: Consumer becomes DEGRADED
         consumerMonitor.degraded(Monitors.Dimension.CONFIRMED);
@@ -187,7 +187,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testErraticConsumptionEmitsWarning() {
         // Given: Consumer monitor
-        Monitors.Monitor consumerMonitor = monitors.get(cortex().name("audit-consumer"));
+        Monitors.Monitor consumerMonitor = monitors.percept(cortex().name("audit-consumer"));
 
         // When: Consumer shows ERRATIC consumption
         consumerMonitor.erratic(Monitors.Dimension.CONFIRMED);
@@ -201,7 +201,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testSingleDivergingEmitsWarning() {
         // Given: Consumer lag monitor
-        Monitors.Monitor lagMonitor = monitors.get(cortex().name("reporting-consumer.lag"));
+        Monitors.Monitor lagMonitor = monitors.percept(cortex().name("reporting-consumer.lag"));
 
         // When: Lag shows single DIVERGING (early detection)
         lagMonitor.diverging(Monitors.Dimension.CONFIRMED);
@@ -215,7 +215,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testStableConsumerEmitsNormal() {
         // Given: Consumer monitor
-        Monitors.Monitor consumerMonitor = monitors.get(cortex().name("email-consumer"));
+        Monitors.Monitor consumerMonitor = monitors.percept(cortex().name("email-consumer"));
 
         // When: Consumer is STABLE
         consumerMonitor.stable(Monitors.Dimension.CONFIRMED);
@@ -229,7 +229,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testConvergingLagEmitsNormal() {
         // Given: Consumer lag monitor
-        Monitors.Monitor lagMonitor = monitors.get(cortex().name("search-consumer.lag"));
+        Monitors.Monitor lagMonitor = monitors.percept(cortex().name("search-consumer.lag"));
 
         // When: Lag is CONVERGING (reducing)
         lagMonitor.converging(Monitors.Dimension.CONFIRMED);
@@ -243,8 +243,8 @@ class ConsumerHealthReporterTest {
     @Test
     void testMultipleConsumersTrackedIndependently() {
         // Given: Two consumer monitors
-        Monitors.Monitor consumer1 = monitors.get(cortex().name("consumer-1"));
-        Monitors.Monitor consumer2 = monitors.get(cortex().name("consumer-2"));
+        Monitors.Monitor consumer1 = monitors.percept(cortex().name("consumer-1"));
+        Monitors.Monitor consumer2 = monitors.percept(cortex().name("consumer-2"));
 
         // When: Consumer1 has 2 DIVERGING, Consumer2 has 2 DIVERGING
         consumer1.diverging(Monitors.Dimension.CONFIRMED);
@@ -283,7 +283,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testClearTrackingResetsCounter() {
         // Given: Consumer with 2 consecutive DIVERGING
-        Monitors.Monitor lagMonitor = monitors.get(cortex().name("test-consumer"));
+        Monitors.Monitor lagMonitor = monitors.percept(cortex().name("test-consumer"));
 
         lagMonitor.diverging(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
@@ -309,8 +309,8 @@ class ConsumerHealthReporterTest {
     @Test
     void testClearAllTrackingResetsAllCounters() {
         // Given: Multiple consumers with DIVERGING counts
-        Monitors.Monitor consumer1 = monitors.get(cortex().name("consumer-1"));
-        Monitors.Monitor consumer2 = monitors.get(cortex().name("consumer-2"));
+        Monitors.Monitor consumer1 = monitors.percept(cortex().name("consumer-1"));
+        Monitors.Monitor consumer2 = monitors.percept(cortex().name("consumer-2"));
 
         consumer1.diverging(Monitors.Dimension.CONFIRMED);
         consumer2.diverging(Monitors.Dimension.CONFIRMED);
@@ -341,7 +341,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testEventDrivenSynchronization() {
         // Given: Consumer monitor
-        Monitors.Monitor consumerMonitor = monitors.get(cortex().name("sync-test-consumer"));
+        Monitors.Monitor consumerMonitor = monitors.percept(cortex().name("sync-test-consumer"));
 
         long startTime = System.nanoTime();
 
@@ -362,7 +362,7 @@ class ConsumerHealthReporterTest {
     @Test
     void testCompleteScenario_LagSpikeThenRecovery() {
         // Given: Consumer lag monitor
-        Monitors.Monitor lagMonitor = monitors.get(cortex().name("complete-scenario-consumer"));
+        Monitors.Monitor lagMonitor = monitors.percept(cortex().name("complete-scenario-consumer"));
 
         // Scenario: Lag spike → recovery
         emittedSigns.clear();

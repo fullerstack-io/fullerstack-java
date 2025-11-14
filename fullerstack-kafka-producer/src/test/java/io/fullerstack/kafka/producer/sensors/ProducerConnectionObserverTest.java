@@ -49,7 +49,7 @@ class ProducerConnectionObserverTest {
     @Test
     void testConstructorWithValidParameters() {
         // When
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -58,16 +58,16 @@ class ProducerConnectionObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testConstructorDoesNotStartMonitoring() {
         // When
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -81,7 +81,7 @@ class ProducerConnectionObserverTest {
         verifyNoInteractions(mockIoWaitGauge);
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -91,7 +91,7 @@ class ProducerConnectionObserverTest {
     @Test
     void testCloseWithoutStart() {
         // Given
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -100,13 +100,13 @@ class ProducerConnectionObserverTest {
         );
 
         // When / Then - should not throw
-        assertThatCode(observer::close).doesNotThrowAnyException();
+        assertThatCode(receptor::close).doesNotThrowAnyException();
     }
 
     @Test
     void testStopWithoutStart() {
         // Given
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -115,10 +115,10 @@ class ProducerConnectionObserverTest {
         );
 
         // When / Then - should not throw
-        assertThatCode(observer::stop).doesNotThrowAnyException();
+        assertThatCode(receptor::stop).doesNotThrowAnyException();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // Note: Cannot test start() without actual JMX server
@@ -131,7 +131,7 @@ class ProducerConnectionObserverTest {
     @Test
     void testConnectionCountGaugeIsProvided() {
         // When
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -140,16 +140,16 @@ class ProducerConnectionObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testCreationRateCounterIsProvided() {
         // When
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -158,16 +158,16 @@ class ProducerConnectionObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testIoWaitGaugeIsProvided() {
         // When
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -176,10 +176,10 @@ class ProducerConnectionObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -189,7 +189,7 @@ class ProducerConnectionObserverTest {
     @Test
     void testProducerIdIsStored() {
         // When
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "test-producer-id",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -198,16 +198,16 @@ class ProducerConnectionObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testJmxEndpointIsStored() {
         // When
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "test-jmx-endpoint:9999",
             mockConnectionCountGauge,
@@ -216,10 +216,10 @@ class ProducerConnectionObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -229,7 +229,7 @@ class ProducerConnectionObserverTest {
     @Test
     void testMultipleCloseCallsAreIdempotent() {
         // Given
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -239,16 +239,16 @@ class ProducerConnectionObserverTest {
 
         // When / Then - multiple closes should not throw
         assertThatCode(() -> {
-            observer.close();
-            observer.close();
-            observer.close();
+            receptor.close();
+            receptor.close();
+            receptor.close();
         }).doesNotThrowAnyException();
     }
 
     @Test
     void testMultipleStopCallsAreIdempotent() {
         // Given
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -258,19 +258,19 @@ class ProducerConnectionObserverTest {
 
         // When / Then - multiple stops should not throw
         assertThatCode(() -> {
-            observer.stop();
-            observer.stop();
-            observer.stop();
+            receptor.stop();
+            receptor.stop();
+            receptor.stop();
         }).doesNotThrowAnyException();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
     // Signal Emission Pattern Tests (Conceptual)
     // ========================================
-    // Note: These tests verify the observer can be constructed with the correct
+    // Note: These tests verify the receptor can be constructed with the correct
     // instruments. Actual signal emission is tested in integration tests with
     // real JMX data.
 
@@ -280,7 +280,7 @@ class ProducerConnectionObserverTest {
         Gauge connectionCountGauge = mock(Gauge.class);
 
         // When
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             connectionCountGauge,
@@ -289,8 +289,8 @@ class ProducerConnectionObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
-        observer.close();
+        assertThat(receptor).isNotNull();
+        receptor.close();
     }
 
     @Test
@@ -299,7 +299,7 @@ class ProducerConnectionObserverTest {
         Counter creationRateCounter = mock(Counter.class);
 
         // When
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -308,8 +308,8 @@ class ProducerConnectionObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
-        observer.close();
+        assertThat(receptor).isNotNull();
+        receptor.close();
     }
 
     @Test
@@ -318,7 +318,7 @@ class ProducerConnectionObserverTest {
         Gauge ioWaitGauge = mock(Gauge.class);
 
         // When
-        ProducerConnectionObserver observer = new ProducerConnectionObserver(
+        ProducerConnectionObserver receptor = new ProducerConnectionObserver(
             "producer-1",
             "localhost:11001",
             mockConnectionCountGauge,
@@ -327,8 +327,8 @@ class ProducerConnectionObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
-        observer.close();
+        assertThat(receptor).isNotNull();
+        receptor.close();
     }
 
     // ========================================

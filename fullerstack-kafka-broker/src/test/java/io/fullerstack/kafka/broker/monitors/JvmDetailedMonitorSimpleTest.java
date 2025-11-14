@@ -9,7 +9,7 @@ import javax.management.ObjectName;
 
 import java.lang.management.ManagementFactory;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**

@@ -38,7 +38,7 @@
  *
  * <pre>{@code
  * // 1. Monitor emits Signal to conduit
- * Monitors.Monitor monitor = monitors.get(cortex().name("broker-1.orders.p0"));
+ * Monitors.Monitor monitor = monitors.percept(cortex().name("broker-1.orders.p0"));
  * monitor.degraded(Monitors.Dimension.CONFIRMED);
  * // → Signal{ sign=DEGRADED, dimension=CONFIRMED } emitted to conduit
  *

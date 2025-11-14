@@ -9,13 +9,13 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
  * Emits Counters.Sign for network I/O metrics using Serventis RC1 vocabulary.
  *
  * <p><b>Layer 2: Serventis Signal Emission</b>
- * This observer emits signals with Counters API vocabulary (INCREMENT/OVERFLOW), NOT interpretations.
+ * This receptor emits signals with Counters API vocabulary (INCREMENT/OVERFLOW), NOT interpretations.
  *
  * <h3>Network I/O Metrics (5 metrics):</h3>
  * <ul>
@@ -32,7 +32,7 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  * OVERFLOW:  Bytes in rate exceeds saturation threshold (network congestion)
  * </pre>
  *
- * <p><b>Note:</b> This observer uses simple threshold logic for signal emission. Contextual
+ * <p><b>Note:</b> This receptor uses simple threshold logic for signal emission. Contextual
  * assessment using baselines, trends, and recommendations will be added in Epic 2
  * via Observers (Layer 4 - Semiosphere).
  */

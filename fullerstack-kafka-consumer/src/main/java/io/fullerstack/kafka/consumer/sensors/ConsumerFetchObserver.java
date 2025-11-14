@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
  * Gauge fetchSizeGauge = ...;
  * Gauge fetchLatencyGauge = ...;
  *
- * ConsumerFetchObserver observer = new ConsumerFetchObserver(
+ * ConsumerFetchObserver receptor = new ConsumerFetchObserver(
  *     "consumer-1",
  *     "localhost:11001",  // JMX endpoint
  *     fetchRateCounter,
@@ -45,10 +45,10 @@ import java.util.concurrent.TimeUnit;
  *     fetchLatencyGauge
  * );
  *
- * observer.start();  // Begins monitoring every 10 seconds
+ * receptor.start();  // Begins monitoring every 10 seconds
  *
  * // Later...
- * observer.stop();
+ * receptor.stop();
  * }</pre>
  *
  * @author Fullerstack
@@ -85,7 +85,7 @@ public class ConsumerFetchObserver implements AutoCloseable {
     private double previousFetchLatency = 0.0;
 
     /**
-     * Creates a new consumer fetch observer.
+     * Creates a new consumer fetch receptor.
      *
      * @param consumerId              Consumer identifier (e.g., "consumer-1")
      * @param jmxEndpoint            JMX endpoint (e.g., "localhost:11001")
@@ -112,7 +112,7 @@ public class ConsumerFetchObserver implements AutoCloseable {
         this.fetchSizeGauge = fetchSizeGauge;
         this.fetchLatencyGauge = fetchLatencyGauge;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "consumer-fetch-observer-" + consumerId);
+            Thread t = new Thread(r, "consumer-fetch-receptor-" + consumerId);
             t.setDaemon(true);
             return t;
         });
@@ -125,7 +125,7 @@ public class ConsumerFetchObserver implements AutoCloseable {
      */
     public void start() {
         if (running) {
-            logger.warn("Consumer fetch observer for {} is already running", consumerId);
+            logger.warn("Consumer fetch receptor for {} is already running", consumerId);
             return;
         }
 
@@ -141,12 +141,12 @@ public class ConsumerFetchObserver implements AutoCloseable {
                 TimeUnit.SECONDS
             );
 
-            logger.info("Started consumer fetch observer for {} (JMX: {})", consumerId, jmxEndpoint);
+            logger.info("Started consumer fetch receptor for {} (JMX: {})", consumerId, jmxEndpoint);
 
         } catch (Exception e) {
-            logger.error("Failed to start consumer fetch observer for {}", consumerId, e);
+            logger.error("Failed to start consumer fetch receptor for {}", consumerId, e);
             running = false;
-            throw new RuntimeException("Failed to start consumer fetch observer", e);
+            throw new RuntimeException("Failed to start consumer fetch receptor", e);
         }
     }
 
@@ -171,7 +171,7 @@ public class ConsumerFetchObserver implements AutoCloseable {
         }
 
         closeJmx();
-        logger.info("Stopped consumer fetch observer for {}", consumerId);
+        logger.info("Stopped consumer fetch receptor for {}", consumerId);
     }
 
     @Override

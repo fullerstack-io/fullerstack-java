@@ -55,7 +55,7 @@ public class HierarchyManager implements AutoCloseable {
      */
     public Cell<Monitors.Sign, Monitors.Sign> getBrokerCell(String brokerId) {
         // Hierarchical name: broker-1 (child of cluster)
-        return clusterCell.get(cortex().name(brokerId));
+        return clusterCell.percept(cortex().name(brokerId));
     }
 
     /**
@@ -69,7 +69,7 @@ public class HierarchyManager implements AutoCloseable {
      */
     public Cell<Monitors.Sign, Monitors.Sign> getTopicCell(String brokerId, String topicName) {
         // Hierarchical name: broker-1.orders
-        return getBrokerCell(brokerId).get(cortex().name(brokerId + "." + topicName));
+        return getBrokerCell(brokerId).percept(cortex().name(brokerId + "." + topicName));
     }
 
     /**
@@ -88,7 +88,7 @@ public class HierarchyManager implements AutoCloseable {
         String partitionId
     ) {
         // Hierarchical name: broker-1.orders.p0
-        return getTopicCell(brokerId, topicName).get(
+        return getTopicCell(brokerId, topicName).percept(
             cortex().name(brokerId + "." + topicName + "." + partitionId)
         );
     }

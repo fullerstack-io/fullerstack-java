@@ -76,7 +76,7 @@ class ConsumerCoordinatorObserverTest {
         Set<String> groups = Set.of("group-1", "group-2");
 
         // When
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -84,10 +84,10 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
@@ -96,7 +96,7 @@ class ConsumerCoordinatorObserverTest {
         Set<String> groups = Set.of("group-1", "group-2", "group-3");
 
         // When
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -104,10 +104,10 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // Then - should create 4 instruments per group (counter, gauge, 2 monitors)
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
@@ -116,7 +116,7 @@ class ConsumerCoordinatorObserverTest {
         Set<String> groups = Set.of("group-1");
 
         // When
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -128,7 +128,7 @@ class ConsumerCoordinatorObserverTest {
         verifyNoInteractions(mockMBeanServer);
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -139,7 +139,7 @@ class ConsumerCoordinatorObserverTest {
     void testStartAndStopLifecycle() {
         // Given
         Set<String> groups = Set.of("group-1");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -147,21 +147,21 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // When
-        observer.start();
-        observer.stop();
+        receptor.start();
+        receptor.stop();
 
         // Then - should not throw
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testMultipleStartCallsAreIdempotent() {
         // Given
         Set<String> groups = Set.of("group-1");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -170,21 +170,21 @@ class ConsumerCoordinatorObserverTest {
 
         // When / Then - multiple starts should not throw
         assertThatCode(() -> {
-            observer.start();
-            observer.start();
-            observer.start();
+            receptor.start();
+            receptor.start();
+            receptor.start();
         }).doesNotThrowAnyException();
 
         // Cleanup
-        observer.stop();
-        observer.close();
+        receptor.stop();
+        receptor.close();
     }
 
     @Test
     void testCloseWithoutStart() {
         // Given
         Set<String> groups = Set.of("group-1");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -192,14 +192,14 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // When / Then - should not throw
-        assertThatCode(observer::close).doesNotThrowAnyException();
+        assertThatCode(receptor::close).doesNotThrowAnyException();
     }
 
     @Test
     void testStopWithoutStart() {
         // Given
         Set<String> groups = Set.of("group-1");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -207,17 +207,17 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // When / Then - should not throw
-        assertThatCode(observer::stop).doesNotThrowAnyException();
+        assertThatCode(receptor::stop).doesNotThrowAnyException();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testMultipleCloseCallsAreIdempotent() {
         // Given
         Set<String> groups = Set.of("group-1");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -226,9 +226,9 @@ class ConsumerCoordinatorObserverTest {
 
         // When / Then - multiple closes should not throw
         assertThatCode(() -> {
-            observer.close();
-            observer.close();
-            observer.close();
+            receptor.close();
+            receptor.close();
+            receptor.close();
         }).doesNotThrowAnyException();
     }
 
@@ -240,7 +240,7 @@ class ConsumerCoordinatorObserverTest {
     void shouldEmitIncrementOnCoordinatorSync() throws Exception {
         // Given
         Set<String> groups = Set.of("test-group");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -262,39 +262,39 @@ class ConsumerCoordinatorObserverTest {
         when(mockMBeanServer.getAttribute(any(ObjectName.class), anyString()))
             .thenReturn(100.0); // heartbeat latency
 
-        // When - observer should be created correctly
+        // When - receptor should be created correctly
         // Full integration test will verify actual signal emission with real AdminClient
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void shouldTrackHeartbeatLatencyWithGauges() {
         // Given
         Set<String> groups = Set.of("test-group");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
             groups
         );
 
-        // Then - observer should be created with gauge instruments
-        assertThat(observer).isNotNull();
+        // Then - receptor should be created with gauge instruments
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void shouldEmitOverflowWhenHeartbeatLatencyExceedsThreshold() {
         // Given
         Set<String> groups = Set.of("test-group");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -302,17 +302,17 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // This will be tested in integration tests with real JMX
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void shouldEmitDegradedWhenApproachingSessionTimeout() {
         // Given
         Set<String> groups = Set.of("test-group");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -320,17 +320,17 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // This will be tested in integration tests with real monitoring
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void shouldEmitDefectiveOnSessionTimeoutViolation() {
         // Given
         Set<String> groups = Set.of("test-group");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -338,17 +338,17 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // This will be tested in integration tests
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void shouldEmitDegradedWhenApproachingMaxPollInterval() {
         // Given
         Set<String> groups = Set.of("test-group");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -356,17 +356,17 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // This will be tested in integration tests
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void shouldEmitDefectiveOnPollIntervalViolation() {
         // Given
         Set<String> groups = Set.of("test-group");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -374,10 +374,10 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // This will be tested in integration tests
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -388,7 +388,7 @@ class ConsumerCoordinatorObserverTest {
     void shouldHandleMultipleConsumerGroupsIndependently() {
         // Given
         Set<String> groups = Set.of("group-1", "group-2", "group-3");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -396,10 +396,10 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // Then - should create separate instruments for each group
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -410,7 +410,7 @@ class ConsumerCoordinatorObserverTest {
     void shouldHandleAdminClientTimeoutsGracefully() throws Exception {
         // Given
         Set<String> groups = Set.of("test-group");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -424,18 +424,18 @@ class ConsumerCoordinatorObserverTest {
             .thenReturn(KafkaFuture.completedFuture(Collections.emptyMap()));
 
         // When / Then - should not throw
-        assertThatCode(() -> observer.start()).doesNotThrowAnyException();
+        assertThatCode(() -> receptor.start()).doesNotThrowAnyException();
 
         // Cleanup
-        observer.stop();
-        observer.close();
+        receptor.stop();
+        receptor.close();
     }
 
     @Test
     void shouldHandleMissingConsumerGroups() throws Exception {
         // Given
         Set<String> groups = Set.of("non-existent-group");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -452,18 +452,18 @@ class ConsumerCoordinatorObserverTest {
         when(mockDescribeResult.all()).thenReturn(failedFuture);
 
         // When / Then - should not throw (logs as debug)
-        assertThatCode(() -> observer.start()).doesNotThrowAnyException();
+        assertThatCode(() -> receptor.start()).doesNotThrowAnyException();
 
         // Cleanup
-        observer.stop();
-        observer.close();
+        receptor.stop();
+        receptor.close();
     }
 
     @Test
     void shouldHandleJmxConnectionFailures() {
         // Given
         Set<String> groups = Set.of("test-group");
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -471,10 +471,10 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // This will be tested in integration tests
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -487,7 +487,7 @@ class ConsumerCoordinatorObserverTest {
         Set<String> groups = Set.of();
 
         // When
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -495,10 +495,10 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // Then - should handle empty set gracefully
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
@@ -507,7 +507,7 @@ class ConsumerCoordinatorObserverTest {
         Set<String> groups = Set.of("single-group");
 
         // When
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -515,10 +515,10 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
@@ -530,7 +530,7 @@ class ConsumerCoordinatorObserverTest {
         }
 
         // When
-        ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+        ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
             mockAdminClient,
             mockMBeanServer,
             circuit,
@@ -538,10 +538,10 @@ class ConsumerCoordinatorObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================

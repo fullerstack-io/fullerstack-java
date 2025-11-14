@@ -76,7 +76,7 @@ class FullStackVerificationTest {
         System.out.println("\n[TEST] Emitting Monitor.degraded(MEASURED) to broker-1.jvm.heap...\n");
 
         // Layer 1: Emit from Monitor
-        Monitors.Monitor brokerMonitor = system.getMonitors().get(
+        Monitors.Monitor brokerMonitor = system.getMonitors().percept(
             cortex().name("broker-1.jvm.heap")
         );
         brokerMonitor.degraded(Monitors.Dimension.MEASURED);
@@ -144,7 +144,7 @@ class FullStackVerificationTest {
         List<Monitors.Sign> clusterSigns = new ArrayList<>();
 
         clusterCell.subscribe(cortex().subscriber(
-            cortex().name("test-cluster-observer"),
+            cortex().name("test-cluster-receptor"),
             (Subject<Channel<Monitors.Sign>> subject, Registrar<Monitors.Sign> registrar) -> {
                 registrar.register(sign -> {
                     clusterSigns.add(sign);
@@ -156,7 +156,7 @@ class FullStackVerificationTest {
         System.out.println("\n[TEST] Emitting DEGRADED from partition level...");
 
         // Emit from partition level (depth=3)
-        Monitors.Monitor partitionMonitor = system.getMonitors().get(
+        Monitors.Monitor partitionMonitor = system.getMonitors().percept(
             cortex().name("broker-1.orders.p0")
         );
         partitionMonitor.degraded(Monitors.Dimension.CONFIRMED);
@@ -193,7 +193,7 @@ class FullStackVerificationTest {
         List<Monitors.Sign> receivedSigns = new ArrayList<>();
 
         clusterCell.subscribe(cortex().subscriber(
-            cortex().name("test-direct-observer"),
+            cortex().name("test-direct-receptor"),
             (Subject<Channel<Monitors.Sign>> subject, Registrar<Monitors.Sign> registrar) -> {
                 registrar.register(sign -> {
                     receivedSigns.add(sign);

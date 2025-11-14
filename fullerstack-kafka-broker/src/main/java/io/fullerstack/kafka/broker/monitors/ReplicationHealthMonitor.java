@@ -75,7 +75,7 @@ public class ReplicationHealthMonitor {
      */
     public ReplicationHealthMonitor(
         Name circuitName,
-        Conduit<Monitor, Monitors.Signal> conduit,
+        Conduit<Monitor, Monitors.Sign> conduit,
         String clusterId
     ) {
         this.circuitName = Objects.requireNonNull(circuitName, "circuitName cannot be null");
@@ -83,8 +83,8 @@ public class ReplicationHealthMonitor {
         Objects.requireNonNull(clusterId, "clusterId cannot be null");
 
         // Get monitors from Conduit (creates via composer)
-        this.partitionHealthMonitor = conduit.get(cortex().name(clusterId + ".partition-health"));
-        this.controllerHealthMonitor = conduit.get(cortex().name(clusterId + ".controller-health"));
+        this.partitionHealthMonitor = conduit.percept(cortex().name(clusterId + ".partition-health"));
+        this.controllerHealthMonitor = conduit.percept(cortex().name(clusterId + ".controller-health"));
         this.channel = null; // Not needed
     }
 

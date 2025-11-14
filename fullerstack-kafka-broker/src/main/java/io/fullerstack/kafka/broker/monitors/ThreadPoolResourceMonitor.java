@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
  * Emits Resources.Sign for thread pool metrics using Serventis RC1 vocabulary.

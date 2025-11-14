@@ -19,7 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
  * Monitors detailed JVM metrics via JMX with advanced runtime visibility.
@@ -130,23 +130,23 @@ public class JvmDetailedMonitor implements AutoCloseable {
         this.threadStateGauges = new EnumMap<>(Thread.State.class);
         for (Thread.State state : Thread.State.values()) {
             threadStateGauges.put(state,
-                gauges.get(cortex().name("jvm.threads." + state.name().toLowerCase())));
+                gauges.percept(cortex().name("jvm.threads." + state.name().toLowerCase())));
         }
 
         // Memory pool gauges (handles different GC algorithm pool names)
         this.memoryPoolGauges = new ConcurrentHashMap<>();
 
         // Class loading
-        this.classLoadCounter = counters.get(cortex().name("jvm.class.load"));
-        this.classUnloadCounter = counters.get(cortex().name("jvm.class.unload"));
-        this.loadedClassGauge = gauges.get(cortex().name("jvm.class.loaded"));
+        this.classLoadCounter = counters.percept(cortex().name("jvm.class.load"));
+        this.classUnloadCounter = counters.percept(cortex().name("jvm.class.unload"));
+        this.loadedClassGauge = gauges.percept(cortex().name("jvm.class.loaded"));
 
         // Safepoint
-        this.safepointCounter = counters.get(cortex().name("jvm.safepoint.count"));
-        this.safepointDurationGauge = gauges.get(cortex().name("jvm.safepoint.duration"));
+        this.safepointCounter = counters.percept(cortex().name("jvm.safepoint.count"));
+        this.safepointDurationGauge = gauges.percept(cortex().name("jvm.safepoint.duration"));
 
         // Compilation
-        this.compilationCounter = counters.get(cortex().name("jvm.compilation.time"));
+        this.compilationCounter = counters.percept(cortex().name("jvm.compilation.time"));
 
         // Schedule polling
         this.scheduler = Executors.newScheduledThreadPool(1);
@@ -265,7 +265,7 @@ public class JvmDetailedMonitor implements AutoCloseable {
 
                         Gauges.Gauge gauge = memoryPoolGauges.computeIfAbsent(
                             mapping.key,
-                            key -> gaugesConduit.get(cortex().name("jvm.memory.pool." + key))
+                            key -> gaugesConduit.percept(cortex().name("jvm.memory.pool." + key))
                         );
 
                         if (utilization >= MEMORY_POOL_OVERFLOW_THRESHOLD) {

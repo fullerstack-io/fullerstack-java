@@ -98,7 +98,7 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
 
     // Conduits
     private final Conduit<Router, Routers.Sign> routers;
-    private final Conduit<Monitor, Monitors.Signal> monitors;
+    private final Conduit<Monitor, Monitors.Sign> monitors;
     private final Conduit<Counter, Counters.Sign> counters;
     private final Conduit<Gauge, Gauges.Sign> gauges;
 
@@ -238,7 +238,7 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
         logger.debug("Emitted FRAGMENT signal for {}", tp);
 
         // Set monitor to DEGRADED
-        Monitor monitor = monitors.get(cortex().name("reassignment-" + tp));
+        Monitor monitor = monitors.percept(cortex().name("reassignment-" + tp));
         monitor.degraded(Monitors.Dimension.CONFIRMED);
         logger.debug("Emitted DEGRADED monitor signal for {}", tp);
 
@@ -287,7 +287,7 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
             newLeader.receive();
 
             // Update bytes counter
-            Counter bytesCounter = counters.get(cortex().name("reassignment-bytes-" + tp));
+            Counter bytesCounter = counters.percept(cortex().name("reassignment-bytes-" + tp));
             bytesCounter.increment();
 
             // Update state
@@ -304,7 +304,7 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
 
         // Calculate completion %
         double completion = calculateCompletion(r);
-        Gauge progressGauge = gauges.get(cortex().name("reassignment-progress-" + tp));
+        Gauge progressGauge = gauges.percept(cortex().name("reassignment-progress-" + tp));
 
         if (completion >= 90) {
             progressGauge.overflow();  // Almost done
@@ -344,7 +344,7 @@ public class PartitionReassignmentMonitor implements AutoCloseable {
         oldLeader.drop();
 
         // Set monitor to STABLE
-        Monitor monitor = monitors.get(cortex().name("reassignment-" + tp));
+        Monitor monitor = monitors.percept(cortex().name("reassignment-" + tp));
         monitor.stable(Monitors.Dimension.CONFIRMED);
 
         // Cleanup

@@ -13,13 +13,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
  * Emits Gauges/Counters/Monitors signals for partition state metrics using Serventis RC1 vocabulary.
  *
  * <p><b>Layer 2: Serventis Signal Emission</b>
- * This observer emits signals with multiple Serventis API vocabularies, NOT interpretations.
+ * This receptor emits signals with multiple Serventis API vocabularies, NOT interpretations.
  *
  * <h3>Partition State Metrics (4 metrics):</h3>
  * <ul>
@@ -47,7 +47,7 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  *   DIVERGING:  Leader epoch increased (leadership change)
  * </pre>
  *
- * <p><b>Note:</b> This observer uses simple state tracking for signal emission. Contextual
+ * <p><b>Note:</b> This receptor uses simple state tracking for signal emission. Contextual
  * assessment using trends and patterns will be added in Epic 2
  * via Observers (Layer 4 - Semiosphere).
  */

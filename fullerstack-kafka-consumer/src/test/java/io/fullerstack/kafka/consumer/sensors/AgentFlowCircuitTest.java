@@ -364,7 +364,7 @@ class AgentFlowCircuitTest {
         agent.promise();
         agent.accept();
         agent.depend();
-        agent.observe();
+        agent.receive(());
         agent.validate();
         agent.fulfill();
         agent.breach();

@@ -100,7 +100,7 @@ public class CommandHierarchy implements AutoCloseable {
      * @return the broker cell
      */
     public Cell<Command, Command> getBrokerCell(String brokerId) {
-        return clusterCell.get(cortex().name(brokerId));
+        return clusterCell.percept(cortex().name(brokerId));
     }
 
     /**
@@ -111,7 +111,7 @@ public class CommandHierarchy implements AutoCloseable {
      * @return the topic cell
      */
     public Cell<Command, Command> getTopicCell(String brokerId, String topicName) {
-        return getBrokerCell(brokerId).get(cortex().name(brokerId + "." + topicName));
+        return getBrokerCell(brokerId).percept(cortex().name(brokerId + "." + topicName));
     }
 
     /**
@@ -127,7 +127,7 @@ public class CommandHierarchy implements AutoCloseable {
         String topicName,
         String partitionId
     ) {
-        return getTopicCell(brokerId, topicName).get(
+        return getTopicCell(brokerId, topicName).percept(
             cortex().name(brokerId + "." + topicName + "." + partitionId)
         );
     }

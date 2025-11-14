@@ -55,7 +55,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * bridge.start();
  *
  * // Now Monitor signals automatically flow to Cell hierarchy
- * Monitors.Monitor monitor = monitors.get(cortex().name("broker-1.orders.p0"));
+ * Monitors.Monitor monitor = monitors.percept(cortex().name("broker-1.orders.p0"));
  * monitor.degraded(Monitors.Dimension.CONFIRMED);
  * // → Sign flows to partition cell → topic cell → broker cell → cluster cell
  * }</pre>

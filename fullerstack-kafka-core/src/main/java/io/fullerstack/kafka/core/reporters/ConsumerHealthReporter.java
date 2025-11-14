@@ -52,7 +52,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * ConsumerHealthReporter reporter = new ConsumerHealthReporter(monitors, reporters);
  *
  * // Monitor emits DIVERGING for consumer lag
- * Monitors.Monitor lagMonitor = monitors.get(cortex().name("order-processor.lag"));
+ * Monitors.Monitor lagMonitor = monitors.percept(cortex().name("order-processor.lag"));
  * lagMonitor.diverging(Monitors.Dimension.CONFIRMED);
  *
  * // Reporter assesses urgency and emits CRITICAL
@@ -95,7 +95,7 @@ public class ConsumerHealthReporter implements AutoCloseable {
     ) {
         this.monitors = monitors;
         this.reporters = reporters;
-        this.reporter = reporters.get(cortex().name("consumer-health"));
+        this.reporter = reporters.percept(cortex().name("consumer-health"));
 
         // Subscribe to all consumer monitor signals
         this.subscription = monitors.subscribe(cortex().subscriber(

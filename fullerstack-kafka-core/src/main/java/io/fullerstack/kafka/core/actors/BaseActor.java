@@ -146,7 +146,7 @@ public abstract class BaseActor implements AutoCloseable {
         long timeSinceLastAction = now - lastActionTimeMs.get();
 
         if (timeSinceLastAction < rateLimitIntervalMs) {
-            Actors.Actor actor = actors.get(cortex().name(actorName));
+            Actors.Actor actor = actors.percept(cortex().name(actorName));
             actor.deny(); // DENY: Rate limited
 
             logger.debug("Actor '{}' denied action '{}' (rate limited: {}ms < {}ms)",
@@ -156,7 +156,7 @@ public abstract class BaseActor implements AutoCloseable {
 
         // Idempotency check
         if (!activeActions.add(actionKey)) {
-            Actors.Actor actor = actors.get(cortex().name(actorName));
+            Actors.Actor actor = actors.percept(cortex().name(actorName));
             actor.deny(); // DENY: Already executing
 
             logger.debug("Actor '{}' denied action '{}' (duplicate)", actorName, actionKey);
@@ -171,14 +171,14 @@ public abstract class BaseActor implements AutoCloseable {
             lastActionTimeMs.set(now);
 
             // Emit DELIVER sign (success)
-            Actors.Actor actor = actors.get(cortex().name(actorName));
+            Actors.Actor actor = actors.percept(cortex().name(actorName));
             actor.deliver();
 
             logger.info("Actor '{}' delivered action '{}'", actorName, actionKey);
 
         } catch (java.lang.Exception e) {
             // Emit DENY sign (failure)
-            Actors.Actor actor = actors.get(cortex().name(actorName));
+            Actors.Actor actor = actors.percept(cortex().name(actorName));
             actor.deny();
 
             logger.error("Actor '{}' failed action '{}': {}", actorName, actionKey, e.getMessage(), e);
@@ -198,7 +198,7 @@ public abstract class BaseActor implements AutoCloseable {
      * @return The Actor Percept for this actor
      */
     protected Actors.Actor getActor() {
-        return actors.get(cortex().name(actorName));
+        return actors.percept(cortex().name(actorName));
     }
 
     /**

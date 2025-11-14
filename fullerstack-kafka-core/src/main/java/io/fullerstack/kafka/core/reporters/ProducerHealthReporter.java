@@ -86,7 +86,7 @@ public class ProducerHealthReporter implements AutoCloseable {
     ) {
         this.producerRootCell = producerRootCell;
         this.reporters = reporters;
-        this.reporter = reporters.get(cortex().name("producer-health"));
+        this.reporter = reporters.percept(cortex().name("producer-health"));
 
         // Subscribe to producer root cell outlet
         this.subscription = producerRootCell.subscribe(cortex().subscriber(

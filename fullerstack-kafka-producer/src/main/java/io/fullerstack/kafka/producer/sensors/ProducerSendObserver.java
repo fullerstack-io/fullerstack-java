@@ -41,7 +41,7 @@ import java.util.concurrent.TimeUnit;
  * Counter retryCounter = ...;
  * Gauge latencyGauge = ...;
  *
- * ProducerSendObserver observer = new ProducerSendObserver(
+ * ProducerSendObserver receptor = new ProducerSendObserver(
  *     "producer-1",
  *     "localhost:11001",  // JMX endpoint
  *     sendRateCounter,
@@ -53,10 +53,10 @@ import java.util.concurrent.TimeUnit;
  *     latencyGauge
  * );
  *
- * observer.start();  // Begins monitoring every 10 seconds
+ * receptor.start();  // Begins monitoring every 10 seconds
  *
  * // Later...
- * observer.stop();
+ * receptor.stop();
  * }</pre>
  *
  * @author Fullerstack
@@ -98,7 +98,7 @@ public class ProducerSendObserver implements AutoCloseable {
     private double previousLatency = 0.0;
 
     /**
-     * Creates a new producer send observer.
+     * Creates a new producer send receptor.
      *
      * @param producerId       Producer identifier (e.g., "producer-1")
      * @param jmxEndpoint     JMX endpoint (e.g., "localhost:11001")
@@ -131,7 +131,7 @@ public class ProducerSendObserver implements AutoCloseable {
         this.retryCounter = retryCounter;
         this.latencyGauge = latencyGauge;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "producer-send-observer-" + producerId);
+            Thread t = new Thread(r, "producer-send-receptor-" + producerId);
             t.setDaemon(true);
             return t;
         });
@@ -144,7 +144,7 @@ public class ProducerSendObserver implements AutoCloseable {
      */
     public void start() {
         if (running) {
-            logger.warn("Producer send observer for {} is already running", producerId);
+            logger.warn("Producer send receptor for {} is already running", producerId);
             return;
         }
 
@@ -160,12 +160,12 @@ public class ProducerSendObserver implements AutoCloseable {
                 TimeUnit.SECONDS
             );
 
-            logger.info("Started producer send observer for {} (JMX: {})", producerId, jmxEndpoint);
+            logger.info("Started producer send receptor for {} (JMX: {})", producerId, jmxEndpoint);
 
         } catch (Exception e) {
-            logger.error("Failed to start producer send observer for {}", producerId, e);
+            logger.error("Failed to start producer send receptor for {}", producerId, e);
             running = false;
-            throw new RuntimeException("Failed to start producer send observer", e);
+            throw new RuntimeException("Failed to start producer send receptor", e);
         }
     }
 
@@ -190,7 +190,7 @@ public class ProducerSendObserver implements AutoCloseable {
         }
 
         closeJmx();
-        logger.info("Stopped producer send observer for {}", producerId);
+        logger.info("Stopped producer send receptor for {}", producerId);
     }
 
     @Override

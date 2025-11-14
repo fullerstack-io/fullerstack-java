@@ -49,17 +49,17 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *
  * MBeanServerConnection mbsc = ...; // JMX connection
  *
- * ConsumerCoordinatorObserver observer = new ConsumerCoordinatorObserver(
+ * ConsumerCoordinatorObserver receptor = new ConsumerCoordinatorObserver(
  *     adminClient,
  *     mbsc,
  *     circuit,
  *     Set.of("consumer-group-1", "consumer-group-2")
  * );
  *
- * observer.start();  // Begins monitoring every 10 seconds
+ * receptor.start();  // Begins monitoring every 10 seconds
  *
  * // Later...
- * observer.stop();
+ * receptor.stop();
  * }</pre>
  *
  * @author Fullerstack
@@ -96,7 +96,7 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
     private volatile boolean running = false;
 
     /**
-     * Creates a new consumer coordinator observer.
+     * Creates a new consumer coordinator receptor.
      *
      * @param adminClient    Kafka AdminClient for coordinator queries
      * @param mbsc          JMX MBean server connection
@@ -129,10 +129,10 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
         this.pollMonitors = new ConcurrentHashMap<>();
 
         for (String group : consumerGroups) {
-            syncCounters.put(group, counters.get(cortex().name(group + ".sync")));
-            heartbeatGauges.put(group, gauges.get(cortex().name(group + ".heartbeat-latency")));
-            sessionMonitors.put(group, monitors.get(cortex().name(group + ".session")));
-            pollMonitors.put(group, monitors.get(cortex().name(group + ".poll")));
+            syncCounters.put(group, counters.percept(cortex().name(group + ".sync")));
+            heartbeatGauges.put(group, gauges.percept(cortex().name(group + ".heartbeat-latency")));
+            sessionMonitors.put(group, monitors.percept(cortex().name(group + ".session")));
+            pollMonitors.put(group, monitors.percept(cortex().name(group + ".poll")));
         }
 
         // State tracking
@@ -141,7 +141,7 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
 
         // Scheduler
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "consumer-coordinator-observer");
+            Thread t = new Thread(r, "consumer-coordinator-receptor");
             t.setDaemon(true);
             return t;
         });
@@ -154,7 +154,7 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
      */
     public void start() {
         if (running) {
-            logger.warn("Consumer coordinator observer is already running");
+            logger.warn("Consumer coordinator receptor is already running");
             return;
         }
 
@@ -168,7 +168,7 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
             TimeUnit.SECONDS
         );
 
-        logger.info("Started consumer coordinator observer for {} groups", consumerGroups.size());
+        logger.info("Started consumer coordinator receptor for {} groups", consumerGroups.size());
     }
 
     /**
@@ -191,7 +191,7 @@ public class ConsumerCoordinatorObserver implements AutoCloseable {
             Thread.currentThread().interrupt();
         }
 
-        logger.info("Stopped consumer coordinator observer");
+        logger.info("Stopped consumer coordinator receptor");
     }
 
     @Override

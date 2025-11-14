@@ -141,7 +141,7 @@ class AlertActorTest {
 
         actorSigns = new ArrayList<>();
         actors.subscribe(cortex().subscriber(
-            cortex().name("test-observer"),
+            cortex().name("test-receptor"),
             (Subject<Channel<Actors.Sign>> subject, Registrar<Actors.Sign> registrar) -> {
                 registrar.register(actorSigns::add);
             }
@@ -159,7 +159,7 @@ class AlertActorTest {
     @DisplayName("AlertActor sends PagerDuty, Slack, and Teams alerts on CRITICAL")
     void testSendsAlertsOnCritical() {
         // When: ClusterHealthReporter emits CRITICAL
-        reporters.get(cortex().name("cluster.health")).critical();
+        reporters.percept(cortex().name("cluster.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -181,14 +181,14 @@ class AlertActorTest {
     @DisplayName("AlertActor includes cluster name and timestamp in alert message")
     void testAlertMessageContainsContextualInfo() {
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("cluster.health")).critical();
+        reporters.percept(cortex().name("cluster.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
 
         // Then: PagerDuty message includes cluster name and emoji
         assertThat(pagerDutyClient.getCallCount()).isEqualTo(1);
-        String message = pagerDutyClient.getMessages().get(0);
+        String message = pagerDutyClient.getMessages().percept(0);
         assertThat(message).contains("test-cluster");
         assertThat(message).contains("🚨");
         assertThat(message).contains("CRITICAL");
@@ -199,7 +199,7 @@ class AlertActorTest {
     void testRateLimiting() {
         // When: 3 rapid CRITICAL signs
         for (int i = 0; i < 3; i++) {
-            reporters.get(cortex().name("cluster.health")).critical();
+            reporters.percept(cortex().name("cluster.health")).critical();
         }
 
         reporterCircuit.await();
@@ -221,7 +221,7 @@ class AlertActorTest {
     @DisplayName("AlertActor ignores WARNING signs")
     void testIgnoresWarning() {
         // When: Reporter emits WARNING
-        reporters.get(cortex().name("cluster.health")).warning();
+        reporters.percept(cortex().name("cluster.health")).warning();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -236,7 +236,7 @@ class AlertActorTest {
     @DisplayName("AlertActor ignores NORMAL signs")
     void testIgnoresNormal() {
         // When: Reporter emits NORMAL
-        reporters.get(cortex().name("cluster.health")).normal();
+        reporters.percept(cortex().name("cluster.health")).normal();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -254,7 +254,7 @@ class AlertActorTest {
         pagerDutyClient.setShouldFail(true);
 
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("cluster.health")).critical();
+        reporters.percept(cortex().name("cluster.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -274,7 +274,7 @@ class AlertActorTest {
         slackClient.setShouldFail(true);
 
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("cluster.health")).critical();
+        reporters.percept(cortex().name("cluster.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -296,7 +296,7 @@ class AlertActorTest {
         teamsClient.setShouldFail(true);
 
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("cluster.health")).critical();
+        reporters.percept(cortex().name("cluster.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -315,7 +315,7 @@ class AlertActorTest {
     @DisplayName("AlertActor only acts on cluster-health reporter")
     void testTargetedReporter() {
         // When: Different reporter emits CRITICAL
-        reporters.get(cortex().name("producer-health")).critical();
+        reporters.percept(cortex().name("producer-health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -330,7 +330,7 @@ class AlertActorTest {
     @DisplayName("AlertActor sends correct severity to PagerDuty")
     void testPagerDutySeverity() {
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("cluster.health")).critical();
+        reporters.percept(cortex().name("cluster.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -345,7 +345,7 @@ class AlertActorTest {
     @DisplayName("AlertActor sends to correct Slack channel")
     void testSlackChannel() {
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("cluster.health")).critical();
+        reporters.percept(cortex().name("cluster.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -363,7 +363,7 @@ class AlertActorTest {
         alertActor.close();
 
         // When: CRITICAL sign emitted after close
-        reporters.get(cortex().name("cluster.health")).critical();
+        reporters.percept(cortex().name("cluster.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();

@@ -16,7 +16,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
 /**
  * Integrates REAL Observer classes with simulated JMX endpoints.
  *
- * <p>Demonstrates the complete semiotic hierarchy using PRODUCTION observer logic:
+ * <p>Demonstrates the complete semiotic hierarchy using PRODUCTION receptor logic:
  * <pre>
  * JmxSimulator (fake MBeans)
  *     ↓ JMX queries
@@ -27,7 +27,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * REAL OODA Loop (Monitors → Reporters → Actors)
  * </pre>
  *
- * <p>This uses the ACTUAL production signal emission logic from the observer classes,
+ * <p>This uses the ACTUAL production signal emission logic from the receptor classes,
  * just with local MBeanServer access instead of remote JMX connections.
  */
 public class KafkaMetricsSimulator implements AutoCloseable {
@@ -39,7 +39,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
     private final Random random = new Random();
     private final AtomicBoolean running = new AtomicBoolean(false);
 
-    // REAL production observer classes (using local MBeanServer)
+    // REAL production receptor classes (using local MBeanServer)
     private final List<LocalProducerBufferMonitor> bufferMonitors = new ArrayList<>();
     private final List<LocalProducerSendObserver> sendObservers = new ArrayList<>();
 
@@ -66,7 +66,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
             // Register simulated JMX MBeans
             jmxSimulator.registerAll();
 
-            // Start REAL observer classes
+            // Start REAL receptor classes
             setupRealObservers();
 
             // Also emit some manual signals for instruments not covered by observers
@@ -77,7 +77,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
     }
 
     /**
-     * Sets up REAL production observer classes using local MBeanServer.
+     * Sets up REAL production receptor classes using local MBeanServer.
      */
     private void setupRealObservers() {
         System.out.println("\n🔍 Setting up REAL production observers...");
@@ -86,19 +86,19 @@ public class KafkaMetricsSimulator implements AutoCloseable {
 
         for (String producerId : producerIds) {
             // Create instruments for buffer monitoring
-            Queues.Queue bufferQueue = ooda.getQueues().get(
+            Queues.Queue bufferQueue = ooda.getQueues().percept(
                 cortex().name(producerId + ".buffer")
             );
-            Gauges.Gauge totalBytesGauge = ooda.getGauges().get(
+            Gauges.Gauge totalBytesGauge = ooda.getGauges().percept(
                 cortex().name(producerId + ".buffer.total-bytes")
             );
-            Counters.Counter exhaustedCounter = ooda.getCounters().get(
+            Counters.Counter exhaustedCounter = ooda.getCounters().percept(
                 cortex().name(producerId + ".buffer.exhausted")
             );
-            Gauges.Gauge batchSizeGauge = ooda.getGauges().get(
+            Gauges.Gauge batchSizeGauge = ooda.getGauges().percept(
                 cortex().name(producerId + ".batch-size")
             );
-            Gauges.Gauge recordsPerRequestGauge = ooda.getGauges().get(
+            Gauges.Gauge recordsPerRequestGauge = ooda.getGauges().percept(
                 cortex().name(producerId + ".records-per-request")
             );
 
@@ -116,29 +116,29 @@ public class KafkaMetricsSimulator implements AutoCloseable {
             bufferMonitors.add(bufferMonitor);
 
             // Create instruments for send monitoring
-            Counters.Counter sendRateCounter = ooda.getCounters().get(
+            Counters.Counter sendRateCounter = ooda.getCounters().percept(
                 cortex().name(producerId + ".send-rate")
             );
-            Counters.Counter sendTotalCounter = ooda.getCounters().get(
+            Counters.Counter sendTotalCounter = ooda.getCounters().percept(
                 cortex().name(producerId + ".send-total")
             );
-            Probes.Probe sendProbe = ooda.getProbes().get(
+            Probes.Probe sendProbe = ooda.getProbes().percept(
                 cortex().name(producerId + ".send")
             );
-            Counters.Counter errorCounter = ooda.getCounters().get(
+            Counters.Counter errorCounter = ooda.getCounters().percept(
                 cortex().name(producerId + ".errors")
             );
-            Services.Service retryService = ooda.getServices().get(
+            Services.Service retryService = ooda.getServices().percept(
                 cortex().name(producerId + ".retry")
             );
-            Counters.Counter retryCounter = ooda.getCounters().get(
+            Counters.Counter retryCounter = ooda.getCounters().percept(
                 cortex().name(producerId + ".retries")
             );
-            Gauges.Gauge latencyGauge = ooda.getGauges().get(
+            Gauges.Gauge latencyGauge = ooda.getGauges().percept(
                 cortex().name(producerId + ".latency")
             );
 
-            // Create REAL send observer with production logic
+            // Create REAL send receptor with production logic
             LocalProducerSendObserver sendObserver = new LocalProducerSendObserver(
                 producerId,
                 sendRateCounter,
@@ -193,7 +193,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
         // Partition queue depths (not covered by observers yet)
         PartitionSimulator part = cluster.getPartition("broker-1.orders.p0");
         if (part != null && part.isOverflowing()) {
-            Queues.Queue partQueue = ooda.getQueues().get(cortex().name("broker-1.orders.p0.queue"));
+            Queues.Queue partQueue = ooda.getQueues().percept(cortex().name("broker-1.orders.p0.queue"));
             partQueue.overflow();
         }
     }
@@ -206,7 +206,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
         // Broker connection probes (not covered by observers yet)
         BrokerSimulator broker = cluster.getBroker("broker-1");
         if (broker != null) {
-            Probes.Probe brokerProbe = ooda.getProbes().get(cortex().name("broker-1.connection"));
+            Probes.Probe brokerProbe = ooda.getProbes().percept(cortex().name("broker-1.connection"));
 
             if (broker.getHealth() == BrokerSimulator.BrokerHealth.CRITICAL) {
                 // Connection failures during critical health
@@ -224,7 +224,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
      */
     private void emitServiceMetrics() {
         // Consumer fetch request (not covered by observers yet)
-        Services.Service consumerService = ooda.getServices().get(cortex().name("consumer-1.fetch"));
+        Services.Service consumerService = ooda.getServices().percept(cortex().name("consumer-1.fetch"));
         consumerService.called();
         consumerService.succeeded();  // Usually succeeds
     }
@@ -236,7 +236,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
         // Broker JVM heap
         BrokerSimulator broker = cluster.getBroker("broker-1");
         if (broker != null) {
-            Gauges.Gauge heapGauge = ooda.getGauges().get(cortex().name("broker-1.jvm.heap"));
+            Gauges.Gauge heapGauge = ooda.getGauges().percept(cortex().name("broker-1.jvm.heap"));
 
             double heapUsage = broker.getMemoryUsage();
             if (heapUsage > 0.85) {
@@ -248,7 +248,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
             }
 
             // CPU gauge
-            Gauges.Gauge cpuGauge = ooda.getGauges().get(cortex().name("broker-1.cpu"));
+            Gauges.Gauge cpuGauge = ooda.getGauges().percept(cortex().name("broker-1.cpu"));
             double cpuUsage = broker.getCpuUsage();
             if (cpuUsage > 0.80) {
                 cpuGauge.overflow();
@@ -258,7 +258,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
         }
 
         // Disk usage
-        Gauges.Gauge diskGauge = ooda.getGauges().get(cortex().name("broker-1.disk"));
+        Gauges.Gauge diskGauge = ooda.getGauges().percept(cortex().name("broker-1.disk"));
         diskGauge.increment();  // Disk slowly growing
     }
 
@@ -269,21 +269,21 @@ public class KafkaMetricsSimulator implements AutoCloseable {
         // Producer message counter
         ProducerSimulator producer = cluster.getProducer("producer-1");
         if (producer != null && producer.getCurrentRate() > 0) {
-            Counters.Counter msgCounter = ooda.getCounters().get(cortex().name("producer-1.messages"));
+            Counters.Counter msgCounter = ooda.getCounters().percept(cortex().name("producer-1.messages"));
             msgCounter.increment();  // Increment by current rate
         }
 
         // Partition message counter
         PartitionSimulator part = cluster.getPartition("broker-1.orders.p0");
         if (part != null && part.getQueueDepth() > 0) {
-            Counters.Counter partCounter = ooda.getCounters().get(cortex().name("broker-1.orders.p0.messages"));
+            Counters.Counter partCounter = ooda.getCounters().percept(cortex().name("broker-1.orders.p0.messages"));
             partCounter.increment();
         }
 
         // Error counter
         BrokerSimulator broker = cluster.getBroker("broker-1");
         if (broker != null && broker.getHealth() == BrokerSimulator.BrokerHealth.CRITICAL) {
-            Counters.Counter errorCounter = ooda.getCounters().get(cortex().name("broker-1.errors"));
+            Counters.Counter errorCounter = ooda.getCounters().percept(cortex().name("broker-1.errors"));
             errorCounter.increment();  // Errors during critical health
         }
     }
@@ -295,7 +295,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
         // Broker request handler thread pool
         BrokerSimulator broker = cluster.getBroker("broker-1");
         if (broker != null) {
-            Resources.Resource threadPool = ooda.getResources().get(
+            Resources.Resource threadPool = ooda.getResources().percept(
                 cortex().name("broker-1.request-handlers")
             );
 
@@ -313,7 +313,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
      */
     private void emitCacheMetrics() {
         // Broker metadata cache
-        Caches.Cache metadataCache = ooda.getCaches().get(cortex().name("broker-1.metadata-cache"));
+        Caches.Cache metadataCache = ooda.getCaches().percept(cortex().name("broker-1.metadata-cache"));
 
         // Simulate cache hit/miss based on random distribution
         if (random.nextDouble() > 0.8) {
@@ -332,7 +332,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
         // Aggregate broker health from all signals
         BrokerSimulator broker = cluster.getBroker("broker-1");
         if (broker != null) {
-            Monitors.Monitor brokerMonitor = ooda.getMonitors().get(
+            Monitors.Monitor brokerMonitor = ooda.getMonitors().percept(
                 cortex().name("broker-1.health")
             );
 
@@ -347,7 +347,7 @@ public class KafkaMetricsSimulator implements AutoCloseable {
         // Aggregate partition health from queue + service metrics
         PartitionSimulator part = cluster.getPartition("broker-1.orders.p0");
         if (part != null) {
-            Monitors.Monitor partMonitor = ooda.getMonitors().get(
+            Monitors.Monitor partMonitor = ooda.getMonitors().percept(
                 cortex().name("broker-1.orders.p0")
             );
 
@@ -413,8 +413,8 @@ public class KafkaMetricsSimulator implements AutoCloseable {
         for (LocalProducerBufferMonitor monitor : bufferMonitors) {
             monitor.close();
         }
-        for (LocalProducerSendObserver observer : sendObservers) {
-            observer.close();
+        for (LocalProducerSendObserver receptor : sendObservers) {
+            receptor.close();
         }
 
         // Close JMX simulator

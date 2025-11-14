@@ -179,7 +179,7 @@ public class ConsumerLagMonitor implements AutoCloseable {
             Map<TopicPartition, Long> endOffsets = new HashMap<>();
             for (Map.Entry<TopicPartition, OffsetSpec> entry : offsetSpecs.entrySet()) {
                 TopicPartition tp = entry.getKey();
-                long endOffset = endOffsetsResult.partitionResult(tp).get(10, TimeUnit.SECONDS).offset();
+                long endOffset = endOffsetsResult.partitionResult(tp).percept(10, TimeUnit.SECONDS).offset();
                 endOffsets.put(tp, endOffset);
             }
 

@@ -87,7 +87,7 @@ class BaseActorTest {
 
         actorSigns = new ArrayList<>();
         actors.subscribe(cortex().subscriber(
-            cortex().name("test-observer"),
+            cortex().name("test-receptor"),
             (Subject<Channel<Actors.Sign>> subject, Registrar<Actors.Sign> registrar) -> {
                 registrar.register(actorSigns::add);
             }
@@ -105,7 +105,7 @@ class BaseActorTest {
     @DisplayName("Actor executes action on CRITICAL sign")
     void testActorExecutesOnCritical() {
         // When: Reporter emits CRITICAL
-        reporters.get(cortex().name("test.reporter")).critical();
+        reporters.percept(cortex().name("test.reporter")).critical();
 
         // Wait for propagation
         reporterCircuit.await();
@@ -121,7 +121,7 @@ class BaseActorTest {
     void testRateLimiting() {
         // When: Emit 5 CRITICAL signs rapidly
         for (int i = 0; i < 5; i++) {
-            reporters.get(cortex().name("test.reporter")).critical();
+            reporters.percept(cortex().name("test.reporter")).critical();
         }
 
         reporterCircuit.await();
@@ -141,8 +141,8 @@ class BaseActorTest {
     @DisplayName("Actor idempotency prevents duplicate actions")
     void testIdempotency() {
         // When: Emit same CRITICAL sign twice
-        reporters.get(cortex().name("test.reporter")).critical();
-        reporters.get(cortex().name("test.reporter")).critical();
+        reporters.percept(cortex().name("test.reporter")).critical();
+        reporters.percept(cortex().name("test.reporter")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -155,7 +155,7 @@ class BaseActorTest {
     @DisplayName("Actor does not act on WARNING by default")
     void testNoActionOnWarning() {
         // When: Reporter emits WARNING
-        reporters.get(cortex().name("test.reporter")).warning();
+        reporters.percept(cortex().name("test.reporter")).warning();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -168,7 +168,7 @@ class BaseActorTest {
     @DisplayName("Actor does not act on NORMAL")
     void testNoActionOnNormal() {
         // When: Reporter emits NORMAL
-        reporters.get(cortex().name("test.reporter")).normal();
+        reporters.percept(cortex().name("test.reporter")).normal();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -181,7 +181,7 @@ class BaseActorTest {
     @DisplayName("Actor ignores signals from non-target reporters")
     void testIgnoresOtherReporters() {
         // When: Different reporter emits CRITICAL
-        reporters.get(cortex().name("other.reporter")).critical();
+        reporters.percept(cortex().name("other.reporter")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -226,7 +226,7 @@ class BaseActorTest {
 
         try {
             // When: Reporter emits CRITICAL
-            reporters.get(cortex().name("test.reporter")).critical();
+            reporters.percept(cortex().name("test.reporter")).critical();
 
             reporterCircuit.await();
             actorCircuit.await();
@@ -243,7 +243,7 @@ class BaseActorTest {
     @DisplayName("Actor can execute after rate limit period expires")
     void testActionAfterRateLimitExpires() throws InterruptedException {
         // Given: First action executed
-        reporters.get(cortex().name("test.reporter")).critical();
+        reporters.percept(cortex().name("test.reporter")).critical();
         reporterCircuit.await();
         actorCircuit.await();
 
@@ -253,7 +253,7 @@ class BaseActorTest {
         Thread.sleep(1100);
 
         // And: Emit CRITICAL again
-        reporters.get(cortex().name("test.reporter")).critical();
+        reporters.percept(cortex().name("test.reporter")).critical();
         reporterCircuit.await();
         actorCircuit.await();
 
@@ -302,8 +302,8 @@ class BaseActorTest {
 
         try {
             // When: Both reporters emit CRITICAL
-            reporters.get(cortex().name("test.reporter")).critical();
-            reporters.get(cortex().name("test.reporter2")).critical();
+            reporters.percept(cortex().name("test.reporter")).critical();
+            reporters.percept(cortex().name("test.reporter2")).critical();
 
             reporterCircuit.await();
             actorCircuit.await();

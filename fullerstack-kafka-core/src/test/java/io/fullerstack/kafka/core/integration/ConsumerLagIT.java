@@ -67,7 +67,7 @@ class ConsumerLagIT {
         // Track reporter emissions
         reporterEmissions = new ArrayList<>();
         reporters.subscribe(cortex().subscriber(
-            cortex().name("test-observer"),
+            cortex().name("test-receptor"),
             (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
                 registrar.register(reporterEmissions::add);
             }
@@ -93,7 +93,7 @@ class ConsumerLagIT {
         long startTime = System.nanoTime();
 
         // When: Consumer shows single DIVERGING (lag starting to grow)
-        Monitors.Monitor consumer = monitors.get(cortex().name("consumer-1"));
+        Monitors.Monitor consumer = monitors.percept(cortex().name("consumer-1"));
         consumer.diverging(Monitors.Dimension.MEASURED);
 
         monitorCircuit.await();
@@ -115,7 +115,7 @@ class ConsumerLagIT {
     @Test
     @DisplayName("Sustained lag growth (3+ DIVERGING) emits CRITICAL")
     void testSustainedLagGrowthEmitsCritical() {
-        Monitors.Monitor consumer = monitors.get(cortex().name("consumer-1"));
+        Monitors.Monitor consumer = monitors.percept(cortex().name("consumer-1"));
 
         // When: Consumer shows sustained DIVERGING (3 consecutive)
         consumer.diverging(Monitors.Dimension.MEASURED);
@@ -139,7 +139,7 @@ class ConsumerLagIT {
     @Test
     @DisplayName("Intermittent DIVERGING resets counter and emits WARNING only")
     void testIntermittentDivergingResetsCounter() {
-        Monitors.Monitor consumer = monitors.get(cortex().name("consumer-1"));
+        Monitors.Monitor consumer = monitors.percept(cortex().name("consumer-1"));
 
         // When: Consumer shows intermittent DIVERGING (not sustained)
         consumer.diverging(Monitors.Dimension.MEASURED);
@@ -173,7 +173,7 @@ class ConsumerLagIT {
     @DisplayName("Consumer DEGRADED emits WARNING")
     void testConsumerDegradedEmitsWarning() {
         // When: Consumer shows DEGRADED (performance degradation)
-        Monitors.Monitor consumer = monitors.get(cortex().name("consumer-1"));
+        Monitors.Monitor consumer = monitors.percept(cortex().name("consumer-1"));
         consumer.degraded(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
@@ -189,7 +189,7 @@ class ConsumerLagIT {
     @DisplayName("Consumer DOWN emits CRITICAL immediately")
     void testConsumerDownEmitsCritical() {
         // When: Consumer goes DOWN (unavailable)
-        Monitors.Monitor consumer = monitors.get(cortex().name("consumer-1"));
+        Monitors.Monitor consumer = monitors.percept(cortex().name("consumer-1"));
         consumer.down(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
@@ -205,7 +205,7 @@ class ConsumerLagIT {
     @DisplayName("Consumer DEFECTIVE emits CRITICAL")
     void testConsumerDefectiveEmitsCritical() {
         // When: Consumer is DEFECTIVE (misconfigured)
-        Monitors.Monitor consumer = monitors.get(cortex().name("consumer-1"));
+        Monitors.Monitor consumer = monitors.percept(cortex().name("consumer-1"));
         consumer.defective(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
@@ -221,7 +221,7 @@ class ConsumerLagIT {
     @DisplayName("Lag recovery (CONVERGING) emits NORMAL")
     void testLagRecoveryEmitsNormal() {
         // Given: Initial lag growth
-        Monitors.Monitor consumer = monitors.get(cortex().name("consumer-1"));
+        Monitors.Monitor consumer = monitors.percept(cortex().name("consumer-1"));
         consumer.diverging(Monitors.Dimension.MEASURED);
 
         monitorCircuit.await();
@@ -244,8 +244,8 @@ class ConsumerLagIT {
     @Test
     @DisplayName("Multiple consumers tracked independently")
     void testMultipleConsumersTrackedIndependently() {
-        Monitors.Monitor consumer1 = monitors.get(cortex().name("consumer-1"));
-        Monitors.Monitor consumer2 = monitors.get(cortex().name("consumer-2"));
+        Monitors.Monitor consumer1 = monitors.percept(cortex().name("consumer-1"));
+        Monitors.Monitor consumer2 = monitors.percept(cortex().name("consumer-2"));
 
         // When: Consumer 1 shows sustained DIVERGING
         consumer1.diverging(Monitors.Dimension.MEASURED);
@@ -279,7 +279,7 @@ class ConsumerLagIT {
     @DisplayName("ERRATIC consumption emits WARNING")
     void testErraticConsumptionEmitsWarning() {
         // When: Consumer shows ERRATIC consumption pattern
-        Monitors.Monitor consumer = monitors.get(cortex().name("consumer-1"));
+        Monitors.Monitor consumer = monitors.percept(cortex().name("consumer-1"));
         consumer.erratic(Monitors.Dimension.MEASURED);
 
         monitorCircuit.await();
@@ -294,7 +294,7 @@ class ConsumerLagIT {
     @Test
     @DisplayName("Complete scenario: Lag spike then recovery")
     void testCompleteLagSpikeAndRecoveryScenario() {
-        Monitors.Monitor consumer = monitors.get(cortex().name("consumer-1"));
+        Monitors.Monitor consumer = monitors.percept(cortex().name("consumer-1"));
 
         // Phase 1: Normal operation
         consumer.stable(Monitors.Dimension.CONFIRMED);
@@ -359,7 +359,7 @@ class ConsumerLagIT {
     void testPatternDetectionLatency() {
         long startTime = System.nanoTime();
 
-        Monitors.Monitor consumer = monitors.get(cortex().name("consumer-1"));
+        Monitors.Monitor consumer = monitors.percept(cortex().name("consumer-1"));
 
         // When: Emit 3 consecutive DIVERGING to trigger pattern detection
         consumer.diverging(Monitors.Dimension.MEASURED);
@@ -391,10 +391,10 @@ class ConsumerLagIT {
     @DisplayName("Multiple consumers with different lag patterns")
     void testMultipleConsumersDifferentPatterns() {
         // When: Different consumers show different patterns
-        monitors.get(cortex().name("consumer-1")).down(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("consumer-2")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("consumer-3")).diverging(Monitors.Dimension.MEASURED);
-        monitors.get(cortex().name("consumer-4")).stable(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("consumer-1")).down(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("consumer-2")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("consumer-3")).diverging(Monitors.Dimension.MEASURED);
+        monitors.percept(cortex().name("consumer-4")).stable(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
         reporterCircuit.await();

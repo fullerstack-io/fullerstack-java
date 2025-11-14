@@ -381,7 +381,7 @@ class IsrReplicationSensorTest {
             );
 
             // Verify router monitors created for each broker
-            verify(mockRoutersConduit, atLeast(3)).get(any(Name.class));
+            verify(mockRoutersConduit, atLeast(3)).percept(any(Name.class));
         }
 
         @Test
@@ -398,7 +398,7 @@ class IsrReplicationSensorTest {
             );
 
             // Verify health monitor created once (cluster-wide)
-            verify(mockMonitorsConduit, atLeast(1)).get(any(Name.class));
+            verify(mockMonitorsConduit, atLeast(1)).percept(any(Name.class));
         }
 
         @Test

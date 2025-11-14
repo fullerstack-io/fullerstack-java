@@ -109,7 +109,7 @@ class JvmHealthMonitorTest {
             Monitors.Signal signal = invocation.getArgument(0);
             emittedMonitorSignals.add(signal);
             return null;
-        }).when(pipe).emit(any(Monitors.Signal.class));
+        }).when(pipe).emit(any(Monitors.Sign.class));
 
         doNothing().when(pipe).flush();
 

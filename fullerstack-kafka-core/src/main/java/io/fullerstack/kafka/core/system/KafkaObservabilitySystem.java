@@ -60,8 +60,8 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * Conduit<Monitors.Monitor, Monitors.Signal> monitors = system.getMonitors();
  *
  * // Emit a signal - flows through entire OODA loop
- * Monitor brokerMonitor = monitors.get(cortex().name("broker-1.jvm.heap"));
- * brokerMonitor.status(Monitors.Condition.DEGRADED, Monitors.Confidence.HIGH);
+ * Monitor brokerMonitor = monitors.percept(cortex().name("broker-1.jvm.heap"));
+ * brokerMonitor.degraded(Monitors.Confidence.HIGH);
  *
  * // ... system automatically:
  * // 1. Routes signal to broker cell via bridge

@@ -120,7 +120,7 @@ public class MSKClusterDiscovery implements AutoCloseable {
     }
 
     if (brokerInfo.endpoints() != null && !brokerInfo.endpoints().isEmpty()) {
-      return brokerInfo.endpoints().get(0); // TLS endpoint
+      return brokerInfo.endpoints().percept(0); // TLS endpoint
     }
 
     throw new MSKDiscoveryException("No broker endpoint found");

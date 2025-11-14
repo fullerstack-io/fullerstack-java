@@ -74,7 +74,7 @@ class MultiLevelAggregationIT {
         // Track reporter emissions
         reporterEmissions = new ArrayList<>();
         reporters.subscribe(cortex().subscriber(
-            cortex().name("test-observer"),
+            cortex().name("test-receptor"),
             (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
                 registrar.register(reporterEmissions::add);
             }
@@ -104,9 +104,9 @@ class MultiLevelAggregationIT {
     @DisplayName("Multiple partition failures aggregate to topic level")
     void testMultiplePartitionsAggregateToTopic() {
         // When: 2 out of 3 partitions in same topic emit DEGRADED
-        monitors.get(cortex().name("broker-1.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-1.orders.p1")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-1.orders.p2")).stable(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p1")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p2")).stable(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -122,9 +122,9 @@ class MultiLevelAggregationIT {
     @DisplayName("Multiple topic failures aggregate to broker level")
     void testMultipleTopicsAggregateToBroker() {
         // When: 2 out of 3 topics on same broker emit DEGRADED
-        monitors.get(cortex().name("broker-1.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-1.payments.p0")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-1.notifications.p0")).stable(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.payments.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.notifications.p0")).stable(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -140,9 +140,9 @@ class MultiLevelAggregationIT {
     @DisplayName("Multiple broker failures aggregate to cluster CRITICAL")
     void testMultipleBrokersAggregateToCluster() {
         // When: 2 out of 3 brokers emit DEGRADED
-        monitors.get(cortex().name("broker-1")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-2")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-3")).stable(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-2")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-3")).stable(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -161,12 +161,12 @@ class MultiLevelAggregationIT {
 
         // When: Multiple partitions fail across multiple brokers
         // Broker 1: 2 topics DEGRADED
-        monitors.get(cortex().name("broker-1.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-1.payments.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.payments.p0")).degraded(Monitors.Dimension.CONFIRMED);
 
         // Broker 2: 2 topics DEGRADED
-        monitors.get(cortex().name("broker-2.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-2.payments.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-2.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-2.payments.p0")).degraded(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -189,9 +189,9 @@ class MultiLevelAggregationIT {
     @DisplayName("Partial failures with ERRATIC emit WARNING not CRITICAL")
     void testPartialFailuresEmitWarning() {
         // When: Only 1 out of 3 brokers has ERRATIC issues (not DEGRADED)
-        monitors.get(cortex().name("broker-1.orders.p0")).erratic(Monitors.Dimension.MEASURED);
-        monitors.get(cortex().name("broker-2")).stable(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-3")).stable(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p0")).erratic(Monitors.Dimension.MEASURED);
+        monitors.percept(cortex().name("broker-2")).stable(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-3")).stable(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -207,9 +207,9 @@ class MultiLevelAggregationIT {
     @DisplayName("Mixed severity signals aggregate to worst case")
     void testMixedSeverityAggregation() {
         // When: Mix of DOWN, DEGRADED, ERRATIC across brokers
-        monitors.get(cortex().name("broker-1.orders.p0")).down(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-2.payments.p0")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-3.notifications.p0")).erratic(Monitors.Dimension.MEASURED);
+        monitors.percept(cortex().name("broker-1.orders.p0")).down(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-2.payments.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-3.notifications.p0")).erratic(Monitors.Dimension.MEASURED);
 
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -225,8 +225,8 @@ class MultiLevelAggregationIT {
     @DisplayName("Recovery propagates from partition to cluster")
     void testRecoveryPropagatesUpHierarchy() {
         // Given: Initial failures
-        monitors.get(cortex().name("broker-1.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-2.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-2.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -235,8 +235,8 @@ class MultiLevelAggregationIT {
         reporterEmissions.clear(); // Clear initial CRITICAL
 
         // When: All partitions recover
-        monitors.get(cortex().name("broker-1.orders.p0")).stable(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-2.orders.p0")).stable(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p0")).stable(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-2.orders.p0")).stable(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -254,10 +254,10 @@ class MultiLevelAggregationIT {
         long startTime = System.nanoTime();
 
         // When: Emit signals at all 4 levels simultaneously
-        monitors.get(cortex().name("broker-1.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-1.payments")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-2")).degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("cluster")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p0")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.payments")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-2")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("cluster")).degraded(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
         hierarchy.getCircuit().await();

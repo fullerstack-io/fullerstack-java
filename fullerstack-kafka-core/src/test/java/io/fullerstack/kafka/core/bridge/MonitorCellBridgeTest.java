@@ -74,7 +74,7 @@ class MonitorCellBridgeTest {
         ));
 
         // When: Monitor emits DEGRADED for "broker-1.orders.p0"
-        Monitors.Monitor monitor = monitors.get(cortex().name("broker-1.orders.p0"));
+        Monitors.Monitor monitor = monitors.percept(cortex().name("broker-1.orders.p0"));
         monitor.degraded(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -99,7 +99,7 @@ class MonitorCellBridgeTest {
         ));
 
         // When: Monitor emits ERRATIC for "broker-2.payments"
-        Monitors.Monitor monitor = monitors.get(cortex().name("broker-2.payments"));
+        Monitors.Monitor monitor = monitors.percept(cortex().name("broker-2.payments"));
         monitor.erratic(Monitors.Dimension.MEASURED);
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -124,7 +124,7 @@ class MonitorCellBridgeTest {
         ));
 
         // When: Monitor emits DIVERGING for "broker-3"
-        Monitors.Monitor monitor = monitors.get(cortex().name("broker-3"));
+        Monitors.Monitor monitor = monitors.percept(cortex().name("broker-3"));
         monitor.diverging(Monitors.Dimension.MEASURED);
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -148,7 +148,7 @@ class MonitorCellBridgeTest {
         ));
 
         // When: Monitor emits STABLE for "cluster"
-        Monitors.Monitor monitor = monitors.get(cortex().name("cluster"));
+        Monitors.Monitor monitor = monitors.percept(cortex().name("cluster"));
         monitor.stable(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -173,7 +173,7 @@ class MonitorCellBridgeTest {
         ));
 
         // When: Monitor emits multiple Signs
-        Monitors.Monitor monitor = monitors.get(cortex().name("broker-1.orders.p0"));
+        Monitors.Monitor monitor = monitors.percept(cortex().name("broker-1.orders.p0"));
         monitor.stable(Monitors.Dimension.CONFIRMED);
         monitor.diverging(Monitors.Dimension.MEASURED);
         monitor.degraded(Monitors.Dimension.CONFIRMED);
@@ -204,11 +204,11 @@ class MonitorCellBridgeTest {
         ));
 
         // When: Multiple monitors emit Signs
-        monitors.get(cortex().name("broker-1.orders.p0"))
+        monitors.percept(cortex().name("broker-1.orders.p0"))
             .degraded(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-2.payments.p1"))
+        monitors.percept(cortex().name("broker-2.payments.p1"))
             .stable(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-3"))
+        monitors.percept(cortex().name("broker-3"))
             .erratic(Monitors.Dimension.MEASURED);
 
         monitorCircuit.await();
@@ -241,7 +241,7 @@ class MonitorCellBridgeTest {
             (subject, registrar) -> registrar.register(emissions::add)
         ));
 
-        monitors.get(cortex().name("broker-1.orders.p0"))
+        monitors.percept(cortex().name("broker-1.orders.p0"))
             .stable(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -264,7 +264,7 @@ class MonitorCellBridgeTest {
         ));
 
         // Verify bridge works
-        monitors.get(cortex().name("broker-1.orders.p0"))
+        monitors.percept(cortex().name("broker-1.orders.p0"))
             .stable(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -275,7 +275,7 @@ class MonitorCellBridgeTest {
         emissions.clear();
 
         // Then: No more signals forwarded
-        monitors.get(cortex().name("broker-1.orders.p0"))
+        monitors.percept(cortex().name("broker-1.orders.p0"))
             .degraded(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -299,7 +299,7 @@ class MonitorCellBridgeTest {
 
         // When: Monitor with too many components (invalid format)
         // Note: The bridge handles this gracefully by logging error
-        Monitors.Monitor monitor = monitors.get(cortex().name("a.b.c.d.e"));
+        Monitors.Monitor monitor = monitors.percept(cortex().name("a.b.c.d.e"));
         monitor.stable(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         hierarchy.getCircuit().await();
@@ -324,7 +324,7 @@ class MonitorCellBridgeTest {
         ));
 
         // When: Monitor emits all Sign types
-        Monitors.Monitor monitor = monitors.get(cortex().name("broker-1.test.p0"));
+        Monitors.Monitor monitor = monitors.percept(cortex().name("broker-1.test.p0"));
         monitor.down(Monitors.Dimension.CONFIRMED);
         monitor.defective(Monitors.Dimension.CONFIRMED);
         monitor.degraded(Monitors.Dimension.CONFIRMED);

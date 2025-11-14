@@ -39,7 +39,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *     "producer".equals(reporterName.extremity().value()) &&
  *     "health".equals(reporterName.value())) {
  *     // Extract producer ID from middle segment
- *     String producerId = reporterName.enclosure().get().value(); // e.g., "producer-1"
+ *     String producerId = reporterName.enclosure().percept().value(); // e.g., "producer-1"
  *     throttleProducer(producerId);
  * }
  * }</pre>
@@ -196,7 +196,7 @@ public class ThrottleActor extends BaseActor {
     private void handleProducerCritical(Name reporterName) {
         // Extract producer ID from Name
         // Current: "producer-1-health" → "producer-1"
-        // TODO: After hierarchical migration: reporterName.enclosure().get().value()
+        // TODO: After hierarchical migration: reporterName.enclosure().percept().value()
         String producerId = extractProducerId(reporterName);
 
         String actionKey = "throttle:" + producerId;
@@ -222,7 +222,7 @@ public class ThrottleActor extends BaseActor {
      * reporterName = "producer.producer-1.health"
      *                   root     middle    leaf
      *                            ↑
-     *                       enclosure().get()
+     *                       enclosure().percept()
      * </pre>
      *
      * @param reporterName Reporter name (e.g., "producer.producer-1.health")

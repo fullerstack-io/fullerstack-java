@@ -135,7 +135,7 @@ class ThrottleActorTest {
 
         actorSigns = new ArrayList<>();
         actors.subscribe(cortex().subscriber(
-            cortex().name("test-observer"),
+            cortex().name("test-receptor"),
             (Subject<Channel<Actors.Sign>> subject, Registrar<Actors.Sign> registrar) -> {
                 registrar.register(actorSigns::add);
             }
@@ -156,7 +156,7 @@ class ThrottleActorTest {
         configManager.setProducerConfig("producer-1", "max.in.flight.requests.per.connection", 5);
 
         // When: ProducerHealthReporter emits CRITICAL
-        reporters.get(cortex().name("producer.producer-1.health")).critical();
+        reporters.percept(cortex().name("producer.producer-1.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -176,7 +176,7 @@ class ThrottleActorTest {
         configManager.setProducerConfig("producer-1", "linger.ms", 10);
 
         // When: ProducerHealthReporter emits CRITICAL
-        reporters.get(cortex().name("producer.producer-1.health")).critical();
+        reporters.percept(cortex().name("producer.producer-1.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -196,7 +196,7 @@ class ThrottleActorTest {
         configManager.setProducerConfig("producer-1", "linger.ms", 60);
 
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("producer.producer-1.health")).critical();
+        reporters.percept(cortex().name("producer.producer-1.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -213,7 +213,7 @@ class ThrottleActorTest {
         configManager.setProducerConfig("producer-1", "max.in.flight.requests.per.connection", 1);
 
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("producer.producer-1.health")).critical();
+        reporters.percept(cortex().name("producer.producer-1.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -231,7 +231,7 @@ class ThrottleActorTest {
         configManager.setProducerConfig("producer-1", "linger.ms", 10);
 
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("producer.producer-1.health")).critical();
+        reporters.percept(cortex().name("producer.producer-1.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -252,7 +252,7 @@ class ThrottleActorTest {
     void testRateLimiting() {
         // When: 3 rapid CRITICAL signs
         for (int i = 0; i < 3; i++) {
-            reporters.get(cortex().name("producer.producer-1.health")).critical();
+            reporters.percept(cortex().name("producer.producer-1.health")).critical();
         }
 
         reporterCircuit.await();
@@ -272,7 +272,7 @@ class ThrottleActorTest {
     @DisplayName("ThrottleActor ignores WARNING signs")
     void testIgnoresWarning() {
         // When: Reporter emits WARNING
-        reporters.get(cortex().name("producer.producer-1.health")).warning();
+        reporters.percept(cortex().name("producer.producer-1.health")).warning();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -285,7 +285,7 @@ class ThrottleActorTest {
     @DisplayName("ThrottleActor ignores NORMAL signs")
     void testIgnoresNormal() {
         // When: Reporter emits NORMAL
-        reporters.get(cortex().name("producer.producer-1.health")).normal();
+        reporters.percept(cortex().name("producer.producer-1.health")).normal();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -301,7 +301,7 @@ class ThrottleActorTest {
         configManager.setShouldFail(true);
 
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("producer.producer-1.health")).critical();
+        reporters.percept(cortex().name("producer.producer-1.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -317,7 +317,7 @@ class ThrottleActorTest {
     @DisplayName("ThrottleActor only acts on producer-health reporters")
     void testTargetedReporter() {
         // When: Different reporter emits CRITICAL
-        reporters.get(cortex().name("cluster-health")).critical();
+        reporters.percept(cortex().name("cluster-health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -330,10 +330,10 @@ class ThrottleActorTest {
     @DisplayName("ThrottleActor extracts producer ID correctly")
     void testProducerIdExtraction() {
         // When: Multiple producers emit CRITICAL
-        reporters.get(cortex().name("producer.producer-1.health")).critical();
+        reporters.percept(cortex().name("producer.producer-1.health")).critical();
         actorCircuit.await();
 
-        reporters.get(cortex().name("producer.producer-2.health")).critical();
+        reporters.percept(cortex().name("producer.producer-2.health")).critical();
         actorCircuit.await();
 
         reporterCircuit.await();
@@ -356,7 +356,7 @@ class ThrottleActorTest {
         configManager.setProducerConfig("producer-2", "linger.ms", 20);
 
         // When: First producer emits CRITICAL
-        reporters.get(cortex().name("producer.producer-1.health")).critical();
+        reporters.percept(cortex().name("producer.producer-1.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -381,7 +381,7 @@ class ThrottleActorTest {
         throttleActor.close();
 
         // When: CRITICAL sign emitted after close
-        reporters.get(cortex().name("producer.producer-1.health")).critical();
+        reporters.percept(cortex().name("producer.producer-1.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();
@@ -397,7 +397,7 @@ class ThrottleActorTest {
         // (MockKafkaConfigManager returns defaults if not explicitly set)
 
         // When: CRITICAL sign emitted
-        reporters.get(cortex().name("producer.producer-1.health")).critical();
+        reporters.percept(cortex().name("producer.producer-1.health")).critical();
 
         reporterCircuit.await();
         actorCircuit.await();

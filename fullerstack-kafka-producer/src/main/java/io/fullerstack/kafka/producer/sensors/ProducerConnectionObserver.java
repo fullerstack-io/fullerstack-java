@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
  * Counter creationRateCounter = ...;
  * Gauge ioWaitGauge = ...;
  *
- * ProducerConnectionObserver observer = new ProducerConnectionObserver(
+ * ProducerConnectionObserver receptor = new ProducerConnectionObserver(
  *     "producer-1",
  *     "localhost:11001",  // JMX endpoint
  *     connectionCountGauge,
@@ -39,10 +39,10 @@ import java.util.concurrent.TimeUnit;
  *     ioWaitGauge
  * );
  *
- * observer.start();  // Begins monitoring every 10 seconds
+ * receptor.start();  // Begins monitoring every 10 seconds
  *
  * // Later...
- * observer.stop();
+ * receptor.stop();
  * }</pre>
  *
  * @author Fullerstack
@@ -74,7 +74,7 @@ public class ProducerConnectionObserver implements AutoCloseable {
     private double previousIoWait = 0.0;
 
     /**
-     * Creates a new producer connection observer.
+     * Creates a new producer connection receptor.
      *
      * @param producerId           Producer identifier (e.g., "producer-1")
      * @param jmxEndpoint         JMX endpoint (e.g., "localhost:11001")
@@ -95,7 +95,7 @@ public class ProducerConnectionObserver implements AutoCloseable {
         this.creationRateCounter = creationRateCounter;
         this.ioWaitGauge = ioWaitGauge;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "producer-connection-observer-" + producerId);
+            Thread t = new Thread(r, "producer-connection-receptor-" + producerId);
             t.setDaemon(true);
             return t;
         });
@@ -108,7 +108,7 @@ public class ProducerConnectionObserver implements AutoCloseable {
      */
     public void start() {
         if (running) {
-            logger.warn("Producer connection observer for {} is already running", producerId);
+            logger.warn("Producer connection receptor for {} is already running", producerId);
             return;
         }
 
@@ -124,12 +124,12 @@ public class ProducerConnectionObserver implements AutoCloseable {
                 TimeUnit.SECONDS
             );
 
-            logger.info("Started producer connection observer for {} (JMX: {})", producerId, jmxEndpoint);
+            logger.info("Started producer connection receptor for {} (JMX: {})", producerId, jmxEndpoint);
 
         } catch (Exception e) {
-            logger.error("Failed to start producer connection observer for {}", producerId, e);
+            logger.error("Failed to start producer connection receptor for {}", producerId, e);
             running = false;
-            throw new RuntimeException("Failed to start producer connection observer", e);
+            throw new RuntimeException("Failed to start producer connection receptor", e);
         }
     }
 
@@ -154,7 +154,7 @@ public class ProducerConnectionObserver implements AutoCloseable {
         }
 
         closeJmx();
-        logger.info("Stopped producer connection observer for {}", producerId);
+        logger.info("Stopped producer connection receptor for {}", producerId);
     }
 
     @Override

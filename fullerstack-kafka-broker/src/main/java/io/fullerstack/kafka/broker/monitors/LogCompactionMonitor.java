@@ -138,11 +138,11 @@ public class LogCompactionMonitor implements AutoCloseable {
         this.gauges = circuit.conduit(cortex().name("gauges"), Gauges::composer);
 
         // Create instruments
-        this.compactionRateCounter = counters.get(cortex().name("log.compaction.rate"));
-        this.tombstoneCounter = counters.get(cortex().name("log.tombstones"));
-        this.compactionLatencyGauge = gauges.get(cortex().name("log.compaction.latency"));
-        this.dirtyRatioGauge = gauges.get(cortex().name("log.dirty-ratio"));
-        this.cleanedRatioGauge = gauges.get(cortex().name("log.cleaned-ratio"));
+        this.compactionRateCounter = counters.percept(cortex().name("log.compaction.rate"));
+        this.tombstoneCounter = counters.percept(cortex().name("log.tombstones"));
+        this.compactionLatencyGauge = gauges.percept(cortex().name("log.compaction.latency"));
+        this.dirtyRatioGauge = gauges.percept(cortex().name("log.dirty-ratio"));
+        this.cleanedRatioGauge = gauges.percept(cortex().name("log.cleaned-ratio"));
 
         // Schedule polling
         this.scheduler = Executors.newScheduledThreadPool(1);

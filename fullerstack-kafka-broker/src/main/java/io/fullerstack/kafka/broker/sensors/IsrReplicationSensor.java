@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Sensor for collecting ISR replication metrics from Kafka brokers via JMX and emitting
- * Routers.Signal (RC6) and Monitors.Signal.
+ * Routers.Signal (RC6) and Monitors.Sign.
  *
  * <p><b>Layer 2: Serventis Signal Emission</b>
  * This sensor collects raw JMX metrics and passes them to:
@@ -68,7 +68,7 @@ import java.util.concurrent.TimeUnit;
  *     cortex().name("routers"),
  *     Routers::composer
  * );
- * Conduit<Monitor, Monitors.Signal> monitorsConduit = circuit.conduit(
+ * Conduit<Monitor, Monitors.Sign> monitorsConduit = circuit.conduit(
  *     cortex().name("monitors"),
  *     Monitors::composer
  * );
@@ -139,7 +139,7 @@ public class IsrReplicationSensor implements AutoCloseable {
     public IsrReplicationSensor(
         final BrokerSensorConfig config,
         final Conduit<Router, Routers.Sign> routersConduit,
-        final Conduit<Monitor, Monitors.Signal> monitorsConduit,
+        final Conduit<Monitor, Monitors.Sign> monitorsConduit,
         final Name circuitName,
         final String clusterId
     ) {

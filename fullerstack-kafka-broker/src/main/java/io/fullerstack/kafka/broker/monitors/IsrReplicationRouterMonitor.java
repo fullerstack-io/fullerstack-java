@@ -82,8 +82,8 @@ public class IsrReplicationRouterMonitor {
         Objects.requireNonNull(brokerId, "brokerId cannot be null");
 
         // Get routers from Conduit (creates via composer)
-        this.leaderRouter = conduit.get(cortex().name(brokerId + ".leader"));
-        this.followerRouter = conduit.get(cortex().name(brokerId + ".follower"));
+        this.leaderRouter = conduit.percept(cortex().name(brokerId + ".leader"));
+        this.followerRouter = conduit.percept(cortex().name(brokerId + ".follower"));
         this.channel = null; // Not needed
     }
 

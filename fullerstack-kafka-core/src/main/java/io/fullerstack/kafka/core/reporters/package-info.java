@@ -59,7 +59,7 @@
  * reporter.start();
  *
  * // Monitors emit signs (Layer 2)
- * Monitors.Monitor producer = monitors.get(cortex().name("producer-1"));
+ * Monitors.Monitor producer = monitors.percept(cortex().name("producer-1"));
  * producer.degraded(Monitors.Dimension.CONFIRMED);
  *
  * // Reporter assesses urgency and emits (Layer 3)

@@ -43,7 +43,7 @@
  *             registrar.register(signal -> {
  *                 System.out.printf("Producer health: %s (%s)%n",
  *                     signal.status().condition(),
- *                     signal.payload().get("producerId"));
+ *                     signal.payload().percept("producerId"));
  *             });
  *         }
  *     ));

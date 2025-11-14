@@ -51,7 +51,7 @@ class GaugeFlowCircuitTest {
   void testConnectionLifecycle () throws InterruptedException {
     // Arrange: Subscribe to capture gauge signals
     signalLatch = new CountDownLatch ( 4 );  // Expect 4 signals
-    circuit.subscribe ( "test-observer", ( subject, registrar ) ->
+    circuit.subscribe ( "test-receptor", ( subject, registrar ) ->
       registrar.register ( sign -> {
         capturedSignals.add ( sign );
         signalLatch.countDown ();
@@ -82,7 +82,7 @@ class GaugeFlowCircuitTest {
   void testCapacitySaturation () throws InterruptedException {
     // Arrange: Subscribe to capture overflow signal
     signalLatch = new CountDownLatch ( 11 );  // 10 increments + 1 overflow
-    circuit.subscribe ( "test-observer", ( subject, registrar ) ->
+    circuit.subscribe ( "test-receptor", ( subject, registrar ) ->
       registrar.register ( sign -> {
         capturedSignals.add ( sign );
         signalLatch.countDown ();
@@ -111,7 +111,7 @@ class GaugeFlowCircuitTest {
   void testResourceDepletion () throws InterruptedException {
     // Arrange: Build up connections then drain
     signalLatch = new CountDownLatch ( 11 );  // 5 increments + 5 decrements + 1 underflow
-    circuit.subscribe ( "test-observer", ( subject, registrar ) ->
+    circuit.subscribe ( "test-receptor", ( subject, registrar ) ->
       registrar.register ( sign -> {
         capturedSignals.add ( sign );
         signalLatch.countDown ();
@@ -143,7 +143,7 @@ class GaugeFlowCircuitTest {
   void testPoolRecycling () throws InterruptedException {
     // Arrange: Subscribe to capture reset signal
     signalLatch = new CountDownLatch ( 6 );  // 5 increments + 1 reset
-    circuit.subscribe ( "test-observer", ( subject, registrar ) ->
+    circuit.subscribe ( "test-receptor", ( subject, registrar ) ->
       registrar.register ( sign -> {
         capturedSignals.add ( sign );
         signalLatch.countDown ();
@@ -177,7 +177,7 @@ class GaugeFlowCircuitTest {
     signalLatch = new CountDownLatch ( 4 );  // 2 signals per gauge
     List < String > capturedEntities = new ArrayList <> ();
 
-    circuit.subscribe ( "test-observer", ( subject, registrar ) ->
+    circuit.subscribe ( "test-receptor", ( subject, registrar ) ->
       registrar.register ( sign -> {
         capturedEntities.add ( subject.name ().toString () );
         signalLatch.countDown ();

@@ -86,7 +86,7 @@ class KafkaObservabilitySystemExample {
         System.out.println("   Reporter CRITICAL → AlertActor\n");
 
         // Get cluster health reporter
-        Reporters.Reporter clusterHealth = system.getReporters().get(
+        Reporters.Reporter clusterHealth = system.getReporters().percept(
             cortex().name("cluster.health")
         );
 

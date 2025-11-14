@@ -70,7 +70,7 @@ public class QueueFlowCircuit implements AutoCloseable {
      * @return Queue instrument for emitting queue signals via method calls
      */
     public Queue queueFor(String entityName) {
-        return conduit.get(Substrates.cortex().name(entityName));
+        return conduit.percept(Substrates.cortex().name(entityName));
     }
 
     /**

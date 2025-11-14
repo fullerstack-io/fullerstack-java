@@ -63,7 +63,7 @@ class ProducerSendObserverTest {
     @Test
     void testConstructorWithValidParameters() {
         // When
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             mockSendRateCounter,
@@ -76,16 +76,16 @@ class ProducerSendObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testConstructorDoesNotStartMonitoring() {
         // When
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             mockSendRateCounter,
@@ -107,7 +107,7 @@ class ProducerSendObserverTest {
         verifyNoInteractions(mockLatencyGauge);
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -117,7 +117,7 @@ class ProducerSendObserverTest {
     @Test
     void testCloseWithoutStart() {
         // Given
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             mockSendRateCounter,
@@ -130,13 +130,13 @@ class ProducerSendObserverTest {
         );
 
         // When / Then - should not throw
-        assertThatCode(observer::close).doesNotThrowAnyException();
+        assertThatCode(receptor::close).doesNotThrowAnyException();
     }
 
     @Test
     void testStopWithoutStart() {
         // Given
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             mockSendRateCounter,
@@ -149,10 +149,10 @@ class ProducerSendObserverTest {
         );
 
         // When / Then - should not throw
-        assertThatCode(observer::stop).doesNotThrowAnyException();
+        assertThatCode(receptor::stop).doesNotThrowAnyException();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // Note: Cannot test start() without actual JMX server
@@ -165,7 +165,7 @@ class ProducerSendObserverTest {
     @Test
     void testAllInstrumentsAreProvided() {
         // When
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             mockSendRateCounter,
@@ -178,10 +178,10 @@ class ProducerSendObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -191,7 +191,7 @@ class ProducerSendObserverTest {
     @Test
     void testProducerIdIsStored() {
         // When
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "test-producer-id",
             "localhost:11001",
             mockSendRateCounter,
@@ -204,16 +204,16 @@ class ProducerSendObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     @Test
     void testJmxEndpointIsStored() {
         // When
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "test-jmx-endpoint:9999",
             mockSendRateCounter,
@@ -226,10 +226,10 @@ class ProducerSendObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
+        assertThat(receptor).isNotNull();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
@@ -239,7 +239,7 @@ class ProducerSendObserverTest {
     @Test
     void testMultipleCloseCallsAreIdempotent() {
         // Given
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             mockSendRateCounter,
@@ -253,16 +253,16 @@ class ProducerSendObserverTest {
 
         // When / Then - multiple closes should not throw
         assertThatCode(() -> {
-            observer.close();
-            observer.close();
-            observer.close();
+            receptor.close();
+            receptor.close();
+            receptor.close();
         }).doesNotThrowAnyException();
     }
 
     @Test
     void testMultipleStopCallsAreIdempotent() {
         // Given
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             mockSendRateCounter,
@@ -276,19 +276,19 @@ class ProducerSendObserverTest {
 
         // When / Then - multiple stops should not throw
         assertThatCode(() -> {
-            observer.stop();
-            observer.stop();
-            observer.stop();
+            receptor.stop();
+            receptor.stop();
+            receptor.stop();
         }).doesNotThrowAnyException();
 
         // Cleanup
-        observer.close();
+        receptor.close();
     }
 
     // ========================================
     // Signal Emission Pattern Tests (Conceptual)
     // ========================================
-    // Note: These tests verify the observer can be constructed with the correct
+    // Note: These tests verify the receptor can be constructed with the correct
     // instruments. Actual signal emission is tested in integration tests with
     // real JMX data.
 
@@ -298,7 +298,7 @@ class ProducerSendObserverTest {
         Counter sendRateCounter = mock(Counter.class);
 
         // When
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             sendRateCounter,
@@ -311,8 +311,8 @@ class ProducerSendObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
-        observer.close();
+        assertThat(receptor).isNotNull();
+        receptor.close();
     }
 
     @Test
@@ -321,7 +321,7 @@ class ProducerSendObserverTest {
         Probe sendProbe = mock(Probe.class);
 
         // When
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             mockSendRateCounter,
@@ -334,8 +334,8 @@ class ProducerSendObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
-        observer.close();
+        assertThat(receptor).isNotNull();
+        receptor.close();
     }
 
     @Test
@@ -344,7 +344,7 @@ class ProducerSendObserverTest {
         Service retryService = mock(Service.class);
 
         // When
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             mockSendRateCounter,
@@ -357,8 +357,8 @@ class ProducerSendObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
-        observer.close();
+        assertThat(receptor).isNotNull();
+        receptor.close();
     }
 
     @Test
@@ -367,7 +367,7 @@ class ProducerSendObserverTest {
         Gauge latencyGauge = mock(Gauge.class);
 
         // When
-        ProducerSendObserver observer = new ProducerSendObserver(
+        ProducerSendObserver receptor = new ProducerSendObserver(
             "producer-1",
             "localhost:11001",
             mockSendRateCounter,
@@ -380,7 +380,7 @@ class ProducerSendObserverTest {
         );
 
         // Then
-        assertThat(observer).isNotNull();
-        observer.close();
+        assertThat(receptor).isNotNull();
+        receptor.close();
     }
 }

@@ -66,7 +66,7 @@ class PartitionToClusterSignalFlowIT {
         // Track reporter emissions
         reporterEmissions = new ArrayList<>();
         reporters.subscribe(cortex().subscriber(
-            cortex().name("test-observer"),
+            cortex().name("test-receptor"),
             (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
                 registrar.register(reporterEmissions::add);
             }
@@ -98,7 +98,7 @@ class PartitionToClusterSignalFlowIT {
         // When: Monitor emits DEGRADED for partition "broker-1.orders.p0"
         long startTime = System.nanoTime();
 
-        Monitors.Monitor partitionMonitor = monitors.get(cortex().name("broker-1.orders.p0"));
+        Monitors.Monitor partitionMonitor = monitors.percept(cortex().name("broker-1.orders.p0"));
         partitionMonitor.degraded(Monitors.Dimension.CONFIRMED);
 
         // Wait for event propagation
@@ -124,9 +124,9 @@ class PartitionToClusterSignalFlowIT {
     @DisplayName("Multiple partition failures aggregate to cluster CRITICAL")
     void testMultiplePartitionFailuresAggregate() {
         // When: Multiple partitions emit DEGRADED
-        Monitors.Monitor partition1 = monitors.get(cortex().name("broker-1.orders.p0"));
-        Monitors.Monitor partition2 = monitors.get(cortex().name("broker-1.orders.p1"));
-        Monitors.Monitor partition3 = monitors.get(cortex().name("broker-1.orders.p2"));
+        Monitors.Monitor partition1 = monitors.percept(cortex().name("broker-1.orders.p0"));
+        Monitors.Monitor partition2 = monitors.percept(cortex().name("broker-1.orders.p1"));
+        Monitors.Monitor partition3 = monitors.percept(cortex().name("broker-1.orders.p2"));
 
         partition1.degraded(Monitors.Dimension.CONFIRMED);
         partition2.degraded(Monitors.Dimension.CONFIRMED);
@@ -146,7 +146,7 @@ class PartitionToClusterSignalFlowIT {
     @DisplayName("Topic-level DEGRADED propagates to cluster")
     void testTopicLevelDegradedPropagates() {
         // When: Monitor emits DEGRADED for topic (2-level name)
-        Monitors.Monitor topicMonitor = monitors.get(cortex().name("broker-2.payments"));
+        Monitors.Monitor topicMonitor = monitors.percept(cortex().name("broker-2.payments"));
         topicMonitor.degraded(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
@@ -161,7 +161,7 @@ class PartitionToClusterSignalFlowIT {
     @DisplayName("Broker-level DEGRADED propagates to cluster")
     void testBrokerLevelDegradedPropagates() {
         // When: Monitor emits DEGRADED for broker (1-level name)
-        Monitors.Monitor brokerMonitor = monitors.get(cortex().name("broker-3"));
+        Monitors.Monitor brokerMonitor = monitors.percept(cortex().name("broker-3"));
         brokerMonitor.degraded(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
@@ -176,7 +176,7 @@ class PartitionToClusterSignalFlowIT {
     @DisplayName("WARNING signals propagate correctly")
     void testWarningSignalsPropagateCorrectly() {
         // When: Monitor emits ERRATIC for partition
-        Monitors.Monitor partitionMonitor = monitors.get(cortex().name("broker-1.orders.p0"));
+        Monitors.Monitor partitionMonitor = monitors.percept(cortex().name("broker-1.orders.p0"));
         partitionMonitor.erratic(Monitors.Dimension.MEASURED);
 
         monitorCircuit.await();
@@ -191,7 +191,7 @@ class PartitionToClusterSignalFlowIT {
     @DisplayName("NORMAL signals propagate correctly")
     void testNormalSignalsPropagateCorrectly() {
         // When: Monitor emits STABLE for partition
-        Monitors.Monitor partitionMonitor = monitors.get(cortex().name("broker-1.orders.p0"));
+        Monitors.Monitor partitionMonitor = monitors.percept(cortex().name("broker-1.orders.p0"));
         partitionMonitor.stable(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
@@ -206,7 +206,7 @@ class PartitionToClusterSignalFlowIT {
     @DisplayName("Cluster-level signal emits directly")
     void testClusterLevelSignalEmitsDirectly() {
         // When: Monitor emits DEGRADED for cluster (special name)
-        Monitors.Monitor clusterMonitor = monitors.get(cortex().name("cluster"));
+        Monitors.Monitor clusterMonitor = monitors.percept(cortex().name("cluster"));
         clusterMonitor.degraded(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
@@ -221,9 +221,9 @@ class PartitionToClusterSignalFlowIT {
     @DisplayName("Mixed severity signals aggregate to worst-case")
     void testMixedSeveritySignalsAggregateToWorstCase() {
         // When: Emit mixed signals (STABLE, ERRATIC, DEGRADED)
-        monitors.get(cortex().name("broker-1.orders.p0")).stable(Monitors.Dimension.CONFIRMED);
-        monitors.get(cortex().name("broker-1.orders.p1")).erratic(Monitors.Dimension.MEASURED);
-        monitors.get(cortex().name("broker-1.orders.p2")).degraded(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p0")).stable(Monitors.Dimension.CONFIRMED);
+        monitors.percept(cortex().name("broker-1.orders.p1")).erratic(Monitors.Dimension.MEASURED);
+        monitors.percept(cortex().name("broker-1.orders.p2")).degraded(Monitors.Dimension.CONFIRMED);
 
         monitorCircuit.await();
         hierarchy.getCircuit().await();

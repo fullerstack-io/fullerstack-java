@@ -136,7 +136,7 @@ public class InteractiveOODADemo {
         metricsSimulator = new KafkaMetricsSimulator(ooda, simulator, monitoringScheduler);
 
         System.out.println("✅ Metrics simulator configured");
-        System.out.println("   → Using REAL production observer classes:");
+        System.out.println("   → Using REAL production receptor classes:");
         System.out.println("      • LocalProducerBufferMonitor (from ProducerBufferMonitor)");
         System.out.println("      • LocalProducerSendObserver (from ProducerSendObserver)");
         System.out.println("   → Feeding all 7 Serventis instrument types:");
@@ -221,7 +221,7 @@ public class InteractiveOODADemo {
             for (String partition : partitions) {
                 PartitionSimulator p = simulator.getPartition(partition);
                 if (p != null && p.isOverflowing()) {
-                    Monitors.Monitor monitor = ooda.getMonitors().get(
+                    Monitors.Monitor monitor = ooda.getMonitors().percept(
                         cortex().name(partition)
                     );
                     monitor.degraded(Monitors.Dimension.MEASURED);
@@ -235,7 +235,7 @@ public class InteractiveOODADemo {
                 if (health == BrokerSimulator.BrokerHealth.DEGRADED ||
                     health == BrokerSimulator.BrokerHealth.CRITICAL) {
 
-                    Monitors.Monitor cpuMonitor = ooda.getMonitors().get(
+                    Monitors.Monitor cpuMonitor = ooda.getMonitors().percept(
                         cortex().name("broker-1.jvm.heap")
                     );
                     cpuMonitor.degraded(Monitors.Dimension.MEASURED);
