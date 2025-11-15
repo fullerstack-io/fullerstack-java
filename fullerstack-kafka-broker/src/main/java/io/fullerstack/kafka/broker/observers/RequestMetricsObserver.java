@@ -1,4 +1,4 @@
-package io.fullerstack.kafka.broker.monitors;
+package io.fullerstack.kafka.broker.observers;
 
 import io.fullerstack.kafka.broker.models.RequestMetrics;
 import io.humainary.substrates.ext.serventis.ext.Counters;
@@ -16,8 +16,8 @@ import static io.humainary.substrates.api.Substrates.cortex;
 /**
  * Emits Counters, Gauges, and Probes signals for request metrics using Serventis RC1 vocabulary.
  *
- * <p><b>Layer 2: Serventis Signal Emission</b>
- * This monitor emits signals with appropriate Serventis API vocabulary based on metric type:
+ * <p><b>Layer 1 (OBSERVE): Raw Signal Emission</b>
+ * This observer emits raw signals with appropriate Serventis API vocabulary based on metric type:
  * <ul>
  *   <li><b>Counters</b> - Request rates (Produce/Fetch requests per second)</li>
  *   <li><b>Gauges</b> - Latency and queue times (bidirectional values)</li>
@@ -39,12 +39,12 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *   - Operation=REQUEST, Role=SERVER, Outcome=FAILURE
  * </pre>
  *
- * <p><b>Note:</b> Simple threshold-based emission for Layer 2. Contextual assessment
- * with baselines and trends will be added in Epic 2 via Observers (Layer 4).
+ * <p><b>Note:</b> Simple threshold-based emission for Layer 1. Pattern detection
+ * and condition assessment (Layer 2) is done by separate Monitor components.
  */
-public class RequestMetricsMonitor {
+public class RequestMetricsObserver {
 
-    private static final Logger logger = LoggerFactory.getLogger(RequestMetricsMonitor.class);
+    private static final Logger logger = LoggerFactory.getLogger(RequestMetricsObserver.class);
 
     // Simple fixed thresholds (no baseline - that's Layer 4)
     private static final double QUEUE_TIME_WARNING_MS = 20.0;  // 20ms queue time = warning
@@ -67,7 +67,7 @@ public class RequestMetricsMonitor {
     private double previousLatency = 0.0;
 
     /**
-     * Creates a RequestMetricsMonitor.
+     * Creates a RequestMetricsObserver.
      *
      * @param circuitName    Circuit name for logging
      * @param counterChannel Channel to emit Counters.Sign
@@ -75,7 +75,7 @@ public class RequestMetricsMonitor {
      * @param probeChannel   Channel to emit Probes.Signal
      * @throws NullPointerException if any parameter is null
      */
-    public RequestMetricsMonitor(
+    public RequestMetricsObserver(
         Name circuitName,
         Channel<Counters.Sign> counterChannel,
         Channel<Gauges.Sign> gaugeChannel,

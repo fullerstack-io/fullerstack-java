@@ -33,13 +33,8 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * <tr><td>DEGRADED</td><td>CONFIRMED</td><td><b>CRITICAL</b></td><td>Immediate action required</td></tr>
  * <tr><td>DEGRADED</td><td>MEASURED</td><td><b>WARNING</b></td><td>Action likely required</td></tr>
  * <tr><td>DEGRADED</td><td>TENTATIVE</td><td><b>WARNING</b></td><td>Monitor closely</td></tr>
- * <tr><td>DEGRADING</td><td>CONFIRMED</td><td><b>WARNING</b></td><td>Trending toward degraded</td></tr>
- * <tr><td>DEGRADING</td><td>MEASURED</td><td><b>WARNING</b></td><td>Early warning</td></tr>
- * <tr><td>DIVERGING</td><td>*</td><td><b>WARNING</b></td><td>Drifting from stable</td></tr>
- * <tr><td>ERRATIC</td><td>*</td><td><b>WARNING</b></td><td>Unstable behavior</td></tr>
  * <tr><td>DEFECTIVE</td><td>*</td><td><b>CRITICAL</b></td><td>Component failure</td></tr>
- * <tr><td>DOWN</td><td>*</td><td><b>CRITICAL</b></td><td>Complete failure</td></tr>
- * <tr><td>CONVERGING</td><td>*</td><td><b>NORMAL</b></td><td>Recovering</td></tr>
+ * <tr><td>DIVERGING</td><td>*</td><td><b>WARNING</b></td><td>Drifting from stable</td></tr>
  * <tr><td>STABLE</td><td>*</td><td><b>NORMAL</b></td><td>Healthy operation</td></tr>
  * </table>
  */
@@ -124,28 +119,16 @@ public class JvmHealthReporter implements AutoCloseable {
                 }
             }
 
-            case DEFECTIVE, DOWN -> {
+            case DEFECTIVE -> {
                 reporter.critical();
                 logger.error("[REPORTER] {} emits CRITICAL - {} detected",
                     reporterName, condition);
             }
 
             // WARNING urgency - Action likely required
-            case DEGRADING -> {
-                reporter.warning();
-                logger.warn("[REPORTER] {} emits WARNING - DEGRADING ({}) detected",
-                    reporterName, confidence);
-            }
-
             case DIVERGING -> {
                 reporter.warning();
                 logger.warn("[REPORTER] {} emits WARNING - DIVERGING ({}) detected (drifting from stable)",
-                    reporterName, confidence);
-            }
-
-            case ERRATIC -> {
-                reporter.warning();
-                logger.warn("[REPORTER] {} emits WARNING - ERRATIC ({}) detected (unstable behavior)",
                     reporterName, confidence);
             }
 
@@ -153,12 +136,6 @@ public class JvmHealthReporter implements AutoCloseable {
             case STABLE -> {
                 reporter.normal();
                 logger.info("[REPORTER] {} emits NORMAL - STABLE ({}) detected",
-                    reporterName, confidence);
-            }
-
-            case CONVERGING -> {
-                reporter.normal();
-                logger.info("[REPORTER] {} emits NORMAL - CONVERGING ({}) detected (recovering)",
                     reporterName, confidence);
             }
 

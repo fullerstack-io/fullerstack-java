@@ -1,4 +1,4 @@
-package io.fullerstack.kafka.broker.receptors;
+package io.fullerstack.kafka.broker.observers;
 
 import io.fullerstack.kafka.broker.models.JvmGcMetrics;
 import io.fullerstack.kafka.broker.models.JvmMemoryMetrics;

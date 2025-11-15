@@ -1,4 +1,4 @@
-package io.fullerstack.kafka.broker.monitors;
+package io.fullerstack.kafka.broker.observers;
 
 import io.fullerstack.kafka.broker.models.SystemMetrics;
 import io.humainary.substrates.api.Substrates.Channel;
@@ -19,7 +19,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests for SystemMetricsMonitor (Layer 2 - Signal Emission).
+ * Tests for SystemMetricsObserver (Layer 1 - Raw Signal Emission).
  *
  * <p>Test Coverage:
  * <ul>
@@ -29,12 +29,12 @@ import static org.mockito.Mockito.*;
  *   <li>Error handling: graceful degradation</li>
  * </ul>
  */
-@DisplayName("SystemMetricsMonitor (Layer 2 - Signal Emission)")
-class SystemMetricsMonitorTest {
+@DisplayName("SystemMetricsObserver (Layer 1 - Raw Signal Emission)")
+class SystemMetricsObserverTest {
 
     private Name circuitName;
     private Channel<Gauges.Sign> gaugesChannel;
-    private SystemMetricsMonitor monitor;
+    private SystemMetricsObserver observer;
 
     private List<Gauges.Sign> emittedGaugeSigns;
 
@@ -46,7 +46,7 @@ class SystemMetricsMonitorTest {
 
         gaugesChannel = createGaugeSignCaptor();
 
-        monitor = new SystemMetricsMonitor(circuitName, gaugesChannel);
+        observer = new SystemMetricsObserver(circuitName, gaugesChannel);
     }
 
     @SuppressWarnings("unchecked")
@@ -99,7 +99,7 @@ class SystemMetricsMonitorTest {
             SystemMetrics metrics = createMetrics("broker-1", 0.95, 0.50, 1000, 10000);
 
             // When
-            monitor.emit(metrics);
+            observer.emit(metrics);
 
             // Then: Should emit OVERFLOW
             assertThat(emittedGaugeSigns).contains(Gauges.Sign.OVERFLOW);
@@ -109,11 +109,11 @@ class SystemMetricsMonitorTest {
         @DisplayName("Should emit INCREMENT when process CPU grows")
         void testProcessCpuIncrement() {
             // Given: CPU grows from 50% to 60%
-            monitor.emit(createMetrics("broker-1", 0.50, 0.40, 1000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.40, 1000, 10000));
             emittedGaugeSigns.clear();
 
             // When
-            monitor.emit(createMetrics("broker-1", 0.60, 0.40, 1000, 10000));
+            observer.emit(createMetrics("broker-1", 0.60, 0.40, 1000, 10000));
 
             // Then: Should emit INCREMENT for process CPU
             assertThat(emittedGaugeSigns).contains(Gauges.Sign.INCREMENT);
@@ -123,11 +123,11 @@ class SystemMetricsMonitorTest {
         @DisplayName("Should emit DECREMENT when process CPU drops")
         void testProcessCpuDecrement() {
             // Given: CPU drops from 70% to 50%
-            monitor.emit(createMetrics("broker-1", 0.70, 0.40, 1000, 10000));
+            observer.emit(createMetrics("broker-1", 0.70, 0.40, 1000, 10000));
             emittedGaugeSigns.clear();
 
             // When
-            monitor.emit(createMetrics("broker-1", 0.50, 0.40, 1000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.40, 1000, 10000));
 
             // Then: Should emit DECREMENT
             assertThat(emittedGaugeSigns).contains(Gauges.Sign.DECREMENT);
@@ -137,7 +137,7 @@ class SystemMetricsMonitorTest {
         @DisplayName("Should emit INCREMENT on first observation")
         void testProcessCpuFirstObservation() {
             // When: First emission
-            monitor.emit(createMetrics("broker-1", 0.50, 0.40, 1000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.40, 1000, 10000));
 
             // Then: Should emit INCREMENT
             assertThat(emittedGaugeSigns).contains(Gauges.Sign.INCREMENT);
@@ -159,7 +159,7 @@ class SystemMetricsMonitorTest {
             SystemMetrics metrics = createMetrics("broker-1", 0.50, 0.92, 1000, 10000);
 
             // When
-            monitor.emit(metrics);
+            observer.emit(metrics);
 
             // Then: Should emit OVERFLOW
             assertThat(emittedGaugeSigns).contains(Gauges.Sign.OVERFLOW);
@@ -169,11 +169,11 @@ class SystemMetricsMonitorTest {
         @DisplayName("Should emit INCREMENT when system CPU grows")
         void testSystemCpuIncrement() {
             // Given: System CPU grows
-            monitor.emit(createMetrics("broker-1", 0.50, 0.40, 1000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.40, 1000, 10000));
             emittedGaugeSigns.clear();
 
             // When
-            monitor.emit(createMetrics("broker-1", 0.50, 0.50, 1000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.50, 1000, 10000));
 
             // Then: Should emit INCREMENT
             assertThat(emittedGaugeSigns).contains(Gauges.Sign.INCREMENT);
@@ -183,11 +183,11 @@ class SystemMetricsMonitorTest {
         @DisplayName("Should emit DECREMENT when system CPU drops")
         void testSystemCpuDecrement() {
             // Given: System CPU drops
-            monitor.emit(createMetrics("broker-1", 0.50, 0.60, 1000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.60, 1000, 10000));
             emittedGaugeSigns.clear();
 
             // When
-            monitor.emit(createMetrics("broker-1", 0.50, 0.50, 1000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.50, 1000, 10000));
 
             // Then: Should emit DECREMENT
             assertThat(emittedGaugeSigns).contains(Gauges.Sign.DECREMENT);
@@ -209,7 +209,7 @@ class SystemMetricsMonitorTest {
             SystemMetrics metrics = createMetrics("broker-1", 0.50, 0.40, 9600, 10000);
 
             // When
-            monitor.emit(metrics);
+            observer.emit(metrics);
 
             // Then: Should emit OVERFLOW
             assertThat(emittedGaugeSigns).contains(Gauges.Sign.OVERFLOW);
@@ -219,11 +219,11 @@ class SystemMetricsMonitorTest {
         @DisplayName("Should emit INCREMENT when FD usage grows")
         void testFdIncrement() {
             // Given: FD usage grows
-            monitor.emit(createMetrics("broker-1", 0.50, 0.40, 5000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.40, 5000, 10000));
             emittedGaugeSigns.clear();
 
             // When
-            monitor.emit(createMetrics("broker-1", 0.50, 0.40, 6000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.40, 6000, 10000));
 
             // Then: Should emit INCREMENT
             assertThat(emittedGaugeSigns).contains(Gauges.Sign.INCREMENT);
@@ -233,11 +233,11 @@ class SystemMetricsMonitorTest {
         @DisplayName("Should emit DECREMENT when FD usage drops")
         void testFdDecrement() {
             // Given: FD usage drops
-            monitor.emit(createMetrics("broker-1", 0.50, 0.40, 7000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.40, 7000, 10000));
             emittedGaugeSigns.clear();
 
             // When
-            monitor.emit(createMetrics("broker-1", 0.50, 0.40, 6000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.40, 6000, 10000));
 
             // Then: Should emit DECREMENT
             assertThat(emittedGaugeSigns).contains(Gauges.Sign.DECREMENT);
@@ -256,7 +256,7 @@ class SystemMetricsMonitorTest {
         @DisplayName("Should emit multiple signals for different metrics")
         void testMultipleSignals() {
             // When: First emission
-            monitor.emit(createMetrics("broker-1", 0.50, 0.40, 5000, 10000));
+            observer.emit(createMetrics("broker-1", 0.50, 0.40, 5000, 10000));
 
             // Then: Should emit signals for all 3 metrics (process CPU, system CPU, FDs)
             assertThat(emittedGaugeSigns).hasSize(3);
@@ -266,7 +266,7 @@ class SystemMetricsMonitorTest {
         @DisplayName("Should emit OVERFLOW for multiple metrics simultaneously")
         void testMultipleOverflows() {
             // When: High utilization across all metrics
-            monitor.emit(createMetrics("broker-1", 0.95, 0.92, 9600, 10000));
+            observer.emit(createMetrics("broker-1", 0.95, 0.92, 9600, 10000));
 
             // Then: Should emit OVERFLOW for all 3 metrics
             assertThat(emittedGaugeSigns).hasSize(3);
@@ -285,7 +285,7 @@ class SystemMetricsMonitorTest {
         @Test
         @DisplayName("Should handle null metrics gracefully")
         void testNullMetrics() {
-            assertThatThrownBy(() -> monitor.emit(null))
+            assertThatThrownBy(() -> observer.emit(null))
                 .isInstanceOf(NullPointerException.class);
         }
 
@@ -296,7 +296,7 @@ class SystemMetricsMonitorTest {
             Channel<Gauges.Sign> faultyChannel = mock(Channel.class);
             when(faultyChannel.pipe()).thenThrow(new RuntimeException("Channel error"));
 
-            SystemMetricsMonitor faultyMonitor = new SystemMetricsMonitor(
+            SystemMetricsObserver faultyObserver = new SystemMetricsObserver(
                 circuitName,
                 faultyChannel
             );
@@ -305,7 +305,7 @@ class SystemMetricsMonitorTest {
             SystemMetrics metrics = createMetrics("broker-1", 0.50, 0.40, 5000, 10000);
 
             // Then: Should not propagate exception
-            assertThatCode(() -> faultyMonitor.emit(metrics))
+            assertThatCode(() -> faultyObserver.emit(metrics))
                 .doesNotThrowAnyException();
         }
     }
@@ -322,10 +322,10 @@ class SystemMetricsMonitorTest {
         @DisplayName("Should track metrics per broker independently")
         void testPerBrokerTracking() {
             // When: Different brokers with different utilization
-            monitor.emit(createMetrics("broker-1", 0.50, 0.40, 5000, 10000));
-            monitor.emit(createMetrics("broker-2", 0.70, 0.60, 7000, 10000));
-            monitor.emit(createMetrics("broker-1", 0.60, 0.45, 5500, 10000)); // broker-1 grows
-            monitor.emit(createMetrics("broker-2", 0.65, 0.55, 6500, 10000)); // broker-2 shrinks
+            observer.emit(createMetrics("broker-1", 0.50, 0.40, 5000, 10000));
+            observer.emit(createMetrics("broker-2", 0.70, 0.60, 7000, 10000));
+            observer.emit(createMetrics("broker-1", 0.60, 0.45, 5500, 10000)); // broker-1 grows
+            observer.emit(createMetrics("broker-2", 0.65, 0.55, 6500, 10000)); // broker-2 shrinks
 
             // Then: Should handle deltas correctly per broker
             // First 2 emissions: 3 signals each (6 total)

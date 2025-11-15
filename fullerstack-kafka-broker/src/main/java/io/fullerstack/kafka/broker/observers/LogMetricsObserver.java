@@ -1,4 +1,4 @@
-package io.fullerstack.kafka.broker.monitors;
+package io.fullerstack.kafka.broker.observers;
 
 import io.fullerstack.kafka.broker.models.LogMetrics;
 import io.humainary.substrates.ext.serventis.ext.Counters;
@@ -17,8 +17,8 @@ import static io.humainary.substrates.api.Substrates.cortex;
 /**
  * Emits Counters and Gauges signals for log metrics using Serventis RC1 vocabulary.
  *
- * <p><b>Layer 2: Serventis Signal Emission</b>
- * This monitor emits signals with appropriate Serventis API vocabulary based on metric type:
+ * <p><b>Layer 1 (OBSERVE): Raw Signal Emission</b>
+ * This observer emits raw signals with appropriate Serventis API vocabulary based on metric type:
  * <ul>
  *   <li><b>Counters</b> - Log flush rate, offsets (monotonic values)</li>
  *   <li><b>Gauges</b> - Log size, segment count (bidirectional values)</li>
@@ -41,15 +41,15 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *   - INCREMENT: Offset advancing
  * </pre>
  *
- * <p><b>Multi-Entity Pattern:</b> This monitor handles metrics for multiple
+ * <p><b>Multi-Entity Pattern:</b> This observer handles metrics for multiple
  * topic-partition entities. Previous values are tracked per partition.
  *
- * <p><b>Note:</b> Simple threshold-based emission for Layer 2. Contextual assessment
- * will be added in Epic 2 via Observers (Layer 4).
+ * <p><b>Note:</b> Simple threshold-based emission for Layer 1. Pattern detection
+ * and condition assessment (Layer 2) is done by separate Monitor components.
  */
-public class LogMetricsMonitor {
+public class LogMetricsObserver {
 
-    private static final Logger logger = LoggerFactory.getLogger(LogMetricsMonitor.class);
+    private static final Logger logger = LoggerFactory.getLogger(LogMetricsObserver.class);
 
     // Simple fixed thresholds
     private static final int EXCESSIVE_SEGMENTS_THRESHOLD = 50;
@@ -70,14 +70,14 @@ public class LogMetricsMonitor {
     private final Map<String, PreviousLogMetrics> previousMetrics = new HashMap<>();
 
     /**
-     * Creates a LogMetricsMonitor.
+     * Creates a LogMetricsObserver.
      *
      * @param circuitName    Circuit name for logging
      * @param counterChannel Channel to emit Counters.Sign
      * @param gaugeChannel   Channel to emit Gauges.Sign
      * @throws NullPointerException if any parameter is null
      */
-    public LogMetricsMonitor(
+    public LogMetricsObserver(
         Name circuitName,
         Channel<Counters.Sign> counterChannel,
         Channel<Gauges.Sign> gaugeChannel

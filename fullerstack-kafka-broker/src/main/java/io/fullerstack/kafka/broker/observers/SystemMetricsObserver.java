@@ -1,4 +1,4 @@
-package io.fullerstack.kafka.broker.monitors;
+package io.fullerstack.kafka.broker.observers;
 
 import io.fullerstack.kafka.broker.models.SystemMetrics;
 import io.humainary.substrates.api.Substrates.Channel;
@@ -16,8 +16,8 @@ import static io.humainary.substrates.api.Substrates.cortex;
 /**
  * Emits Serventis signals for system metrics (CPU, file descriptors) using RC6 APIs.
  *
- * <p><b>Layer 2: OBSERVE Phase (Raw Signals)</b>
- * This monitor emits signals using Gauges API:
+ * <p><b>Layer 1 (OBSERVE): Raw Signal Emission</b>
+ * This observer emits raw signals using Gauges API:
  * <ul>
  *   <li>Process CPU → Gauges (INCREMENT/DECREMENT/OVERFLOW >90%)</li>
  *   <li>System CPU → Gauges</li>
@@ -30,8 +30,8 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * FD OVERFLOW: >95%
  * </pre>
  */
-public class SystemMetricsMonitor {
-    private static final Logger logger = LoggerFactory.getLogger(SystemMetricsMonitor.class);
+public class SystemMetricsObserver {
+    private static final Logger logger = LoggerFactory.getLogger(SystemMetricsObserver.class);
 
     private static final double CPU_OVERFLOW_THRESHOLD = 0.90;
     private static final double FD_OVERFLOW_THRESHOLD = 0.95;
@@ -50,12 +50,12 @@ public class SystemMetricsMonitor {
     private final Map<String, Double> previousFdUtil = new ConcurrentHashMap<>();
 
     /**
-     * Creates a SystemMetricsMonitor.
+     * Creates a SystemMetricsObserver.
      *
      * @param circuitName   Circuit name for logging
      * @param gaugesChannel Channel for Gauges signals
      */
-    public SystemMetricsMonitor(
+    public SystemMetricsObserver(
         Name circuitName,
         Channel<Gauges.Sign> gaugesChannel
     ) {

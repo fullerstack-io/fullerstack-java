@@ -4,7 +4,7 @@ import io.fullerstack.kafka.broker.models.JvmGcMetrics;
 import io.fullerstack.kafka.broker.models.JvmMemoryMetrics;
 import io.fullerstack.kafka.broker.models.SystemMetrics;
 import io.fullerstack.kafka.broker.monitors.JvmHealthMonitor;
-import io.fullerstack.kafka.broker.monitors.SystemMetricsMonitor;
+import io.fullerstack.kafka.broker.observers.SystemMetricsObserver;
 import io.fullerstack.kafka.core.config.BrokerEndpoint;
 import io.fullerstack.kafka.core.config.BrokerSensorConfig;
 import io.humainary.substrates.api.Substrates.Channel;
@@ -89,7 +89,7 @@ public class BrokerHealthSensor implements AutoCloseable {
 
     private final BrokerSensorConfig config;
     private final JvmHealthMonitor jvmMonitor;
-    private final SystemMetricsMonitor systemMonitor;
+    private final SystemMetricsObserver systemMonitor;
     private final JmxConnectionPool connectionPool;
     private final ScheduledExecutorService jvmScheduler;
     private final ScheduledExecutorService systemScheduler;
@@ -119,7 +119,7 @@ public class BrokerHealthSensor implements AutoCloseable {
 
         // Create monitors
         this.jvmMonitor = new JvmHealthMonitor(circuitName, gaugesChannel, countersChannel, monitorsChannel);
-        this.systemMonitor = new SystemMetricsMonitor(circuitName, gaugesChannel);
+        this.systemMonitor = new SystemMetricsObserver(circuitName, gaugesChannel);
 
         // Create connection pool
         this.connectionPool = new JmxConnectionPool();

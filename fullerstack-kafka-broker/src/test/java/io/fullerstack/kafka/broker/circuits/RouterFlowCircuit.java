@@ -118,7 +118,7 @@ public class RouterFlowCircuit implements AutoCloseable {
      */
     public Router getRouter(String routerName) {
         Objects.requireNonNull(routerName, "routerName cannot be null");
-        return routers.get(cortex().name(routerName));
+        return routers.percept(cortex().name(routerName));
     }
 
     /**

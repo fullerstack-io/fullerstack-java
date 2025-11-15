@@ -151,7 +151,7 @@ class PartitionReassignmentMonitorTest {
             .hasSize(1);
 
         PartitionReassignmentMonitor.ReassignmentState state =
-            monitor.getActiveReassignments().percept(tp);
+            monitor.getActiveReassignments().get(tp);
 
         assertThat(state.targetReplicas()).containsExactly(1, 2, 3);
         assertThat(state.addingReplicas()).containsExactly(3);
@@ -220,10 +220,10 @@ class PartitionReassignmentMonitorTest {
 
         // When: Poll twice
         monitor.pollReassignments();
-        long firstStartTime = monitor.getActiveReassignments().percept(tp).startTime();
+        long firstStartTime = monitor.getActiveReassignments().get(tp).startTime();
 
         monitor.pollReassignments();
-        long secondStartTime = monitor.getActiveReassignments().percept(tp).startTime();
+        long secondStartTime = monitor.getActiveReassignments().get(tp).startTime();
 
         // Then: Start time should not change (not re-tracked)
         assertThat(firstStartTime).isEqualTo(secondStartTime);
@@ -303,7 +303,7 @@ class PartitionReassignmentMonitorTest {
             .thenReturn(Map.of(tp, reassignment));
         monitor.pollReassignments();
 
-        long initialBytes = monitor.getActiveReassignments().percept(tp).bytesMoved();
+        long initialBytes = monitor.getActiveReassignments().get(tp).bytesMoved();
 
         // When: Bytes moved (mock JMX)
         javax.management.ObjectName objectName =
@@ -313,7 +313,7 @@ class PartitionReassignmentMonitorTest {
         monitor.pollReassignments();
 
         // Then: Bytes should be updated
-        long updatedBytes = monitor.getActiveReassignments().percept(tp).bytesMoved();
+        long updatedBytes = monitor.getActiveReassignments().get(tp).bytesMoved();
         assertThat(updatedBytes).isGreaterThan(initialBytes);
     }
 
@@ -433,8 +433,8 @@ class PartitionReassignmentMonitorTest {
         monitor.pollReassignments();
 
         assertThat(monitor.getActiveReassignments()).containsKey(tp);
-        assertThat(monitor.getActiveReassignments().percept(tp).addingReplicas()).isEmpty();
-        assertThat(monitor.getActiveReassignments().percept(tp).removingReplicas()).containsExactly(3);
+        assertThat(monitor.getActiveReassignments().get(tp).addingReplicas()).isEmpty();
+        assertThat(monitor.getActiveReassignments().get(tp).removingReplicas()).containsExactly(3);
     }
 
     @Test
@@ -455,8 +455,8 @@ class PartitionReassignmentMonitorTest {
         monitor.pollReassignments();
 
         assertThat(monitor.getActiveReassignments()).containsKey(tp);
-        assertThat(monitor.getActiveReassignments().percept(tp).addingReplicas()).containsExactly(3);
-        assertThat(monitor.getActiveReassignments().percept(tp).removingReplicas()).isEmpty();
+        assertThat(monitor.getActiveReassignments().get(tp).addingReplicas()).containsExactly(3);
+        assertThat(monitor.getActiveReassignments().get(tp).removingReplicas()).isEmpty();
     }
 
     // ========================================================================
@@ -487,13 +487,13 @@ class PartitionReassignmentMonitorTest {
         when(mbsc.getAttribute(objectName, "Count")).thenReturn(1024L);
         monitor.pollReassignments();
 
-        assertThat(monitor.getActiveReassignments().percept(tp).bytesMoved()).isEqualTo(1024L);
+        assertThat(monitor.getActiveReassignments().get(tp).bytesMoved()).isEqualTo(1024L);
 
         // Phase 3: More progress
         when(mbsc.getAttribute(objectName, "Count")).thenReturn(2048L);
         monitor.pollReassignments();
 
-        assertThat(monitor.getActiveReassignments().percept(tp).bytesMoved()).isEqualTo(2048L);
+        assertThat(monitor.getActiveReassignments().get(tp).bytesMoved()).isEqualTo(2048L);
 
         // Phase 4: Complete
         when(reassignmentsFuture.get(anyLong(), any(TimeUnit.class)))
