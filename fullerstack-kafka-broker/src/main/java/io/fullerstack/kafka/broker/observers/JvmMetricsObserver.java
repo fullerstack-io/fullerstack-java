@@ -76,7 +76,9 @@ public class JvmMetricsObserver implements AutoCloseable {
 
     // Raw thresholds for signal emission (NOT health assessment)
     private static final double HEAP_OVERFLOW_THRESHOLD = 0.90;
+    private static final double NON_HEAP_OVERFLOW_THRESHOLD = 0.90;
     private static final int GC_STORM_THRESHOLD = 10;  // GCs per second
+    private static final long GC_TIME_OVERFLOW_THRESHOLD_MS = 5000;  // 5 seconds
 
     private final Circuit circuit;
     private final Conduit<Gauges.Gauge, Gauges.Sign> gauges;
@@ -84,6 +86,7 @@ public class JvmMetricsObserver implements AutoCloseable {
 
     // Previous values for delta calculation (per entity)
     private final Map<String, Double> previousHeapUtil = new ConcurrentHashMap<>();
+    private final Map<String, Double> previousNonHeapUtil = new ConcurrentHashMap<>();
     private final Map<String, Long> previousGcCount = new ConcurrentHashMap<>();
     private final Map<String, Long> previousGcTime = new ConcurrentHashMap<>();
     private final Map<String, Long> previousTimestamp = new ConcurrentHashMap<>();
@@ -140,12 +143,31 @@ public class JvmMetricsObserver implements AutoCloseable {
 
             previousHeapUtil.put(brokerId, heapUtil);
 
-            // Non-heap gauge (simplified - just track that it exists)
+            // Non-heap gauge - track utilization changes
+            double nonHeapUtil = (double) metrics.nonHeapUsed() / metrics.nonHeapMax();
             Gauges.Gauge nonHeapGauge = gauges.percept(cortex().name("jvm.non-heap." + brokerId));
-            nonHeapGauge.increment();  // Non-heap typically grows over time
 
-            logger.debug("[Layer 1] Emitted JVM memory signals for {}: heap={}%",
-                brokerId, (int)(heapUtil * 100));
+            if (nonHeapUtil >= NON_HEAP_OVERFLOW_THRESHOLD) {
+                nonHeapGauge.overflow();  // "Non-heap is above 90%"
+            } else {
+                Double prevNonHeapUtil = previousNonHeapUtil.get(brokerId);
+                if (prevNonHeapUtil != null) {
+                    if (nonHeapUtil > prevNonHeapUtil) {
+                        nonHeapGauge.increment();  // "Non-heap is growing"
+                    } else if (nonHeapUtil < prevNonHeapUtil) {
+                        nonHeapGauge.decrement();  // "Non-heap is shrinking"
+                    } else {
+                        nonHeapGauge.increment();  // No change - emit activity signal
+                    }
+                } else {
+                    nonHeapGauge.increment();  // First observation
+                }
+            }
+
+            previousNonHeapUtil.put(brokerId, nonHeapUtil);
+
+            logger.debug("[Layer 1] Emitted JVM memory signals for {}: heap={}%, non-heap={}%",
+                brokerId, (int)(heapUtil * 100), (int)(nonHeapUtil * 100));
 
         } catch (java.lang.Exception e) {
             logger.error("Failed to emit JVM memory signals for {}: {}",
@@ -201,9 +223,13 @@ public class JvmMetricsObserver implements AutoCloseable {
             Long prevTime = previousGcTime.get(entityId);
             if (prevTime != null) {
                 long timeDelta = metrics.collectionTime() - prevTime;
-                if (timeDelta > 0) {
+                if (timeDelta > GC_TIME_OVERFLOW_THRESHOLD_MS) {
+                    gcTimeCounter.overflow();  // "GC time increased excessively (>5s)"
+                } else if (timeDelta > 0) {
                     gcTimeCounter.increment();  // "GC time increased"
                 }
+            } else {
+                gcTimeCounter.increment();  // First observation
             }
             previousGcTime.put(entityId, metrics.collectionTime());
 

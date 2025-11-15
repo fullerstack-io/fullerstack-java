@@ -101,12 +101,16 @@ class JvmMetricsObserverTest {
     }
 
     private JvmGcMetrics createGcMetrics(String brokerId, String collectorName, long count, long time) {
+        return createGcMetrics(brokerId, collectorName, count, time, System.currentTimeMillis());
+    }
+
+    private JvmGcMetrics createGcMetrics(String brokerId, String collectorName, long count, long time, long timestamp) {
         return new JvmGcMetrics(
             brokerId,
             collectorName,
             count,
             time,
-            System.currentTimeMillis()
+            timestamp
         );
     }
 
@@ -286,13 +290,14 @@ class JvmMetricsObserverTest {
         @Test
         @DisplayName("Should emit INCREMENT for normal GC count increase")
         void shouldEmitIncrementForNormalGcIncrease() {
-            // Given: Normal GC count
-            receptor.emitGc(createGcMetrics("broker-1", "G1YoungGeneration", 100L, 5000L));
+            // Given: Normal GC count at T=1000
+            long baseTime = 1000L;
+            receptor.emitGc(createGcMetrics("broker-1", "G1YoungGeneration", 100L, 5000L, baseTime));
             awaitSignalPropagation();
             capturedCounterSigns.clear();
 
-            // When: GC count increases by 1
-            receptor.emitGc(createGcMetrics("broker-1", "G1YoungGeneration", 101L, 5100L));
+            // When: GC count increases by 1 over 1 second (1 GC/sec, normal rate)
+            receptor.emitGc(createGcMetrics("broker-1", "G1YoungGeneration", 101L, 5100L, baseTime + 1000));
             awaitSignalPropagation();
 
             // Then: Should emit INCREMENT for count
@@ -305,13 +310,14 @@ class JvmMetricsObserverTest {
         @Test
         @DisplayName("Should emit OVERFLOW for GC storm (rapid increase)")
         void shouldEmitOverflowForGcStorm() {
-            // Given: Previous GC count
-            receptor.emitGc(createGcMetrics("broker-1", "G1YoungGeneration", 100L, 5000L));
+            // Given: Previous GC count at T=1000
+            long baseTime = 1000L;
+            receptor.emitGc(createGcMetrics("broker-1", "G1YoungGeneration", 100L, 5000L, baseTime));
             awaitSignalPropagation();
             capturedCounterSigns.clear();
 
-            // When: GC count increases by 50 (storm threshold)
-            receptor.emitGc(createGcMetrics("broker-1", "G1YoungGeneration", 150L, 8000L));
+            // When: GC count increases by 50 in 1 second (50 GCs/sec > 10 threshold)
+            receptor.emitGc(createGcMetrics("broker-1", "G1YoungGeneration", 150L, 8000L, baseTime + 1000));
             awaitSignalPropagation();
 
             // Then: Should emit OVERFLOW for count (indicating GC storm)
