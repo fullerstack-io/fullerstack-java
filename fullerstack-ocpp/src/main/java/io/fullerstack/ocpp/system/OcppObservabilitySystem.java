@@ -3,9 +3,11 @@ package io.fullerstack.ocpp.system;
 import io.fullerstack.ocpp.agents.ChargerDisableAgent;
 import io.fullerstack.ocpp.agents.TransactionStopAgent;
 import io.fullerstack.ocpp.observers.OcppMessageObserver;
+import io.fullerstack.ocpp.observers.CommandVerificationObserver;
 import io.fullerstack.ocpp.reporters.ChargerHealthReporter;
 import io.fullerstack.ocpp.server.OcppCentralSystem;
 import io.fullerstack.ocpp.server.OcppCommandExecutor;
+import io.fullerstack.ocpp.server.CommandTrackingExecutor;
 import io.humainary.substrates.Circuit;
 import io.humainary.substrates.Conduit;
 import io.humainary.substrates.ext.serventis.ext.agents.Agents;
@@ -59,6 +61,7 @@ public class OcppObservabilitySystem implements AutoCloseable {
 
     // Layer 1: Observers
     private final OcppMessageObserver messageObserver;
+    private final CommandVerificationObserver commandVerificationObserver;
 
     // Layer 3: Reporter Circuit and Components
     private final Circuit reporterCircuit;
@@ -84,7 +87,6 @@ public class OcppObservabilitySystem implements AutoCloseable {
         // Layer 0: OCPP Central System
         // ====================================================================
         this.centralSystem = new OcppCentralSystem(ocppPort);
-        OcppCommandExecutor commandExecutor = centralSystem::executeCommand;
 
         // ====================================================================
         // Layer 1: Instrumentation Circuits and Conduits
@@ -116,6 +118,10 @@ public class OcppObservabilitySystem implements AutoCloseable {
 
         this.messageObserver = new OcppMessageObserver(monitors, counters, gauges);
 
+        // Command verification observer for closed-loop feedback
+        this.commandVerificationObserver = new CommandVerificationObserver(monitors);
+        messageObserver.setCommandVerificationObserver(commandVerificationObserver);
+
         // Register message observer with central system
         centralSystem.registerMessageHandler(messageObserver);
 
@@ -143,8 +149,15 @@ public class OcppObservabilitySystem implements AutoCloseable {
             Agents::composer
         );
 
-        this.chargerDisableAgent = new ChargerDisableAgent(reporters, agents, commandExecutor);
-        this.transactionStopAgent = new TransactionStopAgent(reporters, agents, commandExecutor);
+        // Wrap command executor with tracking for closed-loop feedback
+        OcppCommandExecutor baseExecutor = centralSystem::executeCommand;
+        OcppCommandExecutor trackingExecutor = new CommandTrackingExecutor(
+            baseExecutor,
+            commandVerificationObserver
+        );
+
+        this.chargerDisableAgent = new ChargerDisableAgent(reporters, agents, trackingExecutor);
+        this.transactionStopAgent = new TransactionStopAgent(reporters, agents, trackingExecutor);
 
         logger.info("OCPP Observability System initialized successfully");
     }
@@ -165,6 +178,7 @@ public class OcppObservabilitySystem implements AutoCloseable {
         logger.info("  - Monitor Circuit: ACTIVE");
         logger.info("  - Reporter Circuit: ACTIVE");
         logger.info("  - Agent Circuit: ACTIVE (Autonomous Self-Regulation)");
+        logger.info("  - Command Verification: ENABLED (Closed-Loop Feedback)");
         logger.info("  - Connected Chargers: {}", centralSystem.getConnectedChargerCount());
     }
 
@@ -238,6 +252,7 @@ public class OcppObservabilitySystem implements AutoCloseable {
         chargerHealthReporter.close();
 
         // Close observers (Layer 1)
+        commandVerificationObserver.close();
         messageObserver.close();
 
         // Close central system (Layer 0)

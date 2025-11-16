@@ -41,6 +41,9 @@ public class OcppMessageObserver implements OcppMessageHandler, AutoCloseable {
     private final Map<String, ChargerStatus> chargerStates;
     private final Map<String, Long> lastHeartbeatTimes;
 
+    // Optional: Command verification for closed-loop feedback
+    private CommandVerificationObserver commandVerificationObserver;
+
     public OcppMessageObserver(
         Conduit<Monitors.Monitor, Monitors.Sign> monitors,
         Conduit<Counters.Counter, Counters.Sign> counters,
@@ -53,11 +56,28 @@ public class OcppMessageObserver implements OcppMessageHandler, AutoCloseable {
         this.lastHeartbeatTimes = new ConcurrentHashMap<>();
     }
 
+    /**
+     * Set command verification observer for closed-loop feedback.
+     * When set, all OCPP messages will be verified against pending commands.
+     *
+     * @param observer the command verification observer
+     */
+    public void setCommandVerificationObserver(CommandVerificationObserver observer) {
+        this.commandVerificationObserver = observer;
+        logger.info("Command verification enabled - closing feedback loop");
+    }
+
     @Override
     public void handleMessage(OcppMessage message) {
         logger.debug("Processing OCPP message: {} from charger {}",
             message.getClass().getSimpleName(), message.chargerId());
 
+        // Notify command verification observer FIRST (for closed-loop feedback)
+        if (commandVerificationObserver != null) {
+            commandVerificationObserver.verifyMessage(message);
+        }
+
+        // Then process message normally
         switch (message) {
             case OcppMessage.BootNotification boot -> handleBootNotification(boot);
             case OcppMessage.StatusNotification status -> handleStatusNotification(status);
