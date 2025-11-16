@@ -38,23 +38,23 @@
             <artifactId>humainary-substrates-ext-serventis</artifactId>
         </dependency>
 
-        <!-- OCPP Library (ChargeTimeEU) -->
+        <!-- OCPP Library (ChargeTimeEU) - OCPP 1.6 -->
         <dependency>
             <groupId>eu.chargetime.ocpp</groupId>
-            <artifactId>OCPP-J</artifactId>
-            <version>1.0.1</version>
+            <artifactId>v1_6</artifactId>
+            <version>1.2.0</version>
         </dependency>
         <dependency>
             <groupId>eu.chargetime.ocpp</groupId>
-            <artifactId>v2_0</artifactId>
-            <version>1.0.1</version>
+            <artifactId>common</artifactId>
+            <version>1.0.2</version>
         </dependency>
 
-        <!-- WebSocket Support -->
+        <!-- WebSocket Support (included in OCPP library, but keeping for direct use) -->
         <dependency>
             <groupId>org.java-websocket</groupId>
             <artifactId>Java-WebSocket</artifactId>
-            <version>1.5.3</version>
+            <version>1.5.4</version>
         </dependency>
 
         <!-- JSON Processing -->

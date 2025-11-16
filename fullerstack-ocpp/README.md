@@ -4,7 +4,7 @@ Comprehensive OCPP (Open Charge Point Protocol) integration using the Substrates
 
 ## Overview
 
-This module provides a complete OCPP 2.0+ Central System implementation that:
+This module provides a complete **OCPP 1.6** Central System implementation that:
 
 - ✅ Manages WebSocket connections to multiple EV chargers
 - ✅ Translates OCPP messages into semantic Substrates signals
@@ -13,6 +13,50 @@ This module provides a complete OCPP 2.0+ Central System implementation that:
 - ✅ Exposes REST API for external applications and dashboards
 - ✅ Provides deterministic event processing with temporal ordering
 - ✅ Implements operational safety with tiered confidence assessments
+
+## Two Implementation Modes
+
+### 1. Production Mode (`RealOcppCentralSystem`)
+
+**Full OCPP 1.6 implementation using ChargeTimeEU library:**
+- Real WebSocket server (ChargeTimeEU Java-OCA-OCPP)
+- Complete OCPP 1.6J protocol support
+- Production-ready with session management
+- Supports real chargers and test clients
+- **Use this for production deployment**
+
+**See:** `DEPLOYMENT.md` for full production guide
+
+### 2. Test Mode (`OcppCentralSystem`)
+
+**Simplified implementation for testing:**
+- Simulated message handling
+- Unit/integration test support
+- No external dependencies
+- **Use this for testing Substrates integration**
+
+## Quick Start
+
+### Run Production Demo
+
+```bash
+cd fullerstack-ocpp
+mvn exec:java -Dexec.mainClass="io.fullerstack.ocpp.example.OcppDemo"
+```
+
+This starts:
+- OCPP WebSocket server on port **8080**
+- REST API on port **9090**
+- Complete signal-flow architecture with adaptive responses
+
+### Connect a Charger
+
+Configure your OCPP 1.6 charger to connect to:
+```
+ws://localhost:8080/{chargerId}
+```
+
+Or use an OCPP simulator/test client.
 
 ## Architecture
 
@@ -287,13 +331,30 @@ mvn package
 
 ## Production Deployment
 
-For production use, integrate with a full OCPP library:
+The module includes **full production integration** using the [ChargeTimeEU Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) library.
 
-- [ChargeTimeEU/Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) - OCPP 2.0.1
-- [steve-community/steve](https://github.com/steve-community/steve) - SteVe Central System
+**See `DEPLOYMENT.md` for:**
+- Building and running
+- Connecting real chargers
+- OCPP message support matrix
+- Testing with simulators
+- REST API usage
+- Security configuration
+- Performance tuning
+- Monitoring and observability
+- Troubleshooting guide
+- Production deployment checklist
 
-Replace the simplified `OcppCentralSystem` with a production WebSocket server
-while keeping the Substrates integration layer intact.
+## Real-World Example
+
+See `io.fullerstack.ocpp.example.OcppDemo` for a complete working example that demonstrates:
+
+1. **Production OCPP Server** with WebSocket transport
+2. **Substrates signal-flow** architecture (all 5 layers)
+3. **Adaptive coordination** (auto-disable faulty chargers)
+4. **REST API** for external access
+5. **Offline operation** with event sourcing
+6. **Signal logging** for observability
 
 ## License
 
