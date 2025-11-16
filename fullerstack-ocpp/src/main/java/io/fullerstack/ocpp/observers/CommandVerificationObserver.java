@@ -211,6 +211,11 @@ public class CommandVerificationObserver implements AutoCloseable {
             case OcppCommand.RemoteStartTransaction rst -> "StartTransaction";
             case OcppCommand.UnlockConnector uc -> "StatusNotification";
             case OcppCommand.Reset r -> "BootNotification";  // After reset, charger reboots
+            // Smart Charging commands - these have synchronous confirmation responses
+            // rather than async message responses, so verification is immediate
+            case OcppCommand.SetChargingProfile scp -> "None";  // Synchronous confirmation only
+            case OcppCommand.ClearChargingProfile ccp -> "None";  // Synchronous confirmation only
+            case OcppCommand.GetCompositeSchedule gcs -> "None";  // Response is synchronous
             default -> "Unknown";
         };
     }
