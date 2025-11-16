@@ -2,7 +2,6 @@ package io.fullerstack.ocpp.example;
 
 import io.fullerstack.ocpp.server.production.RealOcppCentralSystem;
 import io.fullerstack.ocpp.observers.OcppMessageObserver;
-import io.fullerstack.ocpp.monitors.ChargerConnectionMonitor;
 import io.fullerstack.ocpp.reporters.ChargerHealthReporter;
 import io.fullerstack.ocpp.actors.ChargerDisableActor;
 import io.fullerstack.ocpp.actors.TransactionStopActor;
@@ -78,12 +77,11 @@ public class OcppDemo {
         );
 
         // ================================================================
-        // Layer 1-2: Observers (OBSERVE/ORIENT)
+        // Layer 1: Observers (OBSERVE)
         // ================================================================
-        logger.info("[Layer 1-2] Creating observers");
+        logger.info("[Layer 1] Creating observers");
 
         OcppMessageObserver messageObserver = new OcppMessageObserver(monitors, counters, gauges);
-        ChargerConnectionMonitor connectionMonitor = new ChargerConnectionMonitor(monitors);
 
         // Register observer with Central System
         centralSystem.registerMessageHandler(messageObserver);
@@ -134,7 +132,6 @@ public class OcppDemo {
         logger.info("Starting all systems...");
 
         centralSystem.start();
-        connectionMonitor.start();
         restApi.start();
 
         logger.info("");
@@ -148,7 +145,7 @@ public class OcppDemo {
         logger.info("Signal Flow Architecture:");
         logger.info("  Layer 0: OCPP Protocol (WebSocket)");
         logger.info("  Layer 1: OBSERVE (Message → Signals)");
-        logger.info("  Layer 2: ORIENT (Health Monitoring)");
+        logger.info("  Layer 2: ORIENT (Signal Flow)");
         logger.info("  Layer 3: DECIDE (Urgency Assessment)");
         logger.info("  Layer 4: ACT (Adaptive Commands)");
         logger.info("");
@@ -173,7 +170,6 @@ public class OcppDemo {
                 stopActor.close();
                 disableActor.close();
                 healthReporter.close();
-                connectionMonitor.close();
                 messageObserver.close();
                 centralSystem.close();
                 stateManager.close();

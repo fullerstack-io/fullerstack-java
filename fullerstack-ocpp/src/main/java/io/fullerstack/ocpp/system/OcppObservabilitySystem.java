@@ -2,7 +2,6 @@ package io.fullerstack.ocpp.system;
 
 import io.fullerstack.ocpp.actors.ChargerDisableActor;
 import io.fullerstack.ocpp.actors.TransactionStopActor;
-import io.fullerstack.ocpp.monitors.ChargerConnectionMonitor;
 import io.fullerstack.ocpp.observers.OcppMessageObserver;
 import io.fullerstack.ocpp.reporters.ChargerHealthReporter;
 import io.fullerstack.ocpp.server.OcppCentralSystem;
@@ -29,7 +28,7 @@ import static io.humainary.substrates.Substrates.cortex;
  *          ↓
  * Layer 1: OBSERVE - OcppMessageObserver translates messages to signals
  *          ↓ (Monitors, Counters, Gauges)
- * Layer 2: ORIENT - ChargerConnectionMonitor tracks health
+ * Layer 2: ORIENT - Monitor signals flow through circuits
  *          ↓ (Monitor.Sign: STABLE, DEGRADED, DOWN, etc.)
  * Layer 3: DECIDE - ChargerHealthReporter assesses urgency
  *          ↓ (Reporter.Sign: NORMAL, WARNING, CRITICAL)
@@ -57,9 +56,8 @@ public class OcppObservabilitySystem implements AutoCloseable {
     private final Conduit<Counters.Counter, Counters.Sign> counters;
     private final Conduit<Gauges.Gauge, Gauges.Sign> gauges;
 
-    // Layer 1-2: Observers
+    // Layer 1: Observers
     private final OcppMessageObserver messageObserver;
-    private final ChargerConnectionMonitor connectionMonitor;
 
     // Layer 3: Reporter Circuit and Components
     private final Circuit reporterCircuit;
@@ -111,12 +109,11 @@ public class OcppObservabilitySystem implements AutoCloseable {
         );
 
         // ====================================================================
-        // Layer 1-2: Observers (OBSERVE/ORIENT)
+        // Layer 1: Observers (OBSERVE)
         // ====================================================================
-        logger.info("Creating Layer 1-2 observers");
+        logger.info("Creating Layer 1 observers");
 
         this.messageObserver = new OcppMessageObserver(monitors, counters, gauges);
-        this.connectionMonitor = new ChargerConnectionMonitor(monitors);
 
         // Register message observer with central system
         centralSystem.registerMessageHandler(messageObserver);
@@ -154,7 +151,6 @@ public class OcppObservabilitySystem implements AutoCloseable {
     /**
      * Start the complete system.
      * - Starts OCPP Central System server
-     * - Activates connection monitoring
      * - Enables signal flow through all circuits
      */
     public void start() {
@@ -162,9 +158,6 @@ public class OcppObservabilitySystem implements AutoCloseable {
 
         // Start OCPP server
         centralSystem.start();
-
-        // Start connection monitor
-        connectionMonitor.start();
 
         logger.info("OCPP Observability System started successfully");
         logger.info("  - OCPP Central System: RUNNING");
@@ -179,9 +172,6 @@ public class OcppObservabilitySystem implements AutoCloseable {
      */
     public void stop() {
         logger.info("Stopping OCPP Observability System");
-
-        // Stop monitoring
-        connectionMonitor.stop();
 
         // Stop OCPP server
         centralSystem.stop();
@@ -246,8 +236,7 @@ public class OcppObservabilitySystem implements AutoCloseable {
         // Close reporters (Layer 3)
         chargerHealthReporter.close();
 
-        // Close observers (Layer 1-2)
-        connectionMonitor.close();
+        // Close observers (Layer 1)
         messageObserver.close();
 
         // Close central system (Layer 0)

@@ -42,12 +42,12 @@
         <dependency>
             <groupId>eu.chargetime.ocpp</groupId>
             <artifactId>v1_6</artifactId>
-            <version>1.2.0</version>
+            <version>1.1.0</version>
         </dependency>
         <dependency>
             <groupId>eu.chargetime.ocpp</groupId>
             <artifactId>common</artifactId>
-            <version>1.0.2</version>
+            <version>1.1.0</version>
         </dependency>
 
         <!-- WebSocket Support (included in OCPP library, but keeping for direct use) -->
