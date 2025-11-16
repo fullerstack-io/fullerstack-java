@@ -163,7 +163,7 @@ public class OcppDemo {
         logger.info("");
 
         // Subscribe to signals for logging
-        setupSignalLogging(monitors, reporters, actors);
+        setupSignalLogging(monitors, reporters, agents);
 
         // Add shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
