@@ -125,10 +125,10 @@ public class ConsumerRebalanceAgentMonitor implements ConsumerRebalanceListener,
         this.lagMonitor = lagMonitor;
 
         // Create agents using static cortex() pattern (RC7)
-        this.consumer = agents.get(
+        this.consumer = agents.percept(
             io.humainary.substrates.api.Substrates.cortex().name(consumerId)
         );
-        this.coordinator = agents.get(
+        this.coordinator = agents.percept(
             io.humainary.substrates.api.Substrates.cortex().name("coordinator-" + consumerGroup)
         );
 
@@ -166,7 +166,7 @@ public class ConsumerRebalanceAgentMonitor implements ConsumerRebalanceListener,
 
             // Consumer inquires about joining new generation
             // OUTBOUND: "I ask to participate in rebalance"
-            consumer.inquire();
+            consumer.inquire(Agents.Dimension.PROMISER);
             // Signal processing happens asynchronously via Valve
 
             rebalanceStartTime = System.currentTimeMillis();
@@ -207,15 +207,15 @@ public class ConsumerRebalanceAgentMonitor implements ConsumerRebalanceListener,
 
             // Step 1: Coordinator offers partition assignment
             // INBOUND: "Coordinator offered me these partitions" (past tense, observed)
-            coordinator.offered();
+            coordinator.offer(Agents.Dimension.PROMISEE);
 
             // Step 2: Consumer promises to consume partitions
             // OUTBOUND: "I promise to consume these partitions" (present tense, self)
-            consumer.promise();
+            consumer.promise(Agents.Dimension.PROMISER);
 
             // Step 3: Coordinator accepts the promise
             // INBOUND: "Coordinator accepted my promise" (past tense, observed)
-            coordinator.accepted();
+            coordinator.accept(Agents.Dimension.PROMISEE);
 
             // All signals process asynchronously via Valve
 
@@ -305,7 +305,7 @@ public class ConsumerRebalanceAgentMonitor implements ConsumerRebalanceListener,
                 logger.warn("Consumer {} BREACHED promise: lag={} exceeds threshold={}",
                     consumerId, totalLag, BREACH_LAG_THRESHOLD);
 
-                consumer.breach();  // OUTBOUND: "I failed to keep my promise"
+                consumer.breach(Agents.Dimension.PROMISER);  // OUTBOUND: "I failed to keep my promise"
                 // Signal processes asynchronously
 
                 stopBreachMonitoring();
@@ -315,7 +315,7 @@ public class ConsumerRebalanceAgentMonitor implements ConsumerRebalanceListener,
                 logger.info("Consumer {} FULFILLED promise: lag={} below threshold={}",
                     consumerId, totalLag, FULFILL_LAG_THRESHOLD);
 
-                consumer.fulfill();  // OUTBOUND: "I kept my promise"
+                consumer.fulfill(Agents.Dimension.PROMISER);  // OUTBOUND: "I kept my promise"
                 // Signal processes asynchronously
 
                 stopBreachMonitoring();

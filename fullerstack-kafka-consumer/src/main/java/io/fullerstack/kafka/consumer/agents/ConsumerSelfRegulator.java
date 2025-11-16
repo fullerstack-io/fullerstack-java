@@ -1,8 +1,9 @@
 package io.fullerstack.kafka.consumer.agents;
 
-import io.humainary.substrates.ext.serventis.ext.agents.Agents;
-import io.humainary.substrates.ext.serventis.ext.agents.Agents.Agent;
-import io.humainary.substrates.ext.serventis.ext.monitors.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Agents;
+import io.humainary.substrates.ext.serventis.ext.Agents.Agent;
+import io.humainary.substrates.ext.serventis.ext.Agents.Dimension;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
 import io.humainary.substrates.api.Substrates.*;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.slf4j.Logger;
@@ -15,7 +16,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
  * Layer 4a (ACT - Agents): Autonomous promise-based self-regulation for Kafka consumers.
@@ -204,10 +205,10 @@ public class ConsumerSelfRegulator implements AutoCloseable {
             return;  // Already paused
         }
 
-        Agent agent = agents.channel(cortex.name("agent.consumer.pause"));
+        Agent agent = agents.percept(cortex.name("agent.consumer.pause"));
 
         // PROMISER perspective: I am making this promise
-        agent.promise();  // "I promise to pause the consumer"
+        agent.promise(Dimension.PROMISER);  // "I promise to pause the consumer"
 
         try {
             logger.warn("[AGENTS] Pausing consumer due to {} - pausing all assigned partitions",
@@ -217,7 +218,7 @@ public class ConsumerSelfRegulator implements AutoCloseable {
             consumer.pause(consumer.assignment());
 
             // Agent kept promise
-            agent.fulfill();  // PROMISER: "I fulfilled my promise to pause"
+            agent.fulfill(Dimension.PROMISER);  // PROMISER: "I fulfilled my promise to pause"
 
             logger.info("[AGENTS] Promise fulfilled: Consumer paused ({} partitions)",
                 consumer.assignment().size());
@@ -225,9 +226,9 @@ public class ConsumerSelfRegulator implements AutoCloseable {
             // Schedule auto-resume after cooldown (safety mechanism)
             scheduleAutoResume(Duration.ofSeconds(30));
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             // Agent failed to keep promise
-            agent.breach();  // PROMISER: "I failed to fulfill my promise"
+            agent.breach(Dimension.PROMISER);  // PROMISER: "I failed to fulfill my promise"
 
             logger.error("[AGENTS] Promise breached: Failed to pause consumer", e);
 
@@ -247,10 +248,10 @@ public class ConsumerSelfRegulator implements AutoCloseable {
             return;  // Already running
         }
 
-        Agent agent = agents.channel(cortex.name("agent.consumer.resume"));
+        Agent agent = agents.percept(cortex.name("agent.consumer.resume"));
 
         // PROMISER perspective: I am making this promise
-        agent.promise();  // "I promise to resume the consumer"
+        agent.promise(Dimension.PROMISER);  // "I promise to resume the consumer"
 
         try {
             logger.info("[AGENTS] Resuming consumer due to {} - resuming all paused partitions",
@@ -260,14 +261,14 @@ public class ConsumerSelfRegulator implements AutoCloseable {
             consumer.resume(consumer.paused());
 
             // Agent kept promise
-            agent.fulfill();  // PROMISER: "I fulfilled my promise to resume"
+            agent.fulfill(Dimension.PROMISER);  // PROMISER: "I fulfilled my promise to resume"
 
             logger.info("[AGENTS] Promise fulfilled: Consumer resumed ({} partitions)",
                 consumer.paused().size());
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             // Agent failed to keep promise
-            agent.breach();  // PROMISER: "I failed to fulfill my promise"
+            agent.breach(Dimension.PROMISER);  // PROMISER: "I failed to fulfill my promise"
 
             logger.error("[AGENTS] Promise breached: Failed to resume consumer", e);
 
