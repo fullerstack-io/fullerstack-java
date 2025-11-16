@@ -186,22 +186,38 @@ public class OcppMessageObserver implements OcppMessageHandler, AutoCloseable {
      * MeterValues → Emit Gauge signals for power, energy, temperature, SoC
      */
     private void handleMeterValues(OcppMessage.MeterValues meter) {
-        String baseName = meter.chargerId() + ".connector." + meter.connectorId();
-        logger.trace("Meter values from {}: {}", baseName, meter.values());
+        logger.trace("Meter values from charger {}: {}", meter.chargerId(), meter.values());
 
         // Emit gauge signals for each measured value
         for (Map.Entry<String, Double> entry : meter.values().entrySet()) {
             String measurementType = entry.getKey();
             Double value = entry.getValue();
 
-            String gaugeName = baseName + "." + normalizeMeasurementName(measurementType);
-            Gauges.Gauge gauge = gauges.percept(cortex().name(gaugeName));
+            // Emit power gauge at charger level for load balancing
+            if (isPowerMeasurement(measurementType)) {
+                // Charger-level power gauge (for load balancing)
+                Gauges.Gauge powerGauge = gauges.percept(
+                    cortex().name(meter.chargerId()).name("power")
+                );
+                powerGauge.measured(value);  // Emit measured value in Watts
 
-            // Emit gauge signal - increment/decrement based on value change
-            // For simplicity, we'll emit set() signals
-            // In production, you'd track previous values and emit increment/decrement
-            gauge.set();  // Value changed
+                logger.debug("Charger {} power: {}W", meter.chargerId(), value);
+            }
+
+            // Also emit connector-level gauge for detailed tracking
+            String gaugeName = meter.chargerId() + ".connector." + meter.connectorId() + "." +
+                normalizeMeasurementName(measurementType);
+            Gauges.Gauge gauge = gauges.percept(cortex().name(gaugeName));
+            gauge.measured(value);
         }
+    }
+
+    /**
+     * Check if measurement is a power measurement.
+     */
+    private boolean isPowerMeasurement(String measurementType) {
+        return measurementType.contains("Power.Active.Import") ||
+               measurementType.contains("Power.Active");
     }
 
     /**

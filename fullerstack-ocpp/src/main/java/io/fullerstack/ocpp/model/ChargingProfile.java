@@ -57,7 +57,7 @@ public record ChargingProfile(
     /**
      * Recurrency pattern for recurring profiles.
      */
-    public enum Recurrency Kind {
+    public enum RecurrencyKind {
         Daily,
         Weekly
     }
