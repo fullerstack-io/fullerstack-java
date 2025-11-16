@@ -85,6 +85,27 @@ Events can be:
 - Synchronized with cloud backend
 - Audited for compliance
 
+## Agents vs Actors: Critical Distinction
+
+**This system uses AGENTS, not ACTORS:**
+
+### Agents API (What We Use)
+- **Purpose**: Autonomous self-regulation (Promise Theory - Mark Burgess)
+- **Interaction**: System regulates itself based on observed signals
+- **Speed**: Millisecond response, NO human approval needed
+- **Semantics**: `promise()` → `fulfill()` or `breach()`
+- **Use Cases**: Auto-disable faulty chargers, stop critical transactions, load balancing
+- **Scalability**: Handles thousands of chargers without coordination bottleneck
+
+### Actors API (What We DON'T Use)
+- **Purpose**: Human-to-AI interactions
+- **Interaction**: Human operator commands, approval workflows
+- **Speed**: Requires human-in-the-loop
+- **Semantics**: `DELIVER`, `DENY` speech acts
+- **Use Cases**: Manual operator commands, approval processes, human decision points
+
+**Example**: When a charger reports a ground fault, our **ChargerDisableAgent** autonomously promises to disable it, executes the OCPP command, and fulfills (or breaches) that promise—all without human intervention. This is closed-loop autonomous control.
+
 ## Component Responsibilities
 
 ### OcppMessageObserver
@@ -111,21 +132,6 @@ private void handleBootNotification(BootNotification boot) {
 }
 ```
 
-### ChargerConnectionMonitor
-
-**Layer**: 2 (Orient)
-
-**Input**: Heartbeat timestamps
-
-**Output**: DOWN signals for offline chargers
-
-**Responsibilities**:
-- Track heartbeat times for all chargers
-- Periodically check for timeouts
-- Emit DOWN signals for offline chargers
-
-**Pattern**: Similar to JvmMetricsObserver - scheduled monitoring
-
 ### ChargerHealthReporter
 
 **Layer**: 3 (Decide)
@@ -150,40 +156,50 @@ private Reporters.Sign assessUrgency(Monitors.Sign sign) {
 }
 ```
 
-### ChargerDisableActor
+### ChargerDisableAgent
 
-**Layer**: 4 (Act)
+**Layer**: 4 (Act - Autonomous Agents)
 
 **Input**: CRITICAL reporter signals
 
-**Output**: ChangeAvailability commands + DELIVER/DENY speech acts
+**Output**: ChangeAvailability commands + promise/fulfill/breach signals
 
 **Responsibilities**:
 - Subscribe to charger health reporters
 - Filter for CRITICAL signals
-- Execute ChangeAvailability(Inoperative) command
-- Emit DELIVER on success, DENY on failure
+- Autonomously promise to execute ChangeAvailability(Inoperative) command
+- Fulfill promise on success, breach on failure
+
+**Promise Theory Pattern**:
+1. Agent PROMISES to disable charger
+2. Agent executes OCPP command
+3. Agent FULFILLS promise (success) or BREACHES (failure)
 
 **Protection Mechanisms**:
 - Rate limiting (5 minute interval)
 - Idempotency (prevent duplicate actions)
-- Speech acts (observability of actor decisions)
+- Promise semantics (observability of agent decisions)
 
-### TransactionStopActor
+### TransactionStopAgent
 
-**Layer**: 4 (Act)
+**Layer**: 4 (Act - Autonomous Agents)
 
 **Input**: CRITICAL connector health signals
 
-**Output**: RemoteStopTransaction commands + DELIVER/DENY speech acts
+**Output**: RemoteStopTransaction commands + promise/fulfill/breach signals
 
 **Responsibilities**:
 - Subscribe to connector health reporters
 - Track active transactions
-- Execute RemoteStopTransaction on critical faults
-- Emit speech acts for observability
+- Autonomously promise to execute RemoteStopTransaction on critical faults
+- Emit promise fulfillment/breach for observability
 
-**Use Case**: Safely terminate charging when connector faults detected
+**Promise Theory Pattern**:
+1. Agent PROMISES to stop transaction
+2. Agent executes OCPP command
+3. Agent FULFILLS promise (success) or BREACHES (failure)
+
+**Use Case**: Autonomously and safely terminate charging when connector faults detected
 
 ### OfflineStateManager
 
@@ -242,10 +258,10 @@ this.reporterCircuit = cortex().circuit(cortex().name(systemName + "-reporters")
 this.reporters = reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
 this.chargerHealthReporter = new ChargerHealthReporter(monitors, reporters);
 
-// Layer 4: Actors
-this.actorCircuit = cortex().circuit(cortex().name(systemName + "-actors"));
-this.actors = actorCircuit.conduit(cortex().name("actors"), Actors::composer);
-this.chargerDisableActor = new ChargerDisableActor(reporters, actors, commandExecutor);
+// Layer 4: Agents (Autonomous Self-Regulation)
+this.agentCircuit = cortex().circuit(cortex().name(systemName + "-agents"));
+this.agents = agentCircuit.conduit(cortex().name("agents"), Agents::composer);
+this.chargerDisableAgent = new ChargerDisableAgent(reporters, agents, commandExecutor);
 ```
 
 ## Concurrency and Threading
@@ -256,7 +272,7 @@ Each circuit processes signals on its own thread:
 
 - **Monitor Circuit**: Processes all monitor signal emissions
 - **Reporter Circuit**: Processes all reporter assessments
-- **Actor Circuit**: Processes all actor executions
+- **Agent Circuit**: Processes all autonomous agent promise/fulfill/breach signals
 
 ### Deterministic Ordering
 
@@ -285,23 +301,26 @@ try {
 }
 ```
 
-### Actor Level
+### Agent Level
 
 ```java
+Agent agent = agents.channel(cortex().name(agentName + "." + actionKey));
 try {
+    agent.promise();  // "I promise to execute this action"
     action.run();
-    emitDeliver(actionKey);
+    agent.fulfill();  // "I fulfilled my promise"
 } catch (Exception e) {
-    logger.error("Actor action failed: {}", e.getMessage(), e);
-    emitDeny(actionKey, "failed: " + e.getMessage());
+    logger.error("Agent action failed: {}", e.getMessage(), e);
+    agent.breach();   // "I failed to fulfill my promise"
 }
 ```
 
 ### System Level
 
-- Actors emit DENY speech acts on failure
+- Agents emit BREACH signals on promise failure
 - Reporters continue assessing despite individual failures
-- System remains operational even if actors fail
+- System remains operational even if agents fail
+- Promise semantics provide clear accountability
 
 ## Testing Strategy
 
@@ -330,10 +349,11 @@ void testCompleteOodaLoop() {
     system.getCentralSystem().simulateIncomingMessage(faultStatus);
     system.awaitSignalProcessing();
 
-    // Verify complete flow
+    // Verify complete flow (autonomous agent response)
     assertThat(monitorSigns).contains(Monitors.Sign.DOWN);
     assertThat(reporterSigns).contains(Reporters.Sign.CRITICAL);
-    assertThat(actorSigns).contains(Actors.Sign.DELIVER);
+    assertThat(agentSigns).contains(Agents.Sign.PROMISED);
+    assertThat(agentSigns).contains(Agents.Sign.FULFILLED);
 }
 ```
 

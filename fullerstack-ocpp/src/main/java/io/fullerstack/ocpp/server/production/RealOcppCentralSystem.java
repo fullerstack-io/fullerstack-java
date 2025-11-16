@@ -331,7 +331,18 @@ public class RealOcppCentralSystem implements OcppCommandExecutor, AutoCloseable
             chargerSessions.remove(chargerId);
             logger.info("Lost session: charger {} disconnected (session: {})", chargerId, sessionId);
 
-            // TODO: Emit signal for charger offline
+            // Signal-first: Emit disconnection as OCPP message
+            // When we observe a disconnect, we signal it immediately
+            OcppMessage.StatusNotification disconnectMessage = new OcppMessage.StatusNotification(
+                chargerId,
+                java.time.Instant.now(),
+                UUID.randomUUID().toString(),
+                0,  // Connector 0 = entire charger
+                "Unavailable",  // Status when disconnected
+                "NoError"  // Disconnection is not an error code
+            );
+
+            notifyHandlers(disconnectMessage);
         }
     }
 

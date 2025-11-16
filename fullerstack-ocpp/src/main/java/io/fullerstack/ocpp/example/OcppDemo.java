@@ -2,15 +2,19 @@ package io.fullerstack.ocpp.example;
 
 import io.fullerstack.ocpp.server.production.RealOcppCentralSystem;
 import io.fullerstack.ocpp.observers.OcppMessageObserver;
-import io.fullerstack.ocpp.monitors.ChargerConnectionMonitor;
 import io.fullerstack.ocpp.reporters.ChargerHealthReporter;
-import io.fullerstack.ocpp.actors.ChargerDisableActor;
-import io.fullerstack.ocpp.actors.TransactionStopActor;
+import io.fullerstack.ocpp.agents.ChargerDisableAgent;
+import io.fullerstack.ocpp.agents.TransactionStopAgent;
 import io.fullerstack.ocpp.offline.OfflineStateManager;
 import io.fullerstack.ocpp.api.OcppRestApi;
 import io.humainary.substrates.Circuit;
 import io.humainary.substrates.Conduit;
-import io.humainary.substrates.ext.serventis.ext.*;
+import io.humainary.substrates.ext.serventis.ext.agents.Agents;
+import io.humainary.substrates.ext.serventis.ext.agents.Agents.Agent;
+import io.humainary.substrates.ext.serventis.ext.counters.Counters;
+import io.humainary.substrates.ext.serventis.ext.gauges.Gauges;
+import io.humainary.substrates.ext.serventis.ext.monitors.Monitors;
+import io.humainary.substrates.ext.serventis.ext.reporters.Reporters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,12 +82,11 @@ public class OcppDemo {
         );
 
         // ================================================================
-        // Layer 1-2: Observers (OBSERVE/ORIENT)
+        // Layer 1: Observers (OBSERVE)
         // ================================================================
-        logger.info("[Layer 1-2] Creating observers");
+        logger.info("[Layer 1] Creating observers");
 
         OcppMessageObserver messageObserver = new OcppMessageObserver(monitors, counters, gauges);
-        ChargerConnectionMonitor connectionMonitor = new ChargerConnectionMonitor(monitors);
 
         // Register observer with Central System
         centralSystem.registerMessageHandler(messageObserver);
@@ -94,7 +97,7 @@ public class OcppDemo {
         logger.info("[Layer 3] Creating reporter circuit");
 
         Circuit reporterCircuit = cortex().circuit(cortex().name("ocpp-demo-reporters"));
-        Conduit<Reporters.Reporter, Reporters.Sign> reporters = reporterCircuit.conduit(
+        Conduit<Reporters.Reporter, Reporters.Signal> reporters = reporterCircuit.conduit(
             cortex().name("reporters"),
             Reporters::composer
         );
@@ -102,18 +105,18 @@ public class OcppDemo {
         ChargerHealthReporter healthReporter = new ChargerHealthReporter(monitors, reporters);
 
         // ================================================================
-        // Layer 4: Actors (ACT)
+        // Layer 4: Agents (ACT - Autonomous Self-Regulation)
         // ================================================================
-        logger.info("[Layer 4] Creating actor circuit");
+        logger.info("[Layer 4] Creating agent circuit (Agents API - autonomous)");
 
-        Circuit actorCircuit = cortex().circuit(cortex().name("ocpp-demo-actors"));
-        Conduit<Actors.Actor, Actors.Sign> actors = actorCircuit.conduit(
-            cortex().name("actors"),
-            Actors::composer
+        Circuit agentCircuit = cortex().circuit(cortex().name("ocpp-demo-agents"));
+        Conduit<Agent, Agents.Signal> agents = agentCircuit.conduit(
+            cortex().name("agents"),
+            Agents::composer
         );
 
-        ChargerDisableActor disableActor = new ChargerDisableActor(reporters, actors, centralSystem);
-        TransactionStopActor stopActor = new TransactionStopActor(reporters, actors, centralSystem);
+        ChargerDisableAgent disableAgent = new ChargerDisableAgent(reporters, agents, centralSystem);
+        TransactionStopAgent stopAgent = new TransactionStopAgent(reporters, agents, centralSystem);
 
         // ================================================================
         // Cross-cutting: Offline State Management
@@ -134,7 +137,6 @@ public class OcppDemo {
         logger.info("Starting all systems...");
 
         centralSystem.start();
-        connectionMonitor.start();
         restApi.start();
 
         logger.info("");
@@ -148,20 +150,20 @@ public class OcppDemo {
         logger.info("Signal Flow Architecture:");
         logger.info("  Layer 0: OCPP Protocol (WebSocket)");
         logger.info("  Layer 1: OBSERVE (Message → Signals)");
-        logger.info("  Layer 2: ORIENT (Health Monitoring)");
+        logger.info("  Layer 2: ORIENT (Signal Flow)");
         logger.info("  Layer 3: DECIDE (Urgency Assessment)");
-        logger.info("  Layer 4: ACT (Adaptive Commands)");
+        logger.info("  Layer 4: ACT (Autonomous Agents - Promise Theory)");
         logger.info("");
-        logger.info("Adaptive Responses:");
-        logger.info("  - CRITICAL health → Auto-disable charger");
-        logger.info("  - CRITICAL connector → Remote stop transaction");
+        logger.info("Adaptive Responses (Autonomous):");
+        logger.info("  - CRITICAL health → Agent autonomously disables charger");
+        logger.info("  - CRITICAL connector → Agent autonomously stops transaction");
         logger.info("");
         logger.info("Press Ctrl+C to shutdown");
         logger.info("====================================================");
         logger.info("");
 
         // Subscribe to signals for logging
-        setupSignalLogging(monitors, reporters, actors);
+        setupSignalLogging(monitors, reporters, agents);
 
         // Add shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -170,10 +172,9 @@ public class OcppDemo {
 
             try {
                 restApi.close();
-                stopActor.close();
-                disableActor.close();
+                stopAgent.close();
+                disableAgent.close();
                 healthReporter.close();
-                connectionMonitor.close();
                 messageObserver.close();
                 centralSystem.close();
                 stateManager.close();
@@ -193,8 +194,8 @@ public class OcppDemo {
      */
     private static void setupSignalLogging(
         Conduit<Monitors.Monitor, Monitors.Sign> monitors,
-        Conduit<Reporters.Reporter, Reporters.Sign> reporters,
-        Conduit<Actors.Actor, Actors.Sign> actors
+        Conduit<Reporters.Reporter, Reporters.Signal> reporters,
+        Conduit<Agent, Agents.Signal> agents
     ) {
         // Log critical monitor signals
         monitors.subscribe(cortex().subscriber(
@@ -218,8 +219,8 @@ public class OcppDemo {
             cortex().name("demo-reporter-logger"),
             (subject, registrar) -> {
                 String reporterName = subject.name().path();
-                registrar.register(sign -> {
-                    switch (sign) {
+                registrar.register(signal -> {
+                    switch (signal.sign()) {
                         case CRITICAL -> logger.error("🚨 REPORTER [{}] → CRITICAL", reporterName);
                         case WARNING -> logger.warn("⚠️  REPORTER [{}] → WARNING", reporterName);
                         case NORMAL -> logger.info("✅ REPORTER [{}] → NORMAL", reporterName);
@@ -228,15 +229,16 @@ public class OcppDemo {
             }
         ));
 
-        // Log all actor speech acts
-        actors.subscribe(cortex().subscriber(
-            cortex().name("demo-actor-logger"),
+        // Log all agent promise signals
+        agents.subscribe(cortex().subscriber(
+            cortex().name("demo-agent-logger"),
             (subject, registrar) -> {
-                String actorName = subject.name().path();
-                registrar.register(sign -> {
-                    switch (sign) {
-                        case DELIVER -> logger.info("✓ ACTOR [{}] → DELIVER (action succeeded)", actorName);
-                        case DENY -> logger.warn("✗ ACTOR [{}] → DENY (action blocked/failed)", actorName);
+                String agentName = subject.name().path();
+                registrar.register(signal -> {
+                    switch (signal.sign()) {
+                        case PROMISED -> logger.info("🤝 AGENT [{}] → PROMISED (committing to action)", agentName);
+                        case FULFILLED -> logger.info("✓ AGENT [{}] → FULFILLED (promise kept)", agentName);
+                        case BREACHED -> logger.warn("✗ AGENT [{}] → BREACHED (promise broken)", agentName);
                     }
                 });
             }
