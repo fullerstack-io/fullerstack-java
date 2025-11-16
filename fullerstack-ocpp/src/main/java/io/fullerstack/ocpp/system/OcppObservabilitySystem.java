@@ -1,18 +1,19 @@
 package io.fullerstack.ocpp.system;
 
-import io.fullerstack.ocpp.actors.ChargerDisableActor;
-import io.fullerstack.ocpp.actors.TransactionStopActor;
+import io.fullerstack.ocpp.agents.ChargerDisableAgent;
+import io.fullerstack.ocpp.agents.TransactionStopAgent;
 import io.fullerstack.ocpp.observers.OcppMessageObserver;
 import io.fullerstack.ocpp.reporters.ChargerHealthReporter;
 import io.fullerstack.ocpp.server.OcppCentralSystem;
 import io.fullerstack.ocpp.server.OcppCommandExecutor;
 import io.humainary.substrates.Circuit;
 import io.humainary.substrates.Conduit;
-import io.humainary.substrates.ext.serventis.ext.Actors;
-import io.humainary.substrates.ext.serventis.ext.Counters;
-import io.humainary.substrates.ext.serventis.ext.Gauges;
-import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.agents.Agents;
+import io.humainary.substrates.ext.serventis.ext.agents.Agents.Agent;
+import io.humainary.substrates.ext.serventis.ext.counters.Counters;
+import io.humainary.substrates.ext.serventis.ext.gauges.Gauges;
+import io.humainary.substrates.ext.serventis.ext.monitors.Monitors;
+import io.humainary.substrates.ext.serventis.ext.reporters.Reporters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,9 +33,9 @@ import static io.humainary.substrates.Substrates.cortex;
  *          ↓ (Monitor.Sign: STABLE, DEGRADED, DOWN, etc.)
  * Layer 3: DECIDE - ChargerHealthReporter assesses urgency
  *          ↓ (Reporter.Sign: NORMAL, WARNING, CRITICAL)
- * Layer 4: ACT - Actors execute semantic commands
- *          ↓ (ChargerDisableActor, TransactionStopActor)
- *          ↓ (Actor.Sign: DELIVER, DENY)
+ * Layer 4: ACT - Agents execute autonomous actions (Promise Theory)
+ *          ↓ (ChargerDisableAgent, TransactionStopAgent)
+ *          ↓ (promise → fulfill/breach)
  * Layer 5: Physical Actions (ChangeAvailability, RemoteStopTransaction)
  * </pre>
  * <p>
@@ -61,14 +62,14 @@ public class OcppObservabilitySystem implements AutoCloseable {
 
     // Layer 3: Reporter Circuit and Components
     private final Circuit reporterCircuit;
-    private final Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private final Conduit<Reporters.Reporter, Reporters.Signal> reporters;
     private final ChargerHealthReporter chargerHealthReporter;
 
-    // Layer 4: Actor Circuit and Components
-    private final Circuit actorCircuit;
-    private final Conduit<Actors.Actor, Actors.Sign> actors;
-    private final ChargerDisableActor chargerDisableActor;
-    private final TransactionStopActor transactionStopActor;
+    // Layer 4: Agent Circuit and Components (Autonomous Self-Regulation)
+    private final Circuit agentCircuit;
+    private final Conduit<Agent, Agents.Signal> agents;
+    private final ChargerDisableAgent chargerDisableAgent;
+    private final TransactionStopAgent transactionStopAgent;
 
     /**
      * Create the complete OCPP observability system.
@@ -132,18 +133,18 @@ public class OcppObservabilitySystem implements AutoCloseable {
         this.chargerHealthReporter = new ChargerHealthReporter(monitors, reporters);
 
         // ====================================================================
-        // Layer 4: Actor Circuit and Components (ACT)
+        // Layer 4: Agent Circuit and Components (ACT - Autonomous)
         // ====================================================================
-        logger.info("Creating Layer 4 actor circuit (ACT)");
+        logger.info("Creating Layer 4 agent circuit (ACT - Agents API for autonomous self-regulation)");
 
-        this.actorCircuit = cortex().circuit(cortex().name(systemName + "-actors"));
-        this.actors = actorCircuit.conduit(
-            cortex().name("actors"),
-            Actors::composer
+        this.agentCircuit = cortex().circuit(cortex().name(systemName + "-agents"));
+        this.agents = agentCircuit.conduit(
+            cortex().name("agents"),
+            Agents::composer
         );
 
-        this.chargerDisableActor = new ChargerDisableActor(reporters, actors, commandExecutor);
-        this.transactionStopActor = new TransactionStopActor(reporters, actors, commandExecutor);
+        this.chargerDisableAgent = new ChargerDisableAgent(reporters, agents, commandExecutor);
+        this.transactionStopAgent = new TransactionStopAgent(reporters, agents, commandExecutor);
 
         logger.info("OCPP Observability System initialized successfully");
     }
@@ -163,7 +164,7 @@ public class OcppObservabilitySystem implements AutoCloseable {
         logger.info("  - OCPP Central System: RUNNING");
         logger.info("  - Monitor Circuit: ACTIVE");
         logger.info("  - Reporter Circuit: ACTIVE");
-        logger.info("  - Actor Circuit: ACTIVE");
+        logger.info("  - Agent Circuit: ACTIVE (Autonomous Self-Regulation)");
         logger.info("  - Connected Chargers: {}", centralSystem.getConnectedChargerCount());
     }
 
@@ -196,22 +197,22 @@ public class OcppObservabilitySystem implements AutoCloseable {
     /**
      * Get the Reporter conduit for signal inspection/testing.
      */
-    public Conduit<Reporters.Reporter, Reporters.Sign> getReporters() {
+    public Conduit<Reporters.Reporter, Reporters.Signal> getReporters() {
         return reporters;
     }
 
     /**
-     * Get the Actor conduit for signal inspection/testing.
+     * Get the Agent conduit for signal inspection/testing.
      */
-    public Conduit<Actors.Actor, Actors.Sign> getActors() {
-        return actors;
+    public Conduit<Agent, Agents.Signal> getAgents() {
+        return agents;
     }
 
     /**
-     * Get the transaction stop actor (for transaction registration).
+     * Get the transaction stop agent (for transaction registration).
      */
-    public TransactionStopActor getTransactionStopActor() {
-        return transactionStopActor;
+    public TransactionStopAgent getTransactionStopAgent() {
+        return transactionStopAgent;
     }
 
     /**
@@ -222,16 +223,16 @@ public class OcppObservabilitySystem implements AutoCloseable {
         counterCircuit.await();
         gaugeCircuit.await();
         reporterCircuit.await();
-        actorCircuit.await();
+        agentCircuit.await();
     }
 
     @Override
     public void close() {
         logger.info("Closing OCPP Observability System");
 
-        // Close actors (Layer 4)
-        transactionStopActor.close();
-        chargerDisableActor.close();
+        // Close agents (Layer 4)
+        transactionStopAgent.close();
+        chargerDisableAgent.close();
 
         // Close reporters (Layer 3)
         chargerHealthReporter.close();
