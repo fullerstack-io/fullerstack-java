@@ -21,6 +21,7 @@
         <module>fullerstack-kafka-consumer</module>
         <module>fullerstack-kafka-runtime</module>
         <module>fullerstack-kafka-msk</module>
+        <module>fullerstack-ocpp</module>
     </modules>
 
     <properties>
@@ -98,6 +99,13 @@
             <dependency>
                 <groupId>io.fullerstack</groupId>
                 <artifactId>fullerstack-kafka-msk</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- Fullerstack OCPP module -->
+            <dependency>
+                <groupId>io.fullerstack</groupId>
+                <artifactId>fullerstack-ocpp</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
