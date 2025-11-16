@@ -259,7 +259,7 @@ public class ProducerSendObserver implements AutoCloseable {
         } catch (Exception e) {
             logger.error("Error collecting send metrics for producer {}", producerId, e);
             // Emit failure probe on error
-            sendProbe.failed();
+            sendProbe.fail(Probes.Dimension.OUTBOUND);
         }
     }
 
@@ -299,7 +299,7 @@ public class ProducerSendObserver implements AutoCloseable {
 
         if (approximateErrors > 0) {
             // Emit Probe signal for send failure
-            sendProbe.failed();
+            sendProbe.fail(Probes.Dimension.OUTBOUND);
 
             // Also increment error counter
             errorCounter.increment();
@@ -308,7 +308,7 @@ public class ProducerSendObserver implements AutoCloseable {
                 producerId, errorRate, approximateErrors);
         } else if (previousErrorRate > 0 && errorRate == 0) {
             // Errors cleared - emit success
-            sendProbe.transmitted();
+            sendProbe.transfer(Probes.Dimension.OUTBOUND);
             logger.info("Producer {} error rate cleared", producerId);
         }
 
@@ -326,7 +326,7 @@ public class ProducerSendObserver implements AutoCloseable {
 
         if (approximateRetries > 0) {
             // Emit Service retry signal
-            retryService.retry();
+            retryService.retry(Services.Dimension.CALLER);
 
             // Also increment retry counter
             retryCounter.increment();

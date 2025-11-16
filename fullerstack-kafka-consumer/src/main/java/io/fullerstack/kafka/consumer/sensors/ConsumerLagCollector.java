@@ -79,7 +79,7 @@ public class ConsumerLagCollector implements AutoCloseable {
 
             ListOffsetsResult listOffsetsResult = adminClient.listOffsets(partitionsToQuery);
             Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> endOffsetInfos =
-                    listOffsetsResult.all().percept(REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                    listOffsetsResult.all().get(REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
             // 3. Calculate lag: endOffset - committedOffset
             Map<TopicPartition, Long> lag = new HashMap<>();

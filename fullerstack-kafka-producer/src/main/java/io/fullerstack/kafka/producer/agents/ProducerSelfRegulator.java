@@ -1,8 +1,9 @@
 package io.fullerstack.kafka.producer.agents;
 
-import io.humainary.substrates.ext.serventis.ext.agents.Agents;
-import io.humainary.substrates.ext.serventis.ext.agents.Agents.Agent;
-import io.humainary.substrates.ext.serventis.ext.monitors.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Agents;
+import io.humainary.substrates.ext.serventis.ext.Agents.Agent;
+import io.humainary.substrates.ext.serventis.ext.Agents.Dimension;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
 import io.humainary.substrates.api.Substrates.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.slf4j.Logger;
@@ -16,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
  * Layer 4a (ACT - Agents): Autonomous promise-based self-regulation for Kafka producers.
@@ -209,10 +210,10 @@ public class ProducerSelfRegulator implements AutoCloseable {
             return;  // Already throttled enough
         }
 
-        Agent agent = agents.channel(cortex.name("agent.producer.throttle"));
+        Agent agent = agents.percept(cortex.name("agent.producer.throttle"));
 
         // PROMISER perspective: I am making this promise
-        agent.promise();  // "I promise to throttle the producer"
+        agent.promise(Dimension.PROMISER);  // "I promise to throttle the producer"
 
         try {
             logger.warn("[AGENTS] Throttling producer due to {} - reducing max.in.flight.requests: {} → {}",
@@ -230,7 +231,7 @@ public class ProducerSelfRegulator implements AutoCloseable {
             throttled.set(true);
 
             // Agent kept promise
-            agent.fulfill();  // PROMISER: "I fulfilled my promise to throttle"
+            agent.fulfill(Dimension.PROMISER);  // PROMISER: "I fulfilled my promise to throttle"
 
             logger.info("[AGENTS] Promise fulfilled: Producer throttled from {} to {} max in-flight requests",
                 previousLimit, targetMaxInFlight);
@@ -238,9 +239,9 @@ public class ProducerSelfRegulator implements AutoCloseable {
             // Schedule auto-resume after cooldown (in case monitor doesn't recover)
             scheduleAutoResume(Duration.ofSeconds(30));
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             // Agent failed to keep promise
-            agent.breach();  // PROMISER: "I failed to fulfill my promise"
+            agent.breach(Dimension.PROMISER);  // PROMISER: "I failed to fulfill my promise"
 
             logger.error("[AGENTS] Promise breached: Failed to throttle producer", e);
             throw e;
@@ -258,10 +259,10 @@ public class ProducerSelfRegulator implements AutoCloseable {
             return;  // Already at or above target
         }
 
-        Agent agent = agents.channel(cortex.name("agent.producer.resume"));
+        Agent agent = agents.percept(cortex.name("agent.producer.resume"));
 
         // PROMISER perspective: I am making this promise
-        agent.promise();  // "I promise to resume the producer"
+        agent.promise(Dimension.PROMISER);  // "I promise to resume the producer"
 
         try {
             logger.info("[AGENTS] Resuming producer due to {} - increasing max.in.flight.requests: {} → {}",
@@ -275,14 +276,14 @@ public class ProducerSelfRegulator implements AutoCloseable {
             }
 
             // Agent kept promise
-            agent.fulfill();  // PROMISER: "I fulfilled my promise to resume"
+            agent.fulfill(Dimension.PROMISER);  // PROMISER: "I fulfilled my promise to resume"
 
             logger.info("[AGENTS] Promise fulfilled: Producer resumed from {} to {} max in-flight requests",
                 previousLimit, targetMaxInFlight);
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             // Agent failed to keep promise
-            agent.breach();  // PROMISER: "I failed to fulfill my promise"
+            agent.breach(Dimension.PROMISER);  // PROMISER: "I failed to fulfill my promise"
 
             logger.error("[AGENTS] Promise breached: Failed to resume producer", e);
             throw e;

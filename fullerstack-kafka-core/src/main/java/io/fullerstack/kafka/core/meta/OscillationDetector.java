@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.core.meta;
 
-import io.humainary.substrates.ext.serventis.ext.monitors.Monitors;
-import io.humainary.substrates.ext.serventis.ext.reporters.Reporters;
-import io.humainary.substrates.ext.serventis.ext.reporters.Reporters.Reporter;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Reporters.Reporter;
 import io.humainary.substrates.api.Substrates.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
  * Meta-Monitoring: Detects oscillation in the monitoring system itself.
@@ -112,7 +112,7 @@ public class OscillationDetector implements AutoCloseable {
         );
 
         // Create meta-reporter for oscillation warnings
-        this.metaReporter = reporters.channel(cortex.name("meta.oscillation"));
+        this.metaReporter = reporters.percept(cortex.name("meta.oscillation"));
 
         // Subscribe to ALL monitor signals
         this.monitorSubscription = monitors.subscribe(cortex.subscriber(

@@ -135,7 +135,7 @@ public class LocalProducerSendObserver implements AutoCloseable {
             System.err.printf("❌ Error collecting send metrics for %s: %s%n",
                 producerId, e.getMessage());
             // Emit failure probe on error
-            sendProbe.failed();
+            sendProbe.fail(Probes.Dimension.OUTBOUND);
         }
     }
 
@@ -168,7 +168,7 @@ public class LocalProducerSendObserver implements AutoCloseable {
 
         if (approximateErrors > 0) {
             // Emit Probe signal for send failure
-            sendProbe.failed();
+            sendProbe.fail(Probes.Dimension.OUTBOUND);
 
             // Also increment error counter
             errorCounter.increment();
@@ -178,7 +178,7 @@ public class LocalProducerSendObserver implements AutoCloseable {
 
         } else if (previousErrorRate > 0 && errorRate == 0) {
             // Errors cleared - emit success
-            sendProbe.transmitted();
+            sendProbe.transfer(Probes.Dimension.OUTBOUND);
         }
 
         // Track total error count changes
@@ -195,7 +195,7 @@ public class LocalProducerSendObserver implements AutoCloseable {
 
         if (approximateRetries > 0) {
             // Emit Service retry signal
-            retryService.retry();
+            retryService.retry(Services.Dimension.CALLER);
 
             // Also increment retry counter
             retryCounter.increment();

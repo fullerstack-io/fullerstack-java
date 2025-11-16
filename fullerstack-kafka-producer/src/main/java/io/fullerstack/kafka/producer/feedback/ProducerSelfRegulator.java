@@ -147,7 +147,7 @@ public class ProducerSelfRegulator implements AutoCloseable {
                 return;
             }
 
-            Monitors.Condition condition = signal.condition();
+            Monitors.Sign condition = signal.sign();
             Monitors.Dimension confidence = signal.dimension();
 
             // Self-regulation decision logic
@@ -162,27 +162,27 @@ public class ProducerSelfRegulator implements AutoCloseable {
     /**
      * Determines if producer should be paused.
      */
-    private boolean shouldPause(Monitors.Condition condition, Monitors.Dimension confidence) {
+    private boolean shouldPause(Monitors.Sign condition, Monitors.Dimension confidence) {
         // Only pause on DEGRADED with CONFIRMED confidence
         // (tentative/measured signals don't trigger pause - wait for confirmation)
-        return condition == Monitors.Condition.DEGRADED &&
+        return condition == Monitors.Sign.DEGRADED &&
                confidence == Monitors.Dimension.CONFIRMED;
     }
 
     /**
      * Determines if producer should be resumed.
      */
-    private boolean shouldResume(Monitors.Condition condition, Monitors.Dimension confidence) {
+    private boolean shouldResume(Monitors.Sign condition, Monitors.Dimension confidence) {
         // Resume on STABLE or CONVERGING with CONFIRMED confidence
-        return (condition == Monitors.Condition.STABLE ||
-                condition == Monitors.Condition.CONVERGING) &&
+        return (condition == Monitors.Sign.STABLE ||
+                condition == Monitors.Sign.CONVERGING) &&
                confidence == Monitors.Dimension.CONFIRMED;
     }
 
     /**
      * Pauses the producer due to degraded buffer health.
      */
-    private void pauseProducer(String monitorName, Monitors.Condition condition, Monitors.Dimension confidence) {
+    private void pauseProducer(String monitorName, Monitors.Sign condition, Monitors.Dimension confidence) {
         if (paused.compareAndSet(false, true)) {
             pauseStartTime = System.currentTimeMillis();
 
@@ -216,7 +216,7 @@ public class ProducerSelfRegulator implements AutoCloseable {
     /**
      * Resumes the producer after buffer has recovered.
      */
-    private void resumeProducer(String monitorName, Monitors.Condition condition, Monitors.Dimension confidence) {
+    private void resumeProducer(String monitorName, Monitors.Sign condition, Monitors.Dimension confidence) {
         if (paused.compareAndSet(true, false)) {
             long pauseDuration = System.currentTimeMillis() - pauseStartTime;
 
@@ -233,7 +233,7 @@ public class ProducerSelfRegulator implements AutoCloseable {
      */
     private void scheduleAutoResume() {
         scheduler.schedule(() -> {
-            if (paused.percept()) {
+            if (paused.get()) {
                 logger.warn("[SELF-REGULATION] Auto-resume triggered after cooldown ({})",
                     cooldownPeriod);
                 forceResume();
@@ -256,7 +256,7 @@ public class ProducerSelfRegulator implements AutoCloseable {
      * @return true if paused
      */
     public boolean isPaused() {
-        return paused.percept();
+        return paused.get();
     }
 
     /**
@@ -265,7 +265,7 @@ public class ProducerSelfRegulator implements AutoCloseable {
      * @return pause duration in milliseconds
      */
     public long getPauseDuration() {
-        if (!paused.percept()) {
+        if (!paused.get()) {
             return 0;
         }
         return System.currentTimeMillis() - pauseStartTime;

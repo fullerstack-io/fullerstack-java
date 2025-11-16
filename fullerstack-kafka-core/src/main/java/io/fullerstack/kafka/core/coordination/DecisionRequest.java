@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.core.coordination;
 
-import io.humainary.substrates.ext.serventis.ext.reporters.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Reporters;
 
 import java.time.Duration;
 import java.util.Objects;

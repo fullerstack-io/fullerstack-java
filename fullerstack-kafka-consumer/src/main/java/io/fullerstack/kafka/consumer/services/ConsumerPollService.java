@@ -1,7 +1,8 @@
 package io.fullerstack.kafka.consumer.services;
 
-import io.humainary.substrates.ext.serventis.ext.services.Services;
-import io.humainary.substrates.ext.serventis.ext.services.Services.Service;
+import io.humainary.substrates.ext.serventis.ext.Services;
+import io.humainary.substrates.ext.serventis.ext.Services.Service;
+import io.humainary.substrates.ext.serventis.ext.Services.Dimension;
 import io.humainary.substrates.api.Substrates.*;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -11,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.Objects;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
  * Services API for consumer poll() operations (self-monitoring).
@@ -70,7 +71,7 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  *
  * @param <K> consumer key type
  * @param <V> consumer value type
- * @see io.humainary.substrates.ext.serventis.ext.services.Services
+ * @see io.humainary.substrates.ext.serventis.ext.Services
  * @see Service
  */
 public class ConsumerPollService<K, V> implements AutoCloseable {
@@ -79,7 +80,7 @@ public class ConsumerPollService<K, V> implements AutoCloseable {
     private final Cortex cortex;
     private final Circuit circuit;
     private final KafkaConsumer<K, V> consumer;
-    private final Conduit<Service, Services.Sign> services;
+    private final Conduit<Service, Services.Signal> services;
     private final Service pollService;
 
     /**
@@ -103,7 +104,7 @@ public class ConsumerPollService<K, V> implements AutoCloseable {
         );
 
         // Get Service instrument for poll() operation
-        this.pollService = services.channel(cortex.name("consumer.poll"));
+        this.pollService = services.percept(cortex.name("consumer.poll"));
 
         logger.info("ConsumerPollService created - self-monitoring enabled for poll() operations");
     }
@@ -121,7 +122,7 @@ public class ConsumerPollService<K, V> implements AutoCloseable {
      */
     public ConsumerRecords<K, V> poll(Duration timeout) {
         // STEP 1: Emit CALL signal (RELEASE orientation: "I am calling")
-        pollService.call();
+        pollService.call(Dimension.CALLER);
 
         logger.debug("[SERVICES] poll() CALL emitted with timeout: {}", timeout);
 
@@ -131,7 +132,7 @@ public class ConsumerPollService<K, V> implements AutoCloseable {
 
             // STEP 3a: Emit SUCCEEDED signal
             // Note: Success even if 0 records (no data != failure)
-            pollService.succeeded();
+            pollService.success(Dimension.CALLER);
 
             if (records.isEmpty()) {
                 logger.debug("[SERVICES] poll() SUCCEEDED - 0 records fetched (no data available)");
@@ -141,9 +142,9 @@ public class ConsumerPollService<K, V> implements AutoCloseable {
 
             return records;
 
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             // STEP 3b: Emit FAILED signal
-            pollService.failed();
+            pollService.fail(Dimension.CALLER);
 
             logger.error("[SERVICES] poll() FAILED - error: {}", e.getMessage());
 
@@ -164,7 +165,7 @@ public class ConsumerPollService<K, V> implements AutoCloseable {
      *
      * @return services conduit emitting poll() operation signals
      */
-    public Conduit<Service, Services.Sign> services() {
+    public Conduit<Service, Services.Signal> services() {
         return services;
     }
 

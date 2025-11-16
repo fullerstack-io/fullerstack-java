@@ -197,12 +197,12 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
 
             // Layer 1 (Probes): Raw observation - attempting to send
             if (probe != null) {
-                probe.transmitted();
+                probe.transfer(Probes.Dimension.OUTBOUND);
             }
 
             // Layer 2 (Services): Service-level semantics - calling broker
             if (service != null) {
-                service.call();  // RELEASE orientation: "I am calling"
+                service.call(Services.Dimension.CALLER);  // CALLER orientation: "I am calling"
             }
 
             logger.trace("Producer {} CALL for topic {} partition {}",
@@ -243,12 +243,12 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
 
                 // Layer 1 (Probes): Raw observation - received acknowledgement
                 if (probe != null) {
-                    probe.received();
+                    probe.transfer(Probes.Dimension.INBOUND);
                 }
 
                 // Layer 2 (Services): Service-level semantics - call succeeded
                 if (service != null) {
-                    service.success();  // RELEASE orientation: "I succeeded"
+                    service.success(Services.Dimension.CALLER);  // CALLER orientation: "I succeeded"
                 }
 
                 logger.trace ( "Producer {} SUCCESS for topic {} partition {} offset {} latency={}ms",
@@ -259,12 +259,12 @@ public class ProducerEventInterceptor<K, V> implements ProducerInterceptor<K, V>
 
                 // Layer 1 (Probes): Raw observation - send failed
                 if (probe != null) {
-                    probe.failed();
+                    probe.fail(Probes.Dimension.OUTBOUND);
                 }
 
                 // Layer 2 (Services): Service-level semantics - call failed
                 if (service != null) {
-                    service.fail();  // RELEASE orientation: "I failed"
+                    service.fail(Services.Dimension.CALLER);  // CALLER orientation: "I failed"
                 }
 
                 logger.debug("Producer {} FAIL for topic {} partition {} latency={}ms error={}",

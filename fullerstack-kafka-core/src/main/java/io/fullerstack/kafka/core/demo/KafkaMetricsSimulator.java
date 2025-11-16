@@ -210,10 +210,10 @@ public class KafkaMetricsSimulator implements AutoCloseable {
 
             if (broker.getHealth() == BrokerSimulator.BrokerHealth.CRITICAL) {
                 // Connection failures during critical health
-                brokerProbe.failed();
+                brokerProbe.fail(Probes.Dimension.OUTBOUND);
             } else {
                 // Successful connections
-                brokerProbe.transmitted();
+                brokerProbe.transfer(Probes.Dimension.OUTBOUND);
             }
         }
     }
@@ -225,8 +225,8 @@ public class KafkaMetricsSimulator implements AutoCloseable {
     private void emitServiceMetrics() {
         // Consumer fetch request (not covered by observers yet)
         Services.Service consumerService = ooda.getServices().percept(cortex().name("consumer-1.fetch"));
-        consumerService.called();
-        consumerService.succeeded();  // Usually succeeds
+        consumerService.call(Services.Dimension.CALLER);
+        consumerService.success(Services.Dimension.CALLER);  // Usually succeeds
     }
 
     /**

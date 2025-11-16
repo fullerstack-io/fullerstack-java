@@ -1,7 +1,8 @@
 package io.fullerstack.kafka.producer.services;
 
-import io.humainary.substrates.ext.serventis.ext.services.Services;
-import io.humainary.substrates.ext.serventis.ext.services.Services.Service;
+import io.humainary.substrates.ext.serventis.ext.Services;
+import io.humainary.substrates.ext.serventis.ext.Services.Service;
+import io.humainary.substrates.ext.serventis.ext.Services.Dimension;
 import io.humainary.substrates.api.Substrates.*;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -11,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
-import static io.fullerstack.substrates.CortexRuntime.cortex;
+import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
  * Services API for producer send() operations (self-monitoring).
@@ -35,12 +36,12 @@ import static io.fullerstack.substrates.CortexRuntime.cortex;
  * sendOperation.succeeded(); // "I succeeded"
  * }</pre>
  *
- * <h3>Services API Pattern:</h3>
+ * <h3>Services API Pattern (CALLER/CALLEE dimensions):</h3>
  * <ul>
- *   <li><b>call()</b> - "I am initiating this operation" (RELEASE orientation)</li>
- *   <li><b>succeeded()</b> - "My operation succeeded"</li>
- *   <li><b>failed()</b> - "My operation failed"</li>
- *   <li><b>recovered()</b> - "I recovered from previous failure"</li>
+ *   <li><b>call(CALLER)</b> - "I am initiating this operation" (caller perspective)</li>
+ *   <li><b>success(CALLER)</b> - "My operation succeeded"</li>
+ *   <li><b>fail(CALLER)</b> - "My operation failed"</li>
+ *   <li><b>retry(CALLER)</b> - "I am retrying the operation"</li>
  * </ul>
  *
  * <h3>Why Services API Matters:</h3>
@@ -91,7 +92,7 @@ public class ProducerSendService<K, V> implements AutoCloseable {
     private final Cortex cortex;
     private final Circuit circuit;
     private final KafkaProducer<K, V> producer;
-    private final Conduit<Service, Services.Sign> services;
+    private final Conduit<Service, Services.Signal> services;
     private final Service sendService;
 
     /**
@@ -115,7 +116,7 @@ public class ProducerSendService<K, V> implements AutoCloseable {
         );
 
         // Get Service instrument for send() operation
-        this.sendService = services.channel(cortex.name("producer.send"));
+        this.sendService = services.percept(cortex.name("producer.send"));
 
         logger.info("ProducerSendService created - self-monitoring enabled for send() operations");
     }
@@ -132,8 +133,8 @@ public class ProducerSendService<K, V> implements AutoCloseable {
      * @param userCallback optional user callback (called after service monitoring)
      */
     public void send(ProducerRecord<K, V> record, Callback userCallback) {
-        // STEP 1: Emit CALL signal (RELEASE orientation: "I am calling")
-        sendService.call();
+        // STEP 1: Emit CALL signal (CALLER dimension: "I am calling")
+        sendService.call(Dimension.CALLER);
 
         logger.debug("[SERVICES] send() CALL emitted for topic: {}", record.topic());
 
@@ -141,15 +142,15 @@ public class ProducerSendService<K, V> implements AutoCloseable {
             // STEP 2: Execute actual send operation
             producer.send(record, (metadata, exception) -> {
                 if (exception == null) {
-                    // STEP 3a: Emit SUCCEEDED signal
-                    sendService.succeeded();
+                    // STEP 3a: Emit SUCCESS signal (CALLER dimension: my call succeeded)
+                    sendService.success(Dimension.CALLER);
 
                     logger.debug("[SERVICES] send() SUCCEEDED - topic: {}, partition: {}, offset: {}",
                         metadata.topic(), metadata.partition(), metadata.offset());
 
                 } else {
-                    // STEP 3b: Emit FAILED signal
-                    sendService.failed();
+                    // STEP 3b: Emit FAIL signal (CALLER dimension: my call failed)
+                    sendService.fail(Dimension.CALLER);
 
                     logger.warn("[SERVICES] send() FAILED - topic: {}, error: {}",
                         record.topic(), exception.getMessage());
@@ -161,9 +162,9 @@ public class ProducerSendService<K, V> implements AutoCloseable {
                 }
             });
 
-        } catch (Exception e) {
-            // STEP 3c: Emit FAILED signal for synchronous failures
-            sendService.failed();
+        } catch (java.lang.Exception e) {
+            // STEP 3c: Emit FAIL signal for synchronous failures (CALLER dimension)
+            sendService.fail(Dimension.CALLER);
 
             logger.error("[SERVICES] send() FAILED (sync) - topic: {}, error: {}",
                 record.topic(), e.getMessage());
@@ -194,7 +195,7 @@ public class ProducerSendService<K, V> implements AutoCloseable {
      *
      * @return services conduit emitting send() operation signals
      */
-    public Conduit<Service, Services.Sign> services() {
+    public Conduit<Service, Services.Signal> services() {
         return services;
     }
 
