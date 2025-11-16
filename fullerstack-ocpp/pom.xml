@@ -38,6 +38,40 @@
             <artifactId>humainary-substrates-ext-serventis</artifactId>
         </dependency>
 
+        <!-- OCPP Library (ChargeTimeEU) -->
+        <dependency>
+            <groupId>eu.chargetime.ocpp</groupId>
+            <artifactId>OCPP-J</artifactId>
+            <version>1.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>eu.chargetime.ocpp</groupId>
+            <artifactId>v2_0</artifactId>
+            <version>1.0.1</version>
+        </dependency>
+
+        <!-- WebSocket Support -->
+        <dependency>
+            <groupId>org.java-websocket</groupId>
+            <artifactId>Java-WebSocket</artifactId>
+            <version>1.5.3</version>
+        </dependency>
+
+        <!-- JSON Processing -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.10.1</version>
+        </dependency>
+
+        <!-- HTTP Server for REST API -->
+        <dependency>
+            <groupId>com.sun.net.httpserver</groupId>
+            <artifactId>http</artifactId>
+            <version>20070405</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -53,6 +87,11 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
