@@ -139,8 +139,8 @@ public class DashboardWebSocket {
             "status", "starting"
         ));
 
-        // TODO: Integrate with ChaosController when implemented
-        // ChaosController.triggerScenario(scenarioId);
+        // Trigger the actual scenario
+        io.fullerstack.kafka.demo.chaos.ChaosController.triggerScenario(scenarioId);
     }
 
     public static int getConnectedClients() {

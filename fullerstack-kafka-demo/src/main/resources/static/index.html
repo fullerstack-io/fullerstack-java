@@ -3,201 +3,266 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kafka Observability Demo - Substrates API</title>
+    <title>Kafka Observability Demo</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: 'Monaco', 'Courier New', monospace;
-            background: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-            font-size: 14px;
-            line-height: 1.6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            color: #00ff00;
-            border-bottom: 2px solid #00ff00;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-
-        .section {
-            background: #000;
-            border: 1px solid #00ff00;
-            padding: 15px;
+        .container { height: 100vh; display: flex; flex-direction: column; padding: 15px; }
+        
+        .header {
+            background: rgba(0,0,0,0.3);
+            padding: 12px 20px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 15px;
         }
 
-        .section h2 {
-            color: #ffff00;
-            margin-bottom: 10px;
-            font-size: 16px;
-        }
-
-        .status {
+        .header h1 { font-size: 20px; }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
             display: inline-block;
+            margin-right: 8px;
+        }
+        .status-dot.connected { background: #10b981; }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 15px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .card h2 { font-size: 16px; margin-bottom: 10px; }
+
+        .ooda-compact {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
+        }
+
+        .ooda-item { text-align: center; }
+        .ooda-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin: 0 auto 5px;
+        }
+        .ooda-count { font-size: 18px; font-weight: 700; }
+        .ooda-label { font-size: 11px; opacity: 0.7; }
+
+        .sidecar-compact { margin-bottom: 15px; }
+        .sidecar-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+
+        .badge {
             padding: 2px 8px;
-            margin-left: 10px;
-            font-size: 12px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge.healthy { background: #10b981; }
+        .badge.degraded { background: #f59e0b; }
+        .badge.critical { background: #ef4444; }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
         }
 
-        .status.connected {
-            background: #00ff00;
-            color: #000;
-        }
-
-        .status.disconnected {
-            background: #ff0000;
+        .btn {
+            flex: 1;
+            padding: 12px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
             color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
         }
 
-        .signal-line {
-            padding: 5px 0;
-            border-bottom: 1px solid #333;
+        .btn:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.5);
         }
 
-        .signal-line:last-child {
-            border-bottom: none;
+        .btn.active {
+            background: rgba(239,68,68,0.3);
+            border-color: #ef4444;
         }
 
-        .overflow {
-            color: #ff0000;
-            font-weight: bold;
+        #narrative {
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 10px;
         }
 
-        .normal {
-            color: #00ff00;
+        #activityFeed {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
         }
 
-        .timestamp {
-            color: #666;
+        .activity-item {
+            padding: 8px;
+            margin-bottom: 6px;
+            background: rgba(255,255,255,0.05);
+            border-left: 3px solid #3b82f6;
+            border-radius: 4px;
             font-size: 12px;
         }
 
-        pre {
-            background: #111;
-            padding: 10px;
-            overflow-x: auto;
-            border-left: 3px solid #00ff00;
+        .activity-item.overflow { border-left-color: #ef4444; background: rgba(239,68,68,0.1); }
+        .activity-item.healthy { border-left-color: #10b981; background: rgba(16,185,129,0.1); }
+        .activity-item.pressure { border-left-color: #f59e0b; background: rgba(245,158,11,0.1); }
+
+        .activity-time {
+            font-size: 10px;
+            color: rgba(255,255,255,0.5);
         }
 
-        #signalFeed {
-            max-height: 300px;
-            overflow-y: auto;
-        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Kafka Observability Demo - Substrates API
-            <span id="wsStatus" class="status disconnected">DISCONNECTED</span>
-        </h1>
-
-        <div class="section">
-            <h2>WHAT IS THIS?</h2>
-            <p>Production-realistic Kafka monitoring using Humainary Substrates API.</p>
-            <p>A separate producer process exposes JMX metrics. This app monitors those metrics and emits <strong>semiotic signals</strong>.</p>
-        </div>
-
-        <div class="section">
-            <h2>CURRENT STATE</h2>
-            <div id="currentState">
-                <p>Monitoring: <strong>producer-1</strong> buffer via JMX (localhost:11001)</p>
-                <p>Poll interval: 10 seconds</p>
-                <p>Threshold: OVERFLOW when buffer &gt;95% full</p>
-                <p>Total signals received: <span id="signalCount">0</span></p>
+        <div class="header">
+            <h1>Kafka Observability - Substrates API</h1>
+            <div>
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Connecting...</span>
             </div>
         </div>
 
-        <div class="section">
-            <h2>LATEST SIGNAL</h2>
-            <div id="latestSignal">
-                <p class="timestamp">Waiting for first signal...</p>
+        <div class="main-grid">
+            <div style="display: flex; flex-direction: column;">
+                <div class="card" style="margin-bottom: 15px;">
+                    <div class="ooda-compact">
+                        <div class="ooda-item">
+                            <div class="ooda-icon" id="observeIcon">👁️</div>
+                            <div class="ooda-count" id="observeCount">0</div>
+                            <div class="ooda-label">OBSERVE</div>
+                        </div>
+                        <div class="ooda-item">
+                            <div class="ooda-icon">🧭</div>
+                            <div class="ooda-count">0</div>
+                            <div class="ooda-label">ORIENT</div>
+                        </div>
+                        <div class="ooda-item">
+                            <div class="ooda-icon">🎯</div>
+                            <div class="ooda-count">0</div>
+                            <div class="ooda-label">DECIDE</div>
+                        </div>
+                        <div class="ooda-item">
+                            <div class="ooda-icon">⚡</div>
+                            <div class="ooda-count">0</div>
+                            <div class="ooda-label">ACT</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                    <h2>🔴 Live Activity</h2>
+                    <div id="activityFeed">
+                        <div style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">
+                            Waiting for signals...
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="section">
-            <h2>SIGNAL HISTORY (last 10)</h2>
-            <div id="signalFeed">
-                <p class="timestamp">No signals yet</p>
+            <div style="display: flex; flex-direction: column;">
+                <div class="card sidecar-compact">
+                    <h2>Producer Status</h2>
+                    <div id="sidecarGrid">
+                        <div style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px; font-size: 12px;">
+                            No data yet
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Interactive Demo</h2>
+                    <div id="narrative">
+                        <strong>Ready:</strong> Click a button below to see semiotic signals in action.
+                    </div>
+                    <div class="buttons">
+                        <button class="btn" onclick="trigger('normal-operation')">✅ Normal<br><small style="opacity:0.7">10 msg/sec</small></button>
+                        <button class="btn" onclick="trigger('buffer-overflow')">⚠️ Overflow<br><small style="opacity:0.7">10k msg/sec</small></button>
+                    </div>
+                </div>
             </div>
-        </div>
-
-        <div class="section">
-            <h2>WHAT SIGNALS MEAN</h2>
-            <pre>
-Queue.PUT       → Normal: buffer accepting messages, no pressure
-Queue.OVERFLOW  → Problem: buffer &gt;95% full, producer will block soon
-
-Traditional monitoring: Shows metric "buffer-available-bytes: 1638400"
-                       YOU must interpret what that number means
-
-Semiotic monitoring: Shows "Queue.OVERFLOW"
-                    System UNDERSTANDS the problem
-            </pre>
-        </div>
-
-        <div class="section">
-            <h2>HOW TO TRIGGER OVERFLOW</h2>
-            <pre>
-Producer is currently running at 10,000 msg/sec (very high rate).
-If buffer fills faster than Kafka can drain → OVERFLOW signal.
-
-To see normal signals, restart producer at slower rate:
-  RATE=10 java -Dcom.sun.management.jmxremote.port=11001 \
-    -Dcom.sun.management.jmxremote.authenticate=false \
-    -Dcom.sun.management.jmxremote.ssl=false \
-    -Dcom.sun.management.jmxremote.rmi.port=11001 \
-    -cp target/kafka-observability-demo.jar \
-    io.fullerstack.kafka.demo.StandaloneProducer
-            </pre>
         </div>
     </div>
 
     <script>
         let ws;
-        let signalCount = 0;
-        const maxHistory = 10;
-        const signalHistory = [];
+        let oodaCounts = { OBSERVE: 0 };
+        const sidecars = new Map();
+        let currentRate = 10; // Default: 10 msg/sec
+        let realMessageCount = 0; // Real count from JMX
 
         function connect() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws`;
-
-            ws = new WebSocket(wsUrl);
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
             ws.onopen = () => {
-                document.getElementById('wsStatus').textContent = 'CONNECTED';
-                document.getElementById('wsStatus').className = 'status connected';
+                document.getElementById('statusDot').classList.add('connected');
+                document.getElementById('statusText').textContent = 'Connected';
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-
-                if (data.type === 'signal') {
-                    handleSignal(data);
-                }
-            };
-
-            ws.onerror = () => {
-                document.getElementById('wsStatus').textContent = 'ERROR';
-                document.getElementById('wsStatus').className = 'status disconnected';
+                if (data.type === 'signal') handleSignal(data);
+                else if (data.type === 'system-event') handleEvent(data);
             };
 
             ws.onclose = () => {
-                document.getElementById('wsStatus').textContent = 'DISCONNECTED';
-                document.getElementById('wsStatus').className = 'status disconnected';
+                document.getElementById('statusDot').classList.remove('connected');
+                document.getElementById('statusText').textContent = 'Disconnected';
                 setTimeout(connect, 3000);
             };
         }
@@ -205,36 +270,123 @@ To see normal signals, restart producer at slower rate:
         function handleSignal(data) {
             const { entityId, data: signalData } = data;
             const signalStr = signalData.signal || '';
-            const timestamp = new Date().toLocaleTimeString();
 
-            signalCount++;
-            document.getElementById('signalCount').textContent = signalCount;
+            oodaCounts.OBSERVE++;
+            document.getElementById('observeCount').textContent = oodaCounts.OBSERVE;
 
-            // Update latest
-            const isOverflow = signalStr.includes('OVERFLOW');
-            const cssClass = isOverflow ? 'overflow' : 'normal';
+            // Infer buffer utilization from signal type
+            const bufferUtil = signalStr.includes('OVERFLOW') ? '>95%' :
+                              signalStr.includes('PRESSURE') ? '80-95%' : '<80%';
 
-            document.getElementById('latestSignal').innerHTML = `
-                <p class="timestamp">${timestamp}</p>
-                <p class="${cssClass}">Entity: ${entityId}</p>
-                <p class="${cssClass}">Signal: ${signalStr}</p>
-                ${isOverflow ? '<p class="overflow">⚠️  BUFFER OVERFLOW - Producer will block soon!</p>' : '<p class="normal">✓ Normal operation - buffer healthy</p>'}
+            updateSidecar(entityId, signalStr, bufferUtil);
+            updateNarrative(signalStr, entityId, bufferUtil);
+            addActivity(entityId, signalStr, bufferUtil);
+        }
+
+        function handleEvent(data) {
+            if (data.eventType === 'scenario-triggered') {
+                // Update current rate based on scenario
+                if (data.details.scenarioId === 'buffer-overflow') {
+                    currentRate = 10000;
+                    addSystemMessage('🎭 Scenario: OVERFLOW - Rate adjusted to 10,000 msg/sec via JMX');
+                } else if (data.details.scenarioId === 'normal-operation') {
+                    currentRate = 10;
+                    addSystemMessage('🎭 Scenario: NORMAL - Rate adjusted to 10 msg/sec (expect recovery in ~10 sec)');
+                }
+            }
+        }
+
+        function addSystemMessage(message) {
+            const feed = document.getElementById('activityFeed');
+            const item = document.createElement('div');
+            item.className = 'activity-item';
+            item.style.borderLeftColor = '#8b5cf6';
+            item.style.background = 'rgba(139,92,246,0.15)';
+            item.innerHTML = `
+                <div class="activity-time">${new Date().toLocaleTimeString()}</div>
+                <strong>SYSTEM</strong>: ${message}
             `;
+            feed.insertBefore(item, feed.firstChild);
+        }
 
-            // Add to history
-            signalHistory.unshift({ timestamp, entityId, signalStr, cssClass });
-            if (signalHistory.length > maxHistory) {
-                signalHistory.pop();
+        function updateSidecar(entityId, signalStr, bufferUtil) {
+            if (!sidecars.has(entityId)) {
+                sidecars.set(entityId, { id: entityId, status: 'healthy', rate: currentRate, util: bufferUtil });
             }
 
-            // Render history
-            const feed = document.getElementById('signalFeed');
-            feed.innerHTML = signalHistory.map(s =>
-                `<div class="signal-line">
-                    <span class="timestamp">${s.timestamp}</span>
-                    <span class="${s.cssClass}"> ${s.entityId}: ${s.signalStr}</span>
-                </div>`
-            ).join('');
+            const sidecar = sidecars.get(entityId);
+            if (signalStr.includes('OVERFLOW')) sidecar.status = 'degraded';
+            else if (signalStr.includes('PUT') || signalStr.includes('ENQUEUE')) sidecar.status = 'healthy';
+            sidecar.rate = currentRate;
+            sidecar.util = bufferUtil;
+
+            document.getElementById('sidecarGrid').innerHTML = Array.from(sidecars.values()).map(s => `
+                <div class="sidecar-row">
+                    <div>
+                        <strong>${s.id}</strong>
+                        <div style="font-size:10px; opacity:0.7;">${s.rate} msg/sec • Buffer: ${s.util}</div>
+                    </div>
+                    <span class="badge ${s.status}">${s.status}</span>
+                </div>
+            `).join('');
+        }
+
+        function updateNarrative(signalStr, entityId, bufferUtil) {
+            const narrative = document.getElementById('narrative');
+            if (signalStr.includes('OVERFLOW')) {
+                narrative.innerHTML = `<strong style="color:#f59e0b;">⚠️ OVERFLOW:</strong> Buffer ${bufferUtil} full at ${currentRate.toLocaleString()} msg/sec. Producer will block soon. <em>Semiotic signal carries MEANING.</em>`;
+            } else if (signalStr.includes('PUT') || signalStr.includes('ENQUEUE')) {
+                narrative.innerHTML = `<strong style="color:#10b981;">✅ HEALTHY:</strong> Buffer accepting messages at ${currentRate.toLocaleString()} msg/sec. Utilization: ${bufferUtil}.`;
+            }
+        }
+
+        function addActivity(source, message, bufferUtil) {
+            const feed = document.getElementById('activityFeed');
+            if (feed.querySelector('[style*="Waiting"]')) feed.innerHTML = '';
+
+            const item = document.createElement('div');
+
+            // Parse signal type and add color coding
+            const signalType = message.includes('OVERFLOW') ? 'OVERFLOW' :
+                              message.includes('ENQUEUE') ? 'ENQUEUE' :
+                              message.includes('PUT') ? 'PUT' :
+                              message.includes('INCREMENT') ? 'INCREMENT' :
+                              message.includes('DECREMENT') ? 'DECREMENT' : 'SIGNAL';
+
+            // Color code based on health status
+            const cssClass = bufferUtil.includes('>95%') ? 'overflow' :
+                            bufferUtil.includes('80-95%') ? 'pressure' : 'healthy';
+
+            item.className = `activity-item ${cssClass}`;
+
+            // Add visual indicator for state
+            const icon = bufferUtil.includes('>95%') ? '🔴' :
+                        bufferUtil.includes('80-95%') ? '🟡' : '🟢';
+
+            item.innerHTML = `
+                <div class="activity-time">${new Date().toLocaleTimeString()}</div>
+                ${icon} <strong>${source}</strong>: ${signalType}
+                <div style="font-size:10px; opacity:0.7; margin-top:2px;">
+                    Rate: ${currentRate.toLocaleString()} msg/sec • Buffer: ${bufferUtil}
+                </div>
+            `;
+            feed.insertBefore(item, feed.firstChild);
+
+            while (feed.children.length > 20) feed.removeChild(feed.lastChild);
+        }
+
+        function trigger(scenarioId) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addSystemMessage('❌ Not connected to server. Refresh page.');
+                return;
+            }
+
+            // Show immediate feedback
+            const scenarioName = scenarioId === 'buffer-overflow' ? 'OVERFLOW (10,000 msg/sec)' : 'NORMAL (10 msg/sec)';
+            addSystemMessage(`⏳ Triggering ${scenarioName}...`);
+
+            // Send WebSocket message
+            ws.send(JSON.stringify({ type: 'trigger-scenario', scenarioId: scenarioId }));
         }
 
         connect();

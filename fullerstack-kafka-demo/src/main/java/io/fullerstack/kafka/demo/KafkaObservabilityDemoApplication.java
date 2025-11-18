@@ -144,6 +144,30 @@ public class KafkaObservabilityDemoApplication {
             logger.info("   - Counter.INCREMENT for exhaustion events");
             logger.info("");
 
+            // Start periodic broadcast of real message count and rate
+            java.util.concurrent.ScheduledExecutorService statsScheduler =
+                java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+
+            statsScheduler.scheduleAtFixedRate(() -> {
+                try {
+                    long messageCount = io.fullerstack.kafka.demo.chaos.ChaosController.getMessageCount();
+                    int rate = io.fullerstack.kafka.demo.chaos.ChaosController.getCurrentRate();
+
+                    if (messageCount >= 0 && rate >= 0) {
+                        io.fullerstack.kafka.demo.web.DashboardWebSocket.broadcastEvent("producer-stats",
+                            java.util.Map.of(
+                                "messageCount", messageCount,
+                                "rate", rate
+                            )
+                        );
+                    }
+                } catch (java.lang.Exception e) {
+                    // Silently ignore - JMX might not be ready yet
+                }
+            }, 1, 2, java.util.concurrent.TimeUnit.SECONDS);
+
+            logger.info("📈 Broadcasting real producer stats every 2 seconds");
+
             // Keep application running (wait for Ctrl+C)
             logger.info("Press Ctrl+C to stop...");
             Thread.currentThread().join();
