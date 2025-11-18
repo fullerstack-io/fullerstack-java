@@ -436,8 +436,8 @@
                     case 'connection':
                         handleConnection(data);
                         break;
-                    case 'ooda-signal':
-                        handleOODASignal(data);
+                    case 'signal':
+                        handleSignal(data);
                         break;
                     case 'system-event':
                         handleSystemEvent(data);
@@ -467,30 +467,28 @@
             addActivityItem('System', 'Dashboard connected to observability platform', 'system');
         }
 
-        function handleOODASignal(data) {
-            const { layer, sidecarId, signal, timestamp } = data;
+        function handleSignal(data) {
+            const { entityId, data: signalData } = data;
+            const signalType = signalData.type || 'SIGNAL';
+            const signalStr = signalData.signal || '';
 
-            // Update OODA counters
-            if (oodaCounts.hasOwnProperty(layer)) {
-                oodaCounts[layer]++;
-                document.getElementById(`${layer.toLowerCase()}Count`).textContent = oodaCounts[layer];
+            // Count as OBSERVE layer
+            oodaCounts.OBSERVE++;
+            document.getElementById('observeCount').textContent = oodaCounts.OBSERVE;
 
-                // Animate icon
-                const icon = document.getElementById(`${layer.toLowerCase()}Icon`);
-                icon.classList.add('active');
-                setTimeout(() => icon.classList.remove('active'), 500);
-            }
+            // Animate OBSERVE icon
+            const icon = document.getElementById('observeIcon');
+            icon.classList.add('active');
+            setTimeout(() => icon.classList.remove('active'), 500);
 
             // Update sidecar health
-            updateSidecarHealth(sidecarId, layer, signal);
+            updateSidecarHealth(entityId, signalStr);
 
             // Add to activity feed
-            const signalType = signal.sign || signal.type || 'SIGNAL';
-            const details = formatSignalDetails(signal);
             addActivityItem(
-                `${sidecarId} [${layer}]`,
-                `${signalType} ${details}`,
-                layer.toLowerCase()
+                entityId,
+                `${signalType}: ${signalStr}`,
+                'observe'
             );
         }
 
@@ -499,10 +497,10 @@
             addActivityItem('System', `${eventType}: ${JSON.stringify(details)}`, 'system');
         }
 
-        function updateSidecarHealth(sidecarId, layer, signal) {
-            if (!sidecars.has(sidecarId)) {
-                sidecars.set(sidecarId, {
-                    id: sidecarId,
+        function updateSidecarHealth(entityId, signalStr) {
+            if (!sidecars.has(entityId)) {
+                sidecars.set(entityId, {
+                    id: entityId,
                     status: 'healthy',
                     lastSignal: Date.now(),
                     metrics: {}
@@ -510,14 +508,16 @@
                 renderSidecars();
             }
 
-            const sidecar = sidecars.get(sidecarId);
+            const sidecar = sidecars.get(entityId);
             sidecar.lastSignal = Date.now();
 
             // Update status based on signal
-            if (signal.sign === 'DEGRADED' || signal.sign === 'OVERFLOW') {
+            if (signalStr.includes('OVERFLOW') || signalStr.includes('DEGRADED')) {
                 sidecar.status = 'degraded';
-            } else if (signal.sign === 'CRITICAL' || signal.sign === 'DOWN') {
+            } else if (signalStr.includes('CRITICAL') || signalStr.includes('DOWN')) {
                 sidecar.status = 'critical';
+            } else {
+                sidecar.status = 'healthy';
             }
 
             renderSidecars();
