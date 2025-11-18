@@ -11,62 +11,59 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>fullerstack-kafka-producer</artifactId>
+    <artifactId>fullerstack-kafka-coordination</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>Fullerstack Kafka Producer Monitoring</name>
-    <description>Kafka producer monitoring sensors and health assessment using Substrates framework</description>
+    <name>Fullerstack Kafka Coordination</name>
+    <description>Distributed coordination components using Promise Theory (Agents) and Speech Act Theory (Actors)</description>
 
     <dependencies>
-        <!-- Kafka Core -->
+        <!-- Kafka Core (for shared DTOs and interfaces) -->
         <dependency>
             <groupId>io.fullerstack</groupId>
             <artifactId>fullerstack-kafka-core</artifactId>
         </dependency>
 
-        <!-- Kafka Broker (for JmxConnectionPool) -->
+        <!-- Kafka Producer (for CentralCommunicator interface) -->
         <dependency>
             <groupId>io.fullerstack</groupId>
-            <artifactId>fullerstack-kafka-broker</artifactId>
+            <artifactId>fullerstack-kafka-producer</artifactId>
         </dependency>
 
-        <!-- Substrates Framework -->
+        <!-- Fullerstack Substrates -->
         <dependency>
             <groupId>io.fullerstack</groupId>
             <artifactId>fullerstack-substrates</artifactId>
         </dependency>
 
-        <!-- Substrates API (shaded by fullerstack-substrates, needed for compilation) -->
+        <!-- Humainary APIs -->
         <dependency>
             <groupId>io.humainary.substrates</groupId>
             <artifactId>humainary-substrates-api</artifactId>
         </dependency>
-
-        <!-- Serventis Extension (shaded by fullerstack-substrates, needed for compilation) -->
         <dependency>
             <groupId>io.humainary.substrates.ext</groupId>
             <artifactId>humainary-substrates-ext-serventis</artifactId>
         </dependency>
 
-        <!-- Kafka Clients API -->
+        <!-- Kafka Client -->
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
-            <version>3.8.0</version>
+        </dependency>
+
+        <!-- JSON processing -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.18.2</version>
         </dependency>
 
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-        </dependency>
-
-        <!-- Jackson for JSON serialization -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.18.2</version>
         </dependency>
 
         <!-- Testing -->
@@ -80,29 +77,6 @@
             <artifactId>assertj-core</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <version>1.20.4</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>1.20.4</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>kafka</artifactId>
-            <version>1.20.4</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
@@ -110,10 +84,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
             </plugin>
         </plugins>
     </build>

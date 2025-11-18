@@ -51,7 +51,7 @@ class ProducerEventInterceptorTest {
             Services.Signal signal = invocation.getArgument(0);
             capturedSignals.add(signal);
             return null;
-        }).when(mockPipe).emit(any(Services.Sign.class));
+        }).when(mockPipe).emit(any(Services.Signal.class));
 
         doNothing().when(mockPipe).flush();
 

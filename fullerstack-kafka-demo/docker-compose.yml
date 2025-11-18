@@ -1,0 +1,314 @@
+version: '3.8'
+
+networks:
+  kafka-demo-net:
+    driver: bridge
+
+volumes:
+  zk-data:
+  kafka-data-1:
+  kafka-data-2:
+  kafka-data-3:
+  postgres-data:
+
+services:
+  # ================================================================
+  # KAFKA CLUSTER (3 brokers + ZooKeeper)
+  # ================================================================
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    hostname: zookeeper
+    container_name: kafka-demo-zookeeper
+    networks:
+      - kafka-demo-net
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zk-data:/var/lib/zookeeper/data
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka-broker-1:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka-broker-1
+    container_name: kafka-demo-broker-1
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - kafka-demo-net
+    ports:
+      - "9092:9092"
+      - "9999:9999"  # JMX port
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker-1:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_JMX_OPTS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Dcom.sun.management.jmxremote.local.only=false
+        -Dcom.sun.management.jmxremote.rmi.port=9999
+    volumes:
+      - kafka-data-1:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  kafka-broker-2:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka-broker-2
+    container_name: kafka-demo-broker-2
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - kafka-demo-net
+    ports:
+      - "9093:9093"
+      - "9998:9998"  # JMX port
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker-2:29093,PLAINTEXT_HOST://localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_JMX_PORT: 9998
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_JMX_OPTS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Dcom.sun.management.jmxremote.local.only=false
+        -Dcom.sun.management.jmxremote.rmi.port=9998
+    volumes:
+      - kafka-data-2:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9093"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  kafka-broker-3:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka-broker-3
+    container_name: kafka-demo-broker-3
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - kafka-demo-net
+    ports:
+      - "9094:9094"
+      - "9997:9997"  # JMX port
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker-3:29094,PLAINTEXT_HOST://localhost:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_JMX_PORT: 9997
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_JMX_OPTS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Dcom.sun.management.jmxremote.local.only=false
+        -Dcom.sun.management.jmxremote.rmi.port=9997
+    volumes:
+      - kafka-data-3:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9094"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # ================================================================
+  # POSTGRESQL (for Actor audit trail & policy storage - Phase 2)
+  # ================================================================
+
+  postgres:
+    image: postgres:15
+    container_name: kafka-demo-postgres
+    networks:
+      - kafka-demo-net
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: kafka_obs_demo
+      POSTGRES_USER: demo_user
+      POSTGRES_PASSWORD: demo_pass
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ================================================================
+  # MICROSERVICES (Producers & Consumers)
+  # ================================================================
+  # These simulate real production services deployed separately
+
+  order-service:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-demo-order-service
+    hostname: order-service
+    depends_on:
+      kafka-broker-1:
+        condition: service_healthy
+    networks:
+      - kafka-demo-net
+    command:
+      - bash
+      - -c
+      - |
+        echo 'Starting Order Service (Producer)...'
+        kafka-producer-perf-test \
+          --topic orders \
+          --num-records 1000000 \
+          --record-size 256 \
+          --throughput 10 \
+          --producer-props bootstrap.servers=kafka-broker-1:29092,kafka-broker-2:29093,kafka-broker-3:29094 client.id=order-service-producer acks=1 linger.ms=10 batch.size=16384
+
+  payment-service:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-demo-payment-service
+    hostname: payment-service
+    depends_on:
+      kafka-broker-1:
+        condition: service_healthy
+    networks:
+      - kafka-demo-net
+    command:
+      - bash
+      - -c
+      - |
+        echo 'Starting Payment Service (Producer)...'
+        kafka-producer-perf-test \
+          --topic payments \
+          --num-records 1000000 \
+          --record-size 512 \
+          --throughput 5 \
+          --producer-props bootstrap.servers=kafka-broker-1:29092,kafka-broker-2:29093,kafka-broker-3:29094 client.id=payment-service-producer acks=all linger.ms=20
+
+  inventory-service:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-demo-inventory-service
+    hostname: inventory-service
+    depends_on:
+      kafka-broker-1:
+        condition: service_healthy
+    networks:
+      - kafka-demo-net
+    command:
+      - bash
+      - -c
+      - |
+        echo 'Waiting for orders topic...'
+        sleep 10
+        echo 'Starting Inventory Service (Consumer)...'
+        kafka-console-consumer \
+          --bootstrap-server kafka-broker-1:29092,kafka-broker-2:29093,kafka-broker-3:29094 \
+          --topic orders \
+          --group inventory-service-group \
+          --from-beginning
+
+  analytics-service:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-demo-analytics-service
+    hostname: analytics-service
+    depends_on:
+      kafka-broker-1:
+        condition: service_healthy
+    networks:
+      - kafka-demo-net
+    command:
+      - bash
+      - -c
+      - |
+        echo 'Waiting for payments topic...'
+        sleep 10
+        echo 'Starting Analytics Service (Consumer)...'
+        kafka-console-consumer \
+          --bootstrap-server kafka-broker-1:29092,kafka-broker-2:29093,kafka-broker-3:29094 \
+          --topic payments \
+          --group analytics-service-group \
+          --from-beginning
+
+  # ================================================================
+  # DISTRIBUTED COORDINATION TOPICS
+  # ================================================================
+  # Creates topics for Promise Theory + Speech Act Theory coordination
+
+  topic-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-demo-topic-init
+    depends_on:
+      kafka-broker-1:
+        condition: service_healthy
+    networks:
+      - kafka-demo-net
+    command:
+      - bash
+      - -c
+      - |
+        echo 'Creating observability coordination topics...'
+
+        kafka-topics --bootstrap-server kafka-broker-1:29092 --create --if-not-exists \
+          --topic observability.speech-acts \
+          --partitions 3 \
+          --replication-factor 3 \
+          --config retention.ms=86400000
+
+        kafka-topics --bootstrap-server kafka-broker-1:29092 --create --if-not-exists \
+          --topic observability.responses \
+          --partitions 3 \
+          --replication-factor 3 \
+          --config retention.ms=86400000
+
+        kafka-topics --bootstrap-server kafka-broker-1:29092 --create --if-not-exists \
+          --topic orders \
+          --partitions 6 \
+          --replication-factor 3
+
+        kafka-topics --bootstrap-server kafka-broker-1:29092 --create --if-not-exists \
+          --topic payments \
+          --partitions 6 \
+          --replication-factor 3
+
+        echo '✅ Topics created:'
+        kafka-topics --bootstrap-server kafka-broker-1:29092 --list
+    restart: "no"
+
+# ================================================================
+# OPTIONAL: Add these in Phase 2
+# ================================================================
+# - demo-api: Quarkus REST API + WebSocket
+# - demo-ui: Vue.js frontend (Nginx)
+# - chaos-controller: Python chaos API
+# - prometheus: Traditional monitoring
+# - grafana: Dashboards

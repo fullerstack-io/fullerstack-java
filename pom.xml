@@ -20,7 +20,9 @@
         <module>fullerstack-kafka-producer</module>
         <module>fullerstack-kafka-consumer</module>
         <module>fullerstack-kafka-runtime</module>
+        <module>fullerstack-kafka-coordination</module>
         <module>fullerstack-kafka-msk</module>
+        <module>fullerstack-kafka-demo</module>
         <module>fullerstack-ocpp</module>
     </modules>
 
