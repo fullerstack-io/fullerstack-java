@@ -34,7 +34,7 @@ public class DashboardServer {
         context.setContextPath("/");
 
         // Serve static files from resources/static
-        URL webRootLocation = Dashboard Server.class.getResource("/static/");
+        URL webRootLocation = DashboardServer.class.getResource("/static/");
         if (webRootLocation == null) {
             throw new IllegalStateException("Unable to find /static/ in classpath");
         }

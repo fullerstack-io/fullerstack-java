@@ -251,7 +251,7 @@ public class ProducerSidecarApplication {
         } catch (InterruptedException e) {
             logger.info("Demo scenario interrupted");
             Thread.currentThread().interrupt();
-        } catch (java.lang.Exception e) {
+        } catch (Throwable e) {
             logger.error("Demo scenario error", e);
         }
     }
@@ -276,7 +276,7 @@ public class ProducerSidecarApplication {
             int port = basePort + number;
 
             return "localhost:" + port;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             // Fallback to default
             logger.warn("Failed to infer JMX endpoint from sidecar ID: {}, using default", sidecarId);
             return "localhost:11001";

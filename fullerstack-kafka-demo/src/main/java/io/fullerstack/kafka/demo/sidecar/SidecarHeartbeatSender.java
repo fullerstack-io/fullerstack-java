@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.demo.sidecar;
 
-import io.fullerstack.kafka.producer.sidecar.CentralCommunicator.InformMessage;
+import io.fullerstack.kafka.producer.sidecar.InformMessage;
 import io.fullerstack.kafka.producer.sidecar.KafkaCentralCommunicator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

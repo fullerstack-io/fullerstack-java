@@ -4,6 +4,8 @@ import io.fullerstack.kafka.coordination.central.RequestHandler;
 import io.fullerstack.kafka.coordination.central.ResponseSender;
 import io.fullerstack.kafka.coordination.central.SidecarRegistry;
 import io.fullerstack.kafka.coordination.central.SpeechActListener;
+import io.fullerstack.kafka.demo.web.DashboardServer;
+import io.fullerstack.kafka.demo.web.DashboardWebSocket;
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Agents;
 import io.humainary.substrates.ext.serventis.ext.Actors;
@@ -47,6 +49,7 @@ public class CentralPlatformApplication {
         String kafkaBootstrap = System.getenv().getOrDefault("KAFKA_BOOTSTRAP", "localhost:9092");
         String requestTopic = System.getenv().getOrDefault("REQUEST_TOPIC", "observability.speech-acts");
         String responseTopic = System.getenv().getOrDefault("RESPONSE_TOPIC", "observability.responses");
+        int dashboardPort = Integer.parseInt(System.getenv().getOrDefault("DASHBOARD_PORT", "8080"));
 
         logger.info("╔══════════════════════════════════════════════════════════════════╗");
         logger.info("║          Central Platform - Distributed Coordination            ║");
@@ -54,6 +57,7 @@ public class CentralPlatformApplication {
         logger.info("Kafka bootstrap: {}", kafkaBootstrap);
         logger.info("Request topic: {}", requestTopic);
         logger.info("Response topic: {}", responseTopic);
+        logger.info("Dashboard port: {}", dashboardPort);
 
         // Create central circuit
         Circuit centralCircuit = cortex().circuit(cortex().name("central-platform"));
@@ -99,6 +103,37 @@ public class CentralPlatformApplication {
         );
         logger.info("✅ Created SpeechActListener (with auto-discovery)");
 
+        // Start WebSocket dashboard for real-time visualization
+        try {
+            DashboardServer.startServer(dashboardPort);
+            logger.info("✅ Started WebSocket dashboard on port {}", dashboardPort);
+            logger.info("   → Open http://localhost:{} to view OODA loop", dashboardPort);
+        } catch (Throwable e) {
+            logger.error("❌ Failed to start dashboard server", e);
+            // Continue without dashboard
+        }
+
+        // Subscribe to Actors conduit for real-time speech act visualization
+        actors.subscribe(cortex().subscriber(
+            cortex().name("dashboard-subscriber"),
+            (subject, registrar) -> {
+                registrar.register(signal -> {
+                    // Broadcast Actor signals to WebSocket dashboard
+                    try {
+                        String sidecarId = subject.name().toString();
+                        Map<String, Object> signalData = Map.of(
+                            "sign", signal.toString(),
+                            "timestamp", System.currentTimeMillis()
+                        );
+                        DashboardWebSocket.broadcastSignal("ACT", sidecarId, signalData);
+                    } catch (Throwable e) {
+                        logger.debug("Failed to broadcast signal to dashboard: {}", e.getMessage());
+                    }
+                });
+            }
+        ));
+        logger.info("✅ Subscribed to Actors conduit for dashboard updates");
+
         // Start listener in background virtual thread
         Thread listenerThread = Thread.ofVirtual().name("speech-act-listener").start(listener);
         logger.info("✅ Started SpeechActListener in virtual thread");
@@ -109,6 +144,7 @@ public class CentralPlatformApplication {
         logger.info("╚══════════════════════════════════════════════════════════════════╝");
         logger.info("Listening for speech acts on topic: {}", requestTopic);
         logger.info("Sending responses on topic: {}", responseTopic);
+        logger.info("Dashboard: http://localhost:{}", dashboardPort);
         logger.info("");
         logger.info("Press Ctrl+C to shutdown...");
 
@@ -125,6 +161,12 @@ public class CentralPlatformApplication {
             responseSender.close();
             adminClient.close();
             centralCircuit.close();
+            try {
+                DashboardServer.stopServer();
+                logger.info("✅ Dashboard server stopped");
+            } catch (Throwable e) {
+                logger.warn("Dashboard server shutdown error: {}", e.getMessage());
+            }
             logger.info("✅ Central Platform shutdown complete");
         }, "shutdown-hook"));
 
