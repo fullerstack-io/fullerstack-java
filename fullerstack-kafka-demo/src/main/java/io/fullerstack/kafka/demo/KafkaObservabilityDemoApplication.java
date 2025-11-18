@@ -5,7 +5,9 @@ import io.fullerstack.kafka.demo.web.DashboardWebSocket;
 import io.fullerstack.kafka.producer.sensors.ProducerBufferMonitor;
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Conduit;
+import io.humainary.substrates.ext.serventis.ext.Counters;
 import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
+import io.humainary.substrates.ext.serventis.ext.Gauges;
 import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
 import io.humainary.substrates.ext.serventis.ext.Queues;
 import io.humainary.substrates.ext.serventis.ext.Queues.Queue;
@@ -82,6 +84,76 @@ public class KafkaObservabilityDemoApplication {
 
             logger.info("📡 Conduits created: Queues, Gauges, Counters");
 
+            // Start WebSocket dashboard for real-time OODA visualization
+            int dashboardPort = Integer.parseInt(System.getenv().getOrDefault("DASHBOARD_PORT", "8080"));
+            try {
+                DashboardServer.startServer(dashboardPort);
+                logger.info("✅ Started WebSocket dashboard on port {}", dashboardPort);
+                logger.info("   → Open http://localhost:{} to view OODA loop", dashboardPort);
+            } catch (Throwable e) {
+                logger.warn("⚠️  Dashboard server failed to start: {}", e.getMessage());
+                logger.info("   Continuing without dashboard...");
+            }
+
+            // Subscribe to Queues conduit for OBSERVE layer visualization
+            queues.subscribe(cortex().subscriber(
+                cortex().name("queue-observer"),
+                (subject, registrar) -> {
+                    registrar.register(signal -> {
+                        try {
+                            String entityId = subject.name().toString();
+                            Map<String, Object> signalData = Map.of(
+                                "sign", signal.name(),
+                                "timestamp", System.currentTimeMillis()
+                            );
+                            DashboardWebSocket.broadcastSignal("OBSERVE", entityId, signalData);
+                        } catch (Throwable e) {
+                            // Ignore broadcast errors
+                        }
+                    });
+                }
+            ));
+
+            // Subscribe to Gauges conduit for OBSERVE layer visualization
+            gauges.subscribe(cortex().subscriber(
+                cortex().name("gauge-observer"),
+                (subject, registrar) -> {
+                    registrar.register(signal -> {
+                        try {
+                            String entityId = subject.name().toString();
+                            Map<String, Object> signalData = Map.of(
+                                "sign", signal.name(),
+                                "timestamp", System.currentTimeMillis()
+                            );
+                            DashboardWebSocket.broadcastSignal("OBSERVE", entityId, signalData);
+                        } catch (Throwable e) {
+                            // Ignore broadcast errors
+                        }
+                    });
+                }
+            ));
+
+            // Subscribe to Counters conduit for OBSERVE layer visualization
+            counters.subscribe(cortex().subscriber(
+                cortex().name("counter-observer"),
+                (subject, registrar) -> {
+                    registrar.register(signal -> {
+                        try {
+                            String entityId = subject.name().toString();
+                            Map<String, Object> signalData = Map.of(
+                                "sign", signal.name(),
+                                "timestamp", System.currentTimeMillis()
+                            );
+                            DashboardWebSocket.broadcastSignal("OBSERVE", entityId, signalData);
+                        } catch (Throwable e) {
+                            // Ignore broadcast errors
+                        }
+                    });
+                }
+            ));
+
+            logger.info("✅ Subscribed to Queues, Gauges, Counters for dashboard updates");
+
             // Get instruments for producer-1 buffer monitoring
             Queue bufferQueue = queues.percept(cortex().name("producer-1.buffer"));
             Gauge totalBytesGauge = gauges.percept(cortex().name("producer-1.buffer.total-bytes"));
@@ -119,8 +191,10 @@ public class KafkaObservabilityDemoApplication {
             logger.info("📊 Monitoring: producer-1 buffer via JMX");
             logger.info("📡 Emitting: Queue, Gauge, Counter signals");
             logger.info("📨 Producer: Sending 10 msg/sec to 'observability-demo-topic'");
+            logger.info("🌐 Dashboard: http://localhost:{}", dashboardPort);
             logger.info("");
-            logger.info("🔥 Watch the logs below for REAL signal emissions:");
+            logger.info("🔥 Watch the REAL-TIME visualization:");
+            logger.info("   - Open dashboard in browser to see live OODA loop");
             logger.info("   - Queue.OVERFLOW when buffer hits 95%");
             logger.info("   - Gauge.INCREMENT/DECREMENT for buffer changes");
             logger.info("   - Counter.INCREMENT for exhaustion events");
@@ -139,9 +213,15 @@ public class KafkaObservabilityDemoApplication {
             kafkaProducer.stop();
             bufferMonitor.stop();
             circuit.close();
+            try {
+                DashboardServer.stopServer();
+                logger.info("✅ Dashboard server stopped");
+            } catch (Throwable e) {
+                // Ignore shutdown errors
+            }
             logger.info("✅ Demo shutdown complete (sent {} messages)", kafkaProducer.getMessageCount());
 
-        } catch (java.lang.Exception e) {
+        } catch (Throwable e) {
             logger.error("❌ Demo failed", e);
             System.exit(1);
         }
