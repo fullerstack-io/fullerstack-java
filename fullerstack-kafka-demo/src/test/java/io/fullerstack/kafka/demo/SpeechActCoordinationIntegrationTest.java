@@ -2,6 +2,7 @@ package io.fullerstack.kafka.demo;
 
 import io.fullerstack.kafka.coordination.central.RequestHandler;
 import io.fullerstack.kafka.coordination.central.ResponseSender;
+import io.fullerstack.kafka.coordination.central.SidecarRegistry;
 import io.fullerstack.kafka.coordination.central.SpeechActListener;
 import io.fullerstack.kafka.producer.sidecar.AgentCoordinationBridge;
 import io.fullerstack.kafka.producer.sidecar.KafkaCentralCommunicator;
@@ -230,8 +231,9 @@ class SpeechActCoordinationIntegrationTest {
             centralAgents, centralActors, adminClient, responseSender
         );
 
-        // Create and start listener
-        centralListener = new SpeechActListener(bootstrapServers, REQUEST_TOPIC, requestHandler);
+        // Create registry and listener
+        SidecarRegistry registry = new SidecarRegistry();
+        centralListener = new SpeechActListener(bootstrapServers, REQUEST_TOPIC, requestHandler, registry);
         centralListenerThread = Thread.ofVirtual()
             .name("central-listener-test")
             .start(centralListener);

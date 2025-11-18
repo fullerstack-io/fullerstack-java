@@ -4,7 +4,7 @@ package io.fullerstack.kafka.demo;
  * Demo configuration
  *
  * @param kafkaBootstrap Kafka bootstrap servers (e.g., "localhost:9092,localhost:9093,localhost:9094")
- * @param jmxUrl JMX URL for broker metrics (e.g., "localhost:9999")
+ * @param jmxUrl JMX URL for producer metrics (e.g., "localhost:11001")
  * @param mode Demo mode (FULL, PRODUCER, CONSUMER, BROKER)
  */
 public record DemoConfig(
@@ -21,7 +21,7 @@ public record DemoConfig(
 
         String jmxUrl = System.getenv().getOrDefault(
             "JMX_URL",
-            "localhost:9999"
+            "localhost:11001"
         );
 
         String modeStr = System.getenv().getOrDefault(

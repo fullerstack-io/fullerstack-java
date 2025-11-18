@@ -126,31 +126,22 @@ public class KafkaObservabilityDemoApplication {
             logger.info("🔍 Starting ProducerBufferMonitor (JMX: {})", config.jmxUrl());
             bufferMonitor.start();
 
-            // Start Kafka producer to generate traffic and JMX metrics
-            logger.info("🚀 Starting Kafka producer (client-id: producer-1)");
-            SimpleKafkaProducer kafkaProducer = new SimpleKafkaProducer(
-                config.kafkaBootstrap(),
-                "producer-1",
-                "observability-demo-topic"
-            );
-            kafkaProducer.start(10);  // 10 messages per second
-
             logger.info("");
-            logger.info("✅ REAL observability active!");
-            logger.info("📊 Monitoring: producer-1 buffer via JMX");
+            logger.info("✅ Observability monitoring active!");
+            logger.info("📊 Monitoring: producer-1 buffer via JMX at {}", config.jmxUrl());
             logger.info("📡 Emitting: Queue, Gauge, Counter signals");
-            logger.info("📨 Producer: Sending 10 msg/sec to 'observability-demo-topic'");
             logger.info("🌐 Dashboard: http://localhost:{}", dashboardPort);
             logger.info("");
-            logger.info("🔥 Watch the REAL-TIME visualization:");
-            logger.info("   - Open dashboard in browser to see live OODA loop");
+            logger.info("⚠️  Start standalone producer with JMX:");
+            logger.info("   mvn exec:java -Dexec.mainClass=\"io.fullerstack.kafka.demo.StandaloneProducer\" \\");
+            logger.info("     -Dcom.sun.management.jmxremote.port=11001 \\");
+            logger.info("     -Dcom.sun.management.jmxremote.authenticate=false \\");
+            logger.info("     -Dcom.sun.management.jmxremote.ssl=false");
+            logger.info("");
+            logger.info("🔥 Real-time signal visualization:");
             logger.info("   - Queue.OVERFLOW when buffer hits 95%");
             logger.info("   - Gauge.INCREMENT/DECREMENT for buffer changes");
             logger.info("   - Counter.INCREMENT for exhaustion events");
-            logger.info("");
-            logger.info("💡 Try chaos scenarios:");
-            logger.info("   ./scenarios/01-broker-failure.sh");
-            logger.info("   (Watch signal changes during broker failure!)");
             logger.info("");
 
             // Keep application running (wait for Ctrl+C)
@@ -159,7 +150,6 @@ public class KafkaObservabilityDemoApplication {
 
             // Cleanup
             logger.info("Shutting down...");
-            kafkaProducer.stop();
             bufferMonitor.stop();
             circuit.close();
             try {
@@ -168,7 +158,7 @@ public class KafkaObservabilityDemoApplication {
             } catch (Throwable e) {
                 // Ignore shutdown errors
             }
-            logger.info("✅ Demo shutdown complete (sent {} messages)", kafkaProducer.getMessageCount());
+            logger.info("✅ Monitoring shutdown complete");
 
         } catch (Throwable e) {
             logger.error("❌ Demo failed", e);
