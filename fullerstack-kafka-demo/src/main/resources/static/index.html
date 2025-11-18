@@ -357,11 +357,21 @@
             <!-- Dynamically populated -->
         </div>
 
+        <!-- Narrative Panel -->
+        <div class="activity-stream" style="margin-bottom: 20px;">
+            <h2>📖 What's Happening</h2>
+            <div id="narrative" style="padding: 20px; background: rgba(0,0,0,0.3); border-radius: 8px; line-height: 1.8;">
+                <p><strong>Initial State:</strong> Monitoring producer-1 via JMX. Collecting buffer metrics every 10 seconds.</p>
+                <p><strong>How to trigger signals:</strong> The producer is currently sending at configurable rate. Buffer overflow happens when send rate exceeds Kafka's ability to drain.</p>
+                <p><strong>Signal Flow:</strong> JMX → ProducerBufferMonitor → Substrates Circuit → Dashboard</p>
+            </div>
+        </div>
+
         <!-- Activity Stream -->
         <div class="activity-stream">
             <h2>
                 <span>🔴 Live Activity Stream</span>
-                <span style="font-size: 14px; font-weight: normal; color: rgba(255,255,255,0.6);">(Real-time OODA signals)</span>
+                <span style="font-size: 14px; font-weight: normal; color: rgba(255,255,255,0.6);">(Raw signals)</span>
             </h2>
             <div id="activityFeed">
                 <div style="text-align: center; color: rgba(255,255,255,0.5); padding: 40px;">
@@ -484,12 +494,39 @@
             // Update sidecar health
             updateSidecarHealth(entityId, signalStr);
 
+            // Update narrative
+            updateNarrative(signalType, signalStr, entityId);
+
             // Add to activity feed
             addActivityItem(
                 entityId,
                 `${signalType}: ${signalStr}`,
                 'observe'
             );
+        }
+
+        function updateNarrative(signalType, signalStr, entityId) {
+            const narrative = document.getElementById('narrative');
+
+            if (signalStr.includes('OVERFLOW')) {
+                narrative.innerHTML = `
+                    <p style="color: #f59e0b;"><strong>⚠️ BUFFER OVERFLOW DETECTED</strong></p>
+                    <p><strong>What happened:</strong> Producer ${entityId} is sending messages faster than Kafka can drain them.</p>
+                    <p><strong>Signal:</strong> Queue.OVERFLOW emitted via Substrates Circuit</p>
+                    <p><strong>Meaning:</strong> Buffer utilization >95%. Producer will block soon if rate continues.</p>
+                    <p><strong>Traditional monitoring:</strong> Would show metric "buffer.available.bytes" - requires YOU to interpret</p>
+                    <p><strong>Semiotic monitoring:</strong> OVERFLOW signal carries MEANING - system understands the problem</p>
+                    <p><strong>Next step:</strong> In full OODA loop, this would trigger ORIENT (assess severity) → DECIDE (determine action) → ACT (throttle producer or scale Kafka)</p>
+                `;
+            } else if (signalStr.includes('PUT') || signalStr.includes('ENQUEUE')) {
+                narrative.innerHTML = `
+                    <p><strong>✅ Normal Operation</strong></p>
+                    <p><strong>What's happening:</strong> Producer ${entityId} sending messages at normal rate.</p>
+                    <p><strong>Signal:</strong> Queue.PUT - buffer accepting messages without pressure</p>
+                    <p><strong>Buffer state:</strong> Healthy - messages draining to Kafka normally</p>
+                    <p><strong>Semiotic difference:</strong> PUT vs OVERFLOW are different SIGNS with different MEANINGS, not just different metric values</p>
+                `;
+            }
         }
 
         function handleSystemEvent(data) {
