@@ -52,9 +52,12 @@ public class SpeechActListener implements Runnable, AutoCloseable {
         this.registry = registry;
         this.objectMapper = new ObjectMapper();
 
+        // ✅ CONFIGURABLE consumer group ID (no hardcoding)
+        String consumerGroupId = System.getenv().getOrDefault("CONSUMER_GROUP_ID", "central-platform");
+
         Properties props = new Properties();
         props.put("bootstrap.servers", bootstrapServers);
-        props.put("group.id", "central-platform");
+        props.put("group.id", consumerGroupId);
         props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         props.put("auto.offset.reset", "earliest");  // ✅ RESILIENCE FIX: Read buffered messages
@@ -63,7 +66,8 @@ public class SpeechActListener implements Runnable, AutoCloseable {
         this.consumer = new KafkaConsumer<>(props);
         consumer.subscribe(List.of(topic));
 
-        logger.info("SpeechActListener initialized: topic={}, bootstrap={}", topic, bootstrapServers);
+        logger.info("SpeechActListener initialized: topic={}, bootstrap={}, groupId={}",
+            topic, bootstrapServers, consumerGroupId);
         logger.info("Auto-discovery enabled with offset strategy: earliest");
     }
 
@@ -98,10 +102,28 @@ public class SpeechActListener implements Runnable, AutoCloseable {
             logger.info("[RECEIVED] Speech act: {} from {} (key={})", speechAct, source, record.key());
             logger.debug("[RECEIVED] Full message: {}", message);
 
-            // ✅ AUTO-DISCOVER SIDECAR (production feature)
+            // ✅ AUTO-DISCOVER SIDECAR (production feature with explicit metadata)
             if (source != null) {
-                String type = detectSidecarType(source);
-                String jmxEndpoint = extractJmxEndpoint(message, source);
+                // Try to extract explicit metadata first (production pattern)
+                @SuppressWarnings("unchecked")
+                Map<String, Object> metadata = (Map<String, Object>) message.get("metadata");
+
+                String type;
+                String jmxEndpoint;
+
+                if (metadata != null) {
+                    // ✅ PRIMARY: Use explicit metadata (production pattern - no guessing!)
+                    type = (String) metadata.getOrDefault("type", detectSidecarType(source));
+                    jmxEndpoint = (String) metadata.getOrDefault("jmxEndpoint", inferJmxEndpoint(source));
+                    logger.debug("Using explicit metadata: type={}, jmx={}", type, jmxEndpoint);
+                } else {
+                    // ⚠️ FALLBACK: Infer from naming conventions (backward compatibility)
+                    type = detectSidecarType(source);
+                    jmxEndpoint = inferJmxEndpoint(source);
+                    logger.warn("No metadata in message from {} - using inference (type={}, jmx={}). " +
+                        "Consider upgrading sidecar to send explicit metadata.", source, type, jmxEndpoint);
+                }
+
                 registry.registerSidecar(source, type, jmxEndpoint);
             }
 
@@ -135,23 +157,6 @@ public class SpeechActListener implements Runnable, AutoCloseable {
         }
     }
 
-    /**
-     * Extract JMX endpoint from message metadata or infer from sidecar ID.
-     * <p>
-     * Priority:
-     * 1. Explicit "jmxEndpoint" field in message
-     * 2. Infer from sidecar ID convention (producer-1 → localhost:11001)
-     */
-    private String extractJmxEndpoint(Map<String, Object> message, String sidecarId) {
-        // Check for explicit JMX endpoint in message
-        Object explicitJmx = message.get("jmxEndpoint");
-        if (explicitJmx != null) {
-            return explicitJmx.toString();
-        }
-
-        // Infer from sidecar ID using convention
-        return inferJmxEndpoint(sidecarId);
-    }
 
     /**
      * Infer JMX endpoint from sidecar ID using convention.
