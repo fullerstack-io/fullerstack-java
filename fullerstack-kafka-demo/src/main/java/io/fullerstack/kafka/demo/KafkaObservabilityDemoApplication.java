@@ -1,7 +1,7 @@
 package io.fullerstack.kafka.demo;
 
+import io.fullerstack.kafka.demo.web.DashboardBroadcaster;
 import io.fullerstack.kafka.demo.web.DashboardServer;
-import io.fullerstack.kafka.demo.web.DashboardWebSocket;
 import io.fullerstack.kafka.producer.sensors.ProducerBufferMonitor;
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Conduit;
@@ -89,70 +89,19 @@ public class KafkaObservabilityDemoApplication {
             try {
                 DashboardServer.startServer(dashboardPort);
                 logger.info("✅ Started WebSocket dashboard on port {}", dashboardPort);
-                logger.info("   → Open http://localhost:{} to view OODA loop", dashboardPort);
+                logger.info("   → Open http://localhost:{} to view live signals", dashboardPort);
+
+                // Subscribe dashboard (proper Substrates Subscriber pattern)
+                DashboardBroadcaster broadcaster = new DashboardBroadcaster();
+                queues.subscribe(broadcaster.subscriber("queues"));
+                gauges.subscribe(broadcaster.subscriber("gauges"));
+                counters.subscribe(broadcaster.subscriber("counters"));
+                logger.info("✅ Dashboard subscribed to signals (Queues, Gauges, Counters)");
+
             } catch (Throwable e) {
                 logger.warn("⚠️  Dashboard server failed to start: {}", e.getMessage());
                 logger.info("   Continuing without dashboard...");
             }
-
-            // Subscribe to Queues conduit for OBSERVE layer visualization
-            queues.subscribe(cortex().subscriber(
-                cortex().name("queue-observer"),
-                (subject, registrar) -> {
-                    registrar.register(signal -> {
-                        try {
-                            String entityId = subject.name().toString();
-                            Map<String, Object> signalData = Map.of(
-                                "sign", signal.name(),
-                                "timestamp", System.currentTimeMillis()
-                            );
-                            DashboardWebSocket.broadcastSignal("OBSERVE", entityId, signalData);
-                        } catch (Throwable e) {
-                            // Ignore broadcast errors
-                        }
-                    });
-                }
-            ));
-
-            // Subscribe to Gauges conduit for OBSERVE layer visualization
-            gauges.subscribe(cortex().subscriber(
-                cortex().name("gauge-observer"),
-                (subject, registrar) -> {
-                    registrar.register(signal -> {
-                        try {
-                            String entityId = subject.name().toString();
-                            Map<String, Object> signalData = Map.of(
-                                "sign", signal.name(),
-                                "timestamp", System.currentTimeMillis()
-                            );
-                            DashboardWebSocket.broadcastSignal("OBSERVE", entityId, signalData);
-                        } catch (Throwable e) {
-                            // Ignore broadcast errors
-                        }
-                    });
-                }
-            ));
-
-            // Subscribe to Counters conduit for OBSERVE layer visualization
-            counters.subscribe(cortex().subscriber(
-                cortex().name("counter-observer"),
-                (subject, registrar) -> {
-                    registrar.register(signal -> {
-                        try {
-                            String entityId = subject.name().toString();
-                            Map<String, Object> signalData = Map.of(
-                                "sign", signal.name(),
-                                "timestamp", System.currentTimeMillis()
-                            );
-                            DashboardWebSocket.broadcastSignal("OBSERVE", entityId, signalData);
-                        } catch (Throwable e) {
-                            // Ignore broadcast errors
-                        }
-                    });
-                }
-            ));
-
-            logger.info("✅ Subscribed to Queues, Gauges, Counters for dashboard updates");
 
             // Get instruments for producer-1 buffer monitoring
             Queue bufferQueue = queues.percept(cortex().name("producer-1.buffer"));

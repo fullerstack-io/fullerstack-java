@@ -71,24 +71,22 @@ public class DashboardWebSocket {
     }
 
     /**
-     * Broadcast OODA signal to all connected dashboard clients.
-     * Called by production OODA loop (passive observation).
+     * Broadcast signal to all connected dashboard clients.
+     * Package-private - only called by DashboardBroadcaster (proper Substrates Subscriber).
      */
-    public static void broadcastSignal(String layer, String sidecarId, Map<String, Object> signal) {
+    static void broadcast(String entityId, Map<String, Object> signal) {
         if (sessions.isEmpty()) {
             return; // No clients connected, skip serialization
         }
 
         try {
             String json = objectMapper.writeValueAsString(Map.of(
-                "type", "ooda-signal",
-                "layer", layer,           // OBSERVE, ORIENT, DECIDE, ACT
-                "sidecarId", sidecarId,
-                "signal", signal,
-                "timestamp", System.currentTimeMillis()
+                "type", "signal",
+                "entityId", entityId,
+                "data", signal
             ));
 
-            broadcast(json);
+            broadcastToAll(json);
         } catch (IOException e) {
             System.err.println("Error broadcasting signal: " + e.getMessage());
         }
@@ -110,13 +108,13 @@ public class DashboardWebSocket {
                 "timestamp", System.currentTimeMillis()
             ));
 
-            broadcast(json);
+            broadcastToAll(json);
         } catch (IOException e) {
             System.err.println("Error broadcasting event: " + e.getMessage());
         }
     }
 
-    private static void broadcast(String message) {
+    private static void broadcastToAll(String message) {
         sessions.removeIf(session -> {
             try {
                 if (session.isOpen()) {

@@ -4,8 +4,8 @@ import io.fullerstack.kafka.coordination.central.RequestHandler;
 import io.fullerstack.kafka.coordination.central.ResponseSender;
 import io.fullerstack.kafka.coordination.central.SidecarRegistry;
 import io.fullerstack.kafka.coordination.central.SpeechActListener;
+import io.fullerstack.kafka.demo.web.DashboardBroadcaster;
 import io.fullerstack.kafka.demo.web.DashboardServer;
-import io.fullerstack.kafka.demo.web.DashboardWebSocket;
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Agents;
 import io.humainary.substrates.ext.serventis.ext.Actors;
@@ -13,7 +13,6 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
 import java.util.Properties;
 
 import static io.humainary.substrates.api.Substrates.cortex;
@@ -107,32 +106,17 @@ public class CentralPlatformApplication {
         try {
             DashboardServer.startServer(dashboardPort);
             logger.info("✅ Started WebSocket dashboard on port {}", dashboardPort);
-            logger.info("   → Open http://localhost:{} to view OODA loop", dashboardPort);
+            logger.info("   → Open http://localhost:{} to view live signals", dashboardPort);
+
+            // Subscribe dashboard (proper Substrates Subscriber pattern)
+            DashboardBroadcaster broadcaster = new DashboardBroadcaster();
+            actors.subscribe(broadcaster.subscriber("actors"));
+            logger.info("✅ Dashboard subscribed to signals (Actors)");
+
         } catch (Throwable e) {
             logger.error("❌ Failed to start dashboard server", e);
             // Continue without dashboard
         }
-
-        // Subscribe to Actors conduit for real-time speech act visualization
-        actors.subscribe(cortex().subscriber(
-            cortex().name("dashboard-subscriber"),
-            (subject, registrar) -> {
-                registrar.register(signal -> {
-                    // Broadcast Actor signals to WebSocket dashboard
-                    try {
-                        String sidecarId = subject.name().toString();
-                        Map<String, Object> signalData = Map.of(
-                            "sign", signal.toString(),
-                            "timestamp", System.currentTimeMillis()
-                        );
-                        DashboardWebSocket.broadcastSignal("ACT", sidecarId, signalData);
-                    } catch (Throwable e) {
-                        logger.debug("Failed to broadcast signal to dashboard: {}", e.getMessage());
-                    }
-                });
-            }
-        ));
-        logger.info("✅ Subscribed to Actors conduit for dashboard updates");
 
         // Start listener in background virtual thread
         Thread listenerThread = Thread.ofVirtual().name("speech-act-listener").start(listener);
