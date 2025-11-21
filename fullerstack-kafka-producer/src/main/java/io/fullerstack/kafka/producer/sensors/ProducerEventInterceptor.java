@@ -88,7 +88,7 @@ import static io.humainary.substrates.api.Substrates.*;
  * <ul>
  *   <li><b>This interceptor (Layers 1-2):</b> Emits raw observations and service semantics</li>
  *   <li><b>Monitor aggregators (Layer 3):</b> Analyze patterns, assess conditions (STABLE/DEGRADED/DOWN)</li>
- *   <li><b>Reporter assessors (Layer 4):</b> Determine situations (NORMAL/ELEVATED/CRITICAL)</li>
+ *   <li><b>Situation assessors (Layer 4):</b> Determine situations (NORMAL/ELEVATED/CRITICAL)</li>
  * </ul>
  *
  * @param <K> Producer record key type

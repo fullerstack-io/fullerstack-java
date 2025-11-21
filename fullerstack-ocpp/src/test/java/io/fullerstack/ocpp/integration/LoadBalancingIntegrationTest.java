@@ -79,7 +79,7 @@ class LoadBalancingIntegrationTest {
         gauges = gaugeCircuit.conduit(cortex().name("gauges"), Gauges::composer);
 
         reporterCircuit = cortex().circuit(cortex().name("test-reporters"));
-        reporters = reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
+        reporters = reporterCircuit.conduit(cortex().name("reporters"), Situations::composer);
 
         agentCircuit = cortex().circuit(cortex().name("test-agents"));
         agents = agentCircuit.conduit(cortex().name("agents"), Agents::composer);

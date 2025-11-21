@@ -170,7 +170,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Kafka Observability - Substrates API</h1>
+            <h1>Kafka Self-Healing Producer</h1>
             <div>
                 <span class="status-dot" id="statusDot"></span>
                 <span id="statusText">Connecting...</span>
@@ -178,28 +178,28 @@
         </div>
 
         <div class="main-grid">
-            <div style="display: flex; flex-direction: column;">
+            <div style="display: flex; flex-direction: column; min-height: 0;">
                 <div class="card" style="margin-bottom: 15px;">
                     <div class="ooda-compact">
                         <div class="ooda-item">
-                            <div class="ooda-icon" id="observeIcon">👁️</div>
+                            <div class="ooda-icon" id="observeIcon">📊</div>
                             <div class="ooda-count" id="observeCount">0</div>
-                            <div class="ooda-label">OBSERVE</div>
+                            <div class="ooda-label">BUFFER</div>
                         </div>
                         <div class="ooda-item">
-                            <div class="ooda-icon">🧭</div>
-                            <div class="ooda-count">0</div>
-                            <div class="ooda-label">ORIENT</div>
-                        </div>
-                        <div class="ooda-item">
-                            <div class="ooda-icon">🎯</div>
-                            <div class="ooda-count">0</div>
-                            <div class="ooda-label">DECIDE</div>
+                            <div class="ooda-icon">🔍</div>
+                            <div class="ooda-count" id="orientCount">0</div>
+                            <div class="ooda-label">HEALTH</div>
                         </div>
                         <div class="ooda-item">
                             <div class="ooda-icon">⚡</div>
-                            <div class="ooda-count">0</div>
-                            <div class="ooda-label">ACT</div>
+                            <div class="ooda-count" id="actCount">0</div>
+                            <div class="ooda-label">ACTIONS</div>
+                        </div>
+                        <div class="ooda-item">
+                            <div class="ooda-icon">📈</div>
+                            <div class="ooda-count" id="totalCount">0</div>
+                            <div class="ooda-label">TOTAL</div>
                         </div>
                     </div>
                 </div>
@@ -225,13 +225,22 @@
                 </div>
 
                 <div class="card">
-                    <h2>Interactive Demo</h2>
+                    <h2>🎭 Self-Healing Demo</h2>
                     <div id="narrative">
-                        <strong>Ready:</strong> Click a button below to see semiotic signals in action.
+                        <strong>Ready:</strong> Click "Overflow" to trigger buffer saturation. Watch the system self-heal autonomously using semiotic signals.
                     </div>
                     <div class="buttons">
                         <button class="btn" onclick="trigger('normal-operation')">✅ Normal<br><small style="opacity:0.7">10 msg/sec</small></button>
                         <button class="btn" onclick="trigger('buffer-overflow')">⚠️ Overflow<br><small style="opacity:0.7">10k msg/sec</small></button>
+                    </div>
+                    <div style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; font-size: 11px; line-height: 1.5;">
+                        <strong>Signal Flow (Sidecar Demo):</strong><br>
+                        1️⃣ Buffer 95%+ → Queue.OVERFLOW signal<br>
+                        2️⃣ Health detector → Monitor.DEGRADED signal<br>
+                        3️⃣ Sidecar agent → Agent.BREACH (read-only JMX)<br>
+                        4️⃣ Coordination bridge → Actor.REQUEST<br>
+                        5️⃣ Escalate to central platform<br>
+                        6️⃣ Manual recovery (click "Normal")
                     </div>
                 </div>
             </div>
@@ -240,10 +249,12 @@
 
     <script>
         let ws;
-        let oodaCounts = { OBSERVE: 0 };
+        let signalCounts = { buffer: 0, health: 0, actions: 0, total: 0 };
         const sidecars = new Map();
         let currentRate = 10; // Default: 10 msg/sec
+        let currentBufferUtil = 0; // Current buffer utilization %
         let realMessageCount = 0; // Real count from JMX
+        let isThrottled = false; // Track if producer is throttled
 
         function connect() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -270,17 +281,30 @@
         function handleSignal(data) {
             const { entityId, data: signalData } = data;
             const signalStr = signalData.signal || '';
+            const conduitType = signalData.conduit || '';
 
-            oodaCounts.OBSERVE++;
-            document.getElementById('observeCount').textContent = oodaCounts.OBSERVE;
+            // Update signal counters based on conduit type
+            if (conduitType.includes('queues') || conduitType.includes('gauges') || conduitType.includes('counters')) {
+                signalCounts.buffer++;
+                document.getElementById('observeCount').textContent = signalCounts.buffer;
+            } else if (conduitType.includes('monitors')) {
+                signalCounts.health++;
+                document.getElementById('orientCount').textContent = signalCounts.health;
+            } else if (conduitType.includes('agents')) {
+                signalCounts.actions++;
+                document.getElementById('actCount').textContent = signalCounts.actions;
+            }
 
-            // Infer buffer utilization from signal type
-            const bufferUtil = signalStr.includes('OVERFLOW') ? '>95%' :
-                              signalStr.includes('PRESSURE') ? '80-95%' : '<80%';
+            signalCounts.total++;
+            document.getElementById('totalCount').textContent = signalCounts.total;
 
-            updateSidecar(entityId, signalStr, bufferUtil);
-            updateNarrative(signalStr, entityId, bufferUtil);
-            addActivity(entityId, signalStr, bufferUtil);
+            updateSidecar(entityId, signalStr, conduitType);
+            updateNarrative(signalStr, entityId, conduitType);
+
+            // Only show Queue signals in activity feed (reduce clutter)
+            if (conduitType.includes('queues')) {
+                addActivity(entityId, signalStr, conduitType);
+            }
         }
 
         function handleEvent(data) {
@@ -292,6 +316,35 @@
                 } else if (data.details.scenarioId === 'normal-operation') {
                     currentRate = 10;
                     addSystemMessage('🎭 Scenario: NORMAL - Rate adjusted to 10 msg/sec (expect recovery in ~10 sec)');
+                }
+            } else if (data.eventType === 'producer-stats') {
+                // Update producer stats from JMX
+                const { messageCount, rate, bufferUtilization } = data.details;
+                currentRate = rate;
+                currentBufferUtil = bufferUtilization >= 0 ? bufferUtilization : 0;
+
+                // Update sidecar with message count and buffer %
+                const consolidatedId = "producer-1";
+                if (sidecars.has(consolidatedId)) {
+                    const sidecar = sidecars.get(consolidatedId);
+                    sidecar.messageCount = messageCount;
+                    sidecar.rate = rate;
+                    sidecar.util = currentBufferUtil + '%';
+
+                    // Re-render sidecar cards
+                    document.getElementById('sidecarGrid').innerHTML = Array.from(sidecars.values()).map(s => `
+                        <div class="sidecar-row">
+                            <div>
+                                <strong>${s.id}</strong>
+                                <div style="font-size:10px; opacity:0.7;">
+                                    ${s.rate.toLocaleString()} msg/sec • Buffer: ${s.util}
+                                    ${s.throttled ? ' • 🔒 THROTTLED' : ''}
+                                    ${s.messageCount !== undefined ? '<br>📊 Sent: ' + s.messageCount.toLocaleString() + ' messages' : ''}
+                                </div>
+                            </div>
+                            <span class="badge ${s.status}">${s.status}</span>
+                        </div>
+                    `).join('');
                 }
             }
         }
@@ -309,38 +362,67 @@
             feed.insertBefore(item, feed.firstChild);
         }
 
-        function updateSidecar(entityId, signalStr, bufferUtil) {
-            if (!sidecars.has(entityId)) {
-                sidecars.set(entityId, { id: entityId, status: 'healthy', rate: currentRate, util: bufferUtil });
+        function updateSidecar(entityId, signalStr, conduitType) {
+            // Only track buffer-related signals for primary producer display
+            // Ignore batch-size, records-per-request, etc. - they clutter the UI
+            if (!entityId.includes('buffer')) {
+                return; // Skip non-buffer entities
             }
 
-            const sidecar = sidecars.get(entityId);
-            if (signalStr.includes('OVERFLOW')) sidecar.status = 'degraded';
-            else if (signalStr.includes('PUT') || signalStr.includes('ENQUEUE')) sidecar.status = 'healthy';
+            // Consolidate all buffer signals under "producer-1"
+            const consolidatedId = "producer-1";
+
+            if (!sidecars.has(consolidatedId)) {
+                sidecars.set(consolidatedId, { id: consolidatedId, status: 'healthy', rate: currentRate, util: currentBufferUtil + '%', throttled: false });
+            }
+
+            const sidecar = sidecars.get(consolidatedId);
+
+            // Update status based on signal type
+            if (signalStr.includes('DEGRADED') || signalStr.includes('DEFECTIVE')) {
+                sidecar.status = 'degraded';
+            } else if (signalStr.includes('OVERFLOW')) {
+                sidecar.status = 'degraded';
+            } else if (signalStr.includes('STABLE') || signalStr.includes('PUT') || signalStr.includes('ENQUEUE')) {
+                sidecar.status = 'healthy';
+            }
+
+            // Track throttling state
+            if (signalStr.includes('PROMISE') && conduitType.includes('agents')) {
+                sidecar.throttled = true;
+                isThrottled = true;
+            } else if (signalStr.includes('FULFILL') && conduitType.includes('agents') && signalStr.includes('resume')) {
+                sidecar.throttled = false;
+                isThrottled = false;
+            }
+
             sidecar.rate = currentRate;
-            sidecar.util = bufferUtil;
 
             document.getElementById('sidecarGrid').innerHTML = Array.from(sidecars.values()).map(s => `
                 <div class="sidecar-row">
                     <div>
                         <strong>${s.id}</strong>
-                        <div style="font-size:10px; opacity:0.7;">${s.rate} msg/sec • Buffer: ${s.util}</div>
+                        <div style="font-size:10px; opacity:0.7;">
+                            ${s.rate.toLocaleString()} msg/sec • Buffer: ${s.util}
+                            ${s.throttled ? ' • 🔒 THROTTLED' : ''}
+                            ${s.messageCount !== undefined ? '<br>📊 Sent: ' + s.messageCount.toLocaleString() + ' messages' : ''}
+                        </div>
                     </div>
                     <span class="badge ${s.status}">${s.status}</span>
                 </div>
             `).join('');
         }
 
-        function updateNarrative(signalStr, entityId, bufferUtil) {
+        function updateNarrative(signalStr, entityId) {
             const narrative = document.getElementById('narrative');
             if (signalStr.includes('OVERFLOW')) {
-                narrative.innerHTML = `<strong style="color:#f59e0b;">⚠️ OVERFLOW:</strong> Buffer ${bufferUtil} full at ${currentRate.toLocaleString()} msg/sec. Producer will block soon. <em>Semiotic signal carries MEANING.</em>`;
+                narrative.innerHTML = `<strong style="color:#f59e0b;">⚠️ OVERFLOW:</strong> Buffer ${currentBufferUtil}% full at ${currentRate.toLocaleString()} msg/sec. Producer will block soon. <em>Semiotic signal carries MEANING.</em>`;
             } else if (signalStr.includes('PUT') || signalStr.includes('ENQUEUE')) {
-                narrative.innerHTML = `<strong style="color:#10b981;">✅ HEALTHY:</strong> Buffer accepting messages at ${currentRate.toLocaleString()} msg/sec. Utilization: ${bufferUtil}.`;
+                narrative.innerHTML = `<strong style="color:#10b981;">✅ HEALTHY:</strong> Buffer accepting messages at ${currentRate.toLocaleString()} msg/sec. Utilization: ${currentBufferUtil}%.`;
             }
         }
 
-        function addActivity(source, message, bufferUtil) {
+        function addActivity(source, message) {
             const feed = document.getElementById('activityFeed');
             if (feed.querySelector('[style*="Waiting"]')) feed.innerHTML = '';
 
@@ -353,21 +435,21 @@
                               message.includes('INCREMENT') ? 'INCREMENT' :
                               message.includes('DECREMENT') ? 'DECREMENT' : 'SIGNAL';
 
-            // Color code based on health status
-            const cssClass = bufferUtil.includes('>95%') ? 'overflow' :
-                            bufferUtil.includes('80-95%') ? 'pressure' : 'healthy';
+            // Color code based on buffer % thresholds
+            const cssClass = currentBufferUtil >= 95 ? 'overflow' :
+                            currentBufferUtil >= 80 ? 'pressure' : 'healthy';
 
             item.className = `activity-item ${cssClass}`;
 
             // Add visual indicator for state
-            const icon = bufferUtil.includes('>95%') ? '🔴' :
-                        bufferUtil.includes('80-95%') ? '🟡' : '🟢';
+            const icon = currentBufferUtil >= 95 ? '🔴' :
+                        currentBufferUtil >= 80 ? '🟡' : '🟢';
 
             item.innerHTML = `
                 <div class="activity-time">${new Date().toLocaleTimeString()}</div>
                 ${icon} <strong>${source}</strong>: ${signalType}
                 <div style="font-size:10px; opacity:0.7; margin-top:2px;">
-                    Rate: ${currentRate.toLocaleString()} msg/sec • Buffer: ${bufferUtil}
+                    Rate: ${currentRate.toLocaleString()} msg/sec • Buffer: ${currentBufferUtil}%
                 </div>
             `;
             feed.insertBefore(item, feed.firstChild);

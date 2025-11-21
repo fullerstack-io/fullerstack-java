@@ -1,8 +1,8 @@
 package io.fullerstack.kafka.core.meta;
 
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
-import io.humainary.substrates.ext.serventis.ext.Reporters.Reporter;
+import io.humainary.substrates.ext.serventis.ext.Situations;
+import io.humainary.substrates.ext.serventis.ext.Situations.Situation;
 import io.humainary.substrates.api.Substrates.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,8 +84,8 @@ public class OscillationDetector implements AutoCloseable {
 
     private final Cortex cortex;
     private final Circuit circuit;
-    private final Conduit<Reporter, Reporters.Sign> reporters;
-    private final Reporter metaReporter;
+    private final Conduit<Situation, Situations.Signal> reporters;
+    private final Situation metaReporter;
     private final Subscription monitorSubscription;
 
     // Track condition changes per monitor
@@ -108,7 +108,7 @@ public class OscillationDetector implements AutoCloseable {
         // Create Reporters conduit for meta-monitoring warnings
         this.reporters = circuit.conduit(
             cortex.name("meta.reporters"),
-            Reporters::composer
+            Situations::composer
         );
 
         // Create meta-reporter for oscillation warnings
@@ -184,7 +184,7 @@ public class OscillationDetector implements AutoCloseable {
      */
     private void handleOscillation(String monitorName, Deque<ConditionChange> history) {
         // Emit WARNING via meta-reporter
-        metaReporter.warning();
+        metaReporter.warning(Situations.Dimension.VOLATILE);
 
         // Collect oscillation details
         Set<Monitors.Sign> uniqueConditions = new HashSet<>();
@@ -222,7 +222,7 @@ public class OscillationDetector implements AutoCloseable {
      *
      * @return reporters conduit emitting oscillation warnings
      */
-    public Conduit<Reporter, Reporters.Sign> reporters() {
+    public Conduit<Situation, Situations.Signal> reporters() {
         return reporters;
     }
 

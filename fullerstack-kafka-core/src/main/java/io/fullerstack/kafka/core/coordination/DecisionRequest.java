@@ -1,6 +1,6 @@
 package io.fullerstack.kafka.core.coordination;
 
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -11,14 +11,14 @@ import java.util.Objects;
  * Used in SUPERVISED and ADVISORY modes where human can inject approval, veto, or alternative action.
  *
  * @param action action identifier (e.g., "throttle.producer", "pause.consumer")
- * @param urgency urgency level from Reporter (NORMAL, WARNING, CRITICAL)
+ * @param urgency urgency level from Situation (NORMAL, WARNING, CRITICAL)
  * @param explanation human-readable explanation of why this action is needed
  * @param impact expected impact of the action
  * @param timeout how long to wait for human response before auto-executing (ADVISORY) or canceling (SUPERVISED)
  */
 public record DecisionRequest(
     String action,
-    Reporters.Sign urgency,
+    Situations.Sign urgency,
     String explanation,
     String impact,
     Duration timeout
@@ -36,7 +36,7 @@ public record DecisionRequest(
      */
     public static DecisionRequest of(
         String action,
-        Reporters.Sign urgency,
+        Situations.Sign urgency,
         Duration timeout
     ) {
         return new DecisionRequest(
@@ -48,7 +48,7 @@ public record DecisionRequest(
         );
     }
 
-    private static String generateExplanation(String action, Reporters.Sign urgency) {
+    private static String generateExplanation(String action, Situations.Sign urgency) {
         return switch (urgency) {
             case CRITICAL -> String.format("CRITICAL: %s requires immediate action", action);
             case WARNING -> String.format("WARNING: %s recommended", action);

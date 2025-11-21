@@ -11,7 +11,7 @@ import io.fullerstack.kafka.core.reporters.ProducerHealthReporter;
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Actors;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,14 +36,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  *      OBSERVE/ORIENT  →      DECIDE         →      ACT
  * </pre>
  */
-@DisplayName("Reporter → Actor Integration Tests")
+@DisplayName("Situation → Actor Integration Tests")
 class ReporterActorIntegrationTest {
 
     private Circuit monitorCircuit;
     private Circuit reporterCircuit;
     private Circuit actorCircuit;
 
-    private Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private Conduit<Situations.Situation, Situations.Signal> reporters;
     private Conduit<Actors.Actor, Actors.Sign> actors;
 
     private Cell<Monitors.Sign, Monitors.Sign> producerRootCell;
@@ -185,7 +185,7 @@ class ReporterActorIntegrationTest {
         monitorCircuit = cortex().circuit(cortex().name("monitors"));
 
         reporterCircuit = cortex().circuit(cortex().name("reporters"));
-        reporters = reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
+        reporters = reporterCircuit.conduit(cortex().name("reporters"), Situations::composer);
 
         actorCircuit = cortex().circuit(cortex().name("actors"));
         actors = actorCircuit.conduit(cortex().name("actors"), Actors::composer);
@@ -248,16 +248,16 @@ class ReporterActorIntegrationTest {
     }
 
     @Test
-    @DisplayName("Complete OODA Loop: Producer DEGRADED → Reporter CRITICAL → ThrottleActor")
+    @DisplayName("Complete OODA Loop: Producer DEGRADED → Situation CRITICAL → ThrottleActor")
     void testProducerDegradedTriggersThrottle() {
         // Given: Producer configured with defaults
         configManager.setProducerConfig("producer-1", "max.in.flight.requests.per.connection", 5);
         configManager.setProducerConfig("producer-1", "linger.ms", 10);
 
         // OBSERVE → ORIENT → DECIDE: Simulate producer health reporter emitting CRITICAL
-        // In real system: Monitor DEGRADED → Cell aggregation → Reporter assessment → CRITICAL
+        // In real system: Monitor DEGRADED → Cell aggregation → Situation assessment → CRITICAL
         // For integration test: Directly emit CRITICAL from reporter channel
-        Reporters.Reporter producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
+        Situations.Situation producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
         producerHealth.critical();
 
         reporterCircuit.await();
@@ -280,12 +280,12 @@ class ReporterActorIntegrationTest {
     }
 
     @Test
-    @DisplayName("Complete OODA Loop: Cluster DOWN → Reporter CRITICAL → AlertActor")
+    @DisplayName("Complete OODA Loop: Cluster DOWN → Situation CRITICAL → AlertActor")
     void testClusterDownTriggersAlerts() {
         // OBSERVE → ORIENT → DECIDE: Simulate cluster health reporter emitting CRITICAL
-        // In real system: Monitor DOWN → Cell aggregation → Reporter assessment → CRITICAL
+        // In real system: Monitor DOWN → Cell aggregation → Situation assessment → CRITICAL
         // For integration test: Directly emit CRITICAL from reporter channel
-        Reporters.Reporter clusterHealth = reporters.percept(cortex().name("cluster.health"));
+        Situations.Situation clusterHealth = reporters.percept(cortex().name("cluster.health"));
         clusterHealth.critical();
 
         reporterCircuit.await();
@@ -316,7 +316,7 @@ class ReporterActorIntegrationTest {
         configManager.setProducerConfig("producer-2", "linger.ms", 20);
 
         // When: Producer 1 reporter emits CRITICAL
-        Reporters.Reporter producer1Health = reporters.percept(cortex().name("producer.producer-1.health"));
+        Situations.Situation producer1Health = reporters.percept(cortex().name("producer.producer-1.health"));
         producer1Health.critical();
 
         reporterCircuit.await();
@@ -342,7 +342,7 @@ class ReporterActorIntegrationTest {
         configManager.setProducerConfig("producer-1", "max.in.flight.requests.per.connection", 5);
 
         // When: Emit 3 rapid CRITICAL signs
-        Reporters.Reporter producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
+        Situations.Situation producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
         for (int i = 0; i < 3; i++) {
             producerHealth.critical();
         }
@@ -366,8 +366,8 @@ class ReporterActorIntegrationTest {
         // Given: Producer configured
         configManager.setProducerConfig("producer-1", "max.in.flight.requests.per.connection", 5);
 
-        // When: Reporter emits WARNING
-        Reporters.Reporter producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
+        // When: Situation emits WARNING
+        Situations.Situation producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
         producerHealth.warning();
 
         reporterCircuit.await();
@@ -383,8 +383,8 @@ class ReporterActorIntegrationTest {
     @Test
     @DisplayName("NORMAL signs don't trigger actors")
     void testNormalDoesNotTriggerActors() {
-        // When: Reporter emits NORMAL
-        Reporters.Reporter producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
+        // When: Situation emits NORMAL
+        Situations.Situation producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
         producerHealth.normal();
 
         reporterCircuit.await();
@@ -401,8 +401,8 @@ class ReporterActorIntegrationTest {
         // Given: Producer configured
         configManager.setProducerConfig("producer-1", "max.in.flight.requests.per.connection", 5);
 
-        // When: Reporter emits CRITICAL with hierarchical name
-        Reporters.Reporter producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
+        // When: Situation emits CRITICAL with hierarchical name
+        Situations.Situation producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
         producerHealth.critical();
 
         reporterCircuit.await();
@@ -424,13 +424,13 @@ class ReporterActorIntegrationTest {
         // When: Multiple different signals
 
         // Signal 1: Producer health CRITICAL
-        Reporters.Reporter producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
+        Situations.Situation producerHealth = reporters.percept(cortex().name("producer.producer-1.health"));
         producerHealth.critical();
         reporterCircuit.await();
         actorCircuit.await();
 
         // Signal 2: Cluster health CRITICAL
-        Reporters.Reporter clusterHealth = reporters.percept(cortex().name("cluster.health"));
+        Situations.Situation clusterHealth = reporters.percept(cortex().name("cluster.health"));
         clusterHealth.critical();
         reporterCircuit.await();
         actorCircuit.await();

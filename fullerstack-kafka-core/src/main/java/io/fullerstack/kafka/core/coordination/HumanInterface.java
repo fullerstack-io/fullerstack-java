@@ -19,7 +19,7 @@ import java.util.concurrent.CompletableFuture;
  * CompletableFuture<HumanResponse> response = cli.requestApproval(
  *     new DecisionRequest(
  *         "throttle.producer",
- *         Reporters.Sign.CRITICAL,
+ *         Situations.Sign.CRITICAL,
  *         Duration.ofSeconds(3)
  *     )
  * );

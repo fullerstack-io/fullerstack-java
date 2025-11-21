@@ -2,8 +2,8 @@
  * Layer 3 (DECIDE Phase) - Reporters for kafka-obs.
  *
  * <p>Reporters subscribe to Monitor conduits (Layer 2) and assess situation urgency
- * by interpreting Monitors.Sign patterns. They emit Reporters.Sign (NORMAL, WARNING, CRITICAL)
- * to Reporter conduits for consumption by Actors (Layer 4).
+ * by interpreting Monitors.Sign patterns. They emit Situations.Sign (NORMAL, WARNING, CRITICAL)
+ * to Situation conduits for consumption by Actors (Layer 4).
  *
  * <h2>OODA Loop Position</h2>
  * <pre>
@@ -16,7 +16,7 @@
  * Layer 4 (ACT): Actors (automated responses)
  * </pre>
  *
- * <h2>Reporter Types</h2>
+ * <h2>Situation Types</h2>
  * <ul>
  *   <li><b>ProducerHealthReporter</b>: Assesses producer health patterns (buffer overflow, errors, latency)</li>
  *   <li><b>ConsumerHealthReporter</b>: Assesses consumer health patterns (lag, rebalancing, errors)</li>
@@ -46,8 +46,8 @@
  *     monitorCircuit.conduit(cortex().name("monitors"), Monitors::composer);
  *
  * Circuit reporterCircuit = cortex().circuit(cortex().name("reporters"));
- * Conduit<Reporters.Reporter, Reporters.Signal> reporters =
- *     reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
+ * Conduit<Situations.Situation, Situations.Signal> reporters =
+ *     reporterCircuit.conduit(cortex().name("reporters"), Situations::composer);
  *
  * // Create reporter
  * ProducerHealthReporter reporter = new ProducerHealthReporter(
@@ -62,14 +62,14 @@
  * Monitors.Monitor producer = monitors.percept(cortex().name("producer-1"));
  * producer.degraded(Monitors.Dimension.CONFIRMED);
  *
- * // Reporter assesses urgency and emits (Layer 3)
- * // → Reporters.Sign.WARNING emitted
+ * // Situation assesses urgency and emits (Layer 3)
+ * // → Situations.Sign.WARNING emitted
  *
  * // Actors subscribe to reporters (Layer 4)
  * reporters.subscribe(cortex().subscriber(
  *     cortex().name("alert-actor"),
  *     (subject, registrar) -> registrar.register(signal -> {
- *         if (signal.sign() == Reporters.Sign.CRITICAL) {
+ *         if (signal.sign() == Situations.Sign.CRITICAL) {
  *             sendPagerDutyAlert();
  *         }
  *     })

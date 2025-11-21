@@ -6,7 +6,7 @@ import io.fullerstack.kafka.producer.sidecar.SidecarResponseListener;
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Agents;
 import io.humainary.substrates.ext.serventis.ext.Actors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,9 +78,9 @@ public class ProducerSidecarApplication {
         logger.info("✅ Created Actors conduit (Speech Act Theory - Distributed Coordination)");
 
         // Create Reporters conduit (for urgency assessment - DECIDE layer)
-        Conduit<Reporters.Reporter, Reporters.Sign> reporters = sidecarCircuit.conduit(
+        Conduit<Situations.Situation, Situations.Signal> reporters = sidecarCircuit.conduit(
             cortex().name("reporters"),
-            Reporters::composer
+            Situations::composer
         );
         logger.info("✅ Created Reporters conduit (Urgency Assessment)");
 
@@ -187,7 +187,7 @@ public class ProducerSidecarApplication {
      */
     private static void runDemoScenario(
         Conduit<Agents.Agent, Agents.Signal> agents,
-        Conduit<Reporters.Reporter, Reporters.Sign> reporters,
+        Conduit<Situations.Situation, Situations.Signal> reporters,
         Circuit circuit
     ) {
         try {

@@ -3,7 +3,7 @@ package io.fullerstack.kafka.core.integration;
 import io.fullerstack.kafka.core.reporters.ConsumerHealthReporter;
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *           ↓
  * Layer 3 (DECIDE): ConsumerHealthReporter tracks patterns and assesses urgency
  *           ↓
- *           Reporter emits WARNING/CRITICAL based on lag growth trends
+ *           Situation emits WARNING/CRITICAL based on lag growth trends
  * </pre>
  *
  * <p>Consumer-specific scenarios tested:
@@ -49,9 +49,9 @@ class ConsumerLagIT {
     private Circuit monitorCircuit;
     private Circuit reporterCircuit;
     private Conduit<Monitors.Monitor, Monitors.Signal> monitors;
-    private Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private Conduit<Situations.Situation, Situations.Signal> reporters;
     private ConsumerHealthReporter consumerReporter;
-    private List<Reporters.Sign> reporterEmissions;
+    private List<Situations.Signal> reporterEmissions;
 
     @BeforeEach
     void setUp() {
@@ -59,16 +59,16 @@ class ConsumerLagIT {
         monitorCircuit = cortex().circuit(cortex().name("monitors"));
         monitors = monitorCircuit.conduit(cortex().name("monitors"), Monitors::composer);
 
-        // Layer 3: Create Reporter circuit, conduit, and consumer reporter
+        // Layer 3: Create Situation circuit, conduit, and consumer reporter
         reporterCircuit = cortex().circuit(cortex().name("reporters"));
-        reporters = reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
+        reporters = reporterCircuit.conduit(cortex().name("reporters"), Situations::composer);
         consumerReporter = new ConsumerHealthReporter(monitors, reporters);
 
         // Track reporter emissions
         reporterEmissions = new ArrayList<>();
         reporters.subscribe(cortex().subscriber(
             cortex().name("test-receptor"),
-            (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+            (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                 registrar.register(reporterEmissions::add);
             }
         ));
@@ -105,7 +105,7 @@ class ConsumerLagIT {
         // Then: Should emit WARNING for early detection
         assertThat(reporterEmissions)
             .as("Single DIVERGING should emit WARNING for early detection")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
 
         assertThat(latencyMs)
             .as("Detection should complete within 100ms")
@@ -133,7 +133,7 @@ class ConsumerLagIT {
         // Then: Should emit CRITICAL for sustained lag growth trend
         assertThat(reporterEmissions)
             .as("Sustained DIVERGING (3+) should emit CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -162,11 +162,11 @@ class ConsumerLagIT {
         // Then: Should only emit WARNING (counter was reset)
         assertThat(reporterEmissions)
             .as("Intermittent DIVERGING should emit WARNING only")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
 
         assertThat(reporterEmissions)
             .as("Intermittent pattern should NOT reach CRITICAL")
-            .doesNotContain(Reporters.Sign.CRITICAL);
+            .doesNotContain(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -182,7 +182,7 @@ class ConsumerLagIT {
         // Then: Should emit WARNING
         assertThat(reporterEmissions)
             .as("Consumer DEGRADED should emit WARNING")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
     }
 
     @Test
@@ -198,7 +198,7 @@ class ConsumerLagIT {
         // Then: Should emit CRITICAL immediately
         assertThat(reporterEmissions)
             .as("Consumer DOWN should emit CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -214,7 +214,7 @@ class ConsumerLagIT {
         // Then: Should emit CRITICAL
         assertThat(reporterEmissions)
             .as("Consumer DEFECTIVE should emit CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -238,7 +238,7 @@ class ConsumerLagIT {
         // Then: Should emit NORMAL
         assertThat(reporterEmissions)
             .as("Lag recovery should emit NORMAL")
-            .contains(Reporters.Sign.NORMAL);
+            .contains(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -268,11 +268,11 @@ class ConsumerLagIT {
         // Then: Should see CRITICAL (from consumer1) and WARNING (from consumer2)
         assertThat(reporterEmissions)
             .as("Should emit CRITICAL for consumer1 sustained lag")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
 
         assertThat(reporterEmissions)
             .as("Should emit WARNING for consumer2 single lag spike")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
     }
 
     @Test
@@ -288,7 +288,7 @@ class ConsumerLagIT {
         // Then: Should emit WARNING
         assertThat(reporterEmissions)
             .as("ERRATIC consumption should emit WARNING")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
     }
 
     @Test
@@ -303,7 +303,7 @@ class ConsumerLagIT {
 
         assertThat(reporterEmissions)
             .as("Phase 1: Normal operation should emit NORMAL")
-            .contains(Reporters.Sign.NORMAL);
+            .contains(Situations.Sign.NORMAL);
 
         reporterEmissions.clear();
 
@@ -314,7 +314,7 @@ class ConsumerLagIT {
 
         assertThat(reporterEmissions)
             .as("Phase 2: Single spike should emit WARNING")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
 
         reporterEmissions.clear();
 
@@ -329,7 +329,7 @@ class ConsumerLagIT {
 
         assertThat(reporterEmissions)
             .as("Phase 3: Sustained growth (3+ DIVERGING) should emit CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
 
         reporterEmissions.clear();
 
@@ -340,7 +340,7 @@ class ConsumerLagIT {
 
         assertThat(reporterEmissions)
             .as("Phase 4: Recovery should emit NORMAL")
-            .contains(Reporters.Sign.NORMAL);
+            .contains(Situations.Sign.NORMAL);
 
         reporterEmissions.clear();
 
@@ -351,7 +351,7 @@ class ConsumerLagIT {
 
         assertThat(reporterEmissions)
             .as("Phase 5: Stable should emit NORMAL")
-            .contains(Reporters.Sign.NORMAL);
+            .contains(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -384,7 +384,7 @@ class ConsumerLagIT {
 
         assertThat(reporterEmissions)
             .as("Should emit CRITICAL after pattern detected")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -402,14 +402,14 @@ class ConsumerLagIT {
         // Then: Should emit appropriate urgency for each
         assertThat(reporterEmissions)
             .as("Should emit CRITICAL for DOWN consumer")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
 
         assertThat(reporterEmissions)
             .as("Should emit WARNING for DEGRADED consumer")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
 
         assertThat(reporterEmissions)
             .as("Should emit NORMAL for STABLE consumer")
-            .contains(Reporters.Sign.NORMAL);
+            .contains(Situations.Sign.NORMAL);
     }
 }

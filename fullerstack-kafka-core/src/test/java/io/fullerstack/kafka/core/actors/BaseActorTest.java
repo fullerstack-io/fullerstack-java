@@ -2,7 +2,7 @@ package io.fullerstack.kafka.core.actors;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Actors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +20,7 @@ class BaseActorTest {
 
     private Circuit reporterCircuit;
     private Circuit actorCircuit;
-    private Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private Conduit<Situations.Situation, Situations.Signal> reporters;
     private Conduit<Actors.Actor, Actors.Sign> actors;
     private TestActor testActor;
     private List<Actors.Sign> actorSigns;
@@ -33,7 +33,7 @@ class BaseActorTest {
         private final Subscription subscription;
 
         public TestActor(
-            Conduit<Reporters.Reporter, Reporters.Sign> reporters,
+            Conduit<Situations.Situation, Situations.Signal> reporters,
             Conduit<Actors.Actor, Actors.Sign> actors
         ) {
             super(actors, "test-actor", 1000); // 1 second rate limit
@@ -43,11 +43,11 @@ class BaseActorTest {
 
             this.subscription = reporters.subscribe(cortex().subscriber(
                 cortex().name("test-actor-subscriber"),
-                (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+                (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                     // Filter: Only register pipe for test-reporter channel
                     if (subject.name().equals(targetReporterName)) {
                         registrar.register(sign -> {
-                            if (sign == Reporters.Sign.CRITICAL) {
+                            if (sign == Situations.Sign.CRITICAL) {
                                 handleCritical(subject.name());
                             }
                         });
@@ -78,7 +78,7 @@ class BaseActorTest {
     @BeforeEach
     void setUp() {
         reporterCircuit = cortex().circuit(cortex().name("reporters"));
-        reporters = reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
+        reporters = reporterCircuit.conduit(cortex().name("reporters"), Situations::composer);
 
         actorCircuit = cortex().circuit(cortex().name("actors"));
         actors = actorCircuit.conduit(cortex().name("actors"), Actors::composer);
@@ -104,7 +104,7 @@ class BaseActorTest {
     @Test
     @DisplayName("Actor executes action on CRITICAL sign")
     void testActorExecutesOnCritical() {
-        // When: Reporter emits CRITICAL
+        // When: Situation emits CRITICAL
         reporters.percept(cortex().name("test.reporter")).critical();
 
         // Wait for propagation
@@ -154,7 +154,7 @@ class BaseActorTest {
     @Test
     @DisplayName("Actor does not act on WARNING by default")
     void testNoActionOnWarning() {
-        // When: Reporter emits WARNING
+        // When: Situation emits WARNING
         reporters.percept(cortex().name("test.reporter")).warning();
 
         reporterCircuit.await();
@@ -167,7 +167,7 @@ class BaseActorTest {
     @Test
     @DisplayName("Actor does not act on NORMAL")
     void testNoActionOnNormal() {
-        // When: Reporter emits NORMAL
+        // When: Situation emits NORMAL
         reporters.percept(cortex().name("test.reporter")).normal();
 
         reporterCircuit.await();
@@ -201,10 +201,10 @@ class BaseActorTest {
                 Name targetReporterName = cortex().name("test.reporter");
                 this.subscription = reporters.subscribe(cortex().subscriber(
                     cortex().name("failing-actor-subscriber"),
-                    (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+                    (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                         if (subject.name().equals(targetReporterName)) {
                             registrar.register(sign -> {
-                                if (sign == Reporters.Sign.CRITICAL) {
+                                if (sign == Situations.Sign.CRITICAL) {
                                     String actionKey = "failing:" + subject.name().path();
                                     executeWithProtection(actionKey, () -> {
                                         throw new RuntimeException("Simulated failure");
@@ -225,7 +225,7 @@ class BaseActorTest {
         };
 
         try {
-            // When: Reporter emits CRITICAL
+            // When: Situation emits CRITICAL
             reporters.percept(cortex().name("test.reporter")).critical();
 
             reporterCircuit.await();
@@ -273,10 +273,10 @@ class BaseActorTest {
                 Name targetReporterName = cortex().name("test.reporter2");
                 this.subscription = reporters.subscribe(cortex().subscriber(
                     cortex().name("actor-2-subscriber"),
-                    (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+                    (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                         if (subject.name().equals(targetReporterName)) {
                             registrar.register(sign -> {
-                                if (sign == Reporters.Sign.CRITICAL) {
+                                if (sign == Situations.Sign.CRITICAL) {
                                     String actionKey = "actor2:" + subject.name().path();
                                     executeWithProtection(actionKey, () -> {
                                         count.incrementAndGet();

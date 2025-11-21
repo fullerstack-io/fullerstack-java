@@ -75,7 +75,7 @@ public class TransactionStopAgent extends BaseAgent {
     private final Subscription subscription;
 
     public TransactionStopAgent(
-        Conduit<Reporters.Reporter, Reporters.Signal> reporters,
+        Conduit<Situations.Situation, Situations.Signal> reporters,
         Conduit<Agent, Agents.Signal> agents,
         OcppCommandExecutor commandExecutor
     ) {
@@ -98,15 +98,15 @@ public class TransactionStopAgent extends BaseAgent {
      * Handle reporter signals and filter for CRITICAL connector health.
      */
     private void handleReporterSignal(
-        Subject<Channel<Reporters.Signal>> subject,
-        Registrar<Reporters.Signal> registrar
+        Subject<Channel<Situations.Signal>> subject,
+        Registrar<Situations.Signal> registrar
     ) {
         Name reporterName = subject.name();
 
         // Filter: Only register for connector health reporters
         if (isConnectorHealthReporter(reporterName)) {
             registrar.register(signal -> {
-                if (signal.sign() == Reporters.Sign.CRITICAL) {
+                if (signal.sign() == Situations.Sign.CRITICAL) {
                     handleConnectorCritical(reporterName);
                 }
             });

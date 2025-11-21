@@ -95,7 +95,7 @@ public class CounterFlowCircuit implements AutoCloseable {
    * @return Counter instrument for emitting counter signals via method calls
    */
   public Counter counterFor ( String entityName ) {
-    return conduit.get ( Substrates.cortex().name ( entityName ) );
+    return conduit.percept( Substrates.cortex().name ( entityName ) );
   }
 
   /**

@@ -5,7 +5,7 @@ import io.fullerstack.kafka.core.hierarchy.HierarchyManager;
 import io.fullerstack.kafka.core.reporters.ClusterHealthReporter;
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,11 +49,11 @@ class MultiLevelAggregationIT {
     private Circuit monitorCircuit;
     private Circuit reporterCircuit;
     private Conduit<Monitors.Monitor, Monitors.Signal> monitors;
-    private Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private Conduit<Situations.Situation, Situations.Signal> reporters;
     private HierarchyManager hierarchy;
     private MonitorCellBridge bridge;
     private ClusterHealthReporter clusterReporter;
-    private List<Reporters.Sign> reporterEmissions;
+    private List<Situations.Signal> reporterEmissions;
 
     @BeforeEach
     void setUp() {
@@ -66,16 +66,16 @@ class MultiLevelAggregationIT {
         bridge = new MonitorCellBridge(monitors, hierarchy);
         bridge.start();
 
-        // Layer 3: Create Reporter circuit, conduit, and cluster reporter
+        // Layer 3: Create Situation circuit, conduit, and cluster reporter
         reporterCircuit = cortex().circuit(cortex().name("reporters"));
-        reporters = reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
+        reporters = reporterCircuit.conduit(cortex().name("reporters"), Situations::composer);
         clusterReporter = new ClusterHealthReporter(hierarchy.getClusterCell(), reporters);
 
         // Track reporter emissions
         reporterEmissions = new ArrayList<>();
         reporters.subscribe(cortex().subscriber(
             cortex().name("test-receptor"),
-            (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+            (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                 registrar.register(reporterEmissions::add);
             }
         ));
@@ -115,7 +115,7 @@ class MultiLevelAggregationIT {
         // Then: Should aggregate at topic level and emit CRITICAL
         assertThat(reporterEmissions)
             .as("Multiple partition failures should aggregate to topic DEGRADED → CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -133,7 +133,7 @@ class MultiLevelAggregationIT {
         // Then: Should aggregate at broker level and emit CRITICAL
         assertThat(reporterEmissions)
             .as("Multiple topic failures should aggregate to broker DEGRADED → CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -151,7 +151,7 @@ class MultiLevelAggregationIT {
         // Then: Should aggregate to cluster CRITICAL
         assertThat(reporterEmissions)
             .as("2/3 brokers DEGRADED should aggregate to cluster CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -178,7 +178,7 @@ class MultiLevelAggregationIT {
         // Then: Should cascade through hierarchy to cluster CRITICAL
         assertThat(reporterEmissions)
             .as("Cascading failures should aggregate to cluster CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
 
         assertThat(latencyMs)
             .as("Cascading aggregation should complete within 100ms")
@@ -200,7 +200,7 @@ class MultiLevelAggregationIT {
         // Then: Should emit WARNING (not CRITICAL)
         assertThat(reporterEmissions)
             .as("Single broker ERRATIC should emit WARNING")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
     }
 
     @Test
@@ -218,7 +218,7 @@ class MultiLevelAggregationIT {
         // Then: Should aggregate to worst-case (DOWN → CRITICAL)
         assertThat(reporterEmissions)
             .as("Mixed severity should aggregate to worst-case CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -245,7 +245,7 @@ class MultiLevelAggregationIT {
         // Then: Should propagate NORMAL through hierarchy
         assertThat(reporterEmissions)
             .as("Recovery should propagate to cluster NORMAL")
-            .contains(Reporters.Sign.NORMAL);
+            .contains(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -273,6 +273,6 @@ class MultiLevelAggregationIT {
 
         assertThat(reporterEmissions)
             .as("Should emit CRITICAL for cluster-level issues")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 }

@@ -29,7 +29,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * <pre>
  * UPWARD (Sensing):
  * Monitor.status(DEGRADED) → MonitorCellBridge → Cell hierarchy aggregation
- *     → Reporter.critical() → Actor observes
+ *     → Situation.critical() → Actor observes
  *
  * DOWNWARD (Control):
  * Actor.command(THROTTLE) → CommandHierarchy → Cascades to all partitions
@@ -103,7 +103,7 @@ public class KafkaObservabilitySystem implements AutoCloseable {
     private final CommandHierarchy commandHierarchy;
 
     // Layer 3: Reporters
-    private final Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private final Conduit<Situations.Situation, Situations.Signal> reporters;
     private final ProducerHealthReporter producerHealthReporter;
     private final ConsumerHealthReporter consumerHealthReporter;
     private final ClusterHealthReporter clusterHealthReporter;
@@ -175,7 +175,7 @@ public class KafkaObservabilitySystem implements AutoCloseable {
         // Create reporter conduit
         this.reporters = reporterCircuit.conduit(
             cortex().name("reporters"),
-            Reporters::composer
+            Situations::composer
         );
 
         // Create root cells for reporters to subscribe to
@@ -259,7 +259,7 @@ public class KafkaObservabilitySystem implements AutoCloseable {
         bridge.start();
 
         logger.info("✅ KafkaObservabilitySystem ACTIVE - Full OODA loop operational");
-        logger.info("   Monitor signals will now flow: Monitor → Cell → Reporter → Actor");
+        logger.info("   Monitor signals will now flow: Monitor → Cell → Situation → Actor");
     }
 
     // ========================================
@@ -356,13 +356,13 @@ public class KafkaObservabilitySystem implements AutoCloseable {
     }
 
     /**
-     * Returns the Reporter conduit.
+     * Returns the Situation conduit.
      *
-     * <p>Use this to observe Reporter urgency assessments.
+     * <p>Use this to observe Situation urgency assessments.
      *
      * @return the reporter conduit
      */
-    public Conduit<Reporters.Reporter, Reporters.Sign> getReporters() {
+    public Conduit<Situations.Situation, Situations.Signal> getReporters() {
         return reporters;
     }
 

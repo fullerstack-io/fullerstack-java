@@ -86,6 +86,7 @@ public class StandaloneProducer implements ProducerControlMBean {
         props.put(ProducerConfig.ACKS_CONFIG, "1");
         props.put(ProducerConfig.LINGER_MS_CONFIG, "10");
         props.put(ProducerConfig.BATCH_SIZE_CONFIG, "16384");
+        props.put(ProducerConfig.BUFFER_MEMORY_CONFIG, String.valueOf(2 * 1024 * 1024)); // 2MB buffer for demo visibility
         props.put(ProducerConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
 
         KafkaProducer<String, String> producer = new KafkaProducer<>(props);

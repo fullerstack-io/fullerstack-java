@@ -2,7 +2,7 @@ package io.fullerstack.kafka.core.actors;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Actors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -110,7 +110,7 @@ class AlertActorTest {
 
     private Circuit reporterCircuit;
     private Circuit actorCircuit;
-    private Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private Conduit<Situations.Situation, Situations.Signal> reporters;
     private Conduit<Actors.Actor, Actors.Sign> actors;
     private MockPagerDutyClient pagerDutyClient;
     private MockSlackClient slackClient;
@@ -121,7 +121,7 @@ class AlertActorTest {
     @BeforeEach
     void setUp() {
         reporterCircuit = cortex().circuit(cortex().name("reporters"));
-        reporters = reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
+        reporters = reporterCircuit.conduit(cortex().name("reporters"), Situations::composer);
 
         actorCircuit = cortex().circuit(cortex().name("actors"));
         actors = actorCircuit.conduit(cortex().name("actors"), Actors::composer);
@@ -220,7 +220,7 @@ class AlertActorTest {
     @Test
     @DisplayName("AlertActor ignores WARNING signs")
     void testIgnoresWarning() {
-        // When: Reporter emits WARNING
+        // When: Situation emits WARNING
         reporters.percept(cortex().name("cluster.health")).warning();
 
         reporterCircuit.await();
@@ -235,7 +235,7 @@ class AlertActorTest {
     @Test
     @DisplayName("AlertActor ignores NORMAL signs")
     void testIgnoresNormal() {
-        // When: Reporter emits NORMAL
+        // When: Situation emits NORMAL
         reporters.percept(cortex().name("cluster.health")).normal();
 
         reporterCircuit.await();

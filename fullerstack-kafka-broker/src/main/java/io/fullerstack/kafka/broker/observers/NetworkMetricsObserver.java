@@ -275,12 +275,12 @@ public class NetworkMetricsObserver implements AutoCloseable {
                 // New SSL failures OBSERVED
                 long delta = failedAuth - previousFailed;
                 for (int i = 0; i < Math.min(delta, 10); i++) {
-                    sslProbe.failed();  // Report observed failure
+                    sslProbe. fail(Probes.Dimension.OUTBOUND);  // Report observed failure
                 }
                 logger.debug("SSL authentication failures observed: {} new failures", delta);
             } else if (previousFailed != null) {
                 // No new failures observed
-                sslProbe.succeeded();
+                sslProbe.succeed(Probes.Dimension.INBOUND);
             }
 
             previousSslFailures.put("ssl", failedAuth);
@@ -305,10 +305,10 @@ public class NetworkMetricsObserver implements AutoCloseable {
 
             // Report OBSERVED authentication results
             if (failureRate > 0.0) {
-                saslProbe.failed();  // Observed failures
+                saslProbe. fail(Probes.Dimension.OUTBOUND);  // Observed failures
                 logger.debug("SASL authentication failure rate observed: {}/sec", failureRate);
             } else {
-                saslProbe.succeeded();  // Observed successes
+                saslProbe.succeed(Probes.Dimension.INBOUND);  // Observed successes
             }
 
         } catch (InstanceNotFoundException e) {

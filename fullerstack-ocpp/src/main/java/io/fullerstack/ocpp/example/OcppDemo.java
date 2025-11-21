@@ -97,9 +97,9 @@ public class OcppDemo {
         logger.info("[Layer 3] Creating reporter circuit");
 
         Circuit reporterCircuit = cortex().circuit(cortex().name("ocpp-demo-reporters"));
-        Conduit<Reporters.Reporter, Reporters.Signal> reporters = reporterCircuit.conduit(
+        Conduit<Situations.Situation, Situations.Signal> reporters = reporterCircuit.conduit(
             cortex().name("reporters"),
-            Reporters::composer
+            Situations::composer
         );
 
         ChargerHealthReporter healthReporter = new ChargerHealthReporter(monitors, reporters);
@@ -194,7 +194,7 @@ public class OcppDemo {
      */
     private static void setupSignalLogging(
         Conduit<Monitors.Monitor, Monitors.Sign> monitors,
-        Conduit<Reporters.Reporter, Reporters.Signal> reporters,
+        Conduit<Situations.Situation, Situations.Signal> reporters,
         Conduit<Agent, Agents.Signal> agents
     ) {
         // Log critical monitor signals

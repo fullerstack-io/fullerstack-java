@@ -193,7 +193,7 @@ public class RequestMetricsObserver {
             errorCounter.increment();
 
             // Emit probe for error tracking (request processing failed)
-            errorProbe.fail();
+            errorProbe.fail(Probes.Dimension.INBOUND);
         }
     }
 }

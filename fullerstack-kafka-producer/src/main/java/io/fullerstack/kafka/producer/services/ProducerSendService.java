@@ -33,7 +33,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * Service sendOperation = services.channel(cortex().name("producer.send"));
  * sendOperation.call();      // "I am calling send()"
  * producer.send(...);
- * sendOperation.succeeded(); // "I succeeded"
+ * sendOperation.succeed(Probes.Dimension.INBOUND); // "I succeeded"
  * }</pre>
  *
  * <h3>Services API Pattern (CALLER/CALLEE dimensions):</h3>

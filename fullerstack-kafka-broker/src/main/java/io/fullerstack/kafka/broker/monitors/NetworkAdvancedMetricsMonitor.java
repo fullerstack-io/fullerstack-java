@@ -276,7 +276,7 @@ public class NetworkAdvancedMetricsMonitor implements AutoCloseable {
                 // New SSL failures detected
                 long delta = failedAuth - previousFailed;
                 for (int i = 0; i < Math.min(delta, 10); i++) {
-                    sslProbe.failed();
+                    sslProbe. fail(Probes.Dimension.OUTBOUND);
                 }
                 logger.warn("SSL authentication failures detected: {} new failures (total: {})", delta, failedAuth);
             }
@@ -303,12 +303,12 @@ public class NetworkAdvancedMetricsMonitor implements AutoCloseable {
 
             if (failureRate > 0.0) {
                 // SASL authentication failures detected
-                saslProbe.failed();
+                saslProbe. fail(Probes.Dimension.OUTBOUND);
                 logger.warn("SASL authentication failure rate: {}/sec", failureRate);
 
             } else {
                 // No failures - emit success signal
-                saslProbe.succeeded();
+                saslProbe.succeed(Probes.Dimension.INBOUND);
             }
 
         } catch (InstanceNotFoundException e) {

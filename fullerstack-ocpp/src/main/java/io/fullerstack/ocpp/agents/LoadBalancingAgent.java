@@ -101,7 +101,7 @@ public class LoadBalancingAgent extends BaseAgent {
 
     public LoadBalancingAgent(
         Conduit<Gauges.Gauge, Gauges.Sign> gauges,
-        Conduit<Reporters.Reporter, Reporters.Signal> reporters,
+        Conduit<Situations.Situation, Situations.Signal> reporters,
         Conduit<Agent, Agents.Signal> agents,
         OcppCommandExecutor commandExecutor,
         double gridCapacityKw,
@@ -165,8 +165,8 @@ public class LoadBalancingAgent extends BaseAgent {
      * Handle reporter signals for load balancing assessment.
      */
     private void handleReporterSignal(
-        Subject<Channel<Reporters.Signal>> subject,
-        Registrar<Reporters.Signal> registrar
+        Subject<Channel<Situations.Signal>> subject,
+        Registrar<Situations.Signal> registrar
     ) {
         Name reporterName = subject.name();
 

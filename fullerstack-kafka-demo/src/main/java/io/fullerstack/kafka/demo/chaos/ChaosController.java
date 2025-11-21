@@ -25,7 +25,7 @@ public class ChaosController {
             try {
                 switch (scenarioId) {
                     case "buffer-overflow":
-                        setProducerRate(10000); // High rate causes overflow
+                        setProducerRate(10000); // High rate (10k msg/sec) fills 2MB buffer in ~10 seconds for visible demo
                         break;
                     case "normal-operation":
                         setProducerRate(10); // Low rate is healthy
@@ -68,6 +68,34 @@ public class ChaosController {
                 return (Integer) mbsc.getAttribute(mbeanName, "Rate");
             }
         } catch (Exception e) {
+            return -1; // Error indicator
+        }
+    }
+
+    /**
+     * Get buffer utilization percentage from Kafka producer JMX metrics.
+     */
+    public static int getBufferUtilization() {
+        try {
+            JMXServiceURL url = new JMXServiceURL(JMX_URL);
+            try (JMXConnector jmxc = JMXConnectorFactory.connect(url, null)) {
+                MBeanServerConnection mbsc = jmxc.getMBeanServerConnection();
+                ObjectName metricsName = new ObjectName("kafka.producer:type=producer-metrics,client-id=producer-1");
+
+                Double availableBytes = (Double) mbsc.getAttribute(metricsName, "buffer-available-bytes");
+                Double totalBytes = (Double) mbsc.getAttribute(metricsName, "buffer-total-bytes");
+
+                if (availableBytes != null && totalBytes != null && totalBytes > 0) {
+                    double utilization = (1.0 - (availableBytes / totalBytes)) * 100.0;
+                    int percent = (int) Math.round(utilization);
+                    System.out.println("📊 Buffer JMX: available=" + String.format("%.1f", availableBytes/1024/1024) + "MB, total=" + String.format("%.1f", totalBytes/1024/1024) + "MB, utilization=" + percent + "%");
+                    return percent;
+                }
+                System.err.println("⚠️  Buffer JMX returned null values");
+                return -1;
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Buffer JMX error: " + e.getMessage());
             return -1; // Error indicator
         }
     }

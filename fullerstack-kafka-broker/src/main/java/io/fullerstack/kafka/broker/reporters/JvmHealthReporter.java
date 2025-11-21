@@ -2,7 +2,7 @@ package io.fullerstack.kafka.broker.reporters;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,7 +11,7 @@ import java.util.Objects;
 import static io.humainary.substrates.api.Substrates.cortex;
 
 /**
- * Layer 3 Reporter: Subscribes to Monitors → assesses urgency → emits Reporters signals.
+ * Layer 3 Situation: Subscribes to Monitors → assesses urgency → emits Reporters signals.
  * <p>
  * This is the urgency assessment layer - it subscribes to Monitors signals from Layer 2 (JvmHealthMonitor)
  * and determines the urgency level (normal, warning, critical) based on condition + confidence.
@@ -42,7 +42,7 @@ public class JvmHealthReporter implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(JvmHealthReporter.class);
 
     private final Circuit circuit;
-    private final Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private final Conduit<Situations.Situation, Situations.Signal> reporters;
     private final Subscription monitorSubscription;
 
     /**
@@ -58,7 +58,7 @@ public class JvmHealthReporter implements AutoCloseable {
         // Create Reporters conduit
         this.reporters = circuit.conduit(
             cortex().name("jvm.reporters"),
-            Reporters::composer
+            Situations::composer
         );
 
         // Subscribe to Monitors signals from Layer 2
@@ -87,7 +87,7 @@ public class JvmHealthReporter implements AutoCloseable {
 
             // Determine reporter name (e.g., "monitor.jvm.heap" -> "reporter.jvm.heap")
             String reporterName = monitorName.replace("monitor.", "reporter.");
-            Reporters.Reporter reporter = reporters.percept(cortex().name(reporterName));
+            Situations.Situation reporter = reporters.percept(cortex().name(reporterName));
 
             // Assess urgency and emit
             assessUrgency(reporterName, reporter, signal);
@@ -100,7 +100,7 @@ public class JvmHealthReporter implements AutoCloseable {
      * This is where we translate technical health conditions into urgency levels
      * that drive Layer 4 actions (Agents for automation, Actors for human coordination).
      */
-    private void assessUrgency(String reporterName, Reporters.Reporter reporter, Monitors.Signal signal) {
+    private void assessUrgency(String reporterName, Situations.Situation reporter, Monitors.Signal signal) {
         Monitors.Sign condition = signal.sign();
         Monitors.Dimension confidence = signal.dimension();
 
@@ -109,39 +109,39 @@ public class JvmHealthReporter implements AutoCloseable {
             // CRITICAL urgency - Immediate action required
             case DEGRADED -> {
                 if (confidence == Monitors.Dimension.CONFIRMED) {
-                    reporter.critical();
+                    reporter.critical(Situations.Dimension.CONSTANT);
                     logger.error("[REPORTER] {} emits CRITICAL - DEGRADED (CONFIRMED) detected",
                         reporterName);
                 } else {
-                    reporter.warning();
+                    reporter.warning(Situations.Dimension.VARIABLE);
                     logger.warn("[REPORTER] {} emits WARNING - DEGRADED ({}) detected",
                         reporterName, confidence);
                 }
             }
 
             case DEFECTIVE -> {
-                reporter.critical();
+                reporter.critical(Situations.Dimension.CONSTANT);
                 logger.error("[REPORTER] {} emits CRITICAL - {} detected",
                     reporterName, condition);
             }
 
             // WARNING urgency - Action likely required
             case DIVERGING -> {
-                reporter.warning();
+                reporter.warning(Situations.Dimension.VARIABLE);
                 logger.warn("[REPORTER] {} emits WARNING - DIVERGING ({}) detected (drifting from stable)",
                     reporterName, confidence);
             }
 
             // NORMAL urgency - Healthy operation
             case STABLE -> {
-                reporter.normal();
+                reporter.normal(Situations.Dimension.CONSTANT);
                 logger.info("[REPORTER] {} emits NORMAL - STABLE ({}) detected",
                     reporterName, confidence);
             }
 
             default -> {
                 // Fallback for unknown conditions
-                reporter.warning();
+                reporter.warning(Situations.Dimension.VARIABLE);
                 logger.warn("[REPORTER] {} emits WARNING - Unknown condition: {} ({})",
                     reporterName, condition, confidence);
             }
@@ -153,7 +153,7 @@ public class JvmHealthReporter implements AutoCloseable {
      *
      * @return reporters conduit emitting urgency assessment signals
      */
-    public Conduit<Reporters.Reporter, Reporters.Sign> reporters() {
+    public Conduit<Situations.Situation, Situations.Signal> reporters() {
         return reporters;
     }
 

@@ -4,7 +4,7 @@ import io.fullerstack.kafka.core.actors.*;
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Actors;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -64,7 +64,7 @@ class FullStackVerificationTest {
     }
 
     @Test
-    @DisplayName("Verify: Monitor emission → Bridge → Cell → Reporter → Actor")
+    @DisplayName("Verify: Monitor emission → Bridge → Cell → Situation → Actor")
     void verifyCompleteSignalFlow() {
         System.out.println("\n" + "=".repeat(80));
         System.out.println("FULL STACK VERIFICATION TEST");
@@ -107,10 +107,10 @@ class FullStackVerificationTest {
             .anyMatch(s -> s.contains("Cell received") || s.contains("cluster cell"));
         System.out.printf("✓ Cell received signal: %s%n", cellSignalReceived);
 
-        // Did Reporter receive the signal?
+        // Did Situation receive the signal?
         boolean reporterSignalReceived = signalTrace.stream()
-            .anyMatch(s -> s.contains("Reporter conduit") && s.contains("cluster.health"));
-        System.out.printf("✓ Reporter conduit received signal: %s%n", reporterSignalReceived);
+            .anyMatch(s -> s.contains("Situation conduit") && s.contains("cluster.health"));
+        System.out.printf("✓ Situation conduit received signal: %s%n", reporterSignalReceived);
         assertThat(reporterSignalReceived).isTrue();
 
         // Did Actor receive the signal?
@@ -250,13 +250,13 @@ class FullStackVerificationTest {
             }
         ));
 
-        // Subscribe to Reporter conduit
+        // Subscribe to Situation conduit
         system.getReporters().subscribe(cortex().subscriber(
             cortex().name("test-reporter-tracer"),
-            (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+            (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                 registrar.register(sign -> {
                     signalTrace.add(String.format(
-                        "Reporter conduit: %s emitted %s",
+                        "Situation conduit: %s emitted %s",
                         subject.name(),
                         sign
                     ));

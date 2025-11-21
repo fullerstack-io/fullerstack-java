@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
  *                                       ↓
  *                          OCPP response received → Verify → Emit signal
  *                                       ↓
- *                          Reporter re-assesses → Potential re-action
+ *                          Situation re-assesses → Potential re-action
  * </pre>
  *
  * @see CommandVerificationObserver

@@ -2,7 +2,7 @@ package io.fullerstack.kafka.core.reporters;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +36,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *                       ↓
  * Layer 3 (DECIDE): ConsumerHealthReporter assesses urgency
  *                       ↓
- *                   Reporter conduit emits Reporters.Sign
+ *                   Situation conduit emits Situations.Sign
  * </pre>
  *
  * <p><b>Example Usage</b>:
@@ -46,8 +46,8 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *     monitorCircuit.conduit(cortex().name("consumer-monitors"), Monitors::composer);
  *
  * Circuit reporterCircuit = cortex().circuit(cortex().name("reporters"));
- * Conduit<Reporters.Reporter, Reporters.Sign> reporters =
- *     reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
+ * Conduit<Situations.Situation, Situations.Signal> reporters =
+ *     reporterCircuit.conduit(cortex().name("reporters"), Situations::composer);
  *
  * ConsumerHealthReporter reporter = new ConsumerHealthReporter(monitors, reporters);
  *
@@ -55,7 +55,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * Monitors.Monitor lagMonitor = monitors.percept(cortex().name("order-processor.lag"));
  * lagMonitor.diverging(Monitors.Dimension.CONFIRMED);
  *
- * // Reporter assesses urgency and emits CRITICAL
+ * // Situation assesses urgency and emits CRITICAL
  * }</pre>
  *
  * @see Monitors
@@ -73,8 +73,8 @@ public class ConsumerHealthReporter implements AutoCloseable {
     private static final int SUSTAINED_DIVERGING_THRESHOLD = 3;
 
     private final Conduit<Monitors.Monitor, Monitors.Signal> monitors;
-    private final Conduit<Reporters.Reporter, Reporters.Sign> reporters;
-    private final Reporters.Reporter reporter;
+    private final Conduit<Situations.Situation, Situations.Signal> reporters;
+    private final Situations.Situation reporter;
     private final Subscription subscription;
 
     /**
@@ -87,11 +87,11 @@ public class ConsumerHealthReporter implements AutoCloseable {
      * Creates a new ConsumerHealthReporter.
      *
      * @param monitors Monitor conduit (receives consumer-specific Monitors.Sign)
-     * @param reporters Reporter conduit (emits Reporters.Sign)
+     * @param reporters Situation conduit (emits Situations.Sign)
      */
     public ConsumerHealthReporter(
         Conduit<Monitors.Monitor, Monitors.Signal> monitors,
-        Conduit<Reporters.Reporter, Reporters.Sign> reporters
+        Conduit<Situations.Situation, Situations.Signal> reporters
     ) {
         this.monitors = monitors;
         this.reporters = reporters;
@@ -124,7 +124,7 @@ public class ConsumerHealthReporter implements AutoCloseable {
             updateDivergingTracking(consumerName, sign);
 
             // Assess urgency based on Sign
-            Reporters.Sign urgency = assessUrgency(consumerName, sign);
+            Situations.Sign urgency = assessUrgency(consumerName, sign);
 
             // Emit reporter signal
             emitReporterSignal(urgency, consumerName, sign);
@@ -163,11 +163,11 @@ public class ConsumerHealthReporter implements AutoCloseable {
      * @param sign current Monitor.Sign
      * @return assessed urgency level
      */
-    private Reporters.Sign assessUrgency(String consumerName, Monitors.Sign sign) {
+    private Situations.Sign assessUrgency(String consumerName, Monitors.Sign sign) {
         // CRITICAL: Consumer down or defective
         if (sign == Monitors.Sign.DOWN || sign == Monitors.Sign.DEFECTIVE) {
             log.warn("Consumer '{}' CRITICAL: {}", consumerName, sign);
-            return Reporters.Sign.CRITICAL;
+            return Situations.Sign.CRITICAL;
         }
 
         // CRITICAL: Sustained lag growth (3+ consecutive DIVERGING)
@@ -175,52 +175,52 @@ public class ConsumerHealthReporter implements AutoCloseable {
         if (sign == Monitors.Sign.DIVERGING && divergingCount >= SUSTAINED_DIVERGING_THRESHOLD) {
             log.warn("Consumer '{}' CRITICAL: Sustained lag growth ({} consecutive DIVERGING)",
                 consumerName, divergingCount);
-            return Reporters.Sign.CRITICAL;
+            return Situations.Sign.CRITICAL;
         }
 
         // WARNING: Degraded performance
         if (sign == Monitors.Sign.DEGRADED) {
             log.warn("Consumer '{}' WARNING: Degraded performance", consumerName);
-            return Reporters.Sign.WARNING;
+            return Situations.Sign.WARNING;
         }
 
         // WARNING: Erratic consumption patterns
         if (sign == Monitors.Sign.ERRATIC) {
             log.warn("Consumer '{}' WARNING: Erratic consumption detected", consumerName);
-            return Reporters.Sign.WARNING;
+            return Situations.Sign.WARNING;
         }
 
         // WARNING: Early lag growth detection (single DIVERGING)
         if (sign == Monitors.Sign.DIVERGING) {
             log.info("Consumer '{}' WARNING: Lag growth detected (count: {})",
                 consumerName, divergingCount);
-            return Reporters.Sign.WARNING;
+            return Situations.Sign.WARNING;
         }
 
         // NORMAL: Healthy operation
         log.debug("Consumer '{}' NORMAL: {}", consumerName, sign);
-        return Reporters.Sign.NORMAL;
+        return Situations.Sign.NORMAL;
     }
 
     /**
-     * Emits Reporter signal with appropriate method call.
+     * Emits Situation signal with appropriate method call.
      *
      * @param urgency assessed urgency level
      * @param consumerName consumer identifier for logging
      * @param monitorSign original Monitor.Sign for logging
      */
-    private void emitReporterSignal(Reporters.Sign urgency, String consumerName, Monitors.Sign monitorSign) {
+    private void emitReporterSignal(Situations.Sign urgency, String consumerName, Monitors.Sign monitorSign) {
         switch (urgency) {
             case CRITICAL -> {
-                reporter.critical();
+                reporter.critical(Situations.Dimension.CONSTANT);
                 log.info("Emitted CRITICAL for consumer '{}' (monitor: {})", consumerName, monitorSign);
             }
             case WARNING -> {
-                reporter.warning();
+                reporter.warning(Situations.Dimension.VARIABLE);
                 log.debug("Emitted WARNING for consumer '{}' (monitor: {})", consumerName, monitorSign);
             }
             case NORMAL -> {
-                reporter.normal();
+                reporter.normal(Situations.Dimension.CONSTANT);
                 log.trace("Emitted NORMAL for consumer '{}' (monitor: {})", consumerName, monitorSign);
             }
         }

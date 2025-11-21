@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *     ↓
  * Layer 2 (ORIENT): Cell hierarchy aggregates Signs
  *     ↓
- * Layer 3 (DECIDE): Reporter assesses urgency → CRITICAL
+ * Layer 3 (DECIDE): Situation assesses urgency → CRITICAL
  *     ↓
  * Layer 4 (ACT): Actor takes automated action
  * </pre>
@@ -82,10 +82,10 @@ class FullOODALoopTest {
     }
 
     @Test
-    @DisplayName("Full Flow: Monitor.degraded() → Bridge → Cell → Reporter → AlertActor")
+    @DisplayName("Full Flow: Monitor.degraded() → Bridge → Cell → Situation → AlertActor")
     void testMonitorDegradedFlowsToAlertActor() {
         System.out.println("\n" + "=".repeat(70));
-        System.out.println("Full OODA Loop Test: Monitor → Bridge → Cell → Reporter → Actor");
+        System.out.println("Full OODA Loop Test: Monitor → Bridge → Cell → Situation → Actor");
         System.out.println("=".repeat(70));
 
         // Layer 1 (OBSERVE): Get Monitor instrument and emit DEGRADED signal
@@ -260,7 +260,7 @@ class FullOODALoopTest {
         long latencyMs = (endNanos - startNanos) / 1_000_000;
 
         System.out.printf("\n⏱️  Complete OODA loop latency: %d ms%n", latencyMs);
-        System.out.println("   Monitor → Bridge → Cell → Reporter → Actor");
+        System.out.println("   Monitor → Bridge → Cell → Situation → Actor");
 
         // Verify it's fast (< 100ms)
         assertThat(latencyMs).isLessThan(100);

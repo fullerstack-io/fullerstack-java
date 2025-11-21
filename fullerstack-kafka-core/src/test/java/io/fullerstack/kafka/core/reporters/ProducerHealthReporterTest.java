@@ -2,7 +2,7 @@ package io.fullerstack.kafka.core.reporters;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for {@link ProducerHealthReporter}.
  *
- * <p>Verifies urgency mapping from Monitor Signs to Reporter Signs for producer health:
+ * <p>Verifies urgency mapping from Monitor Signs to Situation Signs for producer health:
  * <ul>
  *   <li>DEGRADED/DOWN/DEFECTIVE → CRITICAL (buffer overflow, producer failure)</li>
  *   <li>ERRATIC/DIVERGING → WARNING (buffer pressure, latency increasing)</li>
@@ -30,9 +30,9 @@ class ProducerHealthReporterTest {
     private Circuit producerCircuit;
     private Circuit reporterCircuit;
     private Cell<Monitors.Sign, Monitors.Sign> producerRootCell;
-    private Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private Conduit<Situations.Situation, Situations.Signal> reporters;
     private ProducerHealthReporter producerReporter;
-    private List<Reporters.Sign> reporterEmissions;
+    private List<Situations.Signal> reporterEmissions;
 
     @BeforeEach
     void setUp() {
@@ -49,7 +49,7 @@ class ProducerHealthReporterTest {
         reporterCircuit = cortex().circuit(cortex().name("reporters"));
         reporters = reporterCircuit.conduit(
             cortex().name("reporters"),
-            Reporters::composer
+            Situations::composer
         );
 
         // Create reporter
@@ -59,7 +59,7 @@ class ProducerHealthReporterTest {
         reporterEmissions = new ArrayList<>();
         reporters.subscribe(cortex().subscriber(
             cortex().name("test-receptor"),
-            (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+            (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                 registrar.register(reporterEmissions::add);
             }
         ));
@@ -87,7 +87,7 @@ class ProducerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit CRITICAL
-        assertThat(reporterEmissions).containsExactly(Reporters.Sign.CRITICAL);
+        assertThat(reporterEmissions).containsExactly(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -99,7 +99,7 @@ class ProducerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit CRITICAL
-        assertThat(reporterEmissions).containsExactly(Reporters.Sign.CRITICAL);
+        assertThat(reporterEmissions).containsExactly(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -111,7 +111,7 @@ class ProducerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit CRITICAL
-        assertThat(reporterEmissions).containsExactly(Reporters.Sign.CRITICAL);
+        assertThat(reporterEmissions).containsExactly(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -123,7 +123,7 @@ class ProducerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit WARNING
-        assertThat(reporterEmissions).containsExactly(Reporters.Sign.WARNING);
+        assertThat(reporterEmissions).containsExactly(Situations.Sign.WARNING);
     }
 
     @Test
@@ -135,7 +135,7 @@ class ProducerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit WARNING
-        assertThat(reporterEmissions).containsExactly(Reporters.Sign.WARNING);
+        assertThat(reporterEmissions).containsExactly(Situations.Sign.WARNING);
     }
 
     @Test
@@ -147,7 +147,7 @@ class ProducerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit NORMAL
-        assertThat(reporterEmissions).containsExactly(Reporters.Sign.NORMAL);
+        assertThat(reporterEmissions).containsExactly(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -159,7 +159,7 @@ class ProducerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit NORMAL
-        assertThat(reporterEmissions).containsExactly(Reporters.Sign.NORMAL);
+        assertThat(reporterEmissions).containsExactly(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -174,9 +174,9 @@ class ProducerHealthReporterTest {
 
         // Then: Should emit corresponding urgencies in order
         assertThat(reporterEmissions).containsExactly(
-            Reporters.Sign.NORMAL,
-            Reporters.Sign.WARNING,
-            Reporters.Sign.CRITICAL
+            Situations.Sign.NORMAL,
+            Situations.Sign.WARNING,
+            Situations.Sign.CRITICAL
         );
     }
 
@@ -198,9 +198,9 @@ class ProducerHealthReporterTest {
 
         // Then: Should follow escalation path
         assertThat(reporterEmissions).containsExactly(
-            Reporters.Sign.NORMAL,
-            Reporters.Sign.WARNING,
-            Reporters.Sign.CRITICAL
+            Situations.Sign.NORMAL,
+            Situations.Sign.WARNING,
+            Situations.Sign.CRITICAL
         );
     }
 
@@ -222,23 +222,23 @@ class ProducerHealthReporterTest {
 
         // Then: Should follow de-escalation path
         assertThat(reporterEmissions).containsExactly(
-            Reporters.Sign.CRITICAL,
-            Reporters.Sign.WARNING,
-            Reporters.Sign.NORMAL
+            Situations.Sign.CRITICAL,
+            Situations.Sign.WARNING,
+            Situations.Sign.NORMAL
         );
     }
 
     @Test
-    @DisplayName("Reporter can be closed safely")
+    @DisplayName("Situation can be closed safely")
     void reporterCanBeClosedSafely() {
-        // Given: Reporter is active
+        // Given: Situation is active
         producerRootCell.emit(Monitors.Sign.STABLE);
         producerCircuit.await();
         reporterCircuit.await();
 
         assertThat(reporterEmissions).hasSize(1);
 
-        // When: Reporter is closed
+        // When: Situation is closed
         producerReporter.close();
 
         // Then: No exceptions thrown and subscriptions are cleaned up
@@ -246,7 +246,7 @@ class ProducerHealthReporterTest {
     }
 
     @Test
-    @DisplayName("All Monitor Signs map to valid Reporter Signs")
+    @DisplayName("All Monitor Signs map to valid Situation Signs")
     void allMonitorSignsMapToValidReporterSigns() {
         // When: Emit all possible Monitor Signs
         for (Monitors.Sign sign : Monitors.Sign.values()) {
@@ -255,23 +255,23 @@ class ProducerHealthReporterTest {
         producerCircuit.await();
         reporterCircuit.await();
 
-        // Then: Should emit exactly 7 Reporter Signs (one per Monitor Sign)
+        // Then: Should emit exactly 7 Situation Signs (one per Monitor Sign)
         assertThat(reporterEmissions).hasSize(7);
 
-        // Verify all are valid Reporter Signs
-        for (Reporters.Sign reporterSign : reporterEmissions) {
+        // Verify all are valid Situation Signs
+        for (Situations.Sign reporterSign : reporterEmissions) {
             assertThat(reporterSign).isIn(
-                Reporters.Sign.NORMAL,
-                Reporters.Sign.WARNING,
-                Reporters.Sign.CRITICAL
+                Situations.Sign.NORMAL,
+                Situations.Sign.WARNING,
+                Situations.Sign.CRITICAL
             );
         }
 
         // Verify mapping correctness
         assertThat(reporterEmissions).contains(
-            Reporters.Sign.CRITICAL,  // DOWN, DEFECTIVE, DEGRADED
-            Reporters.Sign.WARNING,   // ERRATIC, DIVERGING
-            Reporters.Sign.NORMAL     // STABLE, CONVERGING
+            Situations.Sign.CRITICAL,  // DOWN, DEFECTIVE, DEGRADED
+            Situations.Sign.WARNING,   // ERRATIC, DIVERGING
+            Situations.Sign.NORMAL     // STABLE, CONVERGING
         );
     }
 
@@ -294,7 +294,7 @@ class ProducerHealthReporterTest {
         // Then: Should aggregate to worst-case (DEGRADED → CRITICAL)
         // NOTE: This assumes identity composers propagate all child emissions
         // The reporter receives DEGRADED from producer-2
-        assertThat(reporterEmissions).contains(Reporters.Sign.CRITICAL);
+        assertThat(reporterEmissions).contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -313,7 +313,7 @@ class ProducerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit WARNING
-        assertThat(reporterEmissions).contains(Reporters.Sign.WARNING);
+        assertThat(reporterEmissions).contains(Situations.Sign.WARNING);
 
         reporterEmissions.clear();
 
@@ -323,7 +323,7 @@ class ProducerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should escalate to CRITICAL
-        assertThat(reporterEmissions).contains(Reporters.Sign.CRITICAL);
+        assertThat(reporterEmissions).contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -334,7 +334,7 @@ class ProducerHealthReporterTest {
         producerCircuit.await();
         reporterCircuit.await();
 
-        assertThat(reporterEmissions).contains(Reporters.Sign.CRITICAL);
+        assertThat(reporterEmissions).contains(Situations.Sign.CRITICAL);
         reporterEmissions.clear();
 
         // When: Producer starts recovering (buffer draining)
@@ -343,7 +343,7 @@ class ProducerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should de-escalate to NORMAL
-        assertThat(reporterEmissions).contains(Reporters.Sign.NORMAL);
+        assertThat(reporterEmissions).contains(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -359,10 +359,10 @@ class ProducerHealthReporterTest {
 
         // Then: Should emit NORMAL-WARNING-NORMAL-WARNING pattern
         assertThat(reporterEmissions).containsExactly(
-            Reporters.Sign.NORMAL,
-            Reporters.Sign.WARNING,
-            Reporters.Sign.NORMAL,
-            Reporters.Sign.WARNING
+            Situations.Sign.NORMAL,
+            Situations.Sign.WARNING,
+            Situations.Sign.NORMAL,
+            Situations.Sign.WARNING
         );
     }
 
@@ -378,9 +378,9 @@ class ProducerHealthReporterTest {
 
         // Then: Should emit CRITICAL for each DEGRADED signal
         assertThat(reporterEmissions).containsExactly(
-            Reporters.Sign.CRITICAL,
-            Reporters.Sign.CRITICAL,
-            Reporters.Sign.CRITICAL
+            Situations.Sign.CRITICAL,
+            Situations.Sign.CRITICAL,
+            Situations.Sign.CRITICAL
         );
     }
 }

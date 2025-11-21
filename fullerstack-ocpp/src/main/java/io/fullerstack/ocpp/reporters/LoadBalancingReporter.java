@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static io.humainary.substrates.Substrates.cortex;
 
 /**
- * Reporter that assesses total power consumption against grid capacity.
+ * Situation that assesses total power consumption against grid capacity.
  * <p>
  * Layer 3 (DECIDE): Assesses urgency of load balancing situation.
  * <p>
@@ -46,7 +46,7 @@ public class LoadBalancingReporter implements AutoCloseable {
     private static final double WARNING_THRESHOLD = 0.80;   // 80% of capacity
     private static final double CRITICAL_THRESHOLD = 0.95;  // 95% of capacity
 
-    private final Conduit<Reporters.Reporter, Reporters.Signal> reporters;
+    private final Conduit<Situations.Situation, Situations.Signal> reporters;
     private final Subscription gaugeSubscription;
     private final double gridCapacityKw;
 
@@ -55,7 +55,7 @@ public class LoadBalancingReporter implements AutoCloseable {
 
     public LoadBalancingReporter(
         Conduit<Gauges.Gauge, Gauges.Sign> gauges,
-        Conduit<Reporters.Reporter, Reporters.Signal> reporters,
+        Conduit<Situations.Situation, Situations.Signal> reporters,
         double gridCapacityKw
     ) {
         this.reporters = reporters;
@@ -111,14 +111,14 @@ public class LoadBalancingReporter implements AutoCloseable {
         double totalPowerKw = getTotalPowerKw();
         double utilizationRatio = totalPowerKw / gridCapacityKw;
 
-        Reporters.Sign sign = assessUrgency(utilizationRatio, totalPowerKw);
+        Situations.Sign sign = assessUrgency(utilizationRatio, totalPowerKw);
 
         // Emit reporter signal
-        Reporters.Reporter reporter = reporters.percept(
+        Situations.Situation reporter = reporters.percept(
             cortex().name("load-balancing").name("health")
         );
 
-        reporter.sign(sign, Reporters.Dimension.CONFIRMED);
+        reporter.sign(sign, Situations.Dimension.CONFIRMED);
 
         logger.debug("Load balancing assessment: {}kW / {}kW ({}%) → {}",
             totalPowerKw, gridCapacityKw, (int)(utilizationRatio * 100), sign);
@@ -127,21 +127,21 @@ public class LoadBalancingReporter implements AutoCloseable {
     /**
      * Assess urgency based on grid utilization.
      */
-    private Reporters.Sign assessUrgency(double utilizationRatio, double totalPowerKw) {
+    private Situations.Sign assessUrgency(double utilizationRatio, double totalPowerKw) {
         if (utilizationRatio >= CRITICAL_THRESHOLD) {
             logger.warn("CRITICAL: Total power {}kW at {}% of capacity (threshold: {}%)",
                 totalPowerKw, (int)(utilizationRatio * 100), (int)(CRITICAL_THRESHOLD * 100));
-            return Reporters.Sign.CRITICAL;
+            return Situations.Sign.CRITICAL;
 
         } else if (utilizationRatio >= WARNING_THRESHOLD) {
             logger.info("WARNING: Total power {}kW at {}% of capacity (threshold: {}%)",
                 totalPowerKw, (int)(utilizationRatio * 100), (int)(WARNING_THRESHOLD * 100));
-            return Reporters.Sign.WARNING;
+            return Situations.Sign.WARNING;
 
         } else {
             logger.debug("NORMAL: Total power {}kW at {}% of capacity",
                 totalPowerKw, (int)(utilizationRatio * 100));
-            return Reporters.Sign.NORMAL;
+            return Situations.Sign.NORMAL;
         }
     }
 

@@ -2,7 +2,7 @@ package io.fullerstack.kafka.core.reporters;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 
 import static io.humainary.substrates.api.Substrates.cortex;
 
@@ -10,7 +10,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * Layer 3 (DECIDE phase): Assesses producer health urgency.
  *
  * <p>Subscribes to the producer root Cell outlet, receives aggregated {@link Monitors.Sign}
- * from all producers in the hierarchy, and emits {@link Reporters.Sign} based on urgency
+ * from all producers in the hierarchy, and emits {@link Situations.Sign} based on urgency
  * assessment.
  *
  * <p><strong>Signal Flow:</strong>
@@ -19,7 +19,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *                                    ↓
  *                         ProducerHealthReporter
  *                                    ↓
- *                       Reporter.critical(OPERATIONAL)
+ *                       Situation.critical(OPERATIONAL)
  * </pre>
  *
  * <p><strong>Hierarchy:</strong>
@@ -33,11 +33,11 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * <p><strong>Urgency Mapping:</strong>
  * <ul>
  *   <li>{@link Monitors.Sign#DOWN DOWN}, {@link Monitors.Sign#DEFECTIVE DEFECTIVE},
- *       {@link Monitors.Sign#DEGRADED DEGRADED} → {@link Reporters.Sign#CRITICAL CRITICAL}</li>
+ *       {@link Monitors.Sign#DEGRADED DEGRADED} → {@link Situations.Sign#CRITICAL CRITICAL}</li>
  *   <li>{@link Monitors.Sign#ERRATIC ERRATIC}, {@link Monitors.Sign#DIVERGING DIVERGING}
- *       → {@link Reporters.Sign#WARNING WARNING}</li>
+ *       → {@link Situations.Sign#WARNING WARNING}</li>
  *   <li>{@link Monitors.Sign#CONVERGING CONVERGING}, {@link Monitors.Sign#STABLE STABLE}
- *       → {@link Reporters.Sign#NORMAL NORMAL}</li>
+ *       → {@link Situations.Sign#NORMAL NORMAL}</li>
  * </ul>
  *
  * <p><strong>Usage Example:</strong>
@@ -51,9 +51,9 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * );
  *
  * Circuit reporterCircuit = cortex().circuit(cortex().name("reporters"));
- * Conduit<Reporters.Reporter, Reporters.Sign> reporters = reporterCircuit.conduit(
+ * Conduit<Situations.Situation, Situations.Signal> reporters = reporterCircuit.conduit(
  *     cortex().name("reporters"),
- *     Reporters::composer
+ *     Situations::composer
  * );
  *
  * ProducerHealthReporter reporter = new ProducerHealthReporter(
@@ -61,7 +61,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *     reporters
  * );
  *
- * // Reporter automatically receives aggregated Signs from producer hierarchy
+ * // Situation automatically receives aggregated Signs from producer hierarchy
  * // and emits urgency assessments to the reporters conduit
  * }</pre>
  *
@@ -70,8 +70,8 @@ import static io.humainary.substrates.api.Substrates.cortex;
 public class ProducerHealthReporter implements AutoCloseable {
 
     private final Cell<Monitors.Sign, Monitors.Sign> producerRootCell;
-    private final Conduit<Reporters.Reporter, Reporters.Sign> reporters;
-    private final Reporters.Reporter reporter;
+    private final Conduit<Situations.Situation, Situations.Signal> reporters;
+    private final Situations.Situation reporter;
     private final Subscription subscription;
 
     /**
@@ -82,7 +82,7 @@ public class ProducerHealthReporter implements AutoCloseable {
      */
     public ProducerHealthReporter(
         Cell<Monitors.Sign, Monitors.Sign> producerRootCell,
-        Conduit<Reporters.Reporter, Reporters.Sign> reporters
+        Conduit<Situations.Situation, Situations.Signal> reporters
     ) {
         this.producerRootCell = producerRootCell;
         this.reporters = reporters;
@@ -99,7 +99,7 @@ public class ProducerHealthReporter implements AutoCloseable {
      * Handles aggregated Monitor Signs from the producer root cell.
      *
      * <p>Assesses urgency based on the aggregated Sign and emits appropriate
-     * Reporter Sign via the reporter instrument.
+     * Situation Sign via the reporter instrument.
      *
      * @param subject the producer root cell subject
      * @param registrar the registrar for handling Monitors.Sign emissions
@@ -112,7 +112,7 @@ public class ProducerHealthReporter implements AutoCloseable {
     }
 
     /**
-     * Assesses urgency from Monitor Sign and emits Reporter Sign.
+     * Assesses urgency from Monitor Sign and emits Situation Sign.
      *
      * <p><strong>Urgency Rules:</strong>
      * <ul>
@@ -127,19 +127,19 @@ public class ProducerHealthReporter implements AutoCloseable {
         switch (sign) {
             case DOWN, DEFECTIVE -> {
                 // Critical failure - producer completely down or not functioning
-                reporter.critical();
+                reporter.critical(Situations.Dimension.CONSTANT);
             }
             case DEGRADED -> {
                 // Degraded performance - buffer overflow, high send latency
-                reporter.critical();
+                reporter.critical(Situations.Dimension.CONSTANT);
             }
             case ERRATIC, DIVERGING -> {
                 // Early warning signs - buffer pressure building, latency increasing
-                reporter.warning();
+                reporter.warning(Situations.Dimension.VARIABLE);
             }
             case CONVERGING, STABLE -> {
                 // Normal operation - producer healthy
-                reporter.normal();
+                reporter.normal(Situations.Dimension.CONSTANT);
             }
         }
     }

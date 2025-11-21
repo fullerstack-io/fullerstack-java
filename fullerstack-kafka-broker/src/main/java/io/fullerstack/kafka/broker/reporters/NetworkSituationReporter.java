@@ -2,8 +2,8 @@ package io.fullerstack.kafka.broker.reporters;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
-import io.humainary.substrates.ext.serventis.ext.Reporters.Reporter;
+import io.humainary.substrates.ext.serventis.ext.Situations;
+import io.humainary.substrates.ext.serventis.ext.Situations.Situation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +20,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * <ul>
  *   <li>Subscribe to Monitor condition signals from Layer 2</li>
  *   <li>Assess URGENCY based on condition + confidence combination</li>
- *   <li>Emit Reporter situation signals (CRITICAL, WARNING, NOTICE, INFO)</li>
+ *   <li>Emit Situation situation signals (CRITICAL, WARNING, NOTICE, INFO)</li>
  *   <li>Combine multiple Monitor signals to assess overall system situation</li>
  * </ul>
  *
@@ -50,18 +50,18 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *     throttleMonitor.monitors(),
  *     quotaMonitor.monitors()
  * );
- * // Reporter automatically subscribes to all monitors and emits urgency assessments
+ * // Situation automatically subscribes to all monitors and emits urgency assessments
  * </pre>
  */
 public class NetworkSituationReporter implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(NetworkSituationReporter.class);
 
     private final Circuit circuit;
-    private final Conduit<Reporter, Reporters.Sign> reporters;
+    private final Conduit<Situation, Situations.Signal> reporters;
     private final Subscription monitorSubscription;
 
-    // Reporter instances per entity (throttle type, client, etc.)
-    private final Map<String, Reporter> entityReporters = new ConcurrentHashMap<>();
+    // Situation instances per entity (throttle type, client, etc.)
+    private final Map<String, Situation> entityReporters = new ConcurrentHashMap<>();
 
     /**
      * Creates a NetworkSituationReporter (Layer 3 - DECIDE).
@@ -79,7 +79,7 @@ public class NetworkSituationReporter implements AutoCloseable {
         Objects.requireNonNull(monitors, "monitors cannot be null");
 
         // Create Layer 3 reporters conduit
-        this.reporters = circuit.conduit(cortex().name("reporters"), Reporters::composer);
+        this.reporters = circuit.conduit(cortex().name("reporters"), Situations::composer);
 
         // Subscribe to ALL monitor conduits
         // Note: In production, you might want separate subscriptions per monitor type
@@ -100,7 +100,7 @@ public class NetworkSituationReporter implements AutoCloseable {
     }
 
     /**
-     * Handles Monitor condition signals from Layer 2 and emits Reporter urgency assessments.
+     * Handles Monitor condition signals from Layer 2 and emits Situation urgency assessments.
      * This is where URGENCY DECISION-MAKING happens.
      *
      * <p><b>NEW API (Serventis PREVIEW):</b> Sign enum values directly represent conditions.
@@ -112,8 +112,8 @@ public class NetworkSituationReporter implements AutoCloseable {
             // Extract entity name from Subject (e.g., "monitor.throttle.produce" or "monitor.quota.health.client-1")
             String monitorName = subject.name().toString();
 
-            // Get or create Reporter for this entity
-            Reporter reporter = entityReporters.computeIfAbsent(monitorName,
+            // Get or create Situation for this entity
+            Situation reporter = entityReporters.computeIfAbsent(monitorName,
                 name -> reporters.percept(cortex().name(name.replace("monitor.", "reporter."))));
 
             // Decision logic: Map Signal sign → Urgency
@@ -122,37 +122,37 @@ public class NetworkSituationReporter implements AutoCloseable {
                 case DEGRADED -> {
                     // Degraded state → CRITICAL urgency
                     // (Monitor already filtered by dimension before emitting)
-                    reporter.critical();
+                    reporter.critical(Situations.Dimension.CONSTANT);
                     logger.error("CRITICAL situation: {} - DEGRADED condition detected", monitorName);
                 }
 
                 case DEFECTIVE, DOWN -> {
                     // System failure → CRITICAL urgency
-                    reporter.critical();
+                    reporter.critical(Situations.Dimension.CONSTANT);
                     logger.error("CRITICAL situation: {} - {} condition detected", monitorName, signal.sign());
                 }
 
                 case DIVERGING -> {
                     // Diverging from normal → WARNING (preventive action)
-                    reporter.warning();
+                    reporter.warning(Situations.Dimension.VARIABLE);
                     logger.warn("WARNING situation: {} - DIVERGING condition detected", monitorName);
                 }
 
                 case ERRATIC -> {
                     // Unpredictable behavior → WARNING (risky)
-                    reporter.warning();
+                    reporter.warning(Situations.Dimension.VARIABLE);
                     logger.warn("WARNING situation: {} - ERRATIC behavior detected", monitorName);
                 }
 
                 case CONVERGING -> {
                     // Improving from degraded state → WARNING (keep monitoring)
-                    reporter.warning();
+                    reporter.warning(Situations.Dimension.VARIABLE);
                     logger.info("WARNING situation: {} - CONVERGING (improving)", monitorName);
                 }
 
                 case STABLE -> {
                     // Normal operation → NORMAL
-                    reporter.normal();
+                    reporter.normal(Situations.Dimension.CONSTANT);
                     logger.debug("NORMAL situation: {} - STABLE condition", monitorName);
                 }
 
@@ -169,7 +169,7 @@ public class NetworkSituationReporter implements AutoCloseable {
      *
      * @return Reporters conduit
      */
-    public Conduit<Reporter, Reporters.Sign> reporters() {
+    public Conduit<Situation, Situations.Signal> reporters() {
         return reporters;
     }
 

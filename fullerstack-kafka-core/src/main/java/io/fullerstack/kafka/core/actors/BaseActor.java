@@ -20,7 +20,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *
  * <h3>Percept Model:</h3>
  * <ul>
- *   <li>{@link io.humainary.substrates.ext.serventis.ext.Reporters.Reporter Reporter} (Percept) - emits situational assessments (NORMAL/WARNING/CRITICAL)</li>
+ *   <li>{@link io.humainary.substrates.ext.serventis.ext.Situations.Situation Situation} (Percept) - emits situational assessments (NORMAL/WARNING/CRITICAL)</li>
  *   <li>{@link Actors.Actor Actor} (Percept) - emits speech acts about actions (DELIVER/DENY)</li>
  * </ul>
  *
@@ -34,7 +34,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *
  * <h3>Subclass Responsibilities:</h3>
  * <ul>
- *   <li>Manage own subscription(s) to Reporter Conduit</li>
+ *   <li>Manage own subscription(s) to Situation Conduit</li>
  *   <li>Filter channels using hierarchical Name matching in subscription callback</li>
  *   <li>Call {@link #executeWithProtection} when performing actions</li>
  *   <li>Close subscription(s) in {@link #close()}</li>
@@ -46,7 +46,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *     private Subscription subscription;
  *
  *     public AlertActor(
- *         Conduit<Reporters.Reporter, Reporters.Sign> reporters,
+ *         Conduit<Situations.Situation, Situations.Signal> reporters,
  *         Conduit<Actors.Actor, Actors.Sign> actors,
  *         ...
  *     ) {
@@ -61,7 +61,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *                 // Filter using hierarchical Name
  *                 if (subject.name().equals(clusterHealthName)) {
  *                     registrar.register(sign -> {
- *                         if (sign == Reporters.Sign.CRITICAL) {
+ *                         if (sign == Situations.Sign.CRITICAL) {
  *                             handleCritical(subject.name());
  *                         }
  *                     });

@@ -118,7 +118,7 @@ public class PredictiveHealthMonitor implements AutoCloseable {
     private static final int DEFECTIVE_COUNT_CRITICAL = 3; // 3+ DEFECTIVE in window → CRITICAL
     private static final double FREQUENCY_INCREASE_THRESHOLD = 2.0;  // 2x increase → WARNING
 
-    private final Conduit<Reporters.Reporter, Reporters.Signal> reporters;
+    private final Conduit<Situations.Situation, Situations.Signal> reporters;
     private final Subscription monitorSubscription;
     private final ScheduledExecutorService analysisScheduler;
 
@@ -232,7 +232,7 @@ public class PredictiveHealthMonitor implements AutoCloseable {
 
     public PredictiveHealthMonitor(
         Conduit<Monitors.Monitor, Monitors.Sign> monitors,
-        Conduit<Reporters.Reporter, Reporters.Signal> reporters
+        Conduit<Situations.Situation, Situations.Signal> reporters
     ) {
         this.reporters = reporters;
         this.healthHistory = new ConcurrentHashMap<>();
@@ -338,10 +338,10 @@ public class PredictiveHealthMonitor implements AutoCloseable {
 
         logger.error("[PREDICTIVE] CRITICAL: {} - {}", key, reason);
 
-        Reporters.Reporter reporter = reporters.percept(
+        Situations.Situation reporter = reporters.percept(
             cortex().name("predictive").name(key)
         );
-        reporter.critical(Reporters.Dimension.PREDICTED);
+        reporter.critical(Situations.Dimension.PREDICTED);
 
         logger.error("🔴 PREDICTION: {} likely to fail soon - {}", key, reason);
     }
@@ -356,10 +356,10 @@ public class PredictiveHealthMonitor implements AutoCloseable {
 
         logger.warn("[PREDICTIVE] WARNING: {} - {}", key, reason);
 
-        Reporters.Reporter reporter = reporters.percept(
+        Situations.Situation reporter = reporters.percept(
             cortex().name("predictive").name(key)
         );
-        reporter.warning(Reporters.Dimension.PREDICTED);
+        reporter.warning(Situations.Dimension.PREDICTED);
 
         logger.warn("⚠️  PREDICTION: {} showing degradation trend - {}", key, reason);
     }

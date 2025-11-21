@@ -95,7 +95,7 @@ public class CacheFlowCircuit implements AutoCloseable {
    * @return Cache instrument for emitting cache signals via method calls
    */
   public Cache cacheFor ( String entityName ) {
-    return conduit.get ( Substrates.cortex().name ( entityName ) );
+    return conduit.percept( Substrates.cortex().name ( entityName ) );
   }
 
   /**

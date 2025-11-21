@@ -5,7 +5,7 @@ import io.fullerstack.kafka.core.hierarchy.HierarchyManager;
 import io.fullerstack.kafka.core.reporters.ClusterHealthReporter;
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,24 +28,24 @@ import static org.assertj.core.api.Assertions.assertThat;
  *           ↓ Partition Cell → Topic Cell → Broker Cell → Cluster Cell
  * Layer 3 (DECIDE): ClusterHealthReporter assesses urgency
  *           ↓
- *           Reporter emits Reporters.Sign.CRITICAL
+ *           Situation emits Situations.Sign.CRITICAL
  * </pre>
  *
  * @see MonitorCellBridge
  * @see HierarchyManager
  * @see ClusterHealthReporter
  */
-@DisplayName("Integration: Partition → Cluster → Reporter Signal Flow")
+@DisplayName("Integration: Partition → Cluster → Situation Signal Flow")
 class PartitionToClusterSignalFlowIT {
 
     private Circuit monitorCircuit;
     private Circuit reporterCircuit;
     private Conduit<Monitors.Monitor, Monitors.Signal> monitors;
-    private Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private Conduit<Situations.Situation, Situations.Signal> reporters;
     private HierarchyManager hierarchy;
     private MonitorCellBridge bridge;
     private ClusterHealthReporter clusterReporter;
-    private List<Reporters.Sign> reporterEmissions;
+    private List<Situations.Signal> reporterEmissions;
 
     @BeforeEach
     void setUp() {
@@ -58,16 +58,16 @@ class PartitionToClusterSignalFlowIT {
         bridge = new MonitorCellBridge(monitors, hierarchy);
         bridge.start();
 
-        // Layer 3: Create Reporter circuit, conduit, and cluster reporter
+        // Layer 3: Create Situation circuit, conduit, and cluster reporter
         reporterCircuit = cortex().circuit(cortex().name("reporters"));
-        reporters = reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
+        reporters = reporterCircuit.conduit(cortex().name("reporters"), Situations::composer);
         clusterReporter = new ClusterHealthReporter(hierarchy.getClusterCell(), reporters);
 
         // Track reporter emissions
         reporterEmissions = new ArrayList<>();
         reporters.subscribe(cortex().subscriber(
             cortex().name("test-receptor"),
-            (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+            (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                 registrar.register(reporterEmissions::add);
             }
         ));
@@ -111,8 +111,8 @@ class PartitionToClusterSignalFlowIT {
 
         // Then: Signal should flow through hierarchy to reporter
         assertThat(reporterEmissions)
-            .as("Reporter should emit CRITICAL for partition DEGRADED")
-            .contains(Reporters.Sign.CRITICAL);
+            .as("Situation should emit CRITICAL for partition DEGRADED")
+            .contains(Situations.Sign.CRITICAL);
 
         // Verify latency requirement
         assertThat(latencyMs)
@@ -139,7 +139,7 @@ class PartitionToClusterSignalFlowIT {
         // Then: Should aggregate to cluster CRITICAL
         assertThat(reporterEmissions)
             .as("Multiple partition failures should emit CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -154,7 +154,7 @@ class PartitionToClusterSignalFlowIT {
         reporterCircuit.await();
 
         // Then: Should propagate to cluster and emit CRITICAL
-        assertThat(reporterEmissions).contains(Reporters.Sign.CRITICAL);
+        assertThat(reporterEmissions).contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -169,7 +169,7 @@ class PartitionToClusterSignalFlowIT {
         reporterCircuit.await();
 
         // Then: Should propagate to cluster and emit CRITICAL
-        assertThat(reporterEmissions).contains(Reporters.Sign.CRITICAL);
+        assertThat(reporterEmissions).contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -184,7 +184,7 @@ class PartitionToClusterSignalFlowIT {
         reporterCircuit.await();
 
         // Then: Should emit WARNING
-        assertThat(reporterEmissions).contains(Reporters.Sign.WARNING);
+        assertThat(reporterEmissions).contains(Situations.Sign.WARNING);
     }
 
     @Test
@@ -199,7 +199,7 @@ class PartitionToClusterSignalFlowIT {
         reporterCircuit.await();
 
         // Then: Should emit NORMAL
-        assertThat(reporterEmissions).contains(Reporters.Sign.NORMAL);
+        assertThat(reporterEmissions).contains(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -214,7 +214,7 @@ class PartitionToClusterSignalFlowIT {
         reporterCircuit.await();
 
         // Then: Should emit CRITICAL
-        assertThat(reporterEmissions).contains(Reporters.Sign.CRITICAL);
+        assertThat(reporterEmissions).contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -230,6 +230,6 @@ class PartitionToClusterSignalFlowIT {
         reporterCircuit.await();
 
         // Then: Should aggregate to worst-case (DEGRADED → CRITICAL)
-        assertThat(reporterEmissions).contains(Reporters.Sign.CRITICAL);
+        assertThat(reporterEmissions).contains(Situations.Sign.CRITICAL);
     }
 }

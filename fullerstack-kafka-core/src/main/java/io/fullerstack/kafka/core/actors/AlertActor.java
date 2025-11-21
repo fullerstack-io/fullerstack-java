@@ -2,7 +2,7 @@ package io.fullerstack.kafka.core.actors;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Actors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +19,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *
  * <h3>Percept-Based Architecture:</h3>
  * <pre>
- * ClusterHealthReporter (Percept) → emits Reporters.Sign.CRITICAL
+ * ClusterHealthReporter (Percept) → emits Situations.Sign.CRITICAL
  *                                 ↓
  *                     AlertActor subscribes & filters
  *                                 ↓
@@ -51,9 +51,9 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * <pre>{@code
  * // Create circuits
  * Circuit reporterCircuit = cortex().circuit(cortex().name("reporters"));
- * Conduit<Reporters.Reporter, Reporters.Sign> reporters = reporterCircuit.conduit(
+ * Conduit<Situations.Situation, Situations.Signal> reporters = reporterCircuit.conduit(
  *     cortex().name("reporters"),
- *     Reporters::composer
+ *     Situations::composer
  * );
  *
  * Circuit actorCircuit = cortex().circuit(cortex().name("actors"));
@@ -114,7 +114,7 @@ public class AlertActor extends BaseActor {
      * @param clusterName      Name of Kafka cluster (included in alerts)
      */
     public AlertActor(
-        Conduit<Reporters.Reporter, Reporters.Sign> reporters,
+        Conduit<Situations.Situation, Situations.Signal> reporters,
         Conduit<Actors.Actor, Actors.Sign> actors,
         PagerDutyClient pagerDutyClient,
         SlackClient slackClient,
@@ -134,11 +134,11 @@ public class AlertActor extends BaseActor {
 
         this.subscription = reporters.subscribe(cortex().subscriber(
             cortex().name("alert-actor-subscriber"),
-            (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+            (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                 // Filter: Only register pipe for cluster.health channel
                 if (subject.name().equals(clusterHealthName)) {
-                    registrar.register(sign -> {
-                        if (sign == Reporters.Sign.CRITICAL) {
+                    registrar.register(signal -> {
+                        if (signal.sign() == Situations.Sign.CRITICAL) {
                             handleClusterHealthCritical(subject.name());
                         }
                     });

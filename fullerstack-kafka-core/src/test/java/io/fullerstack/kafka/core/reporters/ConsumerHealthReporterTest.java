@@ -2,7 +2,7 @@ package io.fullerstack.kafka.core.reporters;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,9 +30,9 @@ class ConsumerHealthReporterTest {
     private Circuit monitorCircuit;
     private Circuit reporterCircuit;
     private Conduit<Monitors.Monitor, Monitors.Signal> monitors;
-    private Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private Conduit<Situations.Situation, Situations.Signal> reporters;
     private ConsumerHealthReporter reporter;
-    private List<Reporters.Sign> emittedSigns;
+    private List<Situations.Signal> emittedSigns;
 
     @BeforeEach
     void setUp() {
@@ -47,7 +47,7 @@ class ConsumerHealthReporterTest {
         reporterCircuit = cortex().circuit(cortex().name("test-reporters"));
         reporters = reporterCircuit.conduit(
             cortex().name("reporters"),
-            Reporters::composer
+            Situations::composer
         );
 
         // Create reporter
@@ -85,7 +85,7 @@ class ConsumerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit CRITICAL
-        assertThat(emittedSigns).contains(Reporters.Sign.CRITICAL);
+        assertThat(emittedSigns).contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -99,7 +99,7 @@ class ConsumerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit CRITICAL
-        assertThat(emittedSigns).contains(Reporters.Sign.CRITICAL);
+        assertThat(emittedSigns).contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -114,28 +114,28 @@ class ConsumerHealthReporterTest {
         lagMonitor.diverging(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         reporterCircuit.await();
-        assertThat(emittedSigns).containsExactly(Reporters.Sign.WARNING);
+        assertThat(emittedSigns).containsExactly(Situations.Sign.WARNING);
 
         // Second DIVERGING → WARNING
         emittedSigns.clear();
         lagMonitor.diverging(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         reporterCircuit.await();
-        assertThat(emittedSigns).containsExactly(Reporters.Sign.WARNING);
+        assertThat(emittedSigns).containsExactly(Situations.Sign.WARNING);
 
         // Third DIVERGING → CRITICAL (sustained pattern)
         emittedSigns.clear();
         lagMonitor.diverging(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         reporterCircuit.await();
-        assertThat(emittedSigns).containsExactly(Reporters.Sign.CRITICAL);
+        assertThat(emittedSigns).containsExactly(Situations.Sign.CRITICAL);
 
         // Fourth DIVERGING → Still CRITICAL
         emittedSigns.clear();
         lagMonitor.diverging(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         reporterCircuit.await();
-        assertThat(emittedSigns).containsExactly(Reporters.Sign.CRITICAL);
+        assertThat(emittedSigns).containsExactly(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -167,7 +167,7 @@ class ConsumerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit WARNING (not CRITICAL)
-        assertThat(emittedSigns).containsExactly(Reporters.Sign.WARNING);
+        assertThat(emittedSigns).containsExactly(Situations.Sign.WARNING);
     }
 
     @Test
@@ -181,7 +181,7 @@ class ConsumerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit WARNING
-        assertThat(emittedSigns).contains(Reporters.Sign.WARNING);
+        assertThat(emittedSigns).contains(Situations.Sign.WARNING);
     }
 
     @Test
@@ -195,7 +195,7 @@ class ConsumerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit WARNING
-        assertThat(emittedSigns).contains(Reporters.Sign.WARNING);
+        assertThat(emittedSigns).contains(Situations.Sign.WARNING);
     }
 
     @Test
@@ -209,7 +209,7 @@ class ConsumerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit WARNING (not CRITICAL yet)
-        assertThat(emittedSigns).containsExactly(Reporters.Sign.WARNING);
+        assertThat(emittedSigns).containsExactly(Situations.Sign.WARNING);
     }
 
     @Test
@@ -223,7 +223,7 @@ class ConsumerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit NORMAL
-        assertThat(emittedSigns).contains(Reporters.Sign.NORMAL);
+        assertThat(emittedSigns).contains(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -237,7 +237,7 @@ class ConsumerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit NORMAL (healthy recovery)
-        assertThat(emittedSigns).contains(Reporters.Sign.NORMAL);
+        assertThat(emittedSigns).contains(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -277,7 +277,7 @@ class ConsumerHealthReporterTest {
         // Then: Both should emit CRITICAL (independent tracking)
         assertThat(emittedSigns)
             .hasSize(2)
-            .containsOnly(Reporters.Sign.CRITICAL);
+            .containsOnly(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -303,7 +303,7 @@ class ConsumerHealthReporterTest {
         reporterCircuit.await();
 
         // Then: Should emit WARNING (not CRITICAL)
-        assertThat(emittedSigns).containsExactly(Reporters.Sign.WARNING);
+        assertThat(emittedSigns).containsExactly(Situations.Sign.WARNING);
     }
 
     @Test
@@ -335,7 +335,7 @@ class ConsumerHealthReporterTest {
         // Then: Both should emit WARNING (counts reset to 1)
         assertThat(emittedSigns)
             .hasSize(2)
-            .containsOnly(Reporters.Sign.WARNING);
+            .containsOnly(Situations.Sign.WARNING);
     }
 
     @Test
@@ -353,7 +353,7 @@ class ConsumerHealthReporterTest {
         long duration = System.nanoTime() - startTime;
 
         // Then: Should complete quickly (sub-millisecond, not sleep-based latency)
-        assertThat(emittedSigns).contains(Reporters.Sign.WARNING);
+        assertThat(emittedSigns).contains(Situations.Sign.WARNING);
 
         // Verify sub-10ms latency (event-driven, not polling)
         assertThat(duration).isLessThan(10_000_000L); // 10ms in nanoseconds
@@ -371,31 +371,31 @@ class ConsumerHealthReporterTest {
         lagMonitor.stable(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         reporterCircuit.await();
-        assertThat(emittedSigns.get(emittedSigns.size() - 1)).isEqualTo(Reporters.Sign.NORMAL);
+        assertThat(emittedSigns.get(emittedSigns.size() - 1)).isEqualTo(Situations.Sign.NORMAL);
 
         // 2. DIVERGING (lag growing) → WARNING
         lagMonitor.diverging(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         reporterCircuit.await();
-        assertThat(emittedSigns.get(emittedSigns.size() - 1)).isEqualTo(Reporters.Sign.WARNING);
+        assertThat(emittedSigns.get(emittedSigns.size() - 1)).isEqualTo(Situations.Sign.WARNING);
 
         // 3. DEGRADED (performance issue) → WARNING
         lagMonitor.degraded(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         reporterCircuit.await();
-        assertThat(emittedSigns.get(emittedSigns.size() - 1)).isEqualTo(Reporters.Sign.WARNING);
+        assertThat(emittedSigns.get(emittedSigns.size() - 1)).isEqualTo(Situations.Sign.WARNING);
 
         // 4. CONVERGING (lag reducing) → NORMAL
         lagMonitor.converging(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         reporterCircuit.await();
-        assertThat(emittedSigns.get(emittedSigns.size() - 1)).isEqualTo(Reporters.Sign.NORMAL);
+        assertThat(emittedSigns.get(emittedSigns.size() - 1)).isEqualTo(Situations.Sign.NORMAL);
 
         // 5. STABLE (recovered) → NORMAL
         lagMonitor.stable(Monitors.Dimension.CONFIRMED);
         monitorCircuit.await();
         reporterCircuit.await();
-        assertThat(emittedSigns.get(emittedSigns.size() - 1)).isEqualTo(Reporters.Sign.NORMAL);
+        assertThat(emittedSigns.get(emittedSigns.size() - 1)).isEqualTo(Situations.Sign.NORMAL);
 
         // Verify complete flow
         assertThat(emittedSigns).hasSize(5);

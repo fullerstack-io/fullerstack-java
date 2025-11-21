@@ -34,7 +34,7 @@ import static io.humainary.substrates.Substrates.cortex;
  * Layer 2: ORIENT - Monitor signals flow through circuits
  *          ↓ (Monitor.Sign: STABLE, DEGRADED, DOWN, etc.)
  * Layer 3: DECIDE - ChargerHealthReporter assesses urgency
- *          ↓ (Reporter.Sign: NORMAL, WARNING, CRITICAL)
+ *          ↓ (Situation.Sign: NORMAL, WARNING, CRITICAL)
  * Layer 4: ACT - Agents execute autonomous actions (Promise Theory)
  *          ↓ (ChargerDisableAgent, TransactionStopAgent)
  *          ↓ (promise → fulfill/breach)
@@ -63,9 +63,9 @@ public class OcppObservabilitySystem implements AutoCloseable {
     private final OcppMessageObserver messageObserver;
     private final CommandVerificationObserver commandVerificationObserver;
 
-    // Layer 3: Reporter Circuit and Components
+    // Layer 3: Situation Circuit and Components
     private final Circuit reporterCircuit;
-    private final Conduit<Reporters.Reporter, Reporters.Signal> reporters;
+    private final Conduit<Situations.Situation, Situations.Signal> reporters;
     private final ChargerHealthReporter chargerHealthReporter;
 
     // Layer 4: Agent Circuit and Components (Autonomous Self-Regulation)
@@ -126,14 +126,14 @@ public class OcppObservabilitySystem implements AutoCloseable {
         centralSystem.registerMessageHandler(messageObserver);
 
         // ====================================================================
-        // Layer 3: Reporter Circuit and Components (DECIDE)
+        // Layer 3: Situation Circuit and Components (DECIDE)
         // ====================================================================
         logger.info("Creating Layer 3 reporter circuit (DECIDE)");
 
         this.reporterCircuit = cortex().circuit(cortex().name(systemName + "-reporters"));
         this.reporters = reporterCircuit.conduit(
             cortex().name("reporters"),
-            Reporters::composer
+            Situations::composer
         );
 
         this.chargerHealthReporter = new ChargerHealthReporter(monitors, reporters);
@@ -176,7 +176,7 @@ public class OcppObservabilitySystem implements AutoCloseable {
         logger.info("OCPP Observability System started successfully");
         logger.info("  - OCPP Central System: RUNNING");
         logger.info("  - Monitor Circuit: ACTIVE");
-        logger.info("  - Reporter Circuit: ACTIVE");
+        logger.info("  - Situation Circuit: ACTIVE");
         logger.info("  - Agent Circuit: ACTIVE (Autonomous Self-Regulation)");
         logger.info("  - Command Verification: ENABLED (Closed-Loop Feedback)");
         logger.info("  - Connected Chargers: {}", centralSystem.getConnectedChargerCount());
@@ -209,9 +209,9 @@ public class OcppObservabilitySystem implements AutoCloseable {
     }
 
     /**
-     * Get the Reporter conduit for signal inspection/testing.
+     * Get the Situation conduit for signal inspection/testing.
      */
-    public Conduit<Reporters.Reporter, Reporters.Signal> getReporters() {
+    public Conduit<Situations.Situation, Situations.Signal> getReporters() {
         return reporters;
     }
 

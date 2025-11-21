@@ -2,7 +2,7 @@ package io.fullerstack.kafka.core.actors;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Actors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,7 +17,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *
  * <h3>Percept-Based Architecture:</h3>
  * <pre>
- * ProducerHealthReporter (Percept) → emits Reporters.Sign.CRITICAL
+ * ProducerHealthReporter (Percept) → emits Situations.Sign.CRITICAL
  *                                  ↓
  *                   ThrottleActor subscribes & filters (multiple producers)
  *                                  ↓
@@ -68,9 +68,9 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * <pre>{@code
  * // Create circuits
  * Circuit reporterCircuit = cortex().circuit(cortex().name("reporters"));
- * Conduit<Reporters.Reporter, Reporters.Sign> reporters = reporterCircuit.conduit(
+ * Conduit<Situations.Situation, Situations.Signal> reporters = reporterCircuit.conduit(
  *     cortex().name("reporters"),
- *     Reporters::composer
+ *     Situations::composer
  * );
  *
  * Circuit actorCircuit = cortex().circuit(cortex().name("actors"));
@@ -136,7 +136,7 @@ public class ThrottleActor extends BaseActor {
      * @param configManager    Kafka configuration manager for producer updates
      */
     public ThrottleActor(
-        Conduit<Reporters.Reporter, Reporters.Sign> reporters,
+        Conduit<Situations.Situation, Situations.Signal> reporters,
         Conduit<Actors.Actor, Actors.Sign> actors,
         KafkaConfigManager configManager
     ) {
@@ -150,13 +150,13 @@ public class ThrottleActor extends BaseActor {
 
         this.subscription = reporters.subscribe(cortex().subscriber(
             cortex().name("throttle-actor-subscriber"),
-            (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+            (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                 Name reporterName = subject.name();
 
                 // Filter: Register pipes only for producer health reporters
                 if (isProducerHealthReporter(reporterName)) {
-                    registrar.register(sign -> {
-                        if (sign == Reporters.Sign.CRITICAL) {
+                    registrar.register(signal -> {
+                        if (signal.sign() == Situations.Sign.CRITICAL) {
                             handleProducerCritical(reporterName);
                         }
                     });
@@ -225,7 +225,7 @@ public class ThrottleActor extends BaseActor {
      *                       enclosure().percept()
      * </pre>
      *
-     * @param reporterName Reporter name (e.g., "producer.producer-1.health")
+     * @param reporterName Situation name (e.g., "producer.producer-1.health")
      * @return Producer identifier (e.g., "producer-1")
      */
     private String extractProducerId(Name reporterName) {

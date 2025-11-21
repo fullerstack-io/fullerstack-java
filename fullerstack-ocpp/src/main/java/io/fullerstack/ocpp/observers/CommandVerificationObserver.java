@@ -30,7 +30,7 @@ import static io.humainary.substrates.Substrates.cortex;
  *   → Waits for StatusNotification(Unavailable)
  *   → If received within 30s: Emit STABLE (command worked)
  *   → If timeout: Emit DEFECTIVE (charger not responding to commands)
- *   → Reporter re-assesses → Potentially triggers different action
+ *   → Situation re-assesses → Potentially triggers different action
  * </pre>
  *
  * <h3>Closed-Loop Feedback:</h3>
@@ -45,16 +45,16 @@ import static io.humainary.substrates.Substrates.cortex;
  * <h3>Adaptive Re-Action Example:</h3>
  * <pre>
  * 1. Charger reports GroundFailure → Monitor.DOWN
- * 2. Reporter assesses CRITICAL
+ * 2. Situation assesses CRITICAL
  * 3. Agent sends ChangeAvailability(Inoperative)
  * 4a. SUCCESS PATH:
  *     → Charger responds with StatusNotification(Unavailable)
  *     → CommandVerificationObserver emits STABLE
- *     → Reporter re-assesses as NORMAL (crisis resolved)
+ *     → Situation re-assesses as NORMAL (crisis resolved)
  * 4b. FAILURE PATH:
  *     → 30s timeout, no response
  *     → CommandVerificationObserver emits DEFECTIVE
- *     → Reporter re-assesses as CRITICAL (charger ignoring commands)
+ *     → Situation re-assesses as CRITICAL (charger ignoring commands)
  *     → Different agent action (e.g., alert operator, circuit breaker)
  * </pre>
  *

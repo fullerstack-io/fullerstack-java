@@ -3,7 +3,7 @@ package io.fullerstack.kafka.core.integration;
 import io.fullerstack.kafka.core.reporters.ProducerHealthReporter;
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *           ↓
  * Layer 3 (DECIDE): ProducerHealthReporter assesses urgency
  *           ↓
- *           Reporter emits WARNING/CRITICAL based on buffer pressure
+ *           Situation emits WARNING/CRITICAL based on buffer pressure
  * </pre>
  *
  * <p>Producer-specific scenarios tested:
@@ -46,9 +46,9 @@ class ProducerBufferOverflowIT {
     private Circuit producerCircuit;
     private Circuit reporterCircuit;
     private Cell<Monitors.Sign, Monitors.Sign> producerRootCell;
-    private Conduit<Reporters.Reporter, Reporters.Sign> reporters;
+    private Conduit<Situations.Situation, Situations.Signal> reporters;
     private ProducerHealthReporter producerReporter;
-    private List<Reporters.Sign> reporterEmissions;
+    private List<Situations.Signal> reporterEmissions;
 
     @BeforeEach
     void setUp() {
@@ -61,16 +61,16 @@ class ProducerBufferOverflowIT {
             cortex().pipe((Monitors.Sign sign) -> {})  // No-op outlet
         );
 
-        // Layer 3: Create Reporter circuit, conduit, and producer reporter
+        // Layer 3: Create Situation circuit, conduit, and producer reporter
         reporterCircuit = cortex().circuit(cortex().name("reporters"));
-        reporters = reporterCircuit.conduit(cortex().name("reporters"), Reporters::composer);
+        reporters = reporterCircuit.conduit(cortex().name("reporters"), Situations::composer);
         producerReporter = new ProducerHealthReporter(producerRootCell, reporters);
 
         // Track reporter emissions
         reporterEmissions = new ArrayList<>();
         reporters.subscribe(cortex().subscriber(
             cortex().name("test-receptor"),
-            (Subject<Channel<Reporters.Sign>> subject, Registrar<Reporters.Sign> registrar) -> {
+            (Subject<Channel<Situations.Signal>> subject, Registrar<Situations.Signal> registrar) -> {
                 registrar.register(reporterEmissions::add);
             }
         ));
@@ -106,7 +106,7 @@ class ProducerBufferOverflowIT {
         // Then: Should emit WARNING for buffer pressure
         assertThat(reporterEmissions)
             .as("Producer buffer overflow should emit WARNING")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
 
         assertThat(latencyMs)
             .as("Detection should complete within 100ms")
@@ -125,7 +125,7 @@ class ProducerBufferOverflowIT {
         // Then: Should emit CRITICAL for sustained issue
         assertThat(reporterEmissions)
             .as("Sustained buffer pressure should emit CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -140,7 +140,7 @@ class ProducerBufferOverflowIT {
         // Then: Should emit CRITICAL immediately
         assertThat(reporterEmissions)
             .as("Producer DOWN should emit CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -155,7 +155,7 @@ class ProducerBufferOverflowIT {
         // Then: Should emit CRITICAL (worst-case aggregation)
         assertThat(reporterEmissions)
             .as("Multiple producer issues should aggregate to worst-case CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -178,7 +178,7 @@ class ProducerBufferOverflowIT {
         // Then: Should emit NORMAL
         assertThat(reporterEmissions)
             .as("Buffer recovery should emit NORMAL")
-            .contains(Reporters.Sign.NORMAL);
+            .contains(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -193,11 +193,11 @@ class ProducerBufferOverflowIT {
         // Then: Should emit WARNING (not CRITICAL)
         assertThat(reporterEmissions)
             .as("Intermittent spikes should emit WARNING")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
 
         assertThat(reporterEmissions)
             .as("Intermittent spikes should NOT emit CRITICAL")
-            .doesNotContain(Reporters.Sign.CRITICAL);
+            .doesNotContain(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -212,7 +212,7 @@ class ProducerBufferOverflowIT {
         // Then: Should emit CRITICAL
         assertThat(reporterEmissions)
             .as("Producer DEFECTIVE should emit CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 
     @Test
@@ -225,7 +225,7 @@ class ProducerBufferOverflowIT {
 
         assertThat(reporterEmissions)
             .as("Phase 1: Normal operation should emit NORMAL")
-            .contains(Reporters.Sign.NORMAL);
+            .contains(Situations.Sign.NORMAL);
 
         reporterEmissions.clear();
 
@@ -236,7 +236,7 @@ class ProducerBufferOverflowIT {
 
         assertThat(reporterEmissions)
             .as("Phase 2: Buffer growth should emit WARNING")
-            .contains(Reporters.Sign.WARNING);
+            .contains(Situations.Sign.WARNING);
 
         reporterEmissions.clear();
 
@@ -247,7 +247,7 @@ class ProducerBufferOverflowIT {
 
         assertThat(reporterEmissions)
             .as("Phase 3: Sustained overflow should emit CRITICAL")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
 
         reporterEmissions.clear();
 
@@ -258,7 +258,7 @@ class ProducerBufferOverflowIT {
 
         assertThat(reporterEmissions)
             .as("Phase 4: Recovery should emit NORMAL")
-            .contains(Reporters.Sign.NORMAL);
+            .contains(Situations.Sign.NORMAL);
     }
 
     @Test
@@ -282,6 +282,6 @@ class ProducerBufferOverflowIT {
 
         assertThat(reporterEmissions)
             .as("Should emit CRITICAL signal")
-            .contains(Reporters.Sign.CRITICAL);
+            .contains(Situations.Sign.CRITICAL);
     }
 }

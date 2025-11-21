@@ -3,7 +3,7 @@ package io.fullerstack.kafka.core.system;
 import io.fullerstack.kafka.core.actors.*;
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +20,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * <ol>
  *   <li>Build a complete OODA loop system</li>
  *   <li>Emit signals to Cells</li>
- *   <li>Observe Reporter urgency assessments</li>
+ *   <li>Observe Situation urgency assessments</li>
  *   <li>See Actors take automated actions</li>
  * </ol>
  *
@@ -30,7 +30,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
 class KafkaObservabilitySystemExample {
 
     /**
-     * Complete OODA loop example: Cell signal → Reporter → Actor
+     * Complete OODA loop example: Cell signal → Situation → Actor
      */
     @Test
     @DisplayName("Example: Complete OODA Loop")
@@ -70,11 +70,11 @@ class KafkaObservabilitySystemExample {
 
     /**
      * Demonstrates cluster health signal flow:
-     * Reporter CRITICAL → AlertActor
+     * Situation CRITICAL → AlertActor
      *
      * <p>Note: In a complete system, Monitor signals would flow through
-     * MonitorCellBridge → Cell hierarchy → Reporter. For this demo, we emit
-     * directly to the Reporter to show the Layer 3 → Layer 4 flow.
+     * MonitorCellBridge → Cell hierarchy → Situation. For this demo, we emit
+     * directly to the Situation to show the Layer 3 → Layer 4 flow.
      */
     private void demonstrateClusterHealthFlow(
         KafkaObservabilitySystem system,
@@ -83,10 +83,10 @@ class KafkaObservabilitySystemExample {
         MockTeamsClient teams
     ) {
         System.out.println("2. Demonstrating Cluster Health Flow:");
-        System.out.println("   Reporter CRITICAL → AlertActor\n");
+        System.out.println("   Situation CRITICAL → AlertActor\n");
 
         // Get cluster health reporter
-        Reporters.Reporter clusterHealth = system.getReporters().percept(
+        Situations.Situation clusterHealth = system.getReporters().percept(
             cortex().name("cluster.health")
         );
 

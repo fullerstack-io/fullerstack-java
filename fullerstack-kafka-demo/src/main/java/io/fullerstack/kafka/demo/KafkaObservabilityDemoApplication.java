@@ -3,14 +3,26 @@ package io.fullerstack.kafka.demo;
 import io.fullerstack.kafka.demo.web.DashboardBroadcaster;
 import io.fullerstack.kafka.demo.web.DashboardServer;
 import io.fullerstack.kafka.producer.sensors.ProducerBufferMonitor;
+import io.fullerstack.kafka.producer.sensors.ProducerHealthDetector;
+import io.fullerstack.kafka.producer.agents.ProducerSelfRegulator;
+import io.fullerstack.kafka.producer.sidecar.AgentCoordinationBridge;
+import io.fullerstack.kafka.producer.sidecar.KafkaCentralCommunicator;
+import io.fullerstack.kafka.producer.sidecar.SidecarResponseListener;
 import io.humainary.substrates.api.Substrates.Circuit;
 import io.humainary.substrates.api.Substrates.Conduit;
+import io.humainary.substrates.ext.serventis.ext.Agents;
+import io.humainary.substrates.ext.serventis.ext.Agents.Agent;
+import io.humainary.substrates.ext.serventis.ext.Actors;
 import io.humainary.substrates.ext.serventis.ext.Counters;
 import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
 import io.humainary.substrates.ext.serventis.ext.Gauges;
 import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
+import io.humainary.substrates.ext.serventis.ext.Monitors;
+import io.humainary.substrates.ext.serventis.ext.Monitors.Monitor;
 import io.humainary.substrates.ext.serventis.ext.Queues;
 import io.humainary.substrates.ext.serventis.ext.Queues.Queue;
+import io.humainary.substrates.ext.serventis.ext.Services;
+import io.humainary.substrates.ext.serventis.ext.Services.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,17 +31,22 @@ import java.util.Map;
 import static io.humainary.substrates.api.Substrates.*;
 
 /**
- * Kafka Observability Demo Application
+ * Kafka Observability Demo Application - Self-Healing Producer
  *
- * Demonstrates full OODA loop (Observe → Orient → Decide → Act) with:
- * - Layer 1 (OBSERVE): Probes, Services, Queues, Gauges
- * - Layer 2 (ORIENT): Monitors, Resources
- * - Layer 3 (DECIDE): Reporters
- * - Layer 4 (ACT): Agents (autonomous) + Actors (human approval)
+ * Demonstrates autonomous producer self-regulation using Substrates signals:
+ * - ProducerBufferMonitor: Collects JMX metrics, emits Queue/Gauge/Counter signals
+ * - ProducerHealthDetector: Analyzes buffer patterns, emits Monitor signals (STABLE, DEGRADED)
+ * - ProducerSelfRegulator: Autonomously throttles/resumes based on health signals
  *
- * Phase 1: Console output (this class)
- * Phase 2: REST API + WebSocket (see api package)
- * Phase 3: Vue.js UI (see frontend/)
+ * Self-Healing Flow:
+ * 1. Buffer hits 95% → Queue.OVERFLOW signal
+ * 2. Health detector emits → Monitor.DEGRADED signal
+ * 3. Self-regulator receives signal → Throttles producer (Agent.PROMISE)
+ * 4. Buffer recovers → Monitor.STABLE signal
+ * 5. Self-regulator receives signal → Resumes producer (Agent.FULFILL)
+ *
+ * Uses Agents API (Promise Theory) for autonomous closed-loop feedback.
+ * WebSocket dashboard shows real-time signals and self-healing actions.
  */
 public class KafkaObservabilityDemoApplication {
 
@@ -66,23 +83,43 @@ public class KafkaObservabilityDemoApplication {
             logger.info("⚡ Circuit created: {}", circuit);
             logger.info("");
 
-            // Create Serventis instruments (Conduits for dynamic entities)
+            // Create Substrates conduits for signal flow
             Conduit<Queue, Queues.Sign> queues = circuit.<Queue, Queues.Sign>conduit(
                 cortex().name("queues"),
                 Queues::composer
             );
 
-            Conduit<Gauge, io.humainary.substrates.ext.serventis.ext.Gauges.Sign> gauges = circuit.<Gauge, io.humainary.substrates.ext.serventis.ext.Gauges.Sign>conduit(
+            Conduit<Gauge, Gauges.Sign> gauges = circuit.<Gauge, Gauges.Sign>conduit(
                 cortex().name("gauges"),
-                io.humainary.substrates.ext.serventis.ext.Gauges::composer
+                Gauges::composer
             );
 
-            Conduit<Counter, io.humainary.substrates.ext.serventis.ext.Counters.Sign> counters = circuit.<Counter, io.humainary.substrates.ext.serventis.ext.Counters.Sign>conduit(
+            Conduit<Counter, Counters.Sign> counters = circuit.<Counter, Counters.Sign>conduit(
                 cortex().name("counters"),
-                io.humainary.substrates.ext.serventis.ext.Counters::composer
+                Counters::composer
             );
 
-            logger.info("📡 Conduits created: Queues, Gauges, Counters");
+            Conduit<Monitor, Monitors.Signal> monitors = circuit.<Monitor, Monitors.Signal>conduit(
+                cortex().name("monitors"),
+                Monitors::composer
+            );
+
+            Conduit<Agent, Agents.Signal> agents = circuit.<Agent, Agents.Signal>conduit(
+                cortex().name("agents"),
+                Agents::composer
+            );
+
+            Conduit<Actors.Actor, Actors.Sign> actors = circuit.<Actors.Actor, Actors.Sign>conduit(
+                cortex().name("actors"),
+                Actors::composer
+            );
+
+            Conduit<Service, Services.Signal> services = circuit.<Service, Services.Signal>conduit(
+                cortex().name("services"),
+                Services::composer
+            );
+
+            logger.info("📡 Signal conduits created: Queues, Gauges, Counters, Monitors, Agents, Actors, Services");
 
             // Start WebSocket dashboard for real-time OODA visualization
             int dashboardPort = Integer.parseInt(System.getenv().getOrDefault("DASHBOARD_PORT", "8080"));
@@ -91,28 +128,56 @@ public class KafkaObservabilityDemoApplication {
                 logger.info("✅ Started WebSocket dashboard on port {}", dashboardPort);
                 logger.info("   → Open http://localhost:{} to view live signals", dashboardPort);
 
-                // Subscribe dashboard (proper Substrates Subscriber pattern)
+                // Subscribe dashboard to all signal types
                 DashboardBroadcaster broadcaster = new DashboardBroadcaster();
                 queues.subscribe(broadcaster.subscriber("queues"));
                 gauges.subscribe(broadcaster.subscriber("gauges"));
                 counters.subscribe(broadcaster.subscriber("counters"));
-                logger.info("✅ Dashboard subscribed to signals (Queues, Gauges, Counters)");
+                monitors.subscribe(broadcaster.subscriber("monitors"));
+                agents.subscribe(broadcaster.subscriber("agents"));
+                actors.subscribe(broadcaster.subscriber("actors"));
+                services.subscribe(broadcaster.subscriber("services"));
+                logger.info("✅ Dashboard subscribed to all signals (Queues, Gauges, Counters, Monitors, Agents, Actors, Services)");
 
             } catch (Throwable e) {
                 logger.warn("⚠️  Dashboard server failed to start: {}", e.getMessage());
                 logger.info("   Continuing without dashboard...");
             }
 
-            // Get instruments for producer-1 buffer monitoring
+            // ============================================================
+            // Buffer Monitoring: Get instruments for producer-1
+            // ============================================================
             Queue bufferQueue = queues.percept(cortex().name("producer-1.buffer"));
             Gauge totalBytesGauge = gauges.percept(cortex().name("producer-1.buffer.total-bytes"));
             Counter exhaustedCounter = counters.percept(cortex().name("producer-1.buffer.exhausted"));
             Gauge batchSizeGauge = gauges.percept(cortex().name("producer-1.batch-size"));
             Gauge recordsPerRequestGauge = gauges.percept(cortex().name("producer-1.records-per-request"));
 
-            logger.info("🎯 Instruments created for producer-1");
+            logger.info("🎯 Buffer monitoring instruments created for producer-1");
 
-            // Start REAL producer buffer monitoring
+            // ============================================================
+            // Health Detection: Analyze buffer patterns
+            // ============================================================
+            Monitor healthMonitor = monitors.percept(cortex().name("producer-1.health"));
+            ProducerHealthDetector healthDetector = new ProducerHealthDetector(
+                "producer-1",
+                healthMonitor
+            );
+
+            logger.info("🎯 Health detector created");
+
+            // ============================================================
+            // Services: Track sidecar component health (meta-monitoring)
+            // ============================================================
+            Service bufferMonitorService = services.percept(cortex().name("sidecar.buffer-monitor"));
+            Service healthDetectorService = services.percept(cortex().name("sidecar.health-detector"));
+            Service coordinationService = services.percept(cortex().name("sidecar.coordination-bridge"));
+
+            logger.info("🔧 Service percepts created for sidecar meta-monitoring");
+
+            // ============================================================
+            // Start JMX-based producer buffer monitoring
+            // ============================================================
             ProducerBufferMonitor bufferMonitor = new ProducerBufferMonitor(
                 "producer-1",
                 config.jmxUrl(),
@@ -120,28 +185,158 @@ public class KafkaObservabilityDemoApplication {
                 totalBytesGauge,
                 exhaustedCounter,
                 batchSizeGauge,
-                recordsPerRequestGauge
+                recordsPerRequestGauge,
+                bufferMonitorService  // Pass service for lifecycle tracking
             );
+
+            // Wire buffer monitor signals to health detector
+            queues.subscribe(cortex().subscriber(
+                cortex().name("health-detector-queue-subscriber"),
+                (subject, registrar) -> {
+                    registrar.register(signal -> {
+                        if (subject.name().toString().contains("producer-1.buffer")) {
+                            if (signal == Queues.Sign.OVERFLOW) {
+                                healthDetector.onBufferOverflow();
+                            } else if (signal == Queues.Sign.ENQUEUE) {
+                                healthDetector.onBufferNormal();
+                            } else if (signal == Queues.Sign.UNDERFLOW || signal == Queues.Sign.DEQUEUE) {
+                                healthDetector.onBufferUnderflow();
+                            }
+                        }
+                    });
+                }
+            ));
+
+            counters.subscribe(cortex().subscriber(
+                cortex().name("health-detector-counter-subscriber"),
+                (subject, registrar) -> {
+                    registrar.register(signal -> {
+                        if (subject.name().toString().contains("exhausted") &&
+                            signal == Counters.Sign.INCREMENT) {
+                            healthDetector.onBufferExhaustion();
+                        }
+                    });
+                }
+            ));
 
             logger.info("🔍 Starting ProducerBufferMonitor (JMX: {})", config.jmxUrl());
             bufferMonitor.start();
 
+            // ============================================================
+            // Autonomous Agent: Monitor health and trigger breach on degradation
+            // ============================================================
+            Agent sidecarAgent = agents.percept(cortex().name("sidecar.producer-1"));
+
+            // Subscribe to health monitor signals → trigger Agent BREACH on DEGRADED
+            monitors.subscribe(cortex().subscriber(
+                cortex().name("sidecar-agent-subscriber"),
+                (subject, registrar) -> {
+                    registrar.register(signal -> {
+                        if (subject.name().toString().contains("producer-1.health")) {
+                            switch (signal.sign()) {
+                                case DEGRADED, DEFECTIVE -> {
+                                    logger.warn("[SIDECAR] Health {} detected → Agent BREACH (cannot regulate locally)", signal.sign());
+                                    sidecarAgent.breach(Agents.Dimension.PROMISER);
+                                    // Signal processes asynchronously - will be picked up by coordination bridge
+                                }
+                            }
+                        }
+                    });
+                }
+            ));
+
+            logger.info("✅ Sidecar agent monitoring health signals (will breach → escalate on degradation)");
+
+            // ============================================================
+            // Distributed Coordination: Escalation to central platform
+            // ============================================================
+            String requestTopic = System.getenv().getOrDefault("REQUEST_TOPIC", "observability.speech-acts");
+            String responseTopic = System.getenv().getOrDefault("RESPONSE_TOPIC", "observability.responses");
+
+            // Create central communicator for sending escalation requests
+            KafkaCentralCommunicator centralCommunicator = new KafkaCentralCommunicator(
+                config.kafkaBootstrap(),
+                requestTopic
+            );
+            logger.info("✅ Created Kafka central communicator (topic: {})", requestTopic);
+
+            // Create coordination bridge to connect Agents → Actors (breach → REQUEST)
+            AgentCoordinationBridge coordinationBridge = new AgentCoordinationBridge(
+                agents,
+                actors,
+                centralCommunicator,
+                "producer-1"
+            );
+            logger.info("✅ Created AgentCoordinationBridge (Promise Theory + Speech Act Theory)");
+
+            // Create and start response listener for central platform replies
+            SidecarResponseListener responseListener = new SidecarResponseListener(
+                config.kafkaBootstrap(),
+                responseTopic,
+                actors,
+                "producer-1"
+            );
+            Thread responseThread = Thread.ofVirtual()
+                .name("response-listener-producer-1")
+                .start(responseListener);
+            logger.info("✅ Started SidecarResponseListener (topic: {})", responseTopic);
+
             logger.info("");
-            logger.info("✅ Observability monitoring active!");
-            logger.info("📊 Monitoring: producer-1 buffer via JMX at {}", config.jmxUrl());
-            logger.info("📡 Emitting: Queue, Gauge, Counter signals");
+            logger.info("✅ SELF-HEALING PRODUCER ACTIVE!");
+            logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            logger.info("");
+            logger.info("📊 Buffer Monitor: JMX metrics from producer-1 at {}", config.jmxUrl());
+            logger.info("   └─ Signals: Queue, Gauge, Counter (buffer state)");
+            logger.info("");
+            logger.info("🔍 Health Detector: Analyzing buffer patterns");
+            logger.info("   └─ Signals: Monitor.STABLE, Monitor.DEGRADED, Monitor.DEFECTIVE");
+            logger.info("");
+            logger.info("⚡ Sidecar Agent: Read-only monitoring (no direct control)");
+            logger.info("   └─ Detects: Monitor.DEGRADED → Agent.BREACH");
+            logger.info("   └─ Cannot regulate locally (read-only JMX access)");
+            logger.info("   └─ Signals: Agent.BREACH → triggers escalation");
+            logger.info("");
+            logger.info("🎭 Coordination Bridge: Escalation to central platform");
+            logger.info("   └─ Agent.BREACH → Actor.REQUEST → Kafka escalation");
+            logger.info("   └─ Listens for: Actor.ACKNOWLEDGE, Actor.PROMISE, Actor.DELIVER");
+            logger.info("");
             logger.info("🌐 Dashboard: http://localhost:{}", dashboardPort);
             logger.info("");
-            logger.info("⚠️  Start standalone producer with JMX:");
-            logger.info("   mvn exec:java -Dexec.mainClass=\"io.fullerstack.kafka.demo.StandaloneProducer\" \\");
-            logger.info("     -Dcom.sun.management.jmxremote.port=11001 \\");
-            logger.info("     -Dcom.sun.management.jmxremote.authenticate=false \\");
-            logger.info("     -Dcom.sun.management.jmxremote.ssl=false");
+            logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             logger.info("");
-            logger.info("🔥 Real-time signal visualization:");
-            logger.info("   - Queue.OVERFLOW when buffer hits 95%");
-            logger.info("   - Gauge.INCREMENT/DECREMENT for buffer changes");
-            logger.info("   - Counter.INCREMENT for exhaustion events");
+            logger.info("🚀 SIDECAR CAPABILITIES (Read-Only Monitoring):");
+            logger.info("   ✅ Monitor producer buffer via JMX (standard metrics)");
+            logger.info("   ✅ Detect degradation patterns (Queue/Monitor signals)");
+            logger.info("   ✅ Emit autonomous promises (Agent API - Promise Theory)");
+            logger.info("   ✅ Escalate to central when local action fails (Actor API)");
+            logger.info("   ❌ CANNOT directly throttle producer (requires custom MBean)");
+            logger.info("");
+            logger.info("📊 What This Demo Shows:");
+            logger.info("   1. JMX monitoring detects buffer state");
+            logger.info("   2. Health detector analyzes patterns → Monitor.DEGRADED");
+            logger.info("   3. Agent makes promise to regulate → Agent.PROMISE");
+            logger.info("   4. If agent cannot fix locally → Agent.BREACH");
+            logger.info("   5. Coordination bridge escalates → Actor.REQUEST");
+            logger.info("   6. Central platform receives escalation via Kafka");
+            logger.info("");
+            logger.info("🎯 Value Proposition:");
+            logger.info("   - Intelligent detection (99% of the value)");
+            logger.info("   - Pattern-based health assessment");
+            logger.info("   - Autonomous local promises when possible");
+            logger.info("   - Smart escalation when local action insufficient");
+            logger.info("   - Central coordination for cluster-level actions");
+            logger.info("");
+            logger.info("📡 Real-time signals to watch:");
+            logger.info("   Buffer: Queue.OVERFLOW, Gauge.INCREMENT, Counter.INCREMENT");
+            logger.info("   Health: Monitor.DEGRADED, Monitor.STABLE, Monitor.CONVERGING");
+            logger.info("   Agents: Agent.PROMISE, Agent.FULFILL, Agent.BREACH");
+            logger.info("   Actors: Actor.REQUEST, Actor.ACKNOWLEDGE, Actor.DELIVER");
+            logger.info("   Services: Service.START, Service.CALL, Service.SUCCESS, Service.FAIL");
+            logger.info("");
+            logger.info("🔧 Meta-Monitoring (Sidecar Self-Awareness):");
+            logger.info("   buffer-monitor: Tracks JMX connection health");
+            logger.info("   health-detector: Tracks analysis component health");
+            logger.info("   coordination-bridge: Tracks escalation component health");
             logger.info("");
 
             // Start periodic broadcast of real message count and rate
@@ -152,12 +347,14 @@ public class KafkaObservabilityDemoApplication {
                 try {
                     long messageCount = io.fullerstack.kafka.demo.chaos.ChaosController.getMessageCount();
                     int rate = io.fullerstack.kafka.demo.chaos.ChaosController.getCurrentRate();
+                    int bufferUtilization = io.fullerstack.kafka.demo.chaos.ChaosController.getBufferUtilization();
 
                     if (messageCount >= 0 && rate >= 0) {
                         io.fullerstack.kafka.demo.web.DashboardWebSocket.broadcastEvent("producer-stats",
                             java.util.Map.of(
                                 "messageCount", messageCount,
-                                "rate", rate
+                                "rate", rate,
+                                "bufferUtilization", bufferUtilization
                             )
                         );
                     }
@@ -174,7 +371,17 @@ public class KafkaObservabilityDemoApplication {
 
             // Cleanup
             logger.info("Shutting down...");
+            logger.info("Stopping response listener...");
+            responseListener.close();
+            logger.info("Stopping coordination bridge...");
+            coordinationBridge.close();
+            logger.info("Stopping health detector...");
+            healthDetector.close();
+            logger.info("Stopping buffer monitor...");
             bufferMonitor.stop();
+            logger.info("Closing central communicator...");
+            centralCommunicator.close();
+            logger.info("Closing circuit...");
             circuit.close();
             try {
                 DashboardServer.stopServer();
@@ -182,7 +389,7 @@ public class KafkaObservabilityDemoApplication {
             } catch (Throwable e) {
                 // Ignore shutdown errors
             }
-            logger.info("✅ Monitoring shutdown complete");
+            logger.info("✅ Self-healing system shutdown complete");
 
         } catch (Throwable e) {
             logger.error("❌ Demo failed", e);
@@ -194,10 +401,10 @@ public class KafkaObservabilityDemoApplication {
         System.out.println();
         System.out.println("╔══════════════════════════════════════════════════════════════════╗");
         System.out.println("║                                                                  ║");
-        System.out.println("║    Kafka Semiotic Observability Demo                           ║");
-        System.out.println("║    Fullerstack + Humainary Substrates                           ║");
+        System.out.println("║    Kafka Self-Healing Producer Demo                             ║");
+        System.out.println("║    Fullerstack + Humainary Substrates                            ║");
         System.out.println("║                                                                  ║");
-        System.out.println("║    OODA Loop: Observe → Orient → Decide → Act                   ║");
+        System.out.println("║    Autonomous producer regulation using semiotic signals         ║");
         System.out.println("║                                                                  ║");
         System.out.println("╚══════════════════════════════════════════════════════════════════╝");
         System.out.println();

@@ -103,7 +103,7 @@ public class GaugeFlowCircuit implements AutoCloseable {
    * @return Gauge instrument for emitting gauge signals via method calls
    */
   public Gauge gaugeFor ( String entityName ) {
-    return conduit.get ( Substrates.cortex().name ( entityName ) );
+    return conduit.percept( Substrates.cortex().name ( entityName ) );
   }
 
   /**

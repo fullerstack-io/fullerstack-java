@@ -3,6 +3,9 @@ package io.fullerstack.kafka.producer.sensors;
 import io.humainary.substrates.ext.serventis.ext.Counters.Counter;
 import io.humainary.substrates.ext.serventis.ext.Gauges.Gauge;
 import io.humainary.substrates.ext.serventis.ext.Queues.Queue;
+import io.humainary.substrates.ext.serventis.ext.Services;
+import io.humainary.substrates.ext.serventis.ext.Services.Service;
+import io.humainary.substrates.ext.serventis.ext.Services.Dimension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +75,7 @@ public class ProducerBufferMonitor implements AutoCloseable {
     private final Counter exhaustedCounter;
     private final Gauge batchSizeGauge;
     private final Gauge recordsPerRequestGauge;
+    private final Service monitorService;  // Optional service for lifecycle tracking
 
     private final ScheduledExecutorService scheduler;
     private JMXConnector jmxConnector;
@@ -104,6 +108,32 @@ public class ProducerBufferMonitor implements AutoCloseable {
         Gauge batchSizeGauge,
         Gauge recordsPerRequestGauge
     ) {
+        this(producerId, jmxEndpoint, bufferQueue, totalBytesGauge, exhaustedCounter,
+            batchSizeGauge, recordsPerRequestGauge, null);
+    }
+
+    /**
+     * Creates a new producer buffer monitor with service lifecycle tracking.
+     *
+     * @param producerId              Producer identifier (e.g., "producer-1")
+     * @param jmxEndpoint            JMX endpoint (e.g., "localhost:11001")
+     * @param bufferQueue            Queue instrument for buffer pressure signals
+     * @param totalBytesGauge        Gauge instrument for total buffer bytes
+     * @param exhaustedCounter       Counter instrument for buffer exhaustion events
+     * @param batchSizeGauge         Gauge instrument for average batch size
+     * @param recordsPerRequestGauge Gauge instrument for average records per request
+     * @param monitorService         Service instrument for lifecycle tracking (optional)
+     */
+    public ProducerBufferMonitor(
+        String producerId,
+        String jmxEndpoint,
+        Queue bufferQueue,
+        Gauge totalBytesGauge,
+        Counter exhaustedCounter,
+        Gauge batchSizeGauge,
+        Gauge recordsPerRequestGauge,
+        Service monitorService
+    ) {
         this.producerId = producerId;
         this.jmxEndpoint = jmxEndpoint;
         this.bufferQueue = bufferQueue;
@@ -111,6 +141,7 @@ public class ProducerBufferMonitor implements AutoCloseable {
         this.exhaustedCounter = exhaustedCounter;
         this.batchSizeGauge = batchSizeGauge;
         this.recordsPerRequestGauge = recordsPerRequestGauge;
+        this.monitorService = monitorService;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "producer-buffer-monitor-" + producerId);
             t.setDaemon(true);
@@ -133,18 +164,29 @@ public class ProducerBufferMonitor implements AutoCloseable {
             connectJmx();
             running = true;
 
-            // Schedule buffer monitoring every 10 seconds
+            // Schedule buffer monitoring every 2 seconds (for responsive demo)
             scheduler.scheduleAtFixedRate(
                 this::collectAndEmit,
                 0,          // Initial delay
-                10,         // Period
+                2,          // Period (2s for live demo feel)
                 TimeUnit.SECONDS
             );
+
+            // Emit service START signal (meta-monitoring)
+            if (monitorService != null) {
+                monitorService.start(Dimension.CALLER);
+            }
 
             logger.info("Started producer buffer monitor for {} (JMX: {})", producerId, jmxEndpoint);
 
         } catch (Exception e) {
             logger.error("Failed to start producer buffer monitor for {}", producerId, e);
+
+            // Emit service FAIL signal (failed to start)
+            if (monitorService != null) {
+                monitorService.fail(Dimension.CALLER);
+            }
+
             running = false;
             throw new RuntimeException("Failed to start producer buffer monitor", e);
         }
@@ -171,6 +213,12 @@ public class ProducerBufferMonitor implements AutoCloseable {
         }
 
         closeJmx();
+
+        // Emit service STOP signal (meta-monitoring)
+        if (monitorService != null) {
+            monitorService.stop(Dimension.CALLER);
+        }
+
         logger.info("Stopped producer buffer monitor for {}", producerId);
     }
 
@@ -207,6 +255,11 @@ public class ProducerBufferMonitor implements AutoCloseable {
     // ========================================
 
     private void collectAndEmit() {
+        // Emit service CALL signal (attempting JMX poll)
+        if (monitorService != null) {
+            monitorService.call(Dimension.CALLER);
+        }
+
         try {
             // Collect JMX metrics
             long availableBytes = getJmxMetricLong("buffer-available-bytes");
@@ -240,8 +293,19 @@ public class ProducerBufferMonitor implements AutoCloseable {
             previousRecordsPerRequest = recordsPerRequestAvg;
             previousExhaustedTotal = exhaustedTotal;
 
+            // Emit service SUCCESS signal (JMX poll succeeded)
+            if (monitorService != null) {
+                monitorService.success(Dimension.CALLER);
+            }
+
         } catch (Exception e) {
             logger.error("Error collecting buffer metrics for producer {}", producerId, e);
+
+            // Emit service FAIL signal (JMX poll failed - connection lost?)
+            if (monitorService != null) {
+                monitorService.fail(Dimension.CALLER);
+            }
+
             // Emit overflow on error (conservative approach)
             bufferQueue.overflow();
         }

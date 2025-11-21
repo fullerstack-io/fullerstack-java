@@ -2,7 +2,7 @@ package io.fullerstack.kafka.core.reporters;
 
 import io.humainary.substrates.api.Substrates.*;
 import io.humainary.substrates.ext.serventis.ext.Monitors;
-import io.humainary.substrates.ext.serventis.ext.Reporters;
+import io.humainary.substrates.ext.serventis.ext.Situations;
 
 import static io.humainary.substrates.api.Substrates.cortex;
 
@@ -10,7 +10,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  * Layer 3 (DECIDE phase): Assesses cluster health urgency.
  *
  * <p>Subscribes to the cluster Cell outlet, receives aggregated {@link Monitors.Sign}
- * from all brokers in the cluster hierarchy, and emits {@link Reporters.Sign} based
+ * from all brokers in the cluster hierarchy, and emits {@link Situations.Sign} based
  * on urgency assessment.
  *
  * <p><strong>Signal Flow:</strong>
@@ -19,26 +19,26 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *                                                              ↓
  *                                                    ClusterHealthReporter
  *                                                              ↓
- *                                              Reporter.critical(OPERATIONAL)
+ *                                              Situation.critical(OPERATIONAL)
  * </pre>
  *
  * <p><strong>Urgency Mapping:</strong>
  * <ul>
  *   <li>{@link Monitors.Sign#DOWN DOWN}, {@link Monitors.Sign#DEFECTIVE DEFECTIVE},
- *       {@link Monitors.Sign#DEGRADED DEGRADED} → {@link Reporters.Sign#CRITICAL CRITICAL}</li>
+ *       {@link Monitors.Sign#DEGRADED DEGRADED} → {@link Situations.Sign#CRITICAL CRITICAL}</li>
  *   <li>{@link Monitors.Sign#ERRATIC ERRATIC}, {@link Monitors.Sign#DIVERGING DIVERGING}
- *       → {@link Reporters.Sign#WARNING WARNING}</li>
+ *       → {@link Situations.Sign#WARNING WARNING}</li>
  *   <li>{@link Monitors.Sign#CONVERGING CONVERGING}, {@link Monitors.Sign#STABLE STABLE}
- *       → {@link Reporters.Sign#NORMAL NORMAL}</li>
+ *       → {@link Situations.Sign#NORMAL NORMAL}</li>
  * </ul>
  *
  * <p><strong>Usage Example:</strong>
  * <pre>{@code
  * HierarchyManager hierarchy = new HierarchyManager("prod-cluster");
  * Circuit reporterCircuit = cortex().circuit(cortex().name("reporters"));
- * Conduit<Reporters.Reporter, Reporters.Sign> reporters = reporterCircuit.conduit(
+ * Conduit<Situations.Situation, Situations.Signal> reporters = reporterCircuit.conduit(
  *     cortex().name("reporters"),
- *     Reporters::composer
+ *     Situations::composer
  * );
  *
  * ClusterHealthReporter reporter = new ClusterHealthReporter(
@@ -46,7 +46,7 @@ import static io.humainary.substrates.api.Substrates.cortex;
  *     reporters
  * );
  *
- * // Reporter automatically receives aggregated Signs from cluster hierarchy
+ * // Situation automatically receives aggregated Signs from cluster hierarchy
  * // and emits urgency assessments to the reporters conduit
  * }</pre>
  *
@@ -56,8 +56,8 @@ import static io.humainary.substrates.api.Substrates.cortex;
 public class ClusterHealthReporter implements AutoCloseable {
 
     private final Cell<Monitors.Sign, Monitors.Sign> clusterCell;
-    private final Conduit<Reporters.Reporter, Reporters.Sign> reporters;
-    private final Reporters.Reporter reporter;
+    private final Conduit<Situations.Situation, Situations.Signal> reporters;
+    private final Situations.Situation reporter;
     private final Subscription subscription;
 
     /**
@@ -68,7 +68,7 @@ public class ClusterHealthReporter implements AutoCloseable {
      */
     public ClusterHealthReporter(
         Cell<Monitors.Sign, Monitors.Sign> clusterCell,
-        Conduit<Reporters.Reporter, Reporters.Sign> reporters
+        Conduit<Situations.Situation, Situations.Signal> reporters
     ) {
         this.clusterCell = clusterCell;
         this.reporters = reporters;
@@ -85,7 +85,7 @@ public class ClusterHealthReporter implements AutoCloseable {
      * Handles aggregated Monitor Signs from the cluster cell.
      *
      * <p>Assesses urgency based on the aggregated Sign and emits appropriate
-     * Reporter Sign via the reporter instrument.
+     * Situation Sign via the reporter instrument.
      *
      * @param subject the cluster cell subject
      * @param registrar the registrar for handling Monitors.Sign emissions
@@ -98,7 +98,7 @@ public class ClusterHealthReporter implements AutoCloseable {
     }
 
     /**
-     * Assesses urgency from Monitor Sign and emits Reporter Sign.
+     * Assesses urgency from Monitor Sign and emits Situation Sign.
      *
      * <p><strong>Urgency Rules:</strong>
      * <ul>
@@ -113,19 +113,19 @@ public class ClusterHealthReporter implements AutoCloseable {
         switch (sign) {
             case DOWN, DEFECTIVE -> {
                 // Critical failure - brokers down or not functioning
-                reporter.critical();
+                reporter.critical(Situations.Dimension.CONSTANT);
             }
             case DEGRADED -> {
                 // Degraded performance - requires immediate attention
-                reporter.critical();
+                reporter.critical(Situations.Dimension.CONSTANT);
             }
             case ERRATIC, DIVERGING -> {
                 // Early warning signs - unstable or trending toward degradation
-                reporter.warning();
+                reporter.warning(Situations.Dimension.VARIABLE);
             }
             case CONVERGING, STABLE -> {
                 // Normal operation - converging toward stability or stable
-                reporter.normal();
+                reporter.normal(Situations.Dimension.CONSTANT);
             }
         }
     }
